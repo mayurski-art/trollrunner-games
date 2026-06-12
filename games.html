@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Troll Runner Games</title>
+<style>
+:root {
+  --bg: #080a12;
+  --panel: rgba(255,255,255,0.08);
+  --line: rgba(255,255,255,0.16);
+  --text: #f8fbff;
+  --muted: rgba(248,251,255,0.72);
+  --green: #72e06a;
+  --gold: #ffd166;
+  --blue: #73d2ff;
+  --red: #ff6b6b;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background:
+    radial-gradient(circle at 18% 8%, rgba(115,210,255,0.22), transparent 28%),
+    radial-gradient(circle at 86% 18%, rgba(255,209,102,0.18), transparent 26%),
+    linear-gradient(145deg, #080a12 0%, #12172a 52%, #111827 100%);
+  color: var(--text);
+}
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 18px clamp(14px, 4vw, 38px);
+  flex-wrap: wrap;
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #fff;
+  text-decoration: none;
+  font-size: clamp(22px, 4vw, 34px);
+  font-weight: 900;
+}
+.brand img {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 10px;
+}
+.pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.pill {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 13px;
+  color: #fff;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 800;
+  background: rgba(255,255,255,0.07);
+  box-shadow: 0 10px 22px rgba(0,0,0,0.2);
+}
+.pill:hover { background: rgba(115,210,255,0.18); }
+.shell {
+  width: min(1180px, calc(100% - 28px));
+  margin: 0 auto 42px;
+}
+.arcade {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.75fr);
+  gap: 16px;
+  align-items: stretch;
+}
+.stage,
+.side,
+.game-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.28);
+  backdrop-filter: blur(10px);
+}
+.stage { overflow: hidden; }
+.hud {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.stat {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.24);
+  border: 1px solid rgba(255,255,255,0.12);
+  font-size: 12px;
+  font-weight: 800;
+}
+canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #10162a;
+}
+.controls {
+  display: flex;
+  gap: 9px;
+  padding: 12px;
+  border-top: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+button,
+select {
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 999px;
+  min-height: 38px;
+  padding: 0 14px;
+  color: #fff;
+  background: rgba(255,255,255,0.1);
+  font-weight: 800;
+}
+button { cursor: pointer; }
+button.primary { background: linear-gradient(135deg, var(--green), #20b15a); color: #041008; }
+button.revive { background: linear-gradient(135deg, var(--gold), #ff9f1c); color: #241300; }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+.side {
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+.side h1 {
+  margin: 0;
+  font-size: clamp(30px, 6vw, 58px);
+  line-height: 0.96;
+}
+.side p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+.coin {
+  color: var(--gold);
+  font-weight: 900;
+}
+.roster {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.roster button {
+  min-height: 54px;
+  border-radius: 12px;
+  padding: 8px;
+  white-space: normal;
+}
+.roster button.is-active {
+  border-color: var(--gold);
+  background: rgba(255,209,102,0.18);
+}
+.library {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.game-card {
+  min-height: 150px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+}
+.game-card strong {
+  font-size: 16px;
+}
+.game-card span {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.tag {
+  align-self: flex-start;
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: rgba(115,210,255,0.16);
+  color: #d8f6ff;
+  font-size: 11px;
+  font-weight: 900;
+}
+@media (max-width: 900px) {
+  .arcade { grid-template-columns: 1fr; }
+  .library { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  header { align-items: flex-start; }
+  .library,
+  .roster { grid-template-columns: 1fr; }
+  .controls button,
+  .controls select { flex: 1 1 140px; }
+}
+</style>
+</head>
+<body>
+  <header>
+    <a class="brand" href="https://trollrunner.net">
+      <img src="assets/animations/troll-grin.gif" alt="">
+      <span>Troll Runner Games</span>
+    </a>
+    <nav class="pills" aria-label="Troll Runner sections">
+      <a class="pill" href="https://blog.trollrunner.net">Blogs</a>
+      <a class="pill" href="https://finance.trollrunner.net">Finances</a>
+      <a class="pill" href="https://garden.trollrunner.net">Garden</a>
+      <a class="pill" href="https://nutrition.trollrunner.net">Nutrition</a>
+      <a class="pill" href="https://projects.trollrunner.net">Projects</a>
+      <a class="pill" href="https://stickers.trollrunner.net">Stickers</a>
+      <a class="pill" href="https://videos.trollrunner.net">Videos</a>
+    </nav>
+  </header>
+
+  <main class="shell">
+    <section class="arcade" aria-label="Featured game">
+      <div class="stage">
+        <div class="hud">
+          <span class="stat">Score: <span id="score">0</span></span>
+          <span class="stat">Wallet: <span id="coins">27.6</span> $TROLL</span>
+          <span class="stat">Revive: <span class="coin">6.9 $TROLL</span></span>
+        </div>
+        <canvas id="game" width="960" height="540" aria-label="Troll Dash playable canvas"></canvas>
+        <div class="controls">
+          <button id="start" class="primary" type="button">Start</button>
+          <button id="revive" class="revive" type="button" disabled>Revive 6.9</button>
+          <select id="theme" aria-label="Game theme">
+            <option value="moon">Moon Pump Sprint</option>
+            <option value="garden">Garden Rugpull Run</option>
+            <option value="launch">Launch Day Dodge</option>
+          </select>
+        </div>
+      </div>
+      <aside class="side">
+        <h1>Meme Arcade</h1>
+        <p>Fast, silly browser games with meme-inspired runners, chaotic NPC obstacles, and optional mock $TROLL coin revives.</p>
+        <div class="roster" aria-label="Runner roster">
+          <button class="is-active" type="button" data-runner="Troll Runner">Troll Runner</button>
+          <button type="button" data-runner="Meme Frog">Meme Frog</button>
+          <button type="button" data-runner="Shiba Sprinter">Shiba Sprinter</button>
+        </div>
+        <p id="status">Press Start, then jump with Space, Arrow Up, or tap the canvas.</p>
+      </aside>
+    </section>
+
+    <section class="library" aria-label="Game library">
+      <article class="game-card"><span class="tag">Playable</span><strong>Troll Dash 6.9</strong><span>Jump over NPC candles and keep the chart alive.</span></article>
+      <article class="game-card"><span class="tag">Next</span><strong>Rocket Reply Rally</strong><span>Out-post billionaire NPCs before the timer dumps.</span></article>
+      <article class="game-card"><span class="tag">Next</span><strong>Garden Coin Harvest</strong><span>Collect seeds, dodge weeds, compound the harvest.</span></article>
+      <article class="game-card"><span class="tag">Next</span><strong>Sticker Street Quest</strong><span>Place stickers around town before the patrol spots you.</span></article>
+    </section>
+  </main>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const scoreNode = document.getElementById('score');
+const coinsNode = document.getElementById('coins');
+const statusNode = document.getElementById('status');
+const startBtn = document.getElementById('start');
+const reviveBtn = document.getElementById('revive');
+const themeSelect = document.getElementById('theme');
+const rosterButtons = [...document.querySelectorAll('[data-runner]')];
+const reviveCost = 6.9;
+
+let runnerName = 'Troll Runner';
+let coins = 27.6;
+let score = 0;
+let speed = 5;
+let running = false;
+let ended = false;
+let raf = 0;
+let player = { x: 110, y: 386, vy: 0, size: 48, grounded: true };
+let obstacles = [];
+let spawnTimer = 0;
+
+const themes = {
+  moon: { sky: '#10162a', ground: '#2d314f', accent: '#ffd166', obstacle: '#ff6b6b' },
+  garden: { sky: '#10251d', ground: '#224333', accent: '#72e06a', obstacle: '#d95d39' },
+  launch: { sky: '#171126', ground: '#30304f', accent: '#73d2ff', obstacle: '#f72585' },
+};
+
+function drawText(text, x, y, size = 18, color = '#fff') {
+  ctx.fillStyle = color;
+  ctx.font = `800 ${size}px Inter, system-ui, sans-serif`;
+  ctx.fillText(text, x, y);
+}
+
+function drawPlayer() {
+  const color = runnerName === 'Meme Frog' ? '#72e06a' : runnerName === 'Shiba Sprinter' ? '#ffd166' : '#f8fbff';
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(player.x, player.y, player.size / 2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#111';
+  ctx.beginPath();
+  ctx.arc(player.x - 10, player.y - 6, 4, 0, Math.PI * 2);
+  ctx.arc(player.x + 10, player.y - 6, 4, 0, Math.PI * 2);
+  ctx.fill();
+  drawText(runnerName.split(' ')[0], player.x - 36, player.y + 44, 14, '#fff');
+}
+
+function drawObstacle(obstacle) {
+  ctx.fillStyle = obstacle.color;
+  ctx.fillRect(obstacle.x, obstacle.y, obstacle.w, obstacle.h);
+  drawText(obstacle.label, obstacle.x - 10, obstacle.y - 10, 14, '#fff');
+}
+
+function drawScene() {
+  const theme = themes[themeSelect.value] || themes.moon;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = theme.sky;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = theme.accent;
+  for (let i = 0; i < 22; i += 1) {
+    ctx.globalAlpha = 0.45;
+    ctx.fillRect((i * 97 + score * 0.7) % canvas.width, 54 + (i * 37) % 190, 3, 3);
+  }
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = theme.ground;
+  ctx.fillRect(0, 430, canvas.width, 110);
+  drawText('Troll Dash 6.9', 30, 48, 26, theme.accent);
+  drawPlayer();
+  obstacles.forEach(drawObstacle);
+  if (!running && !ended) drawText('Press Start', 398, 262, 34, '#fff');
+  if (ended) drawText('Rekt. Revive?', 372, 262, 34, '#fff');
+}
+
+function jump() {
+  if (!running || !player.grounded) return;
+  player.vy = -15;
+  player.grounded = false;
+}
+
+function resetGame(keepScore = false) {
+  player = { x: 110, y: 386, vy: 0, size: 48, grounded: true };
+  obstacles = [];
+  spawnTimer = 0;
+  speed = 5;
+  if (!keepScore) score = 0;
+  ended = false;
+  running = true;
+  reviveBtn.disabled = true;
+  startBtn.textContent = 'Restart';
+  statusNode.textContent = `${runnerName} is live. Jump over the NPC chaos.`;
+  scoreNode.textContent = Math.floor(score);
+  drawScene();
+}
+
+function endGame() {
+  running = false;
+  ended = true;
+  reviveBtn.disabled = coins < reviveCost;
+  statusNode.textContent = coins >= reviveCost
+    ? `Down bad. Spend ${reviveCost} $TROLL to revive.`
+    : 'Wallet too light for a revive.';
+  cancelAnimationFrame(raf);
+  drawScene();
+}
+
+function tick() {
+  if (!running) return;
+  const theme = themes[themeSelect.value] || themes.moon;
+  score += 0.13 * speed;
+  speed = Math.min(11, speed + 0.0018);
+  scoreNode.textContent = Math.floor(score);
+  player.vy += 0.75;
+  player.y += player.vy;
+  if (player.y >= 386) {
+    player.y = 386;
+    player.vy = 0;
+    player.grounded = true;
+  }
+  spawnTimer -= 1;
+  if (spawnTimer <= 0) {
+    const labels = ['NPC', 'FUD', 'TAX', 'MEV'];
+    obstacles.push({
+      x: canvas.width + 40,
+      y: 384,
+      w: 38,
+      h: 46,
+      color: theme.obstacle,
+      label: labels[Math.floor(Math.random() * labels.length)],
+    });
+    spawnTimer = Math.max(52, 118 - speed * 5);
+  }
+  obstacles.forEach(obstacle => { obstacle.x -= speed; });
+  obstacles = obstacles.filter(obstacle => obstacle.x > -80);
+  const hit = obstacles.some(obstacle => {
+    const dx = Math.abs(player.x - (obstacle.x + obstacle.w / 2));
+    const dy = Math.abs(player.y - (obstacle.y + obstacle.h / 2));
+    return dx < player.size / 2 + obstacle.w / 2 - 7 && dy < player.size / 2 + obstacle.h / 2 - 7;
+  });
+  drawScene();
+  if (hit) {
+    endGame();
+    return;
+  }
+  raf = requestAnimationFrame(tick);
+}
+
+startBtn.addEventListener('click', () => {
+  cancelAnimationFrame(raf);
+  resetGame(false);
+  raf = requestAnimationFrame(tick);
+});
+
+reviveBtn.addEventListener('click', () => {
+  if (!ended || coins < reviveCost) return;
+  coins = Math.round((coins - reviveCost) * 10) / 10;
+  coinsNode.textContent = coins.toFixed(1);
+  resetGame(true);
+  raf = requestAnimationFrame(tick);
+});
+
+rosterButtons.forEach(button => {
+  button.addEventListener('click', () => {
+    rosterButtons.forEach(item => item.classList.remove('is-active'));
+    button.classList.add('is-active');
+    runnerName = button.dataset.runner;
+    statusNode.textContent = `${runnerName} selected.`;
+    drawScene();
+  });
+});
+
+window.addEventListener('keydown', event => {
+  if (event.code === 'Space' || event.code === 'ArrowUp') {
+    event.preventDefault();
+    jump();
+  }
+});
+canvas.addEventListener('pointerdown', jump);
+themeSelect.addEventListener('change', drawScene);
+drawScene();
+</script>
+</body>
+</html>
