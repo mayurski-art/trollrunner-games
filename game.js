@@ -20,10 +20,10 @@
 
   // Replace these paths as real game sprites/sounds are created.
   const assetPaths = {
-    player: '/assets/images/troll-buffguyfigure.png',
-    intro: '/assets/images/troll-gamewithmefigure.png',
-    runner: '/assets/images/troll-runnerfigure.png',
-    stick: '/assets/images/troll-stickfigure.png',
+    player: '/assets/animations/troll-buffguyfigure.png',
+    intro: '/assets/animations/troll-gamewithmefigure.png',
+    runner: '/assets/animations/troll-runnerfigure.png',
+    stick: '/assets/animations/troll-stickfigure.png',
     jumpSound: '/assets/audio/jump.mp3',
     coinSound: '/assets/audio/coin.mp3',
     crashSound: '/assets/audio/crash.mp3',
