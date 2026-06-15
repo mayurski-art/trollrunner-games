@@ -12,7 +12,6 @@
   const tvGameSelect = document.getElementById("tv-game-select");
   const tvLoading = document.getElementById("tv-loading");
   const loadingText = document.getElementById("loading-text");
-  const startButton = document.getElementById("start-button");
 
   const loadingLines = [
     "Finding support...",
@@ -29,13 +28,10 @@
   }
 
   function takeController() {
-    intro.classList.add("is-handoff");
+    intro.classList.add("is-menu");
     takeControllerButton.disabled = true;
-    window.setTimeout(() => {
-      intro.classList.add("is-menu");
-      showPanel(tvMainMenu);
-      chooseGamesButton?.focus();
-    }, 1380);
+    showPanel(tvMainMenu);
+    chooseGamesButton?.focus();
   }
 
   function chooseGames() {
@@ -66,9 +62,8 @@
     window.setTimeout(() => {
       window.clearInterval(lineTimer);
       document.body.classList.add("intro-complete");
-      window.setTimeout(() => {
-        startButton?.click();
-      }, 380);
+      document.getElementById("start-overlay")?.classList.add("is-visible");
+      document.getElementById("start-button")?.focus();
     }, 2100);
   }
 

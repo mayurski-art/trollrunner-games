@@ -31,6 +31,7 @@ html {
 
 body {
   min-height: 100vh;
+  min-height: 100svh;
   margin: 0;
   font-family: var(--font);
   color: var(--ink);
@@ -89,11 +90,6 @@ body.intro-complete .arcade-intro {
   object-position: 42% 48%;
   filter: brightness(0.72) contrast(1.16) saturate(0.92);
   transform: scale(1.02);
-  transition: transform 1500ms cubic-bezier(0.2, 0.8, 0.18, 1), filter 1500ms ease, opacity 850ms ease;
-}
-
-.arcade-intro.is-handoff .intro-photo {
-  animation: controllerHandoff 1700ms cubic-bezier(0.24, 0.9, 0.28, 1) forwards;
 }
 
 .arcade-intro.is-menu .intro-photo,
@@ -115,10 +111,6 @@ body.intro-complete .arcade-intro {
   pointer-events: none;
 }
 
-.arcade-intro.is-handoff .controller-rumble {
-  animation: rumbleAura 820ms linear 2;
-}
-
 .handoff-flash {
   position: absolute;
   inset: 0;
@@ -127,10 +119,6 @@ body.intro-complete .arcade-intro {
     radial-gradient(circle at 68% 28%, rgba(77, 238, 255, 0.28), transparent 22%);
   opacity: 0;
   pointer-events: none;
-}
-
-.arcade-intro.is-handoff .handoff-flash {
-  animation: handoffFlash 1700ms ease forwards;
 }
 
 .intro-title-panel {
@@ -145,7 +133,6 @@ body.intro-complete .arcade-intro {
   background: rgba(5, 0, 8, 0.72);
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.46);
   backdrop-filter: blur(10px);
-  transition: opacity 260ms ease, transform 260ms ease;
 }
 
 .intro-title-panel h1 {
@@ -168,7 +155,6 @@ body.intro-complete .arcade-intro {
   line-height: 1.42;
 }
 
-.arcade-intro.is-handoff .intro-title-panel,
 .arcade-intro.is-menu .intro-title-panel,
 .arcade-intro.is-selecting .intro-title-panel,
 .arcade-intro.is-loading .intro-title-panel {
@@ -184,7 +170,6 @@ body.intro-complete .arcade-intro {
   opacity: 0;
   pointer-events: none;
   transform: perspective(900px) rotateX(9deg) scale(0.72) translateY(28px);
-  transition: opacity 520ms ease, transform 650ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .arcade-intro.is-menu .tv-menu-shell,
@@ -239,7 +224,6 @@ body.intro-complete .arcade-intro {
   opacity: 0;
   pointer-events: none;
   transform: translateX(24px);
-  transition: opacity 220ms ease, transform 260ms ease;
 }
 
 .tv-panel.is-active {
@@ -480,7 +464,7 @@ body.intro-complete .arcade-intro {
 .arcade-shell {
   width: min(1440px, 100%);
   margin: 0 auto;
-  padding: clamp(18px, 3vw, 38px);
+  padding: clamp(12px, 2.2vw, 28px);
 }
 
 .game-hero {
@@ -488,7 +472,8 @@ body.intro-complete .arcade-intro {
   grid-template-columns: minmax(280px, 0.62fr) minmax(360px, 1.38fr);
   gap: clamp(18px, 3vw, 34px);
   align-items: center;
-  padding: clamp(14px, 2.4vw, 30px) 0 clamp(18px, 3vw, 36px);
+  min-height: calc(100svh - 78px);
+  padding: 0 0 clamp(14px, 2vw, 24px);
 }
 
 .game-copy {
@@ -669,8 +654,11 @@ h1 {
 .screen-wrap {
   position: relative;
   z-index: 1;
-  margin: 0 12px;
+  width: min(calc(100% - 24px), calc(min(62svh, 680px) * 16 / 9));
+  margin: 0 auto;
   overflow: hidden;
+  aspect-ratio: 16 / 9;
+  max-height: min(62svh, 680px);
   border: 1px solid rgba(77, 255, 115, 0.34);
   background: #020004;
   box-shadow: inset 0 0 34px rgba(77, 255, 115, 0.1);
@@ -680,7 +668,7 @@ h1 {
 #troll-dash-canvas {
   display: block;
   width: 100%;
-  aspect-ratio: 16 / 9;
+  height: 100%;
   background: #050008;
 }
 
@@ -690,6 +678,7 @@ h1 {
   display: grid;
   place-items: center;
   padding: 18px;
+  overflow: auto;
   background:
     radial-gradient(circle at 50% 42%, rgba(154, 92, 255, 0.26), transparent 32%),
     rgba(3, 0, 6, 0.72);
@@ -706,7 +695,7 @@ h1 {
 .overlay-card {
   width: min(500px, 100%);
   max-height: 100%;
-  overflow: hidden;
+  overflow: auto;
   padding: clamp(14px, 2.4vw, 21px);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 8px;
@@ -994,56 +983,6 @@ h1 {
   }
 }
 
-@keyframes controllerHandoff {
-  0% {
-    transform: scale(1.02) translate(0, 0);
-    opacity: 1;
-  }
-  18% {
-    transform: scale(1.04) translate(5px, -3px);
-  }
-  31% {
-    transform: scale(1.035) translate(-5px, 4px);
-  }
-  52% {
-    transform: scale(1.16) translate(-4%, -2%);
-  }
-  100% {
-    transform: scale(1.54) translate(-16%, -5%);
-    opacity: 0.18;
-  }
-}
-
-@keyframes rumbleAura {
-  0%,
-  100% {
-    box-shadow: 0 0 0 rgba(77, 255, 115, 0);
-    transform: translate(0, 0) rotate(0deg);
-  }
-  20% {
-    box-shadow: 0 0 34px rgba(77, 255, 115, 0.24);
-    transform: translate(8px, -5px) rotate(1deg);
-  }
-  42% {
-    transform: translate(-7px, 6px) rotate(-1deg);
-  }
-  68% {
-    box-shadow: 0 0 58px rgba(77, 238, 255, 0.18);
-    transform: translate(5px, 4px) rotate(0.6deg);
-  }
-}
-
-@keyframes handoffFlash {
-  0%,
-  52%,
-  100% {
-    opacity: 0;
-  }
-  68% {
-    opacity: 0.8;
-  }
-}
-
 @keyframes bootProgress {
   0% {
     width: 0%;
@@ -1160,7 +1099,7 @@ h1 {
   }
 
   .arcade-shell {
-    padding: 12px;
+    padding: 10px;
     overflow: hidden;
   }
 
@@ -1188,11 +1127,19 @@ h1 {
   }
 
   .screen-wrap {
-    margin: 0 8px;
+    width: min(calc(100% - 16px), calc(min(54svh, 430px) * 16 / 9));
+    margin: 0 auto;
+    max-height: min(54svh, 430px);
+  }
+
+  .game-overlay {
+    align-items: start;
+    padding: 10px;
   }
 
   .overlay-card {
     padding: 15px;
+    max-height: calc(100% - 2px);
   }
 
   .overlay-card h2 {
@@ -1242,5 +1189,11 @@ h1 {
 
   .overlay-actions {
     display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .overlay-actions .primary-btn,
+  .overlay-actions .secondary-btn {
+    width: 100%;
   }
 }
