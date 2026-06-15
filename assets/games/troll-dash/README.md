@@ -8,10 +8,11 @@ The troll runs in place facing the camera while the cursed temple-chart
 corridor rushes toward it. Swap lanes, jump, and slide to survive; grab
 $TROLL coins; pay the troll toll (6.9 $TROLL) to revive once per run.
 
-Controls: A/D or arrows for lanes, W/Up/Space jump, S/Down slide, touch
-swipes (tap = jump). Deep links: `index.html#play` skips the cabinet intro
-to the preview screen; `#autostart` begins a run immediately (handy for
-embeds/tests).
+Controls: A/D or arrows for lanes, W/Up/Space jump, S/Down roll, plus
+Subway-Surfers-style swipes on touch (mid-gesture detection + re-arm, so a
+quick flick chains; tap = hop). A 3rd-person follow camera trails the lane
+you're in. Deep links: `index.html#play` skips the cabinet intro to the
+preview screen; `#autostart` begins a run immediately (handy for embeds/tests).
 
 ## Rendering
 `game.js` is a self-contained pseudo-3D engine:
@@ -19,15 +20,15 @@ embeds/tests).
 - **Projection** — every entity has world coords `(z depth, laneX, worldY)`
   projected to screen by `project()` from a camera depth/height/horizon.
   Objects scale and slide down-and-out as they approach.
-- **World** — gradient dusk sky, green vanishing-point glow, a chart-bar
-  skyline, a perspective road with scrolling rungs + lane dividers, and
-  torch-lit temple pillars rushing past on both sides for depth.
+- **World** — parallax dusk sky + temple ridge + chart skyline, green
+  vanishing-point glow, a checkerboard stone path with distance fog and
+  glowing edges, and torch-lit temple pillars rushing past for depth.
 - **Player** — a single transparent sprite (`sprites/troll-runner.png`)
-  drawn with a run-bob, lane-lean, jump arc, slide squash, ground shadow,
-  and foot dust.
+  drawn with run-bob, lane-banking lean, jump squash/stretch, roll, ground
+  shadow, foot dust, and speed-lines at high velocity.
 - **Obstacles** — three clear mechanics, themed:
   - `barrier` (red-candle gate) -> jump
-  - `beam` (FUD overhang) -> slide
+  - `beam` (FUD overhang) -> roll
   - `pit` (rugpull hole) -> jump
   Painter's algorithm sorts everything by depth each frame.
 

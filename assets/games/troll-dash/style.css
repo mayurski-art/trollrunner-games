@@ -663,6 +663,10 @@ h1 {
   background: #020004;
   box-shadow: inset 0 0 34px rgba(77, 255, 115, 0.1);
   touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  overscroll-behavior: contain;
 }
 
 #troll-dash-canvas {
@@ -1103,9 +1107,15 @@ h1 {
     overflow: hidden;
   }
 
+  /* Phone: game first, marketing copy below so the runner is up top */
   .game-hero {
+    display: flex;
+    flex-direction: column;
     gap: 14px;
   }
+
+  .game-cabinet { order: -1; }
+  .game-copy { order: 1; }
 
   .hero-stats {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1127,10 +1137,12 @@ h1 {
     justify-self: end;
   }
 
+  /* Phone: tall portrait play area for a Subway-Surfers feel */
   .screen-wrap {
-    width: min(calc(100% - 16px), calc(min(54svh, 430px) * 16 / 9));
+    width: min(calc(100% - 10px), calc(58svh * 0.72));
     margin: 0 auto;
-    max-height: min(54svh, 430px);
+    aspect-ratio: 0.72;
+    max-height: 58svh;
   }
 
   .game-overlay {
