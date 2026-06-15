@@ -284,20 +284,40 @@ body[data-game-state="gameover"] .hud {
 }
 
 @media (max-width: 760px) {
+  html,
+  body {
+    height: auto;
+    min-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
   .game-shell {
+    height: auto;
     min-height: 100svh;
+    overflow-y: auto;
   }
 
   .start-screen {
     grid-template-columns: 1fr;
-    align-content: center;
-    gap: 8px;
+    grid-template-rows: auto auto;
+    align-content: start;
+    justify-items: center;
+    gap: clamp(10px, 3svh, 22px);
+    min-height: 100svh;
+    padding-top: max(20px, env(safe-area-inset-top));
     padding-bottom: max(108px, env(safe-area-inset-bottom));
     text-align: center;
+    overflow-y: auto;
   }
 
   .intro-stage {
-    width: min(72vw, 280px);
+    width: clamp(220px, 72vw, 340px);
+    max-width: calc(100vw - 28px);
+    aspect-ratio: 1 / 1;
+    display: grid;
+    place-items: center;
+    flex: none;
   }
 
   .screen-copy {
@@ -313,6 +333,13 @@ body[data-game-state="gameover"] .hud {
     margin-right: auto;
     margin-left: auto;
     font-size: 0.95rem;
+  }
+
+  .intro-art {
+    width: 100%;
+    height: auto;
+    max-height: min(42svh, 360px);
+    object-fit: contain;
   }
 
   .hud {

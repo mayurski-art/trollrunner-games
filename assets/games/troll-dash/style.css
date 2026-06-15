@@ -1076,27 +1076,64 @@ h1 {
 }
 
 @media (max-width: 720px) {
+  body:not(.intro-complete) {
+    overflow-y: auto;
+  }
+
+  .arcade-intro {
+    place-items: start center;
+    overflow-y: auto;
+    min-height: 100svh;
+    padding: max(10px, env(safe-area-inset-top)) 0 max(10px, env(safe-area-inset-bottom));
+  }
+
+  .intro-photo {
+    height: 100%;
+    min-height: 100svh;
+    object-fit: cover;
+  }
+
   .intro-title-panel {
     left: 12px;
     right: 12px;
     bottom: 16px;
     width: auto;
+    max-height: calc(100svh - 32px);
+    overflow-x: hidden;
+    overflow-y: auto;
   }
 
   .intro-title-panel h1 {
-    font-size: clamp(36px, 13vw, 58px);
+    font-size: 2.65rem;
+    line-height: 0.96;
+    overflow-wrap: anywhere;
   }
 
   .tv-menu-shell {
     width: calc(100vw - 18px);
+    max-height: none;
   }
 
   .tv-screen {
-    min-height: 72vh;
+    min-height: min(720px, calc(100svh - 48px));
+    overflow-y: auto;
   }
 
   .tv-panel {
+    position: relative;
+    display: none;
+    min-height: min(720px, calc(100svh - 48px));
     padding: 16px;
+  }
+
+  .tv-panel.is-active {
+    display: grid;
+  }
+
+  .tv-panel h2 {
+    font-size: 2.7rem;
+    line-height: 1;
+    overflow-wrap: anywhere;
   }
 
   .tv-menu-grid {
@@ -1109,7 +1146,7 @@ h1 {
   }
 
   .game-scroll-list {
-    max-height: 46vh;
+    max-height: none;
   }
 
   .site-header {
@@ -1177,6 +1214,11 @@ h1 {
 }
 
 @media (max-width: 420px) {
+  .intro-title-panel h1,
+  .tv-panel h2 {
+    font-size: 2.35rem;
+  }
+
   .brand-mark {
     width: 52px;
   }
