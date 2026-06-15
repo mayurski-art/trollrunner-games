@@ -67,6 +67,12 @@
     }, 2100);
   }
 
+  // Dev/deep-link: #play skips the cabinet intro straight to the game.
+  if (/(?:^|[#&])(play|autostart)/.test(window.location.hash)) {
+    document.body.classList.add("intro-complete");
+    document.getElementById("start-overlay")?.classList.add("is-visible");
+  }
+
   takeControllerButton?.addEventListener("click", takeController);
   chooseGamesButton?.addEventListener("click", chooseGames);
   backToTvMenuButton?.addEventListener("click", backToMenu);

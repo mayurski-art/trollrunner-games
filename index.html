@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;700;900&family=DM+Mono:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/games/troll-dash/style.css?v=preview-flow-20260615">
+  <link rel="stylesheet" href="assets/games/troll-dash/style.css?v=temple-3d-20260615">
 </head>
 <body>
   <div class="crt-overlay" aria-hidden="true"></div>
@@ -55,15 +55,17 @@
             </div>
             <div class="game-scroll-list" tabindex="0" aria-label="Available Trollrunner games">
               <article class="game-select-card">
-                <span class="game-select-number">001</span>
+                <img class="game-select-art" src="assets/games/troll-dash/sprites/troll-runner.png" alt="" aria-hidden="true">
+                <span class="game-select-number">001 · Live</span>
                 <h3>Troll Dash: Rugpull Run</h3>
                 <p>Survive the chart. Dodge the rugs. Pay the troll toll.</p>
-                <button id="boot-troll-dash" class="primary-btn" type="button">Boot Game</button>
+                <button id="boot-troll-dash" class="primary-btn" type="button">▶ Boot Game</button>
               </article>
               <article class="game-select-card is-locked">
-                <span class="game-select-number">002</span>
-                <h3>NPC Market Maker</h3>
-                <p>Coming soon.</p>
+                <img class="game-select-art" src="assets/animations/troll-wizardfigure.png" alt="" aria-hidden="true">
+                <span class="game-select-number">002 · Soon</span>
+                <h3>Troll Wizard</h3>
+                <p>Cast green candles. Hex the FUD. Coming soon.</p>
               </article>
             </div>
           </div>
@@ -116,36 +118,45 @@
 
         <div class="hud-row" aria-live="polite">
           <div class="hud-item">
-            <span>Score</span>
+            <span>Distance</span>
             <strong id="score-value">0</strong>
           </div>
-          <div class="hud-item">
+          <div class="hud-item is-coin">
             <span>$TROLL</span>
             <strong id="coin-value">0</strong>
           </div>
           <div class="hud-item">
-            <span>High</span>
+            <span>Best</span>
             <strong id="high-score-value">0</strong>
           </div>
-          <button id="sound-toggle" class="icon-btn" type="button" aria-pressed="false" title="Toggle arcade bleeps">SFX</button>
+          <button id="sound-toggle" class="icon-btn" type="button" aria-pressed="false" title="Toggle arcade sound" aria-label="Toggle arcade sound">
+            <span class="sfx-on">🔊</span><span class="sfx-off">🔇</span>
+          </button>
         </div>
 
         <div class="screen-wrap">
           <canvas id="troll-dash-canvas" width="960" height="540" aria-label="Troll Dash endless runner game"></canvas>
 
-          <div id="start-overlay" class="game-overlay is-visible">
-            <div class="overlay-card">
-              <p class="overlay-kicker">Insert chaos</p>
-              <h2>Survive the chart.</h2>
-              <p>Run the glowing candle path, scoop $TROLL, dodge red candles, NPCs, fake scam barrels, and rugpull holes.</p>
-              <button id="start-button" class="primary-btn" type="button">Start Run</button>
-              <div class="controls-grid" aria-label="Controls">
-                <span>A / Left</span><span>Left lane</span>
-                <span>D / Right</span><span>Right lane</span>
-                <span>W / Up / Space</span><span>Jump</span>
-                <span>S / Down</span><span>Slide</span>
+          <div id="start-overlay" class="game-overlay start-overlay is-visible">
+            <div class="overlay-card start-card">
+              <div class="start-art" aria-hidden="true">
+                <img class="start-troll" src="assets/games/troll-dash/sprites/troll-runner.png" alt="">
+                <span class="start-coin start-coin-a">$T</span>
+                <span class="start-coin start-coin-b">$T</span>
+                <span class="start-coin start-coin-c">$T</span>
               </div>
-              <p class="mobile-hint">Mobile: swipe left, right, up, or down.</p>
+              <div class="start-copy">
+                <p class="overlay-kicker">Endless temple runner</p>
+                <h2>Outrun the<br>rugpull.</h2>
+                <p>Sprint the cursed chart, scoop <strong>$TROLL</strong>, and dodge red-candle gates, FUD beams, and rugpull holes. How far can you run before you get rekt?</p>
+                <button id="start-button" class="primary-btn pulse-btn" type="button">▶ Start Run</button>
+                <div class="control-keys" aria-label="Controls">
+                  <span class="ckey"><kbd>A</kbd><kbd>D</kbd> Swap lane</span>
+                  <span class="ckey"><kbd>W</kbd>/<kbd>Space</kbd> Jump</span>
+                  <span class="ckey"><kbd>S</kbd> Slide</span>
+                </div>
+                <p class="mobile-hint">📱 Swipe to move · swipe up to jump · swipe down to slide · tap to hop.</p>
+              </div>
             </div>
           </div>
 
@@ -154,7 +165,17 @@
               <span class="mock-badge">Mock Mode</span>
               <p class="overlay-kicker">Run halted</p>
               <h2 id="death-message">RUGGED</h2>
-              <p class="death-flavor">The candle path cracked under maximum meme pressure.</p>
+
+              <div class="run-stats">
+                <div>
+                  <span>Distance</span>
+                  <strong id="score-final">0</strong>
+                </div>
+                <div class="is-coin">
+                  <span>$TROLL grabbed</span>
+                  <strong id="coin-final">0</strong>
+                </div>
+              </div>
 
               <div class="revive-panel">
                 <div>
@@ -167,14 +188,17 @@
                 </div>
               </div>
 
-              <p class="revive-disclaimer">Revive costs 6.9 $TROLL plus Solana network fees. Revives are optional and non-refundable.</p>
-              <p class="treasury-note">Treasury: <span id="treasury-wallet">79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA</span></p>
-
               <div class="overlay-actions">
-                <button id="revive-button" class="primary-btn" type="button">Revive for 6.9 $TROLL</button>
-                <button id="restart-button" class="secondary-btn" type="button">Restart Run</button>
-                <a class="secondary-btn link-btn" href="/">Back to Arcade</a>
+                <button id="revive-button" class="primary-btn" type="button">Revive · 6.9 $TROLL</button>
+                <button id="restart-button" class="secondary-btn" type="button">↻ Run Again</button>
               </div>
+
+              <details class="revive-fine">
+                <summary>Revive details</summary>
+                <p class="revive-disclaimer">Revive costs 6.9 $TROLL plus Solana network fees. Optional, non-refundable. Currently mock mode — no real transaction occurs.</p>
+                <p class="treasury-note">Treasury: <span id="treasury-wallet">79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA</span></p>
+                <a class="link-back" href="/">← Back to Arcade</a>
+              </details>
             </div>
           </div>
 
@@ -182,8 +206,8 @@
         </div>
 
         <div class="cabinet-footer">
-          <p>Desktop: A/D or arrows to lane swap, W/Up/Space to jump, S/Down to slide.</p>
-          <p>Mobile swipes are enabled on the game screen.</p>
+          <p><strong>Keys</strong> · A/D lanes · W/Space jump · S slide</p>
+          <p><strong>Touch</strong> · swipe to dodge · tap to hop</p>
         </div>
       </section>
     </section>
@@ -195,25 +219,28 @@
       </div>
       <div class="game-grid">
         <article class="coming-card">
+          <img class="coming-art" src="assets/animations/troll-wizardfigure.png" alt="" aria-hidden="true">
           <span>001</span>
-          <h3>NPC Market Maker</h3>
-          <p>Outrun bots, fake liquidity, and suspiciously confident chart wizards.</p>
+          <h3>Troll Wizard</h3>
+          <p>Cast green candles, hex the FUD, and conjure liquidity from thin air.</p>
         </article>
         <article class="coming-card">
+          <img class="coming-art" src="assets/animations/troll-zeldafigure.png" alt="" aria-hidden="true">
           <span>002</span>
-          <h3>Troll Toll Tycoon</h3>
-          <p>Build the booth, collect the toll, survive the comments section.</p>
+          <h3>Temple of Gains</h3>
+          <p>Raid the cursed vault past the snake-eyed guardians. Don't touch the portal.</p>
         </article>
         <article class="coming-card">
+          <img class="coming-art" src="assets/animations/troll-runnerfigure.png" alt="" aria-hidden="true">
           <span>003</span>
-          <h3>FUD Blaster</h3>
-          <p>A neon cabinet shooter for blasting panic posts before support breaks.</p>
+          <h3>Hermes Run</h3>
+          <p>Winged-sandal sprint for the money bag. U mad? Catch it if you can.</p>
         </article>
       </div>
     </section>
   </main>
 
-  <script src="assets/games/troll-dash/arcade-intro.js?v=preview-flow-20260615" defer></script>
-  <script src="assets/games/troll-dash/game.js?v=preview-flow-20260615" defer></script>
+  <script src="assets/games/troll-dash/arcade-intro.js?v=temple-3d-20260615" defer></script>
+  <script src="assets/games/troll-dash/game.js?v=temple-3d-20260615" defer></script>
 </body>
 </html>

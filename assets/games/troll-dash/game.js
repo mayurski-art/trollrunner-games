@@ -1,28 +1,44 @@
 (() => {
   "use strict";
 
+  /* ------------------------------------------------------------------ *
+   * Troll Dash: Rugpull Run
+   * A pseudo-3D endless runner. The troll runs in place facing the
+   * camera while the cursed temple-chart rushes toward it. Lane swap,
+   * jump, and slide to survive. Pay the troll toll to revive.
+   * ------------------------------------------------------------------ */
+
+  // --- Economy / persistence -----------------------------------------
   const REVIVE_COST = 6.9;
   const TREASURY_WALLET = "79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA";
   const TROLL_MINT_ADDRESS = "REPLACE_WITH_VERIFIED_TROLL_SPL_MINT_ADDRESS";
-  const HIGH_SCORE_KEY = "troll_dash_high_score_v1";
+  const HIGH_SCORE_KEY = "troll_dash_high_score_v2";
   const MOCK_WALLET_START_BALANCE = 42;
-  const LANES = [-1, 0, 1];
+
   const DEATH_MESSAGES = [
-    "RUGGED",
-    "LIQUIDATED",
-    "THE NPCs GOT YOU",
-    "CHART FAILED TO HOLD SUPPORT",
+    "RUGGED", "LIQUIDATED", "REKT", "PAPER HANDS",
+    "SUPPORT BROKE", "GG NO RE",
   ];
 
-  const OBSTACLE_TYPES = [
-    { id: "red-candle", label: "RED CANDLE", color: "#ff314f", clear: "jump", weight: 4 },
-    { id: "rug-hole", label: "RUGPULL", color: "#111111", clear: "jump", weight: 3 },
-    { id: "npc", label: "NPC", color: "#9a5cff", clear: "slide", weight: 3 },
-    { id: "bear", label: "BEAR", color: "#ff314f", clear: "dodge", weight: 2 },
-    { id: "chart-wall", label: "SUPPORT?", color: "#4deeff", clear: "dodge", weight: 2 },
-    { id: "scam-barrel", label: "SCAM", color: "#ffd84d", clear: "jump", weight: 2 },
-    { id: "fud-sign", label: "FUD", color: "#ffffff", clear: "slide", weight: 2 },
-  ];
+  // --- Pseudo-3D camera ----------------------------------------------
+  // World units: z = depth ahead of camera (>0). laneX = lateral offset.
+  // worldY = height above the road (0 = on the road).
+  const CAM = { depth: 1.56, height: 1.0, horizon: 0.34 };
+  const LANE_W = 0.8;          // world distance between lanes
+  const ROAD_HALF = 1.34;      // road edge (world units from center)
+  const WALL_X = 1.78;         // pillar lateral offset
+  const PLAYER_Z = 3.0;        // depth the troll sits at
+  const SPAWN_Z = 150;         // depth where obstacles appear
+  const DESPAWN_Z = 1.2;       // depth where things leave the screen
+  const HIT_BAND = 2.1;        // collision depth half-window around player
+
+  const LANES = [-1, 0, 1];
+
+  // --- Obstacle kinds -------------------------------------------------
+  // clear: how the player avoids it. lanes spawn pattern handled below.
+  const OB_BARRIER = { id: "barrier", clear: "jump" };   // red candle gate
+  const OB_BEAM    = { id: "beam",    clear: "slide" };  // FUD overhang
+  const OB_PIT     = { id: "pit",     clear: "jump" };   // rugpull hole
 
   const dom = {
     canvas: document.getElementById("troll-dash-canvas"),
@@ -39,123 +55,121 @@
     startButton: document.getElementById("start-button"),
     revivedBanner: document.getElementById("revived-banner"),
     soundToggle: document.getElementById("sound-toggle"),
+    coinFinal: document.getElementById("coin-final"),
+    scoreFinal: document.getElementById("score-final"),
   };
 
   const ctx = dom.canvas.getContext("2d");
   const playerImage = new Image();
-  // Background-removed buff guy cutout. The rig below animates cropped regions from this single preserved source.
-  playerImage.src = "assets/games/troll-dash/sprites/troll-buffguyfigure-cutout.png";
-
-  const BUFF_RIG = {
-    origin: { x: 705, y: 830 },
-    scale: 0.16,
-    parts: {
-      backArm: { sx: 80, sy: 180, sw: 585, sh: 390, px: 520, py: 420 },
-      leg: { sx: 505, sy: 555, sw: 350, sh: 350, px: 650, py: 665 },
-      torso: { sx: 390, sy: 210, sw: 610, sh: 555, px: 710, py: 525 },
-      frontArm: { sx: 830, sy: 290, sw: 440, sh: 360, px: 940, py: 415 },
-      head: { sx: 625, sy: 235, sw: 370, sh: 280, px: 810, py: 375 },
-    },
-  };
+  playerImage.src = "assets/games/troll-dash/sprites/troll-runner.png?v=2";
 
   const state = {
-    mode: "ready",
+    mode: "ready",                 // ready | running | dead
     view: { w: 960, h: 540 },
     lastTime: 0,
     elapsed: 0,
-    speed: 305,
-    spawnTimer: 0,
-    coinSpawnTimer: 0,
-    score: 0,
+    speed: 26,                     // world-z units per second
+    distance: 0,
     coins: 0,
     highScore: Number(localStorage.getItem(HIGH_SCORE_KEY) || 0),
     walletBalance: MOCK_WALLET_START_BALANCE,
     revivedThisRun: false,
     invincibleUntil: 0,
-    flashTimer: 0,
-    chartPhase: 0,
+    scroll: 0,                     // texture scroll for road/pillars
+    spawnZCursor: SPAWN_Z,         // next obstacle spawn distance
+    coinTimer: 0,
+    flash: 0,
     shake: 0,
+    hitFlash: 0,
     obstacles: [],
-    pickups: [],
+    coinsArr: [],
     particles: [],
     player: {
       lane: 0,
       laneFloat: 0,
-      jumpTime: 0,
-      slideTime: 0,
+      worldY: 0,
+      vy: 0,
+      onGround: true,
+      slideT: 0,
+      runPhase: 0,
+      lean: 0,
     },
   };
 
+  // --- Audio (synth bleeps; swap for files later) --------------------
   const audio = {
     enabled: false,
     context: null,
-    beep(frequency = 520, duration = 0.06, type = "square") {
-      // Replace these synthesized bleeps with arcade sound files when final audio assets are ready.
-      if (!this.enabled || !window.AudioContext && !window.webkitAudioContext) return;
-      if (!this.context) {
-        const AudioCtor = window.AudioContext || window.webkitAudioContext;
-        this.context = new AudioCtor();
-      }
+    beep(frequency = 520, duration = 0.06, type = "square", vol = 0.07) {
+      if (!this.enabled) return;
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      if (!this.context) this.context = new AC();
       const now = this.context.currentTime;
-      const oscillator = this.context.createOscillator();
+      const osc = this.context.createOscillator();
       const gain = this.context.createGain();
-      oscillator.type = type;
-      oscillator.frequency.setValueAtTime(frequency, now);
-      gain.gain.setValueAtTime(0.001, now);
-      gain.gain.exponentialRampToValueAtTime(0.08, now + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
-      oscillator.connect(gain).connect(this.context.destination);
-      oscillator.start(now);
-      oscillator.stop(now + duration + 0.02);
+      osc.type = type;
+      osc.frequency.setValueAtTime(frequency, now);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(vol, now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+      osc.connect(gain).connect(this.context.destination);
+      osc.start(now);
+      osc.stop(now + duration + 0.02);
+    },
+    chord(freqs, duration = 0.16, type = "square") {
+      freqs.forEach((f, i) => setTimeout(() => this.beep(f, duration, type), i * 55));
     },
   };
 
+  // --- Mock revive payment (Solana integration stub) -----------------
   class MockRevivePaymentProvider {
-    constructor(gameState) {
-      this.gameState = gameState;
-      this.mode = "mock";
-    }
-
+    constructor(gs) { this.gs = gs; this.mode = "mock"; }
     createReviveSession() {
       return {
-        id: window.crypto?.randomUUID ? window.crypto.randomUUID() : `mock-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-        cost: REVIVE_COST,
-        treasuryWallet: TREASURY_WALLET,
-        mint: TROLL_MINT_ADDRESS,
+        id: window.crypto?.randomUUID ? crypto.randomUUID() : `mock-${Date.now()}`,
+        cost: REVIVE_COST, treasuryWallet: TREASURY_WALLET, mint: TROLL_MINT_ADDRESS,
         memo: `troll-dash-revive-${Date.now()}`,
       };
     }
-
     async payForRevive() {
       const session = this.createReviveSession();
-      if (this.gameState.walletBalance < REVIVE_COST) {
-        return { ok: false, reason: "Insufficient mock $TROLL balance.", session };
-      }
-      this.gameState.walletBalance = roundTroll(this.gameState.walletBalance - REVIVE_COST);
+      if (this.gs.walletBalance < REVIVE_COST) return { ok: false, reason: "Not enough $TROLL", session };
+      this.gs.walletBalance = round1(this.gs.walletBalance - REVIVE_COST);
       return { ok: true, signature: `mock-${session.id}`, session };
     }
   }
-
+  // Real flow stays disabled until a backend verifies destination, mint,
+  // amount, memo/reference and one-time tx usage. See README.
   class FutureSolanaPaymentProvider {
-    // Replace this mock provider with wallet-adapter + Solana Pay/direct SPL token transfer.
-    // Real paid revives must:
-    // 1. Create a unique revive session id/reference/memo server-side.
-    // 2. Send exactly 6.9 $TROLL to TREASURY_WALLET using the verified TROLL_MINT_ADDRESS.
-    // 3. Wait for confirmed/finalized transaction status.
-    // 4. Call a backend/serverless endpoint that verifies signature, destination, mint, amount,
-    //    memo/reference, and one-time transaction usage before granting the revive.
-    async payForRevive() {
-      throw new Error("Real Solana payment flow is intentionally disabled until backend verification exists.");
-    }
+    async payForRevive() { throw new Error("Real Solana payment disabled until backend verification exists."); }
   }
-
   const revivePayments = new MockRevivePaymentProvider(state);
   void FutureSolanaPaymentProvider;
 
-  function roundTroll(value) {
-    return Math.round(value * 10) / 10;
+  // --- Math helpers ---------------------------------------------------
+  const round1 = v => Math.round(v * 10) / 10;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const pick = arr => arr[(Math.random() * arr.length) | 0];
+
+  // Project a world point to screen. Returns {x, y, scale}.
+  function project(z, laneX, worldY) {
+    const { w, h } = state.view;
+    const horizonY = h * CAM.horizon;
+    const scale = CAM.depth / Math.max(0.35, z);
+    const groundY = horizonY + scale * CAM.height * h;
+    return {
+      x: w / 2 + scale * laneX * (w / 2),
+      y: groundY - scale * worldY * h,
+      scale,
+    };
   }
 
+  function laneToX(lane) { return lane * LANE_W; }
+
+  // --- Resize ---------------------------------------------------------
   function resizeCanvas() {
     const rect = dom.canvas.getBoundingClientRect();
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -168,741 +182,614 @@
     state.view.h = height;
   }
 
+  // --- HUD ------------------------------------------------------------
   function updateHud() {
-    dom.score.textContent = Math.floor(state.score).toLocaleString();
+    dom.score.textContent = Math.floor(state.distance).toLocaleString();
     dom.coins.textContent = state.coins.toLocaleString();
     dom.high.textContent = Math.floor(state.highScore).toLocaleString();
-    dom.walletBalance.textContent = `${state.walletBalance.toFixed(1)} $TROLL`;
-    dom.treasuryWallet.textContent = TREASURY_WALLET;
-    dom.reviveButton.disabled = state.revivedThisRun || state.walletBalance < REVIVE_COST;
-    dom.reviveButton.textContent = state.revivedThisRun ? "Revive Used" : "Revive for 6.9 $TROLL";
+    if (dom.walletBalance) dom.walletBalance.textContent = `${state.walletBalance.toFixed(1)} $TROLL`;
+    if (dom.treasuryWallet) dom.treasuryWallet.textContent = TREASURY_WALLET;
+    if (dom.reviveButton) {
+      dom.reviveButton.disabled = state.revivedThisRun || state.walletBalance < REVIVE_COST;
+      dom.reviveButton.textContent = state.revivedThisRun ? "Revive used" : "Revive · 6.9 $TROLL";
+    }
   }
 
+  // --- Run lifecycle --------------------------------------------------
   function resetRun() {
     state.mode = "running";
     state.elapsed = 0;
-    state.speed = 305;
-    state.spawnTimer = 0.55;
-    state.coinSpawnTimer = 0.4;
-    state.score = 0;
+    state.speed = 26;
+    state.distance = 0;
     state.coins = 0;
     state.revivedThisRun = false;
     state.invincibleUntil = 0;
-    state.flashTimer = 0;
+    state.spawnZCursor = 40;
+    state.coinTimer = 0.6;
+    state.flash = 0;
     state.shake = 0;
+    state.hitFlash = 0;
     state.obstacles = [];
-    state.pickups = [];
+    state.coinsArr = [];
     state.particles = [];
-    state.player.lane = 0;
-    state.player.laneFloat = 0;
-    state.player.jumpTime = 0;
-    state.player.slideTime = 0;
-    hideOverlay(dom.startOverlay);
-    hideOverlay(dom.deathOverlay);
+    Object.assign(state.player, {
+      lane: 0, laneFloat: 0, worldY: 0, vy: 0, onGround: true,
+      slideT: 0, runPhase: 0, lean: 0,
+    });
+    hide(dom.startOverlay);
+    hide(dom.deathOverlay);
     updateHud();
   }
 
-  function showOverlay(node) {
-    node.classList.add("is-visible");
-  }
-
-  function hideOverlay(node) {
-    node.classList.remove("is-visible");
-  }
+  const show = n => n && n.classList.add("is-visible");
+  const hide = n => n && n.classList.remove("is-visible");
 
   function die() {
     if (state.mode !== "running") return;
-    if (state.elapsed < state.invincibleUntil) {
-      state.flashTimer = 0.12;
-      return;
-    }
+    if (state.elapsed < state.invincibleUntil) { state.hitFlash = 0.12; return; }
     state.mode = "dead";
-    state.shake = 18;
-    state.highScore = Math.max(state.highScore, Math.floor(state.score));
+    state.shake = 16;
+    state.hitFlash = 0.3;
+    state.highScore = Math.max(state.highScore, Math.floor(state.distance));
     localStorage.setItem(HIGH_SCORE_KEY, String(state.highScore));
-    dom.deathMessage.textContent = randomChoice(DEATH_MESSAGES);
-    showOverlay(dom.deathOverlay);
+    if (dom.deathMessage) dom.deathMessage.textContent = pick(DEATH_MESSAGES);
+    if (dom.scoreFinal) dom.scoreFinal.textContent = Math.floor(state.distance).toLocaleString();
+    if (dom.coinFinal) dom.coinFinal.textContent = state.coins.toLocaleString();
+    const p = project(PLAYER_Z, laneToX(state.player.laneFloat), 0.4);
+    burst(p.x, p.y, "#ff314f", 30, 220);
+    show(dom.deathOverlay);
     updateHud();
-    burst(laneToX(state.player.lane), groundY(), "#ff314f", 28);
-    audio.beep(110, 0.22, "sawtooth");
+    audio.beep(120, 0.3, "sawtooth", 0.09);
   }
 
   async function revive() {
     if (state.mode !== "dead" || state.revivedThisRun) return;
     dom.reviveButton.disabled = true;
-    dom.reviveButton.textContent = "Mock paying...";
+    dom.reviveButton.textContent = "Paying toll…";
     const payment = await revivePayments.payForRevive();
-    if (!payment.ok) {
-      dom.reviveButton.textContent = payment.reason || "Revive failed";
-      updateHud();
-      return;
-    }
+    if (!payment.ok) { dom.reviveButton.textContent = payment.reason || "Revive failed"; updateHud(); return; }
     state.revivedThisRun = true;
     state.mode = "running";
-    state.invincibleUntil = state.elapsed + 3;
-    state.flashTimer = 3;
-    state.obstacles = state.obstacles.filter(item => Math.abs(item.y - groundY()) > 220);
-    state.pickups = state.pickups.filter(item => item.y < groundY() - 80);
-    hideOverlay(dom.deathOverlay);
+    state.invincibleUntil = state.elapsed + 2.6;
+    state.flash = 0.6;
+    // clear the immediate danger zone
+    state.obstacles = state.obstacles.filter(o => o.z > PLAYER_Z + HIT_BAND + 6);
+    Object.assign(state.player, { worldY: 0, vy: 0, onGround: true, slideT: 0 });
+    hide(dom.deathOverlay);
     dom.revivedBanner.classList.remove("is-visible");
     void dom.revivedBanner.offsetWidth;
     dom.revivedBanner.classList.add("is-visible");
-    burst(laneToX(state.player.lane), groundY() - 45, "#4dff73", 42);
-    audio.beep(740, 0.1, "square");
-    setTimeout(() => audio.beep(980, 0.12, "square"), 110);
+    const p = project(PLAYER_Z, laneToX(state.player.laneFloat), 0.4);
+    burst(p.x, p.y, "#4dff73", 44, 260);
+    audio.chord([660, 880, 1180], 0.12);
     updateHud();
   }
 
-  function moveLane(direction) {
+  // --- Input ----------------------------------------------------------
+  function moveLane(dir) {
     if (state.mode !== "running") return;
-    state.player.lane = clamp(state.player.lane + direction, -1, 1);
-    audio.beep(380 + state.player.lane * 80, 0.04);
-  }
-
-  function jump() {
-    if (state.mode !== "running") return;
-    if (state.player.jumpTime <= 0.02) {
-      state.player.jumpTime = 0.72;
-      state.player.slideTime = 0;
-      audio.beep(620, 0.06);
+    const next = clamp(state.player.lane + dir, -1, 1);
+    if (next !== state.player.lane) {
+      state.player.lane = next;
+      state.player.lean = clamp(state.player.lean + dir * 0.5, -1, 1);
+      audio.beep(420 + next * 70, 0.04, "square", 0.05);
     }
   }
-
+  function jump() {
+    if (state.mode !== "running") return;
+    if (state.player.onGround) {
+      state.player.vy = 3.0;
+      state.player.onGround = false;
+      state.player.slideT = 0;
+      audio.beep(560, 0.08, "square", 0.06);
+      dust();
+    }
+  }
   function slide() {
     if (state.mode !== "running") return;
-    state.player.slideTime = 0.62;
-    state.player.jumpTime = 0;
-    audio.beep(230, 0.05, "sawtooth");
+    if (!state.player.onGround) { state.player.vy = Math.min(state.player.vy, -3.2); } // fast-fall into slide
+    state.player.slideT = 0.62;
+    audio.beep(240, 0.07, "sawtooth", 0.05);
   }
 
+  // --- Update ---------------------------------------------------------
   function update(dt) {
+    const p = state.player;
+    p.runPhase += dt * (state.mode === "running" ? 15 : 4);
+    p.lean = lerp(p.lean, 0, Math.min(1, dt * 6));
+    state.flash = Math.max(0, state.flash - dt);
+    state.hitFlash = Math.max(0, state.hitFlash - dt * 3);
+    state.shake = Math.max(0, state.shake - dt * 36);
+
     if (state.mode !== "running") {
-      state.chartPhase += dt * 0.26;
-      state.shake = Math.max(0, state.shake - dt * 24);
+      state.scroll += dt * 6;
+      stepParticles(dt);
       return;
     }
 
     state.elapsed += dt;
-    state.chartPhase += dt * (0.34 + state.speed / 900);
-    state.speed = Math.min(620, 305 + state.elapsed * 5.8);
-    state.score += dt * (18 + state.speed * 0.12);
-    state.spawnTimer -= dt;
-    state.coinSpawnTimer -= dt;
-    state.flashTimer = Math.max(0, state.flashTimer - dt);
-    state.shake = Math.max(0, state.shake - dt * 38);
+    state.speed = Math.min(64, 26 + state.elapsed * 1.35);
+    state.distance += state.speed * dt * 0.6;
+    state.scroll += dt * state.speed;
 
-    const player = state.player;
-    player.laneFloat += (player.lane - player.laneFloat) * Math.min(1, dt * 13);
-    player.jumpTime = Math.max(0, player.jumpTime - dt);
-    player.slideTime = Math.max(0, player.slideTime - dt);
-
-    if (state.spawnTimer <= 0) {
-      spawnObstacle();
-      state.spawnTimer = Math.max(0.48, random(0.82, 1.34) - state.elapsed * 0.006);
+    // lane / vertical physics
+    p.laneFloat = lerp(p.laneFloat, p.lane, Math.min(1, dt * 12));
+    if (!p.onGround) {
+      p.vy -= 9.2 * dt;             // gravity (world units)
+      p.worldY += p.vy * dt;
+      if (p.worldY <= 0) { p.worldY = 0; p.vy = 0; p.onGround = true; dust(); }
     }
+    p.slideT = Math.max(0, p.slideT - dt);
 
-    if (state.coinSpawnTimer <= 0) {
-      spawnCoinRow();
-      state.coinSpawnTimer = random(0.74, 1.18);
-    }
-
+    // advance world toward camera
     const travel = state.speed * dt;
-    for (const obstacle of state.obstacles) obstacle.y += travel;
-    for (const pickup of state.pickups) pickup.y += travel;
-    for (const particle of state.particles) {
-      particle.x += particle.vx * dt;
-      particle.y += particle.vy * dt;
-      particle.life -= dt;
-      particle.size *= 0.986;
+    for (const o of state.obstacles) o.z -= travel;
+    for (const c of state.coinsArr) c.z -= travel;
+    state.obstacles = state.obstacles.filter(o => o.z > DESPAWN_Z);
+    state.coinsArr = state.coinsArr.filter(c => c.z > DESPAWN_Z && !c.got);
+
+    // spawn obstacles by distance cursor
+    state.spawnZCursor -= travel;
+    if (state.spawnZCursor <= SPAWN_Z) {
+      spawnObstacleRow();
+      const gap = clamp(rand(20, 30) - state.elapsed * 0.18, 11, 30);
+      state.spawnZCursor = SPAWN_Z + gap;
     }
 
-    state.obstacles = state.obstacles.filter(item => item.y < state.view.h + 120);
-    state.pickups = state.pickups.filter(item => item.y < state.view.h + 80 && !item.collected);
-    state.particles = state.particles.filter(item => item.life > 0);
+    // spawn coin arcs
+    state.coinTimer -= dt;
+    if (state.coinTimer <= 0) {
+      spawnCoinRun();
+      state.coinTimer = rand(0.9, 1.7);
+    }
 
+    stepParticles(dt);
     checkCollisions();
     updateHud();
   }
 
-  function spawnObstacle() {
-    const type = weightedObstacle();
-    const lane = randomChoice(LANES);
-    state.obstacles.push({
-      id: `${type.id}-${Date.now()}-${Math.random()}`,
-      type,
-      lane,
-      y: -70,
-      wobble: random(0, Math.PI * 2),
-      size: random(0.88, 1.12),
-    });
+  function stepParticles(dt) {
+    for (const pt of state.particles) {
+      pt.x += pt.vx * dt;
+      pt.y += pt.vy * dt;
+      pt.vy += 320 * dt;
+      pt.life -= dt;
+      pt.size *= 0.98;
+    }
+    state.particles = state.particles.filter(pt => pt.life > 0);
   }
 
-  function spawnCoinRow() {
-    const lane = randomChoice(LANES);
-    const count = Math.random() > 0.68 ? 3 : 2;
-    for (let i = 0; i < count; i += 1) {
-      state.pickups.push({
+  function spawnObstacleRow() {
+    const kind = pick([OB_BARRIER, OB_BEAM, OB_PIT, OB_BARRIER, OB_BEAM]);
+    // Leave at least one safe lane. Block 1 or 2 lanes.
+    const blockCount = Math.random() < 0.34 && state.elapsed > 12 ? 2 : 1;
+    const lanesCopy = [...LANES];
+    const blocked = [];
+    for (let i = 0; i < blockCount; i++) blocked.push(lanesCopy.splice((Math.random() * lanesCopy.length) | 0, 1)[0]);
+    for (const lane of blocked) {
+      state.obstacles.push({ kind, lane, z: SPAWN_Z, cleared: false, wob: rand(0, 6.28) });
+    }
+  }
+
+  function spawnCoinRun() {
+    const lane = pick(LANES);
+    const count = 4 + ((Math.random() * 4) | 0);
+    const arc = Math.random() < 0.4;     // arc invites a jump
+    for (let i = 0; i < count; i++) {
+      state.coinsArr.push({
         lane,
-        y: -90 - i * 58,
-        spin: random(0, Math.PI * 2),
-        collected: false,
+        z: SPAWN_Z + i * 3.0,
+        worldY: arc ? Math.sin((i / (count - 1)) * Math.PI) * 0.7 : 0.15,
+        got: false,
+        spin: rand(0, 6.28),
       });
     }
   }
 
   function checkCollisions() {
-    const px = laneToX(state.player.laneFloat);
-    const py = groundY() - jumpOffset();
-    const sliding = state.player.slideTime > 0;
-    const jumping = jumpOffset() > 42;
+    const p = state.player;
+    const pLane = p.laneFloat;
+    const sliding = p.slideT > 0;
 
-    for (const pickup of state.pickups) {
-      if (pickup.collected) continue;
-      if (Math.abs(laneToX(pickup.lane) - px) < 46 && Math.abs(pickup.y - py) < 54) {
-        pickup.collected = true;
-        state.coins += 1;
-        state.score += 25;
-        burst(laneToX(pickup.lane), pickup.y, "#ffd84d", 8);
-        audio.beep(880, 0.045, "triangle");
+    for (const c of state.coinsArr) {
+      if (c.got) continue;
+      if (c.z < PLAYER_Z + 1.6 && c.z > PLAYER_Z - 1.2 && Math.abs(c.lane - pLane) < 0.45) {
+        const dy = Math.abs(c.worldY - (p.worldY + 0.4));
+        if (dy < 0.6) {
+          c.got = true;
+          state.coins += 1;
+          state.distance += 6;
+          const sp = project(c.z, laneToX(c.lane), c.worldY + 0.4);
+          burst(sp.x, sp.y, "#ffd84d", 7, 120);
+          audio.beep(900 + (state.coins % 6) * 40, 0.05, "triangle", 0.045);
+        }
       }
     }
 
-    for (const obstacle of state.obstacles) {
-      if (Math.abs(laneToX(obstacle.lane) - px) > 48 || Math.abs(obstacle.y - groundY()) > 50) continue;
-      const clear = obstacle.type.clear;
-      const avoided = clear === "jump" && jumping || clear === "slide" && sliding;
-      if (!avoided) {
-        die();
-        break;
-      }
-      if (!obstacle.cleared) {
-        obstacle.cleared = true;
-        state.score += 45;
-        burst(laneToX(obstacle.lane), obstacle.y, "#4deeff", 10);
+    for (const o of state.obstacles) {
+      if (o.z > PLAYER_Z + HIT_BAND || o.z < PLAYER_Z - HIT_BAND) continue;
+      if (Math.abs(o.lane - pLane) > 0.5) continue;
+      let safe = false;
+      if (o.kind.clear === "jump") safe = p.worldY > (o.kind === OB_PIT ? 0.18 : 0.34);
+      else if (o.kind.clear === "slide") safe = sliding && p.onGround;
+      if (!safe) { die(); return; }
+      if (!o.cleared) {
+        o.cleared = true;
+        state.distance += 12;
+        const sp = project(o.z, laneToX(o.lane), 0.5);
+        burst(sp.x, sp.y, "#4deeff", 8, 140);
       }
     }
   }
 
+  // --- Render ---------------------------------------------------------
   function render() {
     const { w, h } = state.view;
     ctx.save();
     ctx.clearRect(0, 0, w, h);
-    if (state.shake > 0) {
-      ctx.translate(random(-state.shake, state.shake), random(-state.shake, state.shake));
+    if (state.shake > 0) ctx.translate(rand(-state.shake, state.shake), rand(-state.shake, state.shake));
+
+    drawSky(w, h);
+    drawRoad(w, h);
+    drawPillars(w, h);
+
+    // depth-sorted scene objects (painter's algorithm, far first)
+    const items = [];
+    for (const o of state.obstacles) items.push({ z: o.z, kind: "ob", ref: o });
+    for (const c of state.coinsArr) if (!c.got) items.push({ z: c.z, kind: "coin", ref: c });
+    items.push({ z: PLAYER_Z, kind: "player", ref: state.player });
+    items.sort((a, b) => b.z - a.z);
+    for (const it of items) {
+      if (it.kind === "ob") drawObstacle(it.ref);
+      else if (it.kind === "coin") drawCoin(it.ref);
+      else drawPlayer();
     }
-    drawBackground(w, h);
-    drawRunway(w, h);
-    drawPickups();
-    drawObstacles();
-    drawPlayer();
+
     drawParticles();
-    drawVignette(w, h);
+    drawAtmosphere(w, h);
     ctx.restore();
   }
 
-  function drawBackground(w, h) {
-    const gradient = ctx.createLinearGradient(0, 0, 0, h);
-    gradient.addColorStop(0, "#07000b");
-    gradient.addColorStop(0.5, "#13071b");
-    gradient.addColorStop(1, "#030105");
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, w, h);
+  function drawSky(w, h) {
+    const horizonY = h * CAM.horizon;
+    const sky = ctx.createLinearGradient(0, 0, 0, horizonY + 40);
+    sky.addColorStop(0, "#06121a");
+    sky.addColorStop(0.55, "#0b2630");
+    sky.addColorStop(1, "#123f3a");
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, w, horizonY + 60);
 
+    // cursed green sun glow at the vanishing point
+    const glow = ctx.createRadialGradient(w / 2, horizonY, 8, w / 2, horizonY, h * 0.5);
+    glow.addColorStop(0, "rgba(77,255,115,0.42)");
+    glow.addColorStop(0.4, "rgba(77,255,115,0.12)");
+    glow.addColorStop(1, "rgba(77,255,115,0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, w, horizonY + h * 0.3);
+
+    // distant chart skyline silhouette
+    ctx.fillStyle = "rgba(3,10,12,0.85)";
+    const baseY = horizonY + 2;
+    const barW = w / 26;
+    for (let i = 0; i <= 26; i++) {
+      const x = i * barW;
+      const hgt = 8 + (Math.sin(i * 1.7) * 0.5 + 0.5) * (h * 0.09);
+      ctx.fillRect(x, baseY - hgt, barW - 2, hgt);
+    }
+    // floor fills below horizon edges (dark temple ground)
+    ctx.fillStyle = "#070d0c";
+    ctx.fillRect(0, horizonY, w, h - horizonY);
+  }
+
+  function drawRoad(w, h) {
+    const nearZ = 1.5, farZ = SPAWN_Z;
+    const nl = project(nearZ, -ROAD_HALF, 0), nr = project(nearZ, ROAD_HALF, 0);
+    const fl = project(farZ, -ROAD_HALF, 0), fr = project(farZ, ROAD_HALF, 0);
+
+    // road surface
+    const grad = ctx.createLinearGradient(0, fl.y, 0, nl.y);
+    grad.addColorStop(0, "#0a1614");
+    grad.addColorStop(1, "#16201d");
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(fl.x, fl.y); ctx.lineTo(fr.x, fr.y);
+    ctx.lineTo(nr.x, nr.y); ctx.lineTo(nl.x, nl.y); ctx.closePath();
+    ctx.fill();
+
+    // glowing road edges
+    ctx.lineWidth = 2;
+    for (const sgn of [-1, 1]) {
+      const f = project(farZ, sgn * ROAD_HALF, 0), n = project(nearZ, sgn * ROAD_HALF, 0);
+      ctx.strokeStyle = "rgba(77,255,115,0.5)";
+      ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.lineTo(n.x, n.y); ctx.stroke();
+    }
+
+    // lane dividers
+    for (const lx of [-LANE_W / 2, LANE_W / 2]) {
+      const f = project(farZ, lx, 0), n = project(nearZ, lx, 0);
+      ctx.strokeStyle = "rgba(120,200,255,0.16)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.lineTo(n.x, n.y); ctx.stroke();
+    }
+
+    // scrolling rungs (sells forward motion)
+    const spacing = 4;
+    const startZ = nearZ + (state.scroll % spacing);
+    for (let z = startZ; z < farZ; z += spacing) {
+      const l = project(z, -ROAD_HALF, 0), r = project(z, ROAD_HALF, 0);
+      const a = clamp(0.42 - z / farZ * 0.4, 0.03, 0.42);
+      ctx.strokeStyle = (Math.floor(z) % 8 < 4) ? `rgba(77,255,115,${a})` : `rgba(255,49,79,${a * 0.8})`;
+      ctx.lineWidth = clamp(l.scale * 60, 0.6, 3);
+      ctx.beginPath(); ctx.moveTo(l.x, l.y); ctx.lineTo(r.x, r.y); ctx.stroke();
+    }
+  }
+
+  function drawPillars(w, h) {
+    const spacing = 9;
+    const startZ = 2 + (state.scroll % spacing);
+    const list = [];
+    for (let z = startZ; z < SPAWN_Z; z += spacing) list.push(z);
+    list.sort((a, b) => b - a); // far first
+    for (const z of list) {
+      for (const sgn of [-1, 1]) {
+        drawPillar(sgn * WALL_X, z);
+      }
+    }
+  }
+
+  function drawPillar(laneX, z) {
+    const base = project(z, laneX, 0);
+    const top = project(z, laneX, 2.3);
+    if (base.scale < 0.012) return;
+    const wpx = clamp(base.scale * (state.view.w * 0.34), 1, 80);
+    const torchOn = Math.floor(z / 9) % 2 === 0;
+
+    // column body
+    const colGrad = ctx.createLinearGradient(base.x - wpx / 2, 0, base.x + wpx / 2, 0);
+    colGrad.addColorStop(0, "#0c1a17");
+    colGrad.addColorStop(0.5, "#27433b");
+    colGrad.addColorStop(1, "#0c1a17");
+    ctx.fillStyle = colGrad;
+    ctx.fillRect(base.x - wpx / 2, top.y, wpx, base.y - top.y);
+    // cap
+    ctx.fillStyle = "#2f4f45";
+    ctx.fillRect(base.x - wpx * 0.62, top.y - wpx * 0.18, wpx * 1.24, wpx * 0.3);
+
+    // torch glow
+    if (torchOn) {
+      const flick = 0.6 + Math.sin(state.elapsed * 12 + z) * 0.18 + Math.random() * 0.08;
+      const ty = lerp(top.y, base.y, 0.28);
+      const r = wpx * 1.5;
+      const tg = ctx.createRadialGradient(base.x, ty, 1, base.x, ty, r);
+      tg.addColorStop(0, `rgba(120,255,150,${0.5 * flick})`);
+      tg.addColorStop(0.5, `rgba(77,255,115,${0.18 * flick})`);
+      tg.addColorStop(1, "rgba(77,255,115,0)");
+      ctx.fillStyle = tg;
+      ctx.beginPath(); ctx.arc(base.x, ty, r, 0, 6.2832); ctx.fill();
+    }
+  }
+
+  function drawCoin(c) {
+    const p = project(c.z, laneToX(c.lane), c.worldY + 0.4);
+    if (p.scale < 0.012) return;
+    const r = clamp(p.scale * 90, 3, 26);
+    const squish = Math.abs(Math.cos(state.elapsed * 5 + c.spin)); // spinning coin
     ctx.save();
-    ctx.globalAlpha = 0.38;
-    ctx.lineWidth = 2;
-    drawChartLine(w, h * 0.24, "#4dff73", 0);
-    drawChartLine(w, h * 0.38, "#ff314f", 1.7);
-    drawChartLine(w, h * 0.56, "#9a5cff", 3.2);
-    ctx.restore();
-
-    const candleCount = Math.ceil(w / 42) + 4;
-    for (let i = -2; i < candleCount; i += 1) {
-      const x = ((i * 42 - state.chartPhase * 96) % (w + 168)) - 84;
-      const base = 62 + (Math.sin(i * 1.8 + state.chartPhase * 4) + 1) * 56;
-      const height = 18 + Math.abs(Math.sin(i * 2.3)) * 58;
-      const green = Math.sin(i + state.chartPhase * 2) > -0.1;
-      ctx.fillStyle = green ? "rgba(77,255,115,0.24)" : "rgba(255,49,79,0.28)";
-      ctx.fillRect(x, base, 10, height);
-      ctx.strokeStyle = green ? "rgba(77,255,115,0.46)" : "rgba(255,49,79,0.5)";
-      ctx.beginPath();
-      ctx.moveTo(x + 5, base - 16);
-      ctx.lineTo(x + 5, base + height + 16);
-      ctx.stroke();
-    }
-
-    ctx.font = "700 13px 'DM Mono', monospace";
-    ctx.fillStyle = "rgba(255,255,255,0.08)";
-    for (let y = 38; y < h; y += 54) {
-      ctx.fillText("FAKE PUMP", 18 + (y % 3) * 34, y);
-      ctx.fillText("DODGE THE RUGS", w - 178 - (y % 2) * 48, y + 22);
-    }
-  }
-
-  function drawChartLine(w, centerY, color, offset) {
-    ctx.strokeStyle = color;
-    ctx.beginPath();
-    for (let x = -20; x <= w + 20; x += 18) {
-      const y = centerY
-        + Math.sin(x * 0.018 + state.chartPhase * 5 + offset) * 28
-        + Math.sin(x * 0.044 - state.chartPhase * 2.5) * 13;
-      if (x === -20) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-  }
-
-  function drawRunway(w, h) {
-    const topY = h * 0.22;
-    const bottomY = h * 0.96;
-    const topW = w * 0.28;
-    const bottomW = w * 0.92;
-    const cx = w / 2;
-
-    const runway = ctx.createLinearGradient(0, topY, 0, bottomY);
-    runway.addColorStop(0, "rgba(77,255,115,0.08)");
-    runway.addColorStop(0.48, "rgba(154,92,255,0.13)");
-    runway.addColorStop(1, "rgba(255,49,79,0.18)");
-
-    ctx.fillStyle = runway;
-    ctx.strokeStyle = "rgba(77,255,115,0.58)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(cx - topW / 2, topY);
-    ctx.lineTo(cx + topW / 2, topY);
-    ctx.lineTo(cx + bottomW / 2, bottomY);
-    ctx.lineTo(cx - bottomW / 2, bottomY);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    for (const laneLine of [-0.5, 0.5]) {
-      ctx.strokeStyle = "rgba(77,238,255,0.28)";
-      ctx.beginPath();
-      ctx.moveTo(interpolate(cx - topW / 2, cx + topW / 2, (laneLine + 1.5) / 3), topY);
-      ctx.lineTo(interpolate(cx - bottomW / 2, cx + bottomW / 2, (laneLine + 1.5) / 3), bottomY);
-      ctx.stroke();
-    }
-
-    for (let y = topY; y < bottomY + 80; y += 46) {
-      const yy = ((y + state.chartPhase * 160 - topY) % (bottomY - topY + 80)) + topY - 40;
-      const scale = (yy - topY) / (bottomY - topY);
-      const half = interpolate(topW, bottomW, scale) / 2;
-      ctx.strokeStyle = Math.sin(yy * 0.08) > 0 ? "rgba(77,255,115,0.22)" : "rgba(255,49,79,0.22)";
-      ctx.beginPath();
-      ctx.moveTo(cx - half, yy);
-      ctx.lineTo(cx + half, yy);
-      ctx.stroke();
-    }
-  }
-
-  function drawPickups() {
-    for (const pickup of state.pickups) {
-      const x = laneToX(pickup.lane);
-      const y = pickup.y;
-      const pulse = 1 + Math.sin(state.elapsed * 8 + pickup.spin) * 0.08;
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.scale(pulse, pulse);
-      ctx.shadowBlur = 20;
-      ctx.shadowColor = "#ffd84d";
-      ctx.fillStyle = "#ffd84d";
-      ctx.beginPath();
-      ctx.arc(0, 0, 17, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.strokeStyle = "#4dff73";
-      ctx.lineWidth = 3;
-      ctx.stroke();
-      ctx.fillStyle = "#190b05";
-      ctx.font = "900 12px 'DM Mono', monospace";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText("$T", 0, 1);
-      ctx.restore();
-    }
-  }
-
-  function drawObstacles() {
-    for (const obstacle of state.obstacles) {
-      const x = laneToX(obstacle.lane);
-      const y = obstacle.y;
-      const scale = obstacle.size;
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.scale(scale, scale);
-      if (obstacle.type.id === "red-candle") drawRedCandle(obstacle);
-      else if (obstacle.type.id === "rug-hole") drawRugHole();
-      else if (obstacle.type.id === "npc") drawNpc(obstacle);
-      else if (obstacle.type.id === "bear") drawBear();
-      else if (obstacle.type.id === "chart-wall") drawChartWall();
-      else if (obstacle.type.id === "scam-barrel") drawScamBarrel();
-      else drawFudSign();
-      ctx.restore();
-    }
-  }
-
-  function drawRedCandle(obstacle) {
-    ctx.shadowBlur = 18;
-    ctx.shadowColor = "#ff314f";
-    ctx.fillStyle = obstacle.cleared ? "rgba(255,49,79,0.35)" : "#ff314f";
-    ctx.fillRect(-16, -54, 32, 82);
-    ctx.fillStyle = "#140006";
-    ctx.fillRect(-9, -46, 18, 66);
-    ctx.strokeStyle = "#ffb0bd";
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(0, -72);
-    ctx.lineTo(0, 42);
-    ctx.stroke();
-    labelText("SELL");
-  }
-
-  function drawRugHole() {
-    ctx.shadowBlur = 24;
-    ctx.shadowColor = "#9a5cff";
-    ctx.fillStyle = "#010101";
-    ctx.beginPath();
-    ctx.ellipse(0, 8, 43, 24, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "#9a5cff";
-    ctx.lineWidth = 3;
-    ctx.stroke();
-    ctx.fillStyle = "#ff314f";
-    ctx.font = "900 12px 'DM Mono', monospace";
-    ctx.textAlign = "center";
-    ctx.fillText("RUG", 0, 12);
-  }
-
-  function drawNpc(obstacle) {
-    const bob = Math.sin(state.elapsed * 9 + obstacle.wobble) * 3;
-    ctx.translate(0, bob);
-    ctx.shadowBlur = 15;
-    ctx.shadowColor = "#9a5cff";
-    ctx.fillStyle = "#9a5cff";
-    ctx.fillRect(-23, -42, 46, 58);
-    ctx.fillStyle = "#f7fff8";
-    ctx.beginPath();
-    ctx.arc(0, -54, 18, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#08010a";
-    ctx.fillRect(-8, -58, 5, 5);
-    ctx.fillRect(5, -58, 5, 5);
-    labelText("NPC");
-  }
-
-  function drawBear() {
-    ctx.shadowBlur = 18;
-    ctx.shadowColor = "#ff314f";
-    ctx.fillStyle = "#2b1014";
-    ctx.beginPath();
-    ctx.arc(0, -18, 34, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#ff314f";
-    ctx.beginPath();
-    ctx.arc(-22, -45, 13, 0, Math.PI * 2);
-    ctx.arc(22, -45, 13, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.translate(p.x, p.y);
+    ctx.shadowBlur = 16; ctx.shadowColor = "#ffd84d";
     ctx.fillStyle = "#ffd84d";
-    ctx.font = "900 22px 'DM Mono', monospace";
-    ctx.textAlign = "center";
-    ctx.fillText("BEAR", 0, -11);
-  }
-
-  function drawChartWall() {
-    ctx.shadowBlur = 18;
-    ctx.shadowColor = "#4deeff";
-    ctx.fillStyle = "#12202a";
-    for (let i = 0; i < 4; i += 1) {
-      ctx.fillRect(-40 + i * 20, -58 + (i % 2) * 8, 18, 78);
-    }
-    ctx.strokeStyle = "#4deeff";
-    ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.moveTo(-42, -18);
-    ctx.lineTo(-16, -34);
-    ctx.lineTo(8, -4);
-    ctx.lineTo(35, -44);
-    ctx.stroke();
-  }
-
-  function drawScamBarrel() {
-    ctx.shadowBlur = 16;
-    ctx.shadowColor = "#ffd84d";
-    ctx.fillStyle = "#d89b18";
-    ctx.fillRect(-30, -48, 60, 66);
-    ctx.fillStyle = "#ff314f";
-    ctx.fillRect(-30, -26, 60, 18);
-    ctx.fillStyle = "#08020a";
-    ctx.font = "900 13px 'DM Mono', monospace";
-    ctx.textAlign = "center";
-    ctx.fillText("SCAM", 0, -12);
-  }
-
-  function drawFudSign() {
-    ctx.shadowBlur = 16;
-    ctx.shadowColor = "#ffffff";
-    ctx.fillStyle = "#f7fff8";
-    ctx.fillRect(-34, -62, 68, 40);
-    ctx.fillStyle = "#ff314f";
-    ctx.font = "900 18px 'DM Mono', monospace";
-    ctx.textAlign = "center";
-    ctx.fillText("FUD", 0, -36);
-    ctx.strokeStyle = "#f7fff8";
-    ctx.lineWidth = 5;
-    ctx.beginPath();
-    ctx.moveTo(0, -22);
-    ctx.lineTo(0, 24);
-    ctx.stroke();
-  }
-
-  function labelText(text) {
+    ctx.ellipse(0, 0, Math.max(2, r * (0.35 + squish * 0.65)), r, 0, 0, 6.2832);
+    ctx.fill();
     ctx.shadowBlur = 0;
-    ctx.fillStyle = "#f7fff8";
-    ctx.font = "900 11px 'DM Mono', monospace";
-    ctx.textAlign = "center";
-    ctx.fillText(text, 0, 50);
+    ctx.lineWidth = Math.max(1, r * 0.14);
+    ctx.strokeStyle = "#b6831a";
+    ctx.stroke();
+    if (r > 9 && squish > 0.4) {
+      ctx.fillStyle = "#6b4a07";
+      ctx.font = `900 ${Math.floor(r * 0.9)}px 'DM Mono', monospace`;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("T", 0, r * 0.06);
+    }
+    ctx.restore();
+  }
+
+  function drawObstacle(o) {
+    const laneX = laneToX(o.lane);
+    if (o.kind === OB_PIT) { drawPit(o, laneX); return; }
+    const p = project(o.z, laneX, 0);
+    if (p.scale < 0.012) return;
+    const halfW = LANE_W * 0.46;
+    const lEdge = project(o.z, laneX - halfW, 0);
+    const rEdge = project(o.z, laneX + halfW, 0);
+    const wpx = Math.max(4, rEdge.x - lEdge.x);
+
+    if (o.kind === OB_BARRIER) {
+      // red-candle gate: jump it
+      const topB = project(o.z, laneX, 0.62);
+      const h = p.y - topB.y;
+      ctx.save();
+      ctx.shadowBlur = clamp(p.scale * 120, 2, 22); ctx.shadowColor = "#ff314f";
+      const g = ctx.createLinearGradient(0, topB.y, 0, p.y);
+      g.addColorStop(0, "#ff5c73"); g.addColorStop(1, "#b3092a");
+      ctx.fillStyle = g;
+      ctx.fillRect(p.x - wpx / 2, topB.y, wpx, h);
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "rgba(0,0,0,0.28)";
+      ctx.fillRect(p.x - wpx / 2, topB.y + h * 0.32, wpx, h * 0.16);
+      // wick
+      ctx.strokeStyle = "#ffd0d8"; ctx.lineWidth = Math.max(1, wpx * 0.05);
+      const wick = project(o.z, laneX, 0.85);
+      ctx.beginPath(); ctx.moveTo(p.x, topB.y); ctx.lineTo(wick.x, wick.y); ctx.stroke();
+      if (wpx > 30) label(p.x, topB.y - 6, "JUMP", "#ffd0d8", wpx);
+      ctx.restore();
+    } else if (o.kind === OB_BEAM) {
+      // FUD overhang: slide under it
+      const lo = project(o.z, laneX, 0.62);
+      const hi = project(o.z, laneX, 1.16);
+      ctx.save();
+      ctx.shadowBlur = clamp(p.scale * 110, 2, 20); ctx.shadowColor = "#4deeff";
+      ctx.fillStyle = "#0e3a44";
+      ctx.fillRect(p.x - wpx / 2, hi.y, wpx, lo.y - hi.y);
+      ctx.strokeStyle = "#4deeff"; ctx.lineWidth = Math.max(1, wpx * 0.04);
+      ctx.strokeRect(p.x - wpx / 2, hi.y, wpx, lo.y - hi.y);
+      ctx.shadowBlur = 0;
+      if (wpx > 34) {
+        ctx.fillStyle = "#bff4ff";
+        ctx.font = `900 ${clamp(wpx * 0.26, 8, 26)}px 'DM Mono', monospace`;
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText("FUD", p.x, (hi.y + lo.y) / 2);
+      }
+      // support posts
+      ctx.fillStyle = "#0e3a44";
+      ctx.fillRect(p.x - wpx / 2, hi.y, Math.max(2, wpx * 0.08), p.y - hi.y);
+      ctx.fillRect(p.x + wpx / 2 - Math.max(2, wpx * 0.08), hi.y, Math.max(2, wpx * 0.08), p.y - hi.y);
+      ctx.restore();
+    }
+  }
+
+  function drawPit(o, laneX) {
+    const half = LANE_W * 0.5;
+    const nearZ = o.z - 1.4, farZ = o.z + 1.4;
+    const fl = project(farZ, laneX - half, 0), fr = project(farZ, laneX + half, 0);
+    const nl = project(nearZ, laneX - half, 0), nr = project(nearZ, laneX + half, 0);
+    if (nl.scale < 0.012) return;
+    ctx.save();
+    ctx.fillStyle = "#01060a";
+    ctx.beginPath();
+    ctx.moveTo(fl.x, fl.y); ctx.lineTo(fr.x, fr.y); ctx.lineTo(nr.x, nr.y); ctx.lineTo(nl.x, nl.y);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "rgba(154,92,255,0.7)"; ctx.lineWidth = clamp(nl.scale * 40, 1, 3);
+    ctx.stroke();
+    const cx = (nl.x + nr.x) / 2, cy = (nl.y + fl.y) / 2;
+    if (nr.x - nl.x > 36) label(cx, cy, "RUG", "#c9a8ff", nr.x - nl.x);
+    ctx.restore();
+  }
+
+  function label(x, y, text, color, wpx) {
+    ctx.fillStyle = color;
+    ctx.font = `900 ${clamp(wpx * 0.2, 8, 18)}px 'DM Mono', monospace`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(text, x, y);
   }
 
   function drawPlayer() {
-    const x = laneToX(state.player.laneFloat);
-    const y = groundY() - jumpOffset();
-    const sliding = state.player.slideTime > 0;
-    const invincible = state.elapsed < state.invincibleUntil;
-    const runCycle = state.elapsed * (state.mode === "running" ? 9.5 : 2.2);
-    const stride = Math.sin(runCycle);
-    const counterStride = Math.cos(runCycle);
-    ctx.save();
-    ctx.translate(x, y);
-    if (sliding) {
-      ctx.translate(0, 14);
-      ctx.scale(1.18, 0.62);
-    }
-    if (invincible && Math.floor(state.elapsed * 16) % 2 === 0) ctx.globalAlpha = 0.48;
-    ctx.shadowBlur = invincible ? 28 : 18;
-    ctx.shadowColor = invincible ? "#4dff73" : "#9a5cff";
+    const p = state.player;
+    const laneX = laneToX(p.laneFloat);
+    const base = project(PLAYER_Z, laneX, 0);
+    const bob = Math.abs(Math.sin(p.runPhase)) * (p.onGround && p.slideT <= 0 ? 6 : 0);
+    const groundProj = project(PLAYER_Z, laneX, 0);
+    const liftPx = groundProj.y - project(PLAYER_Z, laneX, p.worldY).y;
 
-    if (playerImage.complete && playerImage.naturalWidth > 0) {
-      ctx.save();
-      ctx.translate(0, Math.sin(runCycle * 2) * 2);
-      drawBuffPart(BUFF_RIG.parts.backArm, -0.16 - stride * 0.08, 0, 0);
-      drawBuffPart(BUFF_RIG.parts.leg, stride * 0.13, 0, 0);
-      drawBuffPart(BUFF_RIG.parts.torso, Math.sin(runCycle * 0.5) * 0.025, 0, 0);
-      drawBuffPart(BUFF_RIG.parts.frontArm, 0.14 + counterStride * 0.08, 0, 0);
-      drawBuffPart(BUFF_RIG.parts.head, Math.sin(runCycle * 0.7) * 0.035, 0, -1);
-      drawBuffExpression(invincible ? "revived" : sliding ? "sneak" : state.mode === "dead" ? "rugged" : "grin");
-      ctx.restore();
-    } else {
+    // ground shadow (shrinks with jump height)
+    const shW = base.scale * state.view.w * 0.32;
+    const shrink = clamp(1 - p.worldY * 0.7, 0.35, 1);
+    ctx.save();
+    ctx.fillStyle = `rgba(0,0,0,${0.4 * shrink})`;
+    ctx.beginPath();
+    ctx.ellipse(base.x, base.y - 4, shW * shrink, shW * 0.26 * shrink, 0, 0, 6.2832);
+    ctx.fill();
+    ctx.restore();
+
+    if (!(playerImage.complete && playerImage.naturalWidth)) {
       ctx.fillStyle = "#4dff73";
-      ctx.beginPath();
-      ctx.arc(0, -42, 30, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#08020a";
-      ctx.font = "900 15px 'DM Mono', monospace";
-      ctx.textAlign = "center";
-      ctx.fillText(":T", 0, -38);
+      ctx.beginPath(); ctx.arc(base.x, base.y - 40, 26, 0, 6.2832); ctx.fill();
+      return;
     }
 
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = "#ffd84d";
-    ctx.font = "900 11px 'DM Mono', monospace";
-    ctx.textAlign = "center";
-    ctx.fillText("$TROLL", 0, 18);
-    ctx.restore();
-  }
+    const sliding = p.slideT > 0 && p.onGround;
+    const targetH = base.scale * state.view.h * 0.74;     // sprite height in px (~38% of canvas)
+    const aspect = playerImage.naturalWidth / playerImage.naturalHeight;
+    let drawH = targetH;
+    let drawW = drawH * aspect;
 
-  function drawBuffPart(part, rotation, offsetX, offsetY) {
-    const { origin, scale } = BUFF_RIG;
     ctx.save();
-    ctx.translate((part.px - origin.x) * scale + offsetX, (part.py - origin.y) * scale + offsetY);
-    ctx.rotate(rotation);
-    ctx.drawImage(
-      playerImage,
-      part.sx,
-      part.sy,
-      part.sw,
-      part.sh,
-      (part.sx - part.px) * scale,
-      (part.sy - part.py) * scale,
-      part.sw * scale,
-      part.sh * scale
-    );
-    ctx.restore();
-  }
-
-  function drawBuffExpression(expression) {
-    const { origin, scale } = BUFF_RIG;
-    const faceX = (812 - origin.x) * scale;
-    const faceY = (382 - origin.y) * scale;
-    ctx.save();
-    ctx.translate(faceX, faceY);
-    ctx.scale(scale, scale);
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = expression === "revived" ? "#4dff73" : "#08020a";
-    ctx.fillStyle = expression === "rugged" ? "#ff314f" : "#08020a";
-    ctx.lineWidth = 13;
-
-    if (expression === "revived") {
-      ctx.strokeStyle = "#4dff73";
-      ctx.lineWidth = 10;
-      ctx.beginPath();
-      ctx.arc(-58, -24, 23, 0, Math.PI * 2);
-      ctx.arc(55, -24, 23, 0, Math.PI * 2);
-      ctx.stroke();
-    } else if (expression === "sneak") {
-      ctx.beginPath();
-      ctx.moveTo(-78, -42);
-      ctx.lineTo(-18, -32);
-      ctx.moveTo(23, -32);
-      ctx.lineTo(74, -48);
-      ctx.stroke();
-    } else if (expression === "rugged") {
-      ctx.lineWidth = 10;
-      ctx.beginPath();
-      ctx.moveTo(-72, -48);
-      ctx.lineTo(-35, -16);
-      ctx.moveTo(-35, -48);
-      ctx.lineTo(-72, -16);
-      ctx.moveTo(34, -48);
-      ctx.lineTo(72, -16);
-      ctx.moveTo(72, -48);
-      ctx.lineTo(34, -16);
-      ctx.stroke();
-    } else {
-      ctx.globalAlpha = 0.9;
-      ctx.lineWidth = 8;
-      ctx.beginPath();
-      ctx.moveTo(-75, -52);
-      ctx.quadraticCurveTo(-45, -65, -12, -50);
-      ctx.moveTo(22, -50);
-      ctx.quadraticCurveTo(52, -65, 80, -50);
-      ctx.stroke();
-    }
+    ctx.translate(base.x, base.y - bob - liftPx);
+    ctx.rotate(p.lean * 0.12);
+    if (sliding) { ctx.scale(1.16, 0.6); ctx.translate(0, drawH * 0.3); }
+    const invincible = state.elapsed < state.invincibleUntil;
+    if (invincible && Math.floor(state.elapsed * 14) % 2 === 0) ctx.globalAlpha = 0.5;
+    ctx.shadowBlur = invincible ? 26 : 16;
+    ctx.shadowColor = invincible ? "#4dff73" : "rgba(120,200,255,0.5)";
+    ctx.drawImage(playerImage, -drawW / 2, -drawH, drawW, drawH);
     ctx.restore();
   }
 
   function drawParticles() {
-    for (const particle of state.particles) {
-      ctx.globalAlpha = Math.max(0, particle.life / particle.maxLife);
-      ctx.fillStyle = particle.color;
-      ctx.beginPath();
-      ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
+    for (const pt of state.particles) {
+      ctx.globalAlpha = clamp(pt.life / pt.maxLife, 0, 1);
+      ctx.fillStyle = pt.color;
+      ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.size, 0, 6.2832); ctx.fill();
     }
+    ctx.globalAlpha = 1;
   }
 
-  function drawVignette(w, h) {
-    const gradient = ctx.createRadialGradient(w / 2, h / 2, h * 0.12, w / 2, h / 2, h * 0.72);
-    gradient.addColorStop(0, "rgba(0,0,0,0)");
-    gradient.addColorStop(1, "rgba(0,0,0,0.52)");
-    ctx.fillStyle = gradient;
+  function drawAtmosphere(w, h) {
+    // vignette
+    const v = ctx.createRadialGradient(w / 2, h * 0.52, h * 0.18, w / 2, h * 0.52, h * 0.8);
+    v.addColorStop(0, "rgba(0,0,0,0)");
+    v.addColorStop(1, "rgba(0,0,0,0.5)");
+    ctx.fillStyle = v;
     ctx.fillRect(0, 0, w, h);
 
-    if (state.flashTimer > 0) {
-      ctx.fillStyle = `rgba(77,255,115,${Math.min(0.18, state.flashTimer * 0.08)})`;
+    if (state.flash > 0) {
+      ctx.fillStyle = `rgba(77,255,115,${Math.min(0.2, state.flash * 0.32)})`;
       ctx.fillRect(0, 0, w, h);
     }
-
-    ctx.fillStyle = "rgba(255,255,255,0.06)";
-    ctx.font = "900 12px 'DM Mono', monospace";
-    ctx.fillText("PAY THE TROLL TOLL", 18, h - 18);
+    if (state.hitFlash > 0) {
+      ctx.fillStyle = `rgba(255,49,79,${Math.min(0.34, state.hitFlash)})`;
+      ctx.fillRect(0, 0, w, h);
+    }
   }
 
-  function burst(x, y, color, count) {
-    for (let i = 0; i < count; i += 1) {
+  function burst(x, y, color, count, spread) {
+    for (let i = 0; i < count; i++) {
       state.particles.push({
-        x,
-        y,
-        vx: random(-140, 140),
-        vy: random(-170, 80),
-        size: random(2, 6),
-        life: random(0.28, 0.72),
-        maxLife: 0.72,
+        x, y,
+        vx: rand(-spread, spread),
+        vy: rand(-spread, spread * 0.4),
+        size: rand(2, 6),
+        life: rand(0.3, 0.7), maxLife: 0.7,
         color,
       });
     }
   }
-
-  function jumpOffset() {
-    if (state.player.jumpTime <= 0) return 0;
-    const progress = 1 - state.player.jumpTime / 0.72;
-    return Math.sin(progress * Math.PI) * state.view.h * 0.2;
-  }
-
-  function laneToX(lane) {
-    return state.view.w / 2 + lane * Math.min(138, state.view.w * 0.18);
-  }
-
-  function groundY() {
-    return state.view.h * 0.78;
-  }
-
-  function weightedObstacle() {
-    const total = OBSTACLE_TYPES.reduce((sum, item) => sum + item.weight, 0);
-    let cursor = Math.random() * total;
-    for (const item of OBSTACLE_TYPES) {
-      cursor -= item.weight;
-      if (cursor <= 0) return item;
+  function dust() {
+    const p = project(PLAYER_Z, laneToX(state.player.laneFloat), 0);
+    for (let i = 0; i < 8; i++) {
+      state.particles.push({
+        x: p.x + rand(-20, 20), y: p.y - 2,
+        vx: rand(-70, 70), vy: rand(-120, -30),
+        size: rand(2, 5), life: rand(0.2, 0.45), maxLife: 0.45,
+        color: "rgba(180,210,200,0.7)",
+      });
     }
-    return OBSTACLE_TYPES[0];
   }
 
-  function random(min, max) {
-    return min + Math.random() * (max - min);
+  // --- Input wiring ---------------------------------------------------
+  function handleKeydown(e) {
+    const k = e.key.toLowerCase();
+    if (["arrowleft", "arrowright", "arrowup", "arrowdown", " ", "a", "d", "w", "s"].includes(k)) e.preventDefault();
+    if (k === "a" || k === "arrowleft") moveLane(-1);
+    else if (k === "d" || k === "arrowright") moveLane(1);
+    else if (k === "w" || k === "arrowup" || k === " ") jump();
+    else if (k === "s" || k === "arrowdown") slide();
   }
 
-  function randomChoice(items) {
-    return items[Math.floor(Math.random() * items.length)];
-  }
-
-  function clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value));
-  }
-
-  function interpolate(a, b, t) {
-    return a + (b - a) * t;
-  }
-
-  function handleKeydown(event) {
-    const key = event.key.toLowerCase();
-    if (["arrowleft", "arrowright", "arrowup", "arrowdown", " ", "a", "d", "w", "s"].includes(key)) {
-      event.preventDefault();
-    }
-    if (key === "a" || key === "arrowleft") moveLane(-1);
-    else if (key === "d" || key === "arrowright") moveLane(1);
-    else if (key === "w" || key === "arrowup" || key === " ") jump();
-    else if (key === "s" || key === "arrowdown") slide();
-  }
-
-  function bindSwipeControls() {
-    let startX = 0;
-    let startY = 0;
-    let tracking = false;
-
-    dom.canvas.addEventListener("touchstart", event => {
-      const touch = event.changedTouches[0];
-      startX = touch.clientX;
-      startY = touch.clientY;
-      tracking = true;
+  function bindSwipe() {
+    let sx = 0, sy = 0, tracking = false;
+    dom.canvas.addEventListener("touchstart", e => {
+      const t = e.changedTouches[0]; sx = t.clientX; sy = t.clientY; tracking = true;
     }, { passive: true });
-
-    dom.canvas.addEventListener("touchmove", event => {
-      if (tracking) event.preventDefault();
-    }, { passive: false });
-
-    dom.canvas.addEventListener("touchend", event => {
+    dom.canvas.addEventListener("touchmove", e => { if (tracking) e.preventDefault(); }, { passive: false });
+    dom.canvas.addEventListener("touchend", e => {
       if (!tracking) return;
-      const touch = event.changedTouches[0];
-      const dx = touch.clientX - startX;
-      const dy = touch.clientY - startY;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - sx, dy = t.clientY - sy;
       tracking = false;
-      if (Math.max(Math.abs(dx), Math.abs(dy)) < 26) return;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) { jump(); return; } // tap = jump
       if (Math.abs(dx) > Math.abs(dy)) moveLane(dx > 0 ? 1 : -1);
-      else if (dy < 0) jump();
-      else slide();
+      else if (dy < 0) jump(); else slide();
     }, { passive: true });
   }
 
@@ -918,20 +805,24 @@
   function init() {
     resizeCanvas();
     updateHud();
-    drawBackground(state.view.w, state.view.h);
-    drawRunway(state.view.w, state.view.h);
-    bindSwipeControls();
+    bindSwipe();
     window.addEventListener("resize", resizeCanvas);
     window.addEventListener("keydown", handleKeydown);
-    dom.startButton.addEventListener("click", resetRun);
-    dom.restartButton.addEventListener("click", resetRun);
-    dom.reviveButton.addEventListener("click", revive);
-    dom.soundToggle.addEventListener("click", () => {
+    dom.startButton && dom.startButton.addEventListener("click", resetRun);
+    dom.restartButton && dom.restartButton.addEventListener("click", resetRun);
+    dom.reviveButton && dom.reviveButton.addEventListener("click", revive);
+    dom.soundToggle && dom.soundToggle.addEventListener("click", () => {
       audio.enabled = !audio.enabled;
       dom.soundToggle.setAttribute("aria-pressed", String(audio.enabled));
-      if (audio.enabled) audio.beep(660, 0.06);
+      dom.soundToggle.classList.toggle("is-on", audio.enabled);
+      if (audio.enabled) audio.beep(680, 0.06);
     });
     document.documentElement.dataset.trollDashReady = "true";
+    // Dev deep-link: #autostart begins a run immediately (used for previews/tests).
+    if (/(?:^|[#&])autostart/.test(window.location.hash)) {
+      const begin = () => resetRun();
+      if (playerImage.complete) begin(); else playerImage.addEventListener("load", begin, { once: true });
+    }
     requestAnimationFrame(loop);
   }
 
