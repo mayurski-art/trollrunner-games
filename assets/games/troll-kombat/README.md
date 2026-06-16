@@ -20,13 +20,36 @@ damage. Each fighter has a signature special:
 - **Doge** — `1000x BONK` coin barrage (multi-hit spread)
 - **Elon** — `ROCKET` high-damage rocket
 
-## The art (no image assets)
-There are **no sprite files**. Every fighter is drawn live on the canvas by one
-shared muscular rig, cel-shaded in the order base → shadow → highlight → bold
-ink outline, so the face shares the body's palette and "blends in" — the look of
-the dino-riding trollface in `assets/games/troll-dinosaur.jpg`. A character is
-just a palette + a `drawHead()` function + a special, so adding to the roster is
-cheap.
+## The art
+Fighters with a sprite in `fighters/` (`troll.png`, `pepe.png`, `doge.png`)
+render as that green-screened 3D render — feet-anchored, mirrored by facing,
+with state "flavour" transforms (lunge/tilt/squash) since a single still can't
+articulate limbs. A fighter **without** a sprite (Elon, until art exists) falls
+back to a procedural muscular rig drawn live on the canvas: cel-shaded base →
+shadow → highlight → bold ink outline, so the face shares the body palette and
+"blends in" like the dino-riding trollface in `assets/games/troll-dinosaur.jpg`.
+
+### Sprites
+Source renders are full-body, ~3/4 facing RIGHT, on a flat green screen. Cut
+them out with `tools/remove-greenscreen.ps1` (border flood-fill chroma key, so
+an interior region matching the key — e.g. Pepe's green belly — survives because
+the flood can't reach it without crossing the darker silhouette):
+
+```
+powershell -File tools/remove-greenscreen.ps1 `
+  -In  assets/games/troll-kombat/fighters/src/troll-fighter.png `
+  -Out assets/games/troll-kombat/fighters/troll.png -GThresh 22 -Spill -DespillAll 16 -Crop
+```
+
+Raw green-screen renders live in `fighters/src/`. Settings used: troll
+`-GThresh 22 -DespillAll 16`, doge `-GThresh 30 -DespillAll 16`, pepe
+`-GThresh 72` (green body — no despill, relies on connectivity).
+
+Use a low `-GThresh` + `-DespillAll` for non-green bodies (troll/doge: also eats
+the ground shadow and green spill); a higher `-GThresh` and no `-DespillAll` for
+green bodies (pepe). Register a sprite by adding `spriteSrc` + `footFrac` (the
+fraction of image height where the feet rest) to its `ROSTER` entry; everything
+else — scale, select portrait, mirroring — is automatic.
 
 `game.js` structure:
 - **Rig** — `Fighter.draw()` composes torso (gradient + pecs/abs ink lines),

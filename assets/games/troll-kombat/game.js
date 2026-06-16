@@ -20,8 +20,8 @@
 
   // --- Stage geometry ---------------------------------------------------------
   const FLOOR_Y = 486;          // y of the ground line (feet rest here)
-  const WALL_L = 96;            // left fighter bound (fighter centre)
-  const WALL_R = W - 96;        // right fighter bound
+  const WALL_L = 128;           // left fighter bound (fighter centre)
+  const WALL_R = W - 128;       // right fighter bound
   const FIGHTER_SCALE = 1.18;   // rig is ~190px tall before scale
 
   // --- Match tuning -----------------------------------------------------------
@@ -93,6 +93,7 @@
       special: { name: "PROBLEM?", kind: "projectile", cost: 100, color: "#eaf2ff", text: "?" },
       pal: { base: "#e7eef6", dark: "#9bb1c8", light: "#ffffff", ink: "#161d2b", face: "#f4f8fc", accent: "#7fd0ff", accent2: "#ff3d6e" },
       drawHead: drawTrollHead,
+      spriteSrc: "troll.png", footFrac: 1.0,
     },
     {
       id: "pepe", name: "PEPE", tag: "Feels good",
@@ -100,6 +101,7 @@
       special: { name: "FEELS BLAST", kind: "projectile", cost: 100, color: "#7dff52", text: "feels" },
       pal: { base: "#5fae33", dark: "#2f6e1f", light: "#9fe05f", ink: "#10250a", face: "#5fae33", accent: "#9dff52", accent2: "#ff5dab" },
       drawHead: drawPepeHead,
+      spriteSrc: "pepe.png", footFrac: 0.955,
     },
     {
       id: "doge", name: "DOGE", tag: "Much fight",
@@ -107,6 +109,7 @@
       special: { name: "1000x BONK", kind: "barrage", cost: 100, color: "#ffd84d", text: "wow" },
       pal: { base: "#e3ad4f", dark: "#a9762a", light: "#f7d98a", ink: "#3a2406", face: "#e8b85a", accent: "#ffd84d", accent2: "#6fd0ff" },
       drawHead: drawDogeHead,
+      spriteSrc: "doge.png", footFrac: 1.0,
     },
     {
       id: "elon", name: "ELON", tag: "To the moon",
@@ -117,6 +120,19 @@
     },
   ];
   const byId = id => ROSTER.find(r => r.id === id);
+
+  // Preload fighter sprites. A fighter with a loaded image renders as that
+  // image (feet-anchored, mirrored by facing); one without (e.g. Elon until art
+  // exists) falls back to the procedural muscle rig. `spriteScale` maps the
+  // source top->feet span to TARGET_BODY so every fighter is the same height.
+  const SPRITE_DIR = "assets/games/troll-kombat/fighters/";
+  const TARGET_BODY = 272;   // on-screen feet->top height, px
+  ROSTER.forEach(d => {
+    if (!d.spriteSrc) return;
+    const img = new Image();
+    img.onload = () => { d.img = img; d.spriteScale = TARGET_BODY / (img.height * (d.footFrac || 1)); };
+    img.src = SPRITE_DIR + d.spriteSrc;
+  });
 
   /* ==========================================================================
      LOW-LEVEL DRAWING HELPERS
@@ -313,8 +329,8 @@
      ========================================================================== */
   // attack frame data (seconds): startup / active / recovery, damage, reach, push
   const ATTACKS = {
-    punch:   { startup: 0.07, active: 0.07, recovery: 0.17, dmg: 6,  reach: 92,  push: 120, knock: 0.0, meter: 7,  sfx: "punch" },
-    kick:    { startup: 0.15, active: 0.10, recovery: 0.30, dmg: 12, reach: 112, push: 300, knock: 0.0, meter: 10, sfx: "kick" },
+    punch:   { startup: 0.07, active: 0.07, recovery: 0.17, dmg: 6,  reach: 118, push: 150, knock: 0.0, meter: 7,  sfx: "punch" },
+    kick:    { startup: 0.15, active: 0.10, recovery: 0.30, dmg: 12, reach: 150, push: 330, knock: 0.0, meter: 10, sfx: "kick" },
     special: { startup: 0.22, active: 0.12, recovery: 0.34, dmg: 0,  reach: 0,   push: 0,   knock: 0,   meter: 0,  sfx: "special" },
   };
 
@@ -391,7 +407,7 @@
         this.vx = (this.x < fromX ? -1 : 1) * push * 0.4;
         this.meter = Math.min(MAX_METER, this.meter + dmg * 0.4);
         audio.block();
-        spark(this.x + this.facing * 40, this.feetY - 96, this.pal.accent, 6, true);
+        spark(this.x + this.facing * 50, this.feetY - 150, this.pal.accent, 6, true);
         return;
       }
       this.hp = Math.max(0, this.hp - dmg);
@@ -403,7 +419,7 @@
       this.vx = (this.x < fromX ? -1 : 1) * push;
       this.meter = Math.min(MAX_METER, this.meter + dmg * 1.1);
       audio.hitSpark();
-      spark(this.x + (fromX < this.x ? 38 : -38), this.feetY - 110, "#fff2a8", 12, false);
+      spark(this.x + (fromX < this.x ? 44 : -44), this.feetY - 150, "#fff2a8", 12, false);
       shake(Math.min(10, dmg * 0.7));
       if (this.hp <= 0) this.ko();
     }
@@ -501,12 +517,12 @@
       const A = this.attack.def;
       const reach = A.reach;
       const hx = this.x + this.facing * reach * 0.62;
-      const hy = this.feetY - (this.attack.type === "kick" ? 70 : 104);
+      const hy = this.feetY - (this.attack.type === "kick" ? 95 : 150);
       if (opp.state === "ko") return;
-      // opponent hurt box
+      // opponent hurt box (centred mid-body, ~full sprite height)
       const dx = Math.abs(opp.x - hx);
-      const dy = Math.abs((opp.feetY - 100) - hy);
-      if (dx < 56 && dy < 86 && Math.sign(opp.x - this.x) === this.facing) {
+      const dy = Math.abs((opp.feetY - 140) - hy);
+      if (dx < 76 && dy < 130 && Math.sign(opp.x - this.x) === this.facing) {
         const blocking = (opp.state === "block") && (opp.facing !== this.facing);
         this.attack.hasHit = true;
         opp.hurt(A.dmg, A.push, this.x, blocking);
@@ -572,17 +588,65 @@
       for (const k in tgt) t[k] = approach(t[k], tgt[k], rate);
     }
 
-    // ---- the big one: draw the muscular cel-shaded body ----
+    // ---- draw: world shadow, then sprite (if loaded) or procedural rig ----
     draw() {
+      // world-space ground shadow — stays on the floor, shrinks with jump height
+      const shW = Math.max(16, 46 - this.y * 0.06) * (this.def.img ? 1.5 : 1.0);
+      ctx.beginPath();
+      ctx.ellipse(this.x, FLOOR_Y, shW, 9, 0, 0, 7);
+      ctx.fillStyle = "rgba(0,0,0,0.32)"; ctx.fill();
+
+      if (this.def.img && this.def.spriteScale) { this.drawSprite(); return; }
+      this.drawProcedural();
+    }
+
+    // Static sprite: feet-anchored, mirrored by facing, with state "flavour"
+    // transforms (lunge/tilt/squash) since a single image can't articulate limbs.
+    drawSprite() {
+      const img = this.def.img, sc = this.def.spriteScale;
+      const dw = img.width * sc, dh = img.height * sc;
+      const feetTop = img.height * (this.def.footFrac || 1) * sc; // feet dist from sprite top
+
+      let rot = 0, sx = this.facing, sy = 1, tx = 0, ty = 0, alpha = 1;
+      if (this.state === "attack" && this.attack) {
+        const A = this.attack.def, at = this.attack.t;
+        const ph = at < A.startup ? at / A.startup
+          : at < A.startup + A.active ? 1
+          : 1 - (at - A.startup - A.active) / A.recovery;
+        const k = clamp(ph, 0, 1);
+        if (this.attack.type === "kick") { tx = 30 * k; rot = -0.13 * k; }
+        else if (this.attack.type === "special") { sy = 1 + 0.05 * k; ty = -6 * k; }
+        else { tx = 34 * k; rot = 0.11 * k; }            // punch lunge
+      } else if (this.state === "crouch") { sy = 0.76; }
+      else if (this.state === "block") { tx = -8; rot = -0.06; }
+      else if (this.state === "hit") { rot = -0.24; tx = -12; }
+      else if (this.state === "walk") { ty = Math.abs(Math.sin(this.walkPhase)) * -5; }
+      else if (this.state === "idle") { ty = Math.sin(this.stateT * 2.4) * 2.2; }
+      else if (this.state === "win") { ty = Math.abs(Math.sin(this.winT * 5)) * -16; rot = Math.sin(this.winT * 3) * 0.05; }
+      else if (this.state === "ko") { rot = this.koFall * -1.2; ty = this.koFall * 34; alpha = 1 - this.koFall * 0.12; }
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(this.x, this.feetY);   // origin = feet on the floor
+      ctx.scale(sx, sy);
+      ctx.rotate(rot);
+      ctx.translate(tx, ty);
+      if (this.state !== "ko") {            // clip below the feet line (hide leftover shadow)
+        ctx.beginPath();
+        ctx.rect(-dw, -dh - 60, dw * 2, dh + 62);
+        ctx.clip();
+      }
+      if (this.flash > 0) ctx.filter = "brightness(2.6) saturate(0.4)";
+      ctx.drawImage(img, -dw / 2, -feetTop, dw, dh);
+      ctx.filter = "none";
+      ctx.restore();
+    }
+
+    drawProcedural() {
       const pal = this.pal, a = this.a;
       ctx.save();
       ctx.translate(this.x, this.feetY);
       ctx.scale(this.facing * FIGHTER_SCALE, FIGHTER_SCALE);
-
-      // ground shadow — stays on the floor (local y = jump height) and shrinks with height
-      ctx.beginPath();
-      ctx.ellipse(0, this.y / FIGHTER_SCALE, Math.max(16, 46 - this.y * 0.06), 8, 0, 0, 7);
-      ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.fill();
 
       let koRot = 0, koDrop = 0;
       if (this.state === "ko") { koRot = this.koFall * 1.5; koDrop = this.koFall * 18; }
@@ -747,7 +811,7 @@
 
   function fireSpecial(f, opp) {
     const sp = f.def.special;
-    const ox = f.x + f.facing * 50, oy = f.feetY - 108;
+    const ox = f.x + f.facing * 64, oy = f.feetY - 150;
     shake(6);
     if (sp.kind === "barrage") {
       for (let i = 0; i < 5; i++) {
@@ -769,8 +833,8 @@
       if (p.kind === "coin") p.vy += 320 * dt;
       const opp = p.owner === fighters[0] ? fighters[1] : fighters[0];
       if (!p.hit && opp.state !== "ko") {
-        const dx = Math.abs(opp.x - p.x), dy = Math.abs((opp.feetY - 100) - p.y);
-        if (dx < 50 + p.r && dy < 80) {
+        const dx = Math.abs(opp.x - p.x), dy = Math.abs((opp.feetY - 140) - p.y);
+        if (dx < 54 + p.r && dy < 120) {
           p.hit = true;
           const blocking = opp.state === "block" && opp.facing !== p.owner.facing;
           opp.hurt(p.dmg, 360, p.owner.x, blocking);
@@ -1065,7 +1129,7 @@
   const NEUTRAL = { left: false, right: false, up: false, crouch: false, block: false, punch: false, kick: false, special: false };
 
   function separate(a, b) {
-    const minGap = 64;
+    const minGap = 100;
     const dx = b.x - a.x;
     if (Math.abs(dx) < minGap && a.grounded && b.grounded) {
       const overlap = (minGap - Math.abs(dx)) / 2;
@@ -1189,13 +1253,23 @@
     ctx = real;
     return c;
   }
+  // Thumbnail: the real sprite art if the fighter has one, else a procedural head.
+  function portraitEl(def, size) {
+    if (def.spriteSrc) {
+      const im = document.createElement("img");
+      im.src = SPRITE_DIR + def.spriteSrc;
+      im.alt = def.name; im.className = "portrait";
+      return im;
+    }
+    return portrait(def, size);
+  }
 
   ROSTER.forEach(def => {
     const card = document.createElement("button");
     card.type = "button"; card.className = "roster-pick"; card.dataset.id = def.id;
     card.setAttribute("role", "option");
     card.style.setProperty("--accent", def.pal.accent);
-    const port = portrait(def, 96);
+    const port = portraitEl(def, 96);
     card.appendChild(port);
     const nm = document.createElement("strong"); nm.textContent = def.name; card.appendChild(nm);
     const tg = document.createElement("span"); tg.className = "pick-tag"; tg.textContent = def.tag; card.appendChild(tg);
@@ -1230,7 +1304,7 @@
     const card = document.createElement("article");
     card.className = "coming-card roster-card";
     card.style.setProperty("--accent", def.pal.accent);
-    const port = portrait(def, 110);
+    const port = portraitEl(def, 110);
     port.classList.add("roster-card-art");
     card.appendChild(port);
     card.insertAdjacentHTML("beforeend",
