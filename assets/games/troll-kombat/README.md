@@ -25,8 +25,7 @@ render as that green-screened 3D render — feet-anchored, mirrored by facing,
 with state "flavour" transforms (lunge/tilt/squash) since a single still can't
 articulate limbs. The procedural muscular rig remains available for future
 fighters without sprites: cel-shaded base → shadow → highlight → bold ink
-outline, so the face shares the body palette and "blends in" like the
-dino-riding trollface in `assets/games/troll-dinosaur.jpg`.
+outline, so the face shares the body palette and body art direction.
 
 ### Sprites
 Source renders are full-body, ~3/4 facing RIGHT, on a flat green screen. Cut
