@@ -111,20 +111,13 @@
       drawHead: drawDogeHead,
       spriteSrc: "doge.png", footFrac: 1.0,
     },
-    {
-      id: "elon", name: "ELON", tag: "To the moon",
-      blurb: "Richest fighter in the cabinet. Tweets through it, then launches a rocket at your face.",
-      special: { name: "ROCKET", kind: "rocket", cost: 100, color: "#9fe3ff", text: "🚀" },
-      pal: { base: "#d8b39a", dark: "#9c7457", light: "#f1d9c6", ink: "#26170f", face: "#e3c4ad", accent: "#9fe3ff", accent2: "#ff6a3d" },
-      drawHead: drawElonHead,
-    },
   ];
   const byId = id => ROSTER.find(r => r.id === id);
 
   // Preload fighter sprites. A fighter with a loaded image renders as that
-  // image (feet-anchored, mirrored by facing); one without (e.g. Elon until art
-  // exists) falls back to the procedural muscle rig. `spriteScale` maps the
-  // source top->feet span to TARGET_BODY so every fighter is the same height.
+  // image (feet-anchored, mirrored by facing); one without falls back to the
+  // procedural muscle rig. `spriteScale` maps the source top->feet span to
+  // TARGET_BODY so every fighter is the same on-screen height.
   const SPRITE_DIR = "assets/games/troll-kombat/fighters/";
   const TARGET_BODY = 272;   // on-screen feet->top height, px
   ROSTER.forEach(d => {
@@ -289,39 +282,6 @@
     ctx.beginPath(); ctx.moveTo(r * 0.28, -r * 0.42); ctx.lineTo(r * 0.54, -r * 0.36); ctx.stroke();
     // smug doge smile
     ctx.beginPath(); ctx.moveTo(r * 0.2, r * 0.34); ctx.quadraticCurveTo(r * 0.55, r * 0.5, r * 0.9, r * 0.3); ctx.stroke();
-  }
-
-  function drawElonHead(r, pal, o) {
-    headBase(r, pal, 1.04);
-    const ink = pal.ink;
-    // short side-swept hair
-    ctx.fillStyle = "#3a2a1f";
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.95, -r * 0.2);
-    ctx.quadraticCurveTo(-r * 0.6, -r * 1.12, r * 0.5, -r * 0.95);
-    ctx.quadraticCurveTo(r * 0.98, -r * 0.8, r * 0.92, -r * 0.4);
-    ctx.quadraticCurveTo(r * 0.4, -r * 0.78, -r * 0.2, -r * 0.6);
-    ctx.quadraticCurveTo(-r * 0.7, -r * 0.5, -r * 0.95, -r * 0.2);
-    ctx.closePath(); ctx.fill();
-    // brows + eyes
-    ctx.strokeStyle = ink; ctx.lineWidth = r * 0.09; ctx.lineCap = "round";
-    ctx.beginPath(); ctx.moveTo(-r * 0.4, -r * 0.28); ctx.lineTo(-r * 0.05, -r * 0.3); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(r * 0.3, -r * 0.3); ctx.lineTo(r * 0.62, -r * 0.26); ctx.stroke();
-    ctx.fillStyle = ink;
-    ctx.beginPath(); ctx.arc(-r * 0.2, -r * 0.12, r * 0.07, 0, 7); ctx.fill();
-    ctx.beginPath(); ctx.arc(r * 0.46, -r * 0.12, r * 0.07, 0, 7); ctx.fill();
-    // smug smirk
-    ctx.strokeStyle = ink; ctx.lineWidth = r * 0.08;
-    ctx.beginPath();
-    if (o && o.hurt) ctx.arc(r * 0.12, r * 0.34, r * 0.32, 0.2, Math.PI - 0.2);
-    else { ctx.moveTo(-r * 0.18, r * 0.36); ctx.quadraticCurveTo(r * 0.2, r * 0.5, r * 0.6, r * 0.26); }
-    ctx.stroke();
-    // stubble dots
-    ctx.fillStyle = "rgba(40,30,22,0.4)";
-    for (let i = 0; i < 14; i++) {
-      ctx.beginPath();
-      ctx.arc(rand(-r * 0.5, r * 0.7), rand(r * 0.45, r * 0.78), 0.8, 0, 7); ctx.fill();
-    }
   }
 
   /* ==========================================================================
@@ -818,9 +778,6 @@
         projectiles.push({ owner: f, x: ox, y: oy + rand(-18, 18), vx: f.facing * rand(360, 520),
           vy: rand(-40, 40), r: 16, dmg: 5, life: 2.4, color: sp.color, text: "$", hit: false, kind: "coin" });
       }
-    } else if (sp.kind === "rocket") {
-      projectiles.push({ owner: f, x: ox, y: oy, vx: f.facing * 360, vy: 0, r: 18, dmg: 22,
-        life: 2.6, color: sp.color, text: "", hit: false, kind: "rocket", facing: f.facing });
     } else { // projectile orb
       projectiles.push({ owner: f, x: ox, y: oy, vx: f.facing * 440, vy: 0, r: 24, dmg: 16,
         life: 2.4, color: sp.color, text: sp.text, hit: false, kind: "orb" });
@@ -850,26 +807,13 @@
   function drawProjectiles() {
     for (const p of projectiles) {
       ctx.save();
-      if (p.kind === "rocket") {
-        ctx.translate(p.x, p.y); ctx.scale(p.facing, 1);
-        // flame
-        ctx.beginPath(); ctx.moveTo(-18, 0); ctx.lineTo(-40 - Math.random() * 14, -6);
-        ctx.lineTo(-40 - Math.random() * 14, 6); ctx.closePath();
-        ctx.fillStyle = "#ff8a3d"; ctx.fill();
-        // body
-        ctx.beginPath(); ctx.moveTo(20, 0); ctx.lineTo(-2, -8); ctx.lineTo(-18, -8);
-        ctx.lineTo(-18, 8); ctx.lineTo(-2, 8); ctx.closePath();
-        ctx.fillStyle = "#e8eef5"; ctx.strokeStyle = "#1a2230"; ctx.lineWidth = 2; ctx.fill(); ctx.stroke();
-        ctx.fillStyle = "#ff3d6e"; ctx.fillRect(-10, -8, 6, 16);
-      } else {
-        const grd = ctx.createRadialGradient(p.x, p.y, 1, p.x, p.y, p.r);
-        grd.addColorStop(0, "#fff"); grd.addColorStop(0.4, p.color); grd.addColorStop(1, "rgba(0,0,0,0)");
-        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fillStyle = grd; ctx.fill();
-        if (p.text) {
-          ctx.fillStyle = "#0a0a0a"; ctx.font = `900 ${p.kind === "coin" ? 16 : 18}px DM Mono, monospace`;
-          ctx.textAlign = "center"; ctx.textBaseline = "middle";
-          ctx.fillText(p.text, p.x, p.y + 1);
-        }
+      const grd = ctx.createRadialGradient(p.x, p.y, 1, p.x, p.y, p.r);
+      grd.addColorStop(0, "#fff"); grd.addColorStop(0.4, p.color); grd.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fillStyle = grd; ctx.fill();
+      if (p.text) {
+        ctx.fillStyle = "#0a0a0a"; ctx.font = `900 ${p.kind === "coin" ? 16 : 18}px DM Mono, monospace`;
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(p.text, p.x, p.y + 1);
       }
       ctx.restore();
     }

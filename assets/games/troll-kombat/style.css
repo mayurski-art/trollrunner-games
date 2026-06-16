@@ -221,7 +221,7 @@ h1 {
 
 /* roster picks */
 .roster-grid {
-  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 16px 0;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 16px 0;
 }
 .roster-pick {
   --accent: var(--green);
@@ -317,7 +317,7 @@ h1 {
 .arcade-rack { padding: clamp(12px, 3vw, 32px) 0 24px; }
 .section-heading { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
 .section-heading h2 { font-size: clamp(28px, 4vw, 48px); line-height: 1; text-transform: uppercase; }
-.game-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.game-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .roster-card {
   --accent: var(--green); position: relative; overflow: hidden; min-height: 180px; padding: 18px;
   border: 1px solid var(--line); border-radius: 8px;
@@ -342,7 +342,7 @@ h1 {
 @media (max-width: 980px) {
   .fight-hero { min-height: 0; grid-template-columns: 1fr; align-items: start; }
   h1 { max-width: 14ch; }
-  .roster-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .roster-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 760px) {
   .site-header { position: static; align-items: flex-start; flex-direction: column; }
