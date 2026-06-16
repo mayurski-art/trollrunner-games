@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#050008">
+  <meta name="description" content="Troll Kombat: a cursed meme-coin fighting game from Troll Runner. Pick your meme champion and brawl. Problem?">
+  <title>Troll Kombat | Troll Runner Arcade</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23050008'/%3E%3Ctext x='6' y='40' font-size='17' fill='%23ff314f' font-family='monospace' font-weight='900'%3EVS%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;700;900&family=DM+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/games/troll-kombat/style.css?v=kombat-v1-20260616">
+</head>
+<body data-game-state="select">
+  <div class="crt-overlay" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Troll Runner Arcade home">
+      <span class="brand-mark">$TROLL</span>
+      <span class="brand-copy">
+        <span>Troll Runner</span>
+        <small>Arcade</small>
+      </span>
+    </a>
+    <nav class="site-nav" aria-label="Primary">
+      <a href="/">Arcade</a>
+      <a href="https://blog.trollrunner.net">Blog</a>
+      <a href="https://finance.trollrunner.net">Finances</a>
+      <a href="https://trollrunner.net">Main Site</a>
+    </nav>
+  </header>
+
+  <main class="arcade-shell">
+    <section class="fight-hero" aria-labelledby="game-title">
+      <div class="game-copy">
+        <p class="eyebrow">Cursed meme-coin fighter</p>
+        <h1 id="game-title">Troll Kombat</h1>
+        <p class="tagline">Pick your champion. Trade blows. Problem?</p>
+        <div class="hero-stats" aria-label="Game stats">
+          <span><strong>4</strong> fighters</span>
+          <span><strong>3</strong> round match</span>
+          <span><strong>1</strong> finisher</span>
+        </div>
+        <p class="copy-note">A side-view brawler in the style of the classics, starring buff meme champions sculpted in cursed muscle-troll texture. Best of 3. Problem?</p>
+      </div>
+
+      <section class="fight-cabinet" aria-label="Troll Kombat game cabinet">
+        <div class="cabinet-marquee">
+          <span>TROLL KOMBAT</span>
+          <span class="marquee-blink">VS</span>
+        </div>
+
+        <div class="fight-hud" aria-live="off">
+          <div class="hud-fighter is-p1">
+            <div class="health-track"><span id="p1-health" class="health-fill"></span><span id="p1-health-chip" class="health-chip"></span></div>
+            <div class="hud-meta">
+              <strong id="p1-name">P1</strong>
+              <span class="round-pips" id="p1-pips" aria-label="Player 1 rounds won"></span>
+            </div>
+            <div class="special-track" title="Special meter"><span id="p1-meter" class="special-fill"></span></div>
+          </div>
+
+          <div class="hud-center">
+            <strong id="round-timer">60</strong>
+            <span id="round-label">Round 1</span>
+          </div>
+
+          <div class="hud-fighter is-p2">
+            <div class="health-track is-right"><span id="p2-health" class="health-fill"></span><span id="p2-health-chip" class="health-chip"></span></div>
+            <div class="hud-meta is-right">
+              <span class="round-pips" id="p2-pips" aria-label="Player 2 rounds won"></span>
+              <strong id="p2-name">CPU</strong>
+            </div>
+            <div class="special-track is-right" title="Special meter"><span id="p2-meter" class="special-fill"></span></div>
+          </div>
+
+          <button id="tk-sound" class="icon-btn" type="button" aria-pressed="false" title="Toggle arcade sound" aria-label="Toggle arcade sound">
+            <span class="sfx-on">🔊</span><span class="sfx-off">🔇</span>
+          </button>
+        </div>
+
+        <div class="screen-wrap">
+          <canvas id="tk-canvas" width="960" height="540" aria-label="Troll Kombat fighting game"></canvas>
+
+          <div id="tk-announce" class="tk-announce" aria-live="assertive"></div>
+
+          <!-- Character select -->
+          <div id="tk-select" class="game-overlay select-overlay is-visible">
+            <div class="overlay-card select-card">
+              <p class="overlay-kicker">Choose your fighter</p>
+              <h2>Select Champion</h2>
+              <p class="select-sub">Pick a meme. The CPU grabs whatever's left. Best of 3.</p>
+              <div id="roster-grid" class="roster-grid" role="listbox" aria-label="Fighter roster"></div>
+              <div class="select-footer">
+                <div class="select-readout">
+                  <span class="overlay-kicker">You</span>
+                  <strong id="select-you">—</strong>
+                  <span class="vs-dot">vs</span>
+                  <strong id="select-cpu">CPU random</strong>
+                </div>
+                <div class="select-actions">
+                  <label class="cpu-diff">
+                    <span>CPU</span>
+                    <select id="cpu-difficulty" aria-label="CPU difficulty">
+                      <option value="0">Chill</option>
+                      <option value="1" selected>Normal</option>
+                      <option value="2">Sweaty</option>
+                    </select>
+                  </label>
+                  <button id="tk-fight-button" class="primary-btn pulse-btn" type="button" disabled>▶ Fight</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Match result -->
+          <div id="tk-result" class="game-overlay result-overlay" aria-live="assertive">
+            <div class="overlay-card result-card">
+              <span class="finish-badge" id="finish-badge">FLAWLESS?</span>
+              <p class="overlay-kicker" id="result-kicker">Match over</p>
+              <h2 id="result-message">WINNER</h2>
+              <p id="result-detail">—</p>
+              <div class="overlay-actions">
+                <button id="tk-rematch" class="primary-btn" type="button">↻ Rematch</button>
+                <button id="tk-change" class="secondary-btn" type="button">Change fighter</button>
+              </div>
+              <a class="link-back" href="/">← Back to Arcade</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Touch controls -->
+        <div class="touch-controls" aria-hidden="false">
+          <div class="touch-pad" aria-label="Movement">
+            <button class="tbtn" data-key="left" type="button" aria-label="Move left">◀</button>
+            <button class="tbtn" data-key="crouch" type="button" aria-label="Crouch">▼</button>
+            <button class="tbtn" data-key="up" type="button" aria-label="Jump">▲</button>
+            <button class="tbtn" data-key="right" type="button" aria-label="Move right">▶</button>
+          </div>
+          <div class="touch-acts" aria-label="Attacks">
+            <button class="tbtn is-block" data-key="block" type="button" aria-label="Block">🛡</button>
+            <button class="tbtn is-punch" data-key="punch" type="button" aria-label="Punch">👊</button>
+            <button class="tbtn is-kick" data-key="kick" type="button" aria-label="Kick">🦵</button>
+            <button class="tbtn is-special" data-key="special" type="button" aria-label="Special move">✨</button>
+          </div>
+        </div>
+
+        <div class="cabinet-footer">
+          <p><strong>Keys</strong> · A/D move · W jump · S crouch · J punch · K kick · L special · Space block</p>
+          <p><strong>Touch</strong> · pad to move · 👊 punch · 🦵 kick · ✨ special · 🛡 block</p>
+        </div>
+      </section>
+    </section>
+
+    <section class="arcade-rack" aria-labelledby="roster-title">
+      <div class="section-heading">
+        <p class="eyebrow">The roster</p>
+        <h2 id="roster-title">Know Your Memes</h2>
+      </div>
+      <div id="roster-cards" class="game-grid"></div>
+    </section>
+  </main>
+
+  <script src="assets/games/troll-kombat/game.js?v=kombat-v1-20260616" defer></script>
+</body>
+</html>
