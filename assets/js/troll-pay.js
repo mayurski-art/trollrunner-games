@@ -174,17 +174,27 @@
     var sig    = result.signature;
     if (onProgress) onProgress({ stage: 'sent', sig: sig });
 
-    // Websocket subscription + blockhash expiry — reliable on public devnet RPC.
-    var conf = await connection.confirmTransaction({
-      signature:            sig,
-      blockhash:            blockhashInfo.blockhash,
-      lastValidBlockHeight: blockhashInfo.lastValidBlockHeight,
-    }, 'confirmed');
-
-    if (conf && conf.value && conf.value.err) {
-      throw new Error('Transaction failed on-chain: ' + JSON.stringify(conf.value.err));
+    // Poll getSignatureStatus with searchTransactionHistory:true so we search
+    // across all nodes — not just the local RPC node's memory cache, which is
+    // what caused "confirmed" to hang forever on the public devnet RPC.
+    var deadline = Date.now() + 90000; // 90s — devnet can be slow
+    while (Date.now() < deadline) {
+      try {
+        var resp = await connection.getSignatureStatus(sig, { searchTransactionHistory: true });
+        if (resp && resp.value) {
+          if (resp.value.err) {
+            throw new Error('Transaction failed on-chain: ' + JSON.stringify(resp.value.err));
+          }
+          var conf = resp.value.confirmationStatus;
+          if (conf === 'confirmed' || conf === 'finalized') return sig;
+        }
+      } catch (e) {
+        // Only re-throw real failures — ignore transient RPC errors and retry.
+        if (e.message && e.message.indexOf('Transaction failed') === 0) throw e;
+      }
+      await new Promise(function (r) { setTimeout(r, 2000); });
     }
-    return sig;
+    throw new Error('Timed out waiting for confirmation. Check the explorer for sig: ' + sig);
   }
 
   function explorerUrl(sig) {
