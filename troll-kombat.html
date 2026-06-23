@@ -121,6 +121,11 @@
               <p class="overlay-kicker" id="result-kicker">Match over</p>
               <h2 id="result-message">WINNER</h2>
               <p id="result-detail">—</p>
+              <div id="tk-continue-row" class="tk-continue-row" style="display:none">
+                <span class="tk-pay-label">Pay with <span id="tk-pay-token-picker" class="pay-token-picker"></span></span>
+                <button id="tk-continue" class="primary-btn" type="button">Continue</button>
+                <p class="tk-continue-fine">One-time on-chain toll (base $0.69 + 6.9% treasury tax) in USDC, plus Solana fees. Approve in Phantom.</p>
+              </div>
               <div class="overlay-actions">
                 <button id="tk-rematch" class="primary-btn" type="button">↻ Rematch</button>
                 <button id="tk-change" class="secondary-btn" type="button">Change fighter</button>
@@ -162,6 +167,8 @@
     </section>
   </main>
 
-  <script src="assets/games/troll-kombat/game.js?v=kombat-v2-20260616" defer></script>
+  <script src="assets/js/troll-pay-config.js?v=pay-v1-20260622" defer></script>
+  <script src="assets/js/troll-pay.js?v=pay-v1-20260622" defer></script>
+  <script src="assets/games/troll-kombat/game.js?v=pay-v1-20260622" defer></script>
 </body>
 </html>

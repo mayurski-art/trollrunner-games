@@ -107,17 +107,16 @@
     chord(freqs, d = 0.16, type = "square") { freqs.forEach((f, i) => setTimeout(() => this.beep(f, d, type), i * 55)); },
   };
 
-  // --- Mock revive payment (real Phantom flow specced in docs/) -------
-  class MockRevivePaymentProvider {
-    constructor(gs) { this.gs = gs; }
-    async payForRevive() {
-      if (this.gs.walletBalance < REVIVE_COST) return { ok: false, reason: "Not enough $TROLL" };
-      this.gs.walletBalance = round1(this.gs.walletBalance - REVIVE_COST);
-      return { ok: true };
-    }
-  }
-  const revivePayments = new MockRevivePaymentProvider(state);
-  void TROLL_MINT_ADDRESS;
+  // --- Revive payment — real Phantom SPL transfer via TrollPay --------
+  // Pay-per-revive: one on-chain USDC/$TROLL transfer to the treasury.
+  // Network, mints, price and 6.9% tax live in assets/js/troll-pay-config.js.
+  const revivePayments = {
+    async payForRevive(onProgress) {
+      if (!window.TrollPay) return { ok: false, reason: "Payments unavailable" };
+      return window.TrollPay.payForRevive(onProgress);
+    },
+  };
+  void TROLL_MINT_ADDRESS; void REVIVE_COST; void MOCK_WALLET_START_BALANCE;
 
   // --- Math helpers ---------------------------------------------------
   const round1 = v => Math.round(v * 10) / 10;
@@ -159,11 +158,17 @@
     dom.score.textContent = Math.floor(state.distance).toLocaleString();
     dom.coins.textContent = state.coins.toLocaleString();
     dom.high.textContent = Math.floor(state.highScore).toLocaleString();
-    if (dom.walletBalance) dom.walletBalance.textContent = `${state.walletBalance.toFixed(1)} $TROLL`;
+    if (dom.walletBalance) {
+      const tp = window.TrollPay;
+      dom.walletBalance.textContent = (tp && tp.isConnected())
+        ? shortAddr(tp.getWallet().address)
+        : "Connect on revive";
+    }
     if (dom.treasuryWallet) dom.treasuryWallet.textContent = TREASURY_WALLET;
     if (dom.reviveButton) {
-      dom.reviveButton.disabled = state.revivedThisRun || state.walletBalance < REVIVE_COST;
-      dom.reviveButton.textContent = state.revivedThisRun ? "Revive used" : "Revive · 6.9 $TROLL";
+      const label = window.TrollPay ? window.TrollPay.costLabel() : "USDC";
+      dom.reviveButton.disabled = state.revivedThisRun;
+      dom.reviveButton.textContent = state.revivedThisRun ? "Revive used" : `Revive · ${label}`;
     }
   }
 
@@ -181,6 +186,7 @@
   }
   const show = n => n && n.classList.add("is-visible");
   const hide = n => n && n.classList.remove("is-visible");
+  const shortAddr = a => a ? a.slice(0, 4) + "…" + a.slice(-4) : "";
 
   function die() {
     if (state.mode !== "running") return;
@@ -201,14 +207,27 @@
   async function revive() {
     if (state.mode !== "dead" || state.revivedThisRun) return;
     dom.reviveButton.disabled = true;
-    dom.reviveButton.textContent = "Paying toll…";
-    const payment = await revivePayments.payForRevive();
-    if (!payment.ok) { dom.reviveButton.textContent = payment.reason || "Revive failed"; updateHud(); return; }
+    const setBtn = txt => { dom.reviveButton.textContent = txt; };
+    setBtn("Connect wallet…");
+    const payment = await revivePayments.payForRevive(ev => {
+      if (ev.stage === "connecting")      setBtn("Connect wallet…");
+      else if (ev.stage === "building")   setBtn("Building tx…");
+      else if (ev.stage === "awaiting")   setBtn("Confirm in Phantom…");
+      else if (ev.stage === "confirming") setBtn("Confirming…");
+    });
+    if (!payment.ok) {
+      setBtn(payment.reason || "Revive failed");
+      // Restore the normal label shortly so the player can retry.
+      setTimeout(() => { if (state.mode === "dead") updateHud(); }, 1800);
+      return;
+    }
     state.revivedThisRun = true; state.mode = "running";
     state.invincibleUntil = state.elapsed + 2.6; state.flash = 0.6;
     state.obstacles = state.obstacles.filter(o => o.z > PLAYER_Z + HIT_BAND + 6);
     Object.assign(state.player, { worldY: 0, vy: 0, onGround: true, rollT: 0 });
     hide(dom.deathOverlay);
+    dom.revivedBanner.textContent = window.TrollPay && window.TrollPay.getToken() === "TROLL"
+      ? "REVIVED BY $TROLL" : "REVIVED BY USDC";
     dom.revivedBanner.classList.remove("is-visible");
     void dom.revivedBanner.offsetWidth;
     dom.revivedBanner.classList.add("is-visible");
@@ -722,6 +741,7 @@
     dom.startButton && dom.startButton.addEventListener("click", resetRun);
     dom.restartButton && dom.restartButton.addEventListener("click", resetRun);
     dom.reviveButton && dom.reviveButton.addEventListener("click", revive);
+    if (window.TrollPay) window.TrollPay.mountTokenPicker(document.getElementById("pay-token-picker"));
     dom.soundToggle && dom.soundToggle.addEventListener("click", () => {
       audio.enabled = !audio.enabled;
       dom.soundToggle.setAttribute("aria-pressed", String(audio.enabled));

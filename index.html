@@ -173,7 +173,6 @@
 
           <div id="death-overlay" class="game-overlay" aria-live="assertive">
             <div class="overlay-card death-card">
-              <span class="mock-badge">Mock Mode</span>
               <p class="overlay-kicker">Run halted</p>
               <h2 id="death-message">RUGGED</h2>
 
@@ -190,23 +189,23 @@
 
               <div class="revive-panel">
                 <div>
-                  <span>Wallet balance</span>
-                  <strong id="wallet-balance">42.0 $TROLL</strong>
+                  <span>Wallet</span>
+                  <strong id="wallet-balance">Connect on revive</strong>
                 </div>
                 <div>
-                  <span>Revive cost</span>
-                  <strong>6.9 $TROLL</strong>
+                  <span>Pay with</span>
+                  <strong id="pay-token-picker" class="pay-token-picker"></strong>
                 </div>
               </div>
 
               <div class="overlay-actions">
-                <button id="revive-button" class="primary-btn" type="button">Revive · 6.9 $TROLL</button>
+                <button id="revive-button" class="primary-btn" type="button">Revive</button>
                 <button id="restart-button" class="secondary-btn" type="button">↻ Run Again</button>
               </div>
 
               <details class="revive-fine">
                 <summary>Revive details</summary>
-                <p class="revive-disclaimer">Revive costs 6.9 $TROLL plus Solana network fees. Optional, non-refundable. Currently mock mode — no real transaction occurs.</p>
+                <p class="revive-disclaimer">Revive is a one-time on-chain payment (base $0.69 + 6.9% treasury tax) in USDC, plus Solana network fees. Optional, non-refundable. Approve the transaction in Phantom.</p>
                 <p class="treasury-note">Treasury: <span id="treasury-wallet">79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA</span></p>
                 <a class="link-back" href="/">← Back to Arcade</a>
               </details>
@@ -271,7 +270,9 @@
     </section>
   </main>
 
+  <script src="assets/js/troll-pay-config.js?v=pay-v1-20260622" defer></script>
+  <script src="assets/js/troll-pay.js?v=pay-v1-20260622" defer></script>
   <script src="assets/games/troll-dash/arcade-intro.js?v=temple-3d-v2-20260615" defer></script>
-  <script src="assets/games/troll-dash/game.js?v=temple-3d-v2-20260615" defer></script>
+  <script src="assets/games/troll-dash/game.js?v=pay-v1-20260622" defer></script>
 </body>
 </html>

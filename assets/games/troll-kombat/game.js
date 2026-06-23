@@ -1064,6 +1064,16 @@
       this.phase = "matchend";
       showResult(this.winnerIdx, this.byKO, this.fighters);
     },
+    // Arcade continue: after a paid toll, reset the standings to a single
+    // sudden-death round so the player fights on with the same matchup.
+    continueMatch() {
+      const [a, b] = this.fighters;
+      a.rounds = ROUNDS_TO_WIN - 1;
+      b.rounds = ROUNDS_TO_WIN - 1;
+      this.matchWon = false;
+      document.body.dataset.gameState = "fight";
+      this.startRound();
+    },
     draw(dt) {
       const [p1, p2] = this.fighters;
       // draw by x for simple depth (further fighter behind)
@@ -1276,7 +1286,18 @@
       : `Rugged by the CPU's ${winner.def.name}. Run it back?`;
     resultOverlay.classList.toggle("is-loss", !youWon);
     resultOverlay.classList.add("is-visible");
-    document.getElementById("tk-rematch").focus();
+
+    // Continue (paid) is only offered when the player lost.
+    const contRow = document.getElementById("tk-continue-row");
+    const contBtn = document.getElementById("tk-continue");
+    if (contRow && contBtn) {
+      contRow.style.display = youWon ? "none" : "";
+      if (!youWon) {
+        contBtn.disabled = false;
+        contBtn.textContent = "Continue · " + (window.TrollPay ? window.TrollPay.costLabel() : "USDC");
+      }
+    }
+    (!youWon && contBtn ? contBtn : document.getElementById("tk-rematch")).focus();
   }
   document.getElementById("tk-rematch").addEventListener("click", e => {
     resultOverlay.classList.remove("is-visible");
@@ -1284,6 +1305,33 @@
     const p1 = match.fighters[0].def, p2 = match.fighters[1].def;
     match.init(p1, p2, parseInt(diffSel.value, 10));
   });
+
+  // Paid continue — one on-chain toll (base + 6.9% tax) resumes the match.
+  const continueBtn = document.getElementById("tk-continue");
+  if (continueBtn) {
+    if (window.TrollPay) window.TrollPay.mountTokenPicker(document.getElementById("tk-pay-token-picker"));
+    continueBtn.addEventListener("click", async e => {
+      const btn = e.currentTarget;
+      if (!window.TrollPay) { btn.textContent = "Payments unavailable"; return; }
+      btn.disabled = true;
+      const set = t => { btn.textContent = t; };
+      set("Connect wallet…");
+      const res = await window.TrollPay.payForRevive(ev => {
+        if (ev.stage === "connecting")      set("Connect wallet…");
+        else if (ev.stage === "building")   set("Building tx…");
+        else if (ev.stage === "awaiting")   set("Confirm in Phantom…");
+        else if (ev.stage === "confirming") set("Confirming…");
+      });
+      if (!res.ok) {
+        set(res.reason || "Payment failed");
+        setTimeout(() => { btn.disabled = false; set("Continue · " + window.TrollPay.costLabel()); }, 1800);
+        return;
+      }
+      btn.blur();
+      resultOverlay.classList.remove("is-visible");
+      match.continueMatch();
+    });
+  }
   document.getElementById("tk-change").addEventListener("click", () => {
     resultOverlay.classList.remove("is-visible");
     document.getElementById("tk-select").classList.add("is-visible");

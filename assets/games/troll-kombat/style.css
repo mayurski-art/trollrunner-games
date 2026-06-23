@@ -285,6 +285,15 @@ h1 {
 .link-back { display: inline-block; margin-top: 14px; color: var(--green); font-family: var(--mono); font-size: 12px; }
 .link-back:hover { text-decoration: underline; }
 
+/* ---- Paid continue ----------------------------------------------------- */
+.tk-continue-row { margin-top: 16px; padding: 14px; border: 1px solid rgba(255, 216, 77, 0.3); border-radius: 12px; background: rgba(255, 216, 77, 0.08); }
+.tk-pay-label { display: block; color: var(--muted); font-family: var(--mono); font-size: 11px; text-transform: uppercase; margin-bottom: 8px; }
+.tk-continue-row .primary-btn { width: 100%; }
+.tk-continue-fine { margin-top: 8px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.pay-token-picker { display: inline-flex; gap: 6px; vertical-align: middle; }
+.pay-token-btn { padding: 3px 10px; border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.05); color: var(--muted); font-family: var(--mono); font-size: 12px; cursor: pointer; border-radius: 6px; }
+.pay-token-btn.is-active { color: var(--gold); border-color: var(--gold); background: rgba(255, 216, 77, 0.14); }
+
 /* ---- Touch controls ---------------------------------------------------- */
 .touch-controls {
   position: relative; z-index: 1; display: none; align-items: center; justify-content: space-between;

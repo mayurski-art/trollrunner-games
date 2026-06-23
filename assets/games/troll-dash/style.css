@@ -908,6 +908,28 @@ h1 {
   font-size: 18px;
 }
 
+.pay-token-picker {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+.pay-token-btn {
+  flex: 1;
+  padding: 4px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.pay-token-btn.is-active {
+  color: var(--gold);
+  border-color: var(--gold);
+  background: rgba(255, 216, 77, 0.12);
+}
+
 .revive-disclaimer,
 .treasury-note {
   font-size: 12px;
