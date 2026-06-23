@@ -12,6 +12,9 @@
 
   const canvas = document.getElementById("tk-canvas");
   if (!canvas) return;
+  // Iconic trollface, stamped on the meme-coins instead of a plain "$".
+  const TROLL_COIN_IMG = new Image();
+  TROLL_COIN_IMG.src = "https://media.tenor.com/kkkBm71bkRcAAAAi/trollface-troll-face-terror-png.gif";
   // `ctx` is a `let` so portrait() can temporarily swap in an offscreen context
   // and reuse the same head-drawing helpers (they close over this binding).
   let ctx = canvas.getContext("2d");
@@ -807,13 +810,24 @@
   function drawProjectiles() {
     for (const p of projectiles) {
       ctx.save();
-      const grd = ctx.createRadialGradient(p.x, p.y, 1, p.x, p.y, p.r);
-      grd.addColorStop(0, "#fff"); grd.addColorStop(0.4, p.color); grd.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fillStyle = grd; ctx.fill();
-      if (p.text) {
-        ctx.fillStyle = "#0a0a0a"; ctx.font = `900 ${p.kind === "coin" ? 16 : 18}px DM Mono, monospace`;
-        ctx.textAlign = "center"; ctx.textBaseline = "middle";
-        ctx.fillText(p.text, p.x, p.y + 1);
+      if (p.kind === "coin" && TROLL_COIN_IMG.complete && TROLL_COIN_IMG.naturalWidth) {
+        // Gold disc with the trollface minted on it.
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fillStyle = "#ffd84d"; ctx.fill();
+        ctx.save();
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 0.86, 0, 7); ctx.clip();
+        ctx.drawImage(TROLL_COIN_IMG, p.x - p.r, p.y - p.r, p.r * 2, p.r * 2);
+        ctx.restore();
+        ctx.lineWidth = Math.max(1, p.r * 0.16); ctx.strokeStyle = "#b6831a";
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.stroke();
+      } else {
+        const grd = ctx.createRadialGradient(p.x, p.y, 1, p.x, p.y, p.r);
+        grd.addColorStop(0, "#fff"); grd.addColorStop(0.4, p.color); grd.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fillStyle = grd; ctx.fill();
+        if (p.text) {
+          ctx.fillStyle = "#0a0a0a"; ctx.font = `900 ${p.kind === "coin" ? 16 : 18}px DM Mono, monospace`;
+          ctx.textAlign = "center"; ctx.textBaseline = "middle";
+          ctx.fillText(p.text, p.x, p.y + 1);
+        }
       }
       ctx.restore();
     }
@@ -835,8 +849,12 @@
         const g = ctx.createRadialGradient(p.x - 2, p.y - 2, 1, p.x, p.y, p.r);
         g.addColorStop(0, "#ffe88a"); g.addColorStop(1, "#b6831a");
         ctx.fillStyle = g; ctx.fill();
-        ctx.fillStyle = "#6b4a07"; ctx.font = "900 9px DM Mono, monospace";
-        ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("$", p.x, p.y + 1);
+        if (TROLL_COIN_IMG.complete && TROLL_COIN_IMG.naturalWidth) {
+          ctx.save();
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 0.9, 0, 7); ctx.clip();
+          ctx.drawImage(TROLL_COIN_IMG, p.x - p.r, p.y - p.r, p.r * 2, p.r * 2);
+          ctx.restore();
+        }
       } else {
         ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fillStyle = p.color; ctx.fill();
       }

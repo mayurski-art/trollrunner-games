@@ -15,6 +15,10 @@
   const MOCK_WALLET_START_BALANCE = 42;
   const DEATH_MESSAGES = ["RUGGED", "LIQUIDATED", "REKT", "PAPER HANDS", "SUPPORT BROKE", "GG NO RE"];
 
+  // Iconic trollface, stamped on the collectible coins instead of a plain "T".
+  const TROLL_COIN_IMG = new Image();
+  TROLL_COIN_IMG.src = "https://media.tenor.com/kkkBm71bkRcAAAAi/trollface-troll-face-terror-png.gif";
+
   // --- Pseudo-3D camera ----------------------------------------------
   const CAM = { depth: 1.62, height: 1.02, horizon: 0.4 };
   const CAM_FOLLOW = 0.6;        // how much the camera trails the player's lane (0..1)
@@ -497,13 +501,18 @@
     if (p.scale < 0.01) return;
     const r = clamp(p.scale * 95, 3, 28);
     const squish = Math.abs(Math.cos(state.elapsed * 5 + c.spin));
+    const rx = Math.max(2, r * (0.34 + squish * 0.66));   // horizontal radius (spin)
     ctx.save(); ctx.translate(p.x, p.y);
     ctx.shadowBlur = 16; ctx.shadowColor = "#ffd84d"; ctx.fillStyle = "#ffd84d";
-    ctx.beginPath(); ctx.ellipse(0, 0, Math.max(2, r * (0.34 + squish * 0.66)), r, 0, 0, 6.2832); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0, 0, rx, r, 0, 0, 6.2832); ctx.fill();
     ctx.shadowBlur = 0; ctx.lineWidth = Math.max(1, r * 0.14); ctx.strokeStyle = "#b6831a"; ctx.stroke();
-    if (r > 9 && squish > 0.4) {
-      ctx.fillStyle = "#6b4a07"; ctx.font = `900 ${Math.floor(r * 0.9)}px 'DM Mono', monospace`;
-      ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("T", 0, r * 0.06);
+    // Stamp the trollface on the coin face, squished with the spin so it reads
+    // like a minted 3D coin. Falls back to nothing until the image loads.
+    if (r > 6 && TROLL_COIN_IMG.complete && TROLL_COIN_IMG.naturalWidth) {
+      ctx.save();
+      ctx.beginPath(); ctx.ellipse(0, 0, rx * 0.84, r * 0.84, 0, 0, 6.2832); ctx.clip();
+      ctx.drawImage(TROLL_COIN_IMG, -rx * 0.92, -r * 0.92, rx * 1.84, r * 1.84);
+      ctx.restore();
     }
     ctx.restore();
   }
