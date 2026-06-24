@@ -143,6 +143,7 @@
   let revivePhase = "idle";        // idle | paying | ready | countdown
   let reviveCountdownTimer = null;
   let mobileReviveUrl = null;      // pre-built Solana Pay URL (mobile)
+  let mobileReviveToken = "USDC";  // token the prepared URL actually pays in
   let mobileReviveSig = null;      // treasury sig snapshot at pre-build time
   let mobileConfirmRunning = false;
 
@@ -161,26 +162,48 @@
     return "⚠ " + (m.length > 60 ? m.slice(0, 60) : m);
   }
 
-  // Pre-build the Solana Pay URL (price + treasury snapshot) while the death
-  // screen is up, so the Revive tap can navigate to Phantom SYNCHRONOUSLY — iOS
-  // blocks custom-scheme links fired after an await (the user-gesture is lost).
+  // Pre-build the Solana Pay URL while the death screen is up, so the Revive tap
+  // can navigate to Phantom SYNCHRONOUSLY — iOS blocks custom-scheme links fired
+  // after an await (the user-gesture is lost).
+  //
+  // The button must NEVER hang on the network. USDC needs zero network to build,
+  // so we always have it as an instant baseline; if $TROLL is selected we try to
+  // upgrade to a $TROLL URL via the live price, but fall back to USDC if it's
+  // slow. The treasury snapshot (auto-confirm only) is fully backgrounded.
   async function prepareMobileRevive() {
     if (!mobilePay() || state.mode !== "dead" || state.revivedThisRun) return;
-    mobileReviveUrl = null;
     const token = reviveToken();
     if (dom.reviveButton && revivePhase === "idle") { dom.reviveButton.textContent = "Preparing…"; }
-    // Snapshot treasury — if it times out, proceed with null (any new tx will match).
-    try { mobileReviveSig = await TP().latestTreasurySig(token); }
-    catch (_) { mobileReviveSig = null; }
-    // Build the Solana Pay URL — if this fails, show a tap-to-retry hint.
+
+    // Snapshot the treasury in the background — never blocks the button.
+    mobileReviveSig = null;
+    TP().latestTreasurySig(token).then(s => { mobileReviveSig = s; }).catch(() => {});
+
+    // 1) Instant USDC baseline (no network) — guarantees the tap always has a URL.
+    let url = null, payToken = "USDC";
     try {
-      mobileReviveUrl = await TP().solanaPayUrl({
-        amountUsd: reviveTotalUsd(), token,
+      url = await TP().solanaPayUrl({
+        amountUsd: reviveTotalUsd(), token: "USDC",
         label: "Troll Dash Revive", message: "Revive in Troll Dash",
       });
-    } catch (e) {
-      setReviveStatus("Network slow — tap Revive to retry.");
+    } catch (_) {}
+
+    // 2) If $TROLL is selected, try to upgrade to a $TROLL URL (needs live price).
+    if (token === "TROLL") {
+      try {
+        url = await TP().solanaPayUrl({
+          amountUsd: reviveTotalUsd(), token: "TROLL",
+          label: "Troll Dash Revive", message: "Revive in Troll Dash",
+        });
+        payToken = "TROLL";
+        setReviveStatus("");
+      } catch (_) {
+        setReviveStatus("$TROLL price slow — tap to pay in USDC (or retry for $TROLL).");
+      }
     }
+
+    mobileReviveUrl = url;
+    mobileReviveToken = payToken;
     if (dom.reviveButton && revivePhase === "idle" && state.mode === "dead" && !state.revivedThisRun) {
       dom.reviveButton.textContent = "Revive";
     }
@@ -301,7 +324,8 @@
         return;
       }
       revivePhase = "paying";
-      sessionStorage.setItem(REVIVE_PENDING_KEY, JSON.stringify({ token, sinceSig: mobileReviveSig, ts: Date.now() }));
+      // Confirm against the token the URL actually pays in (may be a USDC fallback).
+      sessionStorage.setItem(REVIVE_PENDING_KEY, JSON.stringify({ token: mobileReviveToken, sinceSig: mobileReviveSig, ts: Date.now() }));
       dom.reviveButton.textContent = "Opening Phantom…";
       setReviveStatus("Approve in Phantom, then come back to the game.");
       window.location.href = mobileReviveUrl;       // synchronous — within the tap gesture
@@ -927,6 +951,7 @@
     dom.reviveConfirmButton && dom.reviveConfirmButton.addEventListener("click", confirmReviveResume);
     if (TP()) {
       TP().setToken("TROLL");   // games default to $TROLL (falls back to USDC if unavailable)
+      TP().warmTrollPrice && TP().warmTrollPrice();   // warm the price cache early
       if (dom.payTokenPicker) TP().mountTokenPicker(dom.payTokenPicker, () => { refreshReviveCost(); prepareMobileRevive(); });
     }
     refreshReviveCost();
