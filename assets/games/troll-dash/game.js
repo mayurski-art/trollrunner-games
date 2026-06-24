@@ -150,7 +150,8 @@
     if (!mobilePay() || state.mode !== "dead" || state.revivedThisRun) return;
     mobileReviveUrl = null;
     const token = reviveToken();
-    if (dom.reviveButton && revivePhase === "idle") { dom.reviveButton.disabled = true; dom.reviveButton.textContent = "Preparing…"; }
+    // Never disable the button — user must always be able to tap even while fetching.
+    if (dom.reviveButton && revivePhase === "idle") { dom.reviveButton.textContent = "Preparing…"; }
     try {
       mobileReviveSig = await TP().latestTreasurySig(token);
       mobileReviveUrl = await TP().solanaPayUrl({
@@ -160,9 +161,7 @@
     } catch (e) {
       setReviveStatus(friendlyReviveErr(e));
     }
-    // Re-enable once ready (or to allow a retry on failure), unless we've moved on.
     if (dom.reviveButton && revivePhase === "idle" && state.mode === "dead" && !state.revivedThisRun) {
-      dom.reviveButton.disabled = false;
       dom.reviveButton.textContent = "Revive";
     }
   }
@@ -255,7 +254,7 @@
     refreshReviveCost();
     if (dom.reviveButton) {
       if (state.revivedThisRun) { dom.reviveButton.disabled = true; dom.reviveButton.textContent = "Revive used this run"; }
-      else if (mobilePay()) { dom.reviveButton.disabled = true; dom.reviveButton.textContent = "Preparing…"; }
+      else if (mobilePay()) { dom.reviveButton.disabled = false; dom.reviveButton.textContent = "Preparing…"; }
       else { dom.reviveButton.disabled = false; dom.reviveButton.textContent = "Revive"; }
     }
     if (!state.revivedThisRun) prepareMobileRevive();   // mobile: pre-build the Solana Pay URL
