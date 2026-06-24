@@ -173,7 +173,6 @@
 
           <div id="death-overlay" class="game-overlay" aria-live="assertive">
             <div class="overlay-card death-card">
-              <span class="mock-badge">Mock Mode</span>
               <p class="overlay-kicker">Run halted</p>
               <h2 id="death-message">RUGGED</h2>
 
@@ -188,25 +187,37 @@
                 </div>
               </div>
 
-              <div class="revive-panel">
-                <div>
-                  <span>Wallet balance</span>
-                  <strong id="wallet-balance">42.0 $TROLL</strong>
+              <!-- Default revive prompt (pay to revive) -->
+              <div id="revive-prompt">
+                <div class="revive-panel">
+                  <div>
+                    <span>Pay with</span>
+                    <span id="pay-token-picker" class="pay-token-picker"></span>
+                  </div>
+                  <div>
+                    <span>Revive cost</span>
+                    <strong id="revive-cost">$0.74</strong>
+                  </div>
                 </div>
-                <div>
-                  <span>Revive cost</span>
-                  <strong>6.9 $TROLL</strong>
+
+                <div class="overlay-actions">
+                  <button id="revive-button" class="primary-btn" type="button">Revive</button>
+                  <button id="restart-button" class="secondary-btn" type="button">↻ Run Again</button>
                 </div>
+                <p id="revive-status" class="revive-status" aria-live="polite"></p>
               </div>
 
-              <div class="overlay-actions">
-                <button id="revive-button" class="primary-btn" type="button">Revive · 6.9 $TROLL</button>
-                <button id="restart-button" class="secondary-btn" type="button">↻ Run Again</button>
+              <!-- Shown after the payment confirms -->
+              <div id="revive-ready" hidden>
+                <div class="revive-plus">+1 REVIVE</div>
+                <p class="revive-ready-note">Payment confirmed. Resume when you're ready.</p>
+                <button id="revive-confirm-button" class="primary-btn" type="button">Confirm &amp; Resume</button>
+                <div id="revive-countdown" class="revive-countdown" hidden></div>
               </div>
 
               <details class="revive-fine">
                 <summary>Revive details</summary>
-                <p class="revive-disclaimer">Revive costs 6.9 $TROLL plus Solana network fees. Optional, non-refundable. Currently mock mode — no real transaction occurs.</p>
+                <p class="revive-disclaimer">Revive is a real on-chain payment of ~$0.69 + 6.9% tax, in $TROLL or USDC, approved in your Phantom wallet. Optional, non-refundable.</p>
                 <p class="treasury-note">Treasury: <span id="treasury-wallet">79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA</span></p>
                 <a class="link-back" href="/">← Back to Arcade</a>
               </details>
@@ -271,7 +282,9 @@
     </section>
   </main>
 
+  <script src="assets/js/troll-pay-config.js?v=1" defer></script>
+  <script src="https://trollrunner.net/assets/js/troll-pay.js?v=1" defer></script>
   <script src="assets/games/troll-dash/arcade-intro.js?v=temple-3d-v2-20260615" defer></script>
-  <script src="assets/games/troll-dash/game.js?v=temple-3d-v2-20260615" defer></script>
+  <script src="assets/games/troll-dash/game.js?v=revive-pay-1" defer></script>
 </body>
 </html>

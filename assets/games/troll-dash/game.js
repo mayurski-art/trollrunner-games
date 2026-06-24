@@ -53,6 +53,13 @@
     soundToggle: document.getElementById("sound-toggle"),
     coinFinal: document.getElementById("coin-final"),
     scoreFinal: document.getElementById("score-final"),
+    payTokenPicker: document.getElementById("pay-token-picker"),
+    reviveCost: document.getElementById("revive-cost"),
+    reviveStatus: document.getElementById("revive-status"),
+    revivePrompt: document.getElementById("revive-prompt"),
+    reviveReady: document.getElementById("revive-ready"),
+    reviveConfirmButton: document.getElementById("revive-confirm-button"),
+    reviveCountdown: document.getElementById("revive-countdown"),
   };
 
   const ctx = dom.canvas.getContext("2d");
@@ -111,17 +118,26 @@
     chord(freqs, d = 0.16, type = "square") { freqs.forEach((f, i) => setTimeout(() => this.beep(f, d, type), i * 55)); },
   };
 
-  // --- Mock revive payment (real Phantom flow specced in docs/) -------
-  class MockRevivePaymentProvider {
-    constructor(gs) { this.gs = gs; }
-    async payForRevive() {
-      if (this.gs.walletBalance < REVIVE_COST) return { ok: false, reason: "Not enough $TROLL" };
-      this.gs.walletBalance = round1(this.gs.walletBalance - REVIVE_COST);
-      return { ok: true };
-    }
+  // --- Revive payments (real Phantom flow via the shared TrollPay lib) --
+  const REVIVE_PRICE_USD = (window.TROLL_PAY_CONFIG && window.TROLL_PAY_CONFIG.REVIVE_PRICE_USD) || 0.69;
+  const REVIVE_TAX       = (window.TROLL_PAY_CONFIG && window.TROLL_PAY_CONFIG.TAX_RATE) || 0.069;
+  const REVIVE_PENDING_KEY = "troll_dash_revive_pending";
+  let revivePhase = "idle";        // idle | paying | ready | countdown
+  let reviveCountdownTimer = null;
+
+  const TP = () => window.TrollPay;
+  function reviveToken()   { return (TP() && TP().getToken()) || "USDC"; }
+  function reviveTotalUsd() { return REVIVE_PRICE_USD * (1 + REVIVE_TAX); }
+  function reviveCostText() {
+    const total = reviveTotalUsd();
+    return reviveToken() === "TROLL" ? `$${total.toFixed(2)} in $TROLL` : `${total.toFixed(2)} USDC`;
   }
-  const revivePayments = new MockRevivePaymentProvider(state);
-  void TROLL_MINT_ADDRESS;
+  function setReviveStatus(msg) { if (dom.reviveStatus) dom.reviveStatus.textContent = msg || ""; }
+  function refreshReviveCost()  { if (dom.reviveCost) dom.reviveCost.textContent = reviveCostText(); }
+  function friendlyReviveErr(e) {
+    const m = (e && e.message) || String(e);
+    return "⚠ " + (m.length > 60 ? m.slice(0, 60) : m);
+  }
 
   // --- Math helpers ---------------------------------------------------
   const round1 = v => Math.round(v * 10) / 10;
@@ -163,12 +179,7 @@
     dom.score.textContent = Math.floor(state.distance).toLocaleString();
     dom.coins.textContent = state.coins.toLocaleString();
     dom.high.textContent = Math.floor(state.highScore).toLocaleString();
-    if (dom.walletBalance) dom.walletBalance.textContent = `${state.walletBalance.toFixed(1)} $TROLL`;
     if (dom.treasuryWallet) dom.treasuryWallet.textContent = TREASURY_WALLET;
-    if (dom.reviveButton) {
-      dom.reviveButton.disabled = state.revivedThisRun || state.walletBalance < REVIVE_COST;
-      dom.reviveButton.textContent = state.revivedThisRun ? "Revive used" : "Revive · 6.9 $TROLL";
-    }
   }
 
   // --- Run lifecycle --------------------------------------------------
@@ -198,24 +209,135 @@
     if (dom.coinFinal) dom.coinFinal.textContent = state.coins.toLocaleString();
     const p = project(PLAYER_Z, laneToX(state.player.laneFloat), 0.4);
     burst(p.x, p.y, "#ff314f", 34, 240);
+    resetReviveUI();
     show(dom.deathOverlay); updateHud();
     audio.beep(120, 0.3, "sawtooth", 0.09);
   }
 
-  async function revive() {
-    if (state.mode !== "dead" || state.revivedThisRun) return;
+  // --- Revive flow: pay -> confirm -> "+1 REVIVE" -> 5s countdown -> resume
+  function resetReviveUI() {
+    revivePhase = "idle";
+    if (reviveCountdownTimer) { clearInterval(reviveCountdownTimer); reviveCountdownTimer = null; }
+    if (dom.revivePrompt) dom.revivePrompt.hidden = false;
+    if (dom.reviveReady) dom.reviveReady.hidden = true;
+    if (dom.reviveCountdown) { dom.reviveCountdown.hidden = true; dom.reviveCountdown.textContent = ""; }
+    if (dom.reviveConfirmButton) { dom.reviveConfirmButton.hidden = false; dom.reviveConfirmButton.disabled = false; }
+    setReviveStatus("");
+    refreshReviveCost();
+    if (dom.reviveButton) {
+      dom.reviveButton.disabled = !!state.revivedThisRun;
+      dom.reviveButton.textContent = state.revivedThisRun ? "Revive used this run" : "Revive";
+    }
+  }
+
+  async function startRevive() {
+    if (state.mode !== "dead" || state.revivedThisRun || revivePhase !== "idle") return;
+    if (!TP()) { setReviveStatus("Payments unavailable — reload the page."); return; }
+    const token = reviveToken();
+    revivePhase = "paying";
     dom.reviveButton.disabled = true;
-    dom.reviveButton.textContent = "Paying toll…";
-    const payment = await revivePayments.payForRevive();
-    if (!payment.ok) { dom.reviveButton.textContent = payment.reason || "Revive failed"; updateHud(); return; }
+
+    // Mobile (no injected wallet): hand off to Phantom, then confirm via treasury poll on return.
+    if (TP().shouldUseSolanaPay && TP().shouldUseSolanaPay()) {
+      dom.reviveButton.textContent = "Opening Phantom…";
+      setReviveStatus("Approve the payment in Phantom, then come back here.");
+      try {
+        const sinceSig = await TP().latestTreasurySig(token);
+        const url = await TP().solanaPayUrl({
+          amountUsd: reviveTotalUsd(), token,
+          label: "Troll Dash Revive", message: "Revive in Troll Dash",
+        });
+        sessionStorage.setItem(REVIVE_PENDING_KEY, JSON.stringify({ token, sinceSig }));
+        window.location.href = url;
+      } catch (e) {
+        revivePhase = "idle";
+        dom.reviveButton.disabled = false; dom.reviveButton.textContent = "Revive";
+        setReviveStatus(friendlyReviveErr(e));
+      }
+      return;
+    }
+
+    // Desktop / Phantom in-app browser: injected, confirmed payment.
+    dom.reviveButton.textContent = "Connect wallet…";
+    setReviveStatus("");
+    const res = await TP().pay({
+      amountUsd: REVIVE_PRICE_USD, taxRate: REVIVE_TAX, token,
+      onProgress: (ev) => {
+        if (ev.stage === "connecting") dom.reviveButton.textContent = "Connect wallet…";
+        else if (ev.stage === "building") dom.reviveButton.textContent = "Building tx…";
+        else if (ev.stage === "awaiting") dom.reviveButton.textContent = "Confirm in Phantom…";
+        else if (ev.stage === "confirming") dom.reviveButton.textContent = "Confirming…";
+      },
+    });
+    if (!res.ok) {
+      revivePhase = "idle";
+      dom.reviveButton.disabled = false; dom.reviveButton.textContent = "Revive";
+      setReviveStatus("⚠ " + (res.reason || "Payment failed"));
+      return;
+    }
+    onRevivePaid();
+  }
+
+  // Mobile: on return from Phantom, poll the treasury to confirm the payment landed.
+  async function checkPendingMobileRevive() {
+    const raw = sessionStorage.getItem(REVIVE_PENDING_KEY);
+    if (!raw) return;
+    if (!TP() || state.mode !== "dead" || state.revivedThisRun) { sessionStorage.removeItem(REVIVE_PENDING_KEY); return; }
+    let pending;
+    try { pending = JSON.parse(raw); } catch (e) { sessionStorage.removeItem(REVIVE_PENDING_KEY); return; }
+    revivePhase = "paying";
+    if (dom.reviveButton) { dom.reviveButton.disabled = true; dom.reviveButton.textContent = "Checking payment…"; }
+    setReviveStatus("Confirming your payment on-chain…");
+    const result = await TP().waitForNewTreasuryPayment(pending.token, pending.sinceSig, 120000, null);
+    sessionStorage.removeItem(REVIVE_PENDING_KEY);
+    if (result.ok) { onRevivePaid(); return; }
+    revivePhase = "idle";
+    if (dom.reviveButton) { dom.reviveButton.disabled = false; dom.reviveButton.textContent = "Revive"; }
+    setReviveStatus("No payment detected. Tap Revive to try again.");
+  }
+
+  function onRevivePaid() {
+    revivePhase = "ready";
+    if (dom.revivePrompt) dom.revivePrompt.hidden = true;
+    if (dom.reviveReady) dom.reviveReady.hidden = false;
+    if (dom.reviveConfirmButton) { dom.reviveConfirmButton.hidden = false; dom.reviveConfirmButton.disabled = false; }
+    if (dom.reviveCountdown) dom.reviveCountdown.hidden = true;
+    audio.chord([660, 880, 1180], 0.12);
+  }
+
+  function confirmReviveResume() {
+    if (revivePhase !== "ready") return;
+    revivePhase = "countdown";
+    if (dom.reviveConfirmButton) dom.reviveConfirmButton.hidden = true;
+    let n = 5;
+    if (dom.reviveCountdown) { dom.reviveCountdown.hidden = false; dom.reviveCountdown.textContent = String(n); }
+    audio.beep(880, 0.08);
+    reviveCountdownTimer = setInterval(() => {
+      n -= 1;
+      if (n <= 0) {
+        clearInterval(reviveCountdownTimer); reviveCountdownTimer = null;
+        doResume();
+      } else {
+        if (dom.reviveCountdown) dom.reviveCountdown.textContent = String(n);
+        audio.beep(880, 0.08);
+      }
+    }, 1000);
+  }
+
+  function doResume() {
+    revivePhase = "idle";
     state.revivedThisRun = true; state.mode = "running";
     state.invincibleUntil = state.elapsed + 2.6; state.flash = 0.6;
     state.obstacles = state.obstacles.filter(o => o.z > PLAYER_Z + HIT_BAND + 6);
     Object.assign(state.player, { worldY: 0, vy: 0, onGround: true, rollT: 0 });
     hide(dom.deathOverlay);
-    dom.revivedBanner.classList.remove("is-visible");
-    void dom.revivedBanner.offsetWidth;
-    dom.revivedBanner.classList.add("is-visible");
+    if (dom.reviveReady) dom.reviveReady.hidden = true;
+    if (dom.revivedBanner) {
+      dom.revivedBanner.textContent = reviveToken() === "TROLL" ? "REVIVED BY $TROLL" : "REVIVED BY USDC";
+      dom.revivedBanner.classList.remove("is-visible");
+      void dom.revivedBanner.offsetWidth;
+      dom.revivedBanner.classList.add("is-visible");
+    }
     const p = project(PLAYER_Z, laneToX(state.player.laneFloat), 0.4);
     burst(p.x, p.y, "#4dff73", 46, 260);
     audio.chord([660, 880, 1180], 0.12);
@@ -730,7 +852,14 @@
     window.addEventListener("keydown", handleKeydown);
     dom.startButton && dom.startButton.addEventListener("click", resetRun);
     dom.restartButton && dom.restartButton.addEventListener("click", resetRun);
-    dom.reviveButton && dom.reviveButton.addEventListener("click", revive);
+    dom.reviveButton && dom.reviveButton.addEventListener("click", startRevive);
+    dom.reviveConfirmButton && dom.reviveConfirmButton.addEventListener("click", confirmReviveResume);
+    if (TP()) {
+      TP().setToken("TROLL");   // games default to $TROLL (falls back to USDC if unavailable)
+      if (dom.payTokenPicker) TP().mountTokenPicker(dom.payTokenPicker, () => refreshReviveCost());
+    }
+    refreshReviveCost();
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) checkPendingMobileRevive(); });
     dom.soundToggle && dom.soundToggle.addEventListener("click", () => {
       audio.enabled = !audio.enabled;
       dom.soundToggle.setAttribute("aria-pressed", String(audio.enabled));
