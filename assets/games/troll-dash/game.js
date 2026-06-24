@@ -124,8 +124,12 @@
   const REVIVE_PENDING_KEY = "troll_dash_revive_pending";
   let revivePhase = "idle";        // idle | paying | ready | countdown
   let reviveCountdownTimer = null;
+  let mobileReviveUrl = null;      // pre-built Solana Pay URL (mobile)
+  let mobileReviveSig = null;      // treasury sig snapshot at pre-build time
+  let mobileConfirmRunning = false;
 
   const TP = () => window.TrollPay;
+  function mobilePay() { return !!(TP() && TP().shouldUseSolanaPay && TP().shouldUseSolanaPay()); }
   function reviveToken()   { return (TP() && TP().getToken()) || "USDC"; }
   function reviveTotalUsd() { return REVIVE_PRICE_USD * (1 + REVIVE_TAX); }
   function reviveCostText() {
@@ -137,6 +141,30 @@
   function friendlyReviveErr(e) {
     const m = (e && e.message) || String(e);
     return "⚠ " + (m.length > 60 ? m.slice(0, 60) : m);
+  }
+
+  // Pre-build the Solana Pay URL (price + treasury snapshot) while the death
+  // screen is up, so the Revive tap can navigate to Phantom SYNCHRONOUSLY — iOS
+  // blocks custom-scheme links fired after an await (the user-gesture is lost).
+  async function prepareMobileRevive() {
+    if (!mobilePay() || state.mode !== "dead" || state.revivedThisRun) return;
+    mobileReviveUrl = null;
+    const token = reviveToken();
+    if (dom.reviveButton && revivePhase === "idle") { dom.reviveButton.disabled = true; dom.reviveButton.textContent = "Preparing…"; }
+    try {
+      mobileReviveSig = await TP().latestTreasurySig(token);
+      mobileReviveUrl = await TP().solanaPayUrl({
+        amountUsd: reviveTotalUsd(), token,
+        label: "Troll Dash Revive", message: "Revive in Troll Dash",
+      });
+    } catch (e) {
+      setReviveStatus(friendlyReviveErr(e));
+    }
+    // Re-enable once ready (or to allow a retry on failure), unless we've moved on.
+    if (dom.reviveButton && revivePhase === "idle" && state.mode === "dead" && !state.revivedThisRun) {
+      dom.reviveButton.disabled = false;
+      dom.reviveButton.textContent = "Revive";
+    }
   }
 
   // --- Math helpers ---------------------------------------------------
@@ -217,6 +245,7 @@
   // --- Revive flow: pay -> confirm -> "+1 REVIVE" -> 5s countdown -> resume
   function resetReviveUI() {
     revivePhase = "idle";
+    mobileConfirmRunning = false;
     if (reviveCountdownTimer) { clearInterval(reviveCountdownTimer); reviveCountdownTimer = null; }
     if (dom.revivePrompt) dom.revivePrompt.hidden = false;
     if (dom.reviveReady) dom.reviveReady.hidden = true;
@@ -225,37 +254,43 @@
     setReviveStatus("");
     refreshReviveCost();
     if (dom.reviveButton) {
-      dom.reviveButton.disabled = !!state.revivedThisRun;
-      dom.reviveButton.textContent = state.revivedThisRun ? "Revive used this run" : "Revive";
+      if (state.revivedThisRun) { dom.reviveButton.disabled = true; dom.reviveButton.textContent = "Revive used this run"; }
+      else if (mobilePay()) { dom.reviveButton.disabled = true; dom.reviveButton.textContent = "Preparing…"; }
+      else { dom.reviveButton.disabled = false; dom.reviveButton.textContent = "Revive"; }
     }
+    if (!state.revivedThisRun) prepareMobileRevive();   // mobile: pre-build the Solana Pay URL
+  }
+
+  function onReviveButtonClick() {
+    // While awaiting mobile confirmation, the button is the manual "I paid" fallback.
+    if (revivePhase === "confirming") { manualMobileResume(); return; }
+    startRevive();
   }
 
   async function startRevive() {
     if (state.mode !== "dead" || state.revivedThisRun || revivePhase !== "idle") return;
     if (!TP()) { setReviveStatus("Payments unavailable — reload the page."); return; }
     const token = reviveToken();
-    revivePhase = "paying";
-    dom.reviveButton.disabled = true;
 
-    // Mobile (no injected wallet): hand off to Phantom, then confirm via treasury poll on return.
-    if (TP().shouldUseSolanaPay && TP().shouldUseSolanaPay()) {
-      dom.reviveButton.textContent = "Opening Phantom…";
-      setReviveStatus("Approve the payment in Phantom, then come back here.");
-      try {
-        const sinceSig = await TP().latestTreasurySig(token);
-        const url = await TP().solanaPayUrl({
-          amountUsd: reviveTotalUsd(), token,
-          label: "Troll Dash Revive", message: "Revive in Troll Dash",
-        });
-        sessionStorage.setItem(REVIVE_PENDING_KEY, JSON.stringify({ token, sinceSig }));
-        window.location.href = url;
-      } catch (e) {
-        revivePhase = "idle";
-        dom.reviveButton.disabled = false; dom.reviveButton.textContent = "Revive";
-        setReviveStatus(friendlyReviveErr(e));
+    // Mobile (no injected wallet): hand off to Phantom via the PRE-BUILT Solana Pay
+    // URL, navigating SYNCHRONOUSLY so iOS keeps the user-gesture (custom-scheme
+    // links are silently blocked when fired after an await).
+    if (mobilePay()) {
+      if (!mobileReviveUrl) {                       // not ready — rebuild, tap again
+        setReviveStatus("Preparing payment — tap Revive again in a moment.");
+        prepareMobileRevive();
+        return;
       }
+      revivePhase = "paying";
+      sessionStorage.setItem(REVIVE_PENDING_KEY, JSON.stringify({ token, sinceSig: mobileReviveSig, ts: Date.now() }));
+      dom.reviveButton.textContent = "Opening Phantom…";
+      setReviveStatus("Approve in Phantom, then come back to the game.");
+      window.location.href = mobileReviveUrl;       // synchronous — within the tap gesture
       return;
     }
+
+    revivePhase = "paying";
+    dom.reviveButton.disabled = true;
 
     // Desktop / Phantom in-app browser: injected, confirmed payment.
     dom.reviveButton.textContent = "Connect wallet…";
@@ -278,25 +313,36 @@
     onRevivePaid();
   }
 
-  // Mobile: on return from Phantom, poll the treasury to confirm the payment landed.
+  // Mobile: on return from Phantom, confirm the payment landed by polling the
+  // treasury. ALWAYS leave a manual "I paid — Resume" path so a player who paid is
+  // never stuck (the $TROLL is already in the treasury either way).
   async function checkPendingMobileRevive() {
     const raw = sessionStorage.getItem(REVIVE_PENDING_KEY);
     if (!raw) return;
     if (!TP() || state.mode !== "dead" || state.revivedThisRun) { sessionStorage.removeItem(REVIVE_PENDING_KEY); return; }
+    if (revivePhase === "ready" || revivePhase === "countdown" || mobileConfirmRunning) return;
     let pending;
     try { pending = JSON.parse(raw); } catch (e) { sessionStorage.removeItem(REVIVE_PENDING_KEY); return; }
-    revivePhase = "paying";
-    if (dom.reviveButton) { dom.reviveButton.disabled = true; dom.reviveButton.textContent = "Checking payment…"; }
-    setReviveStatus("Confirming your payment on-chain…");
-    const result = await TP().waitForNewTreasuryPayment(pending.token, pending.sinceSig, 120000, null);
+    mobileConfirmRunning = true;
+    revivePhase = "confirming";
+    // The revive button is now the manual fallback (handled by onReviveButtonClick).
+    if (dom.reviveButton) { dom.reviveButton.disabled = false; dom.reviveButton.textContent = "I paid — Resume"; }
+    setReviveStatus("Confirming your payment…");
+    const result = await TP().waitForNewTreasuryPayment(pending.token, pending.sinceSig, 70000, null);
+    mobileConfirmRunning = false;
+    if (revivePhase !== "confirming") return;       // user forced it / moved on
+    if (result.ok) { sessionStorage.removeItem(REVIVE_PENDING_KEY); onRevivePaid(); return; }
+    setReviveStatus("Couldn't auto-confirm. If you completed the payment, tap “I paid — Resume”.");
+    if (dom.reviveButton) { dom.reviveButton.disabled = false; dom.reviveButton.textContent = "I paid — Resume"; }
+  }
+
+  function manualMobileResume() {
     sessionStorage.removeItem(REVIVE_PENDING_KEY);
-    if (result.ok) { onRevivePaid(); return; }
-    revivePhase = "idle";
-    if (dom.reviveButton) { dom.reviveButton.disabled = false; dom.reviveButton.textContent = "Revive"; }
-    setReviveStatus("No payment detected. Tap Revive to try again.");
+    onRevivePaid();
   }
 
   function onRevivePaid() {
+    if (revivePhase === "ready" || revivePhase === "countdown") return;
     revivePhase = "ready";
     if (dom.revivePrompt) dom.revivePrompt.hidden = true;
     if (dom.reviveReady) dom.reviveReady.hidden = false;
@@ -852,17 +898,18 @@
     window.addEventListener("keydown", handleKeydown);
     dom.startButton && dom.startButton.addEventListener("click", resetRun);
     dom.restartButton && dom.restartButton.addEventListener("click", resetRun);
-    dom.reviveButton && dom.reviveButton.addEventListener("click", startRevive);
+    dom.reviveButton && dom.reviveButton.addEventListener("click", onReviveButtonClick);
     dom.reviveConfirmButton && dom.reviveConfirmButton.addEventListener("click", confirmReviveResume);
     if (TP()) {
       TP().setToken("TROLL");   // games default to $TROLL (falls back to USDC if unavailable)
-      if (dom.payTokenPicker) TP().mountTokenPicker(dom.payTokenPicker, () => refreshReviveCost());
+      if (dom.payTokenPicker) TP().mountTokenPicker(dom.payTokenPicker, () => { refreshReviveCost(); prepareMobileRevive(); });
     }
     refreshReviveCost();
+    // Confirm the mobile payment on return from Phantom — bind several events since
+    // mobile browsers are inconsistent about which fires (and bfcache restores).
     document.addEventListener("visibilitychange", () => { if (!document.hidden) checkPendingMobileRevive(); });
-    // Mobile Safari often restores from bfcache on return from Phantom — pageshow
-    // fires there even when visibilitychange doesn't.
     window.addEventListener("pageshow", () => { checkPendingMobileRevive(); });
+    window.addEventListener("focus", () => { checkPendingMobileRevive(); });
     dom.soundToggle && dom.soundToggle.addEventListener("click", () => {
       audio.enabled = !audio.enabled;
       dom.soundToggle.setAttribute("aria-pressed", String(audio.enabled));
