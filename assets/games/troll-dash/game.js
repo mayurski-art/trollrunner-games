@@ -168,16 +168,18 @@
     if (!mobilePay() || state.mode !== "dead" || state.revivedThisRun) return;
     mobileReviveUrl = null;
     const token = reviveToken();
-    // Never disable the button — user must always be able to tap even while fetching.
     if (dom.reviveButton && revivePhase === "idle") { dom.reviveButton.textContent = "Preparing…"; }
+    // Snapshot treasury — if it times out, proceed with null (any new tx will match).
+    try { mobileReviveSig = await TP().latestTreasurySig(token); }
+    catch (_) { mobileReviveSig = null; }
+    // Build the Solana Pay URL — if this fails, show a tap-to-retry hint.
     try {
-      mobileReviveSig = await TP().latestTreasurySig(token);
       mobileReviveUrl = await TP().solanaPayUrl({
         amountUsd: reviveTotalUsd(), token,
         label: "Troll Dash Revive", message: "Revive in Troll Dash",
       });
     } catch (e) {
-      setReviveStatus(friendlyReviveErr(e));
+      setReviveStatus("Network slow — tap Revive to retry.");
     }
     if (dom.reviveButton && revivePhase === "idle" && state.mode === "dead" && !state.revivedThisRun) {
       dom.reviveButton.textContent = "Revive";
