@@ -860,6 +860,9 @@
     }
     refreshReviveCost();
     document.addEventListener("visibilitychange", () => { if (!document.hidden) checkPendingMobileRevive(); });
+    // Mobile Safari often restores from bfcache on return from Phantom — pageshow
+    // fires there even when visibilitychange doesn't.
+    window.addEventListener("pageshow", () => { checkPendingMobileRevive(); });
     dom.soundToggle && dom.soundToggle.addEventListener("click", () => {
       audio.enabled = !audio.enabled;
       dom.soundToggle.setAttribute("aria-pressed", String(audio.enabled));
