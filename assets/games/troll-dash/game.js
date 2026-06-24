@@ -140,6 +140,9 @@
   const REVIVE_PRICE_USD = (window.TROLL_PAY_CONFIG && window.TROLL_PAY_CONFIG.REVIVE_PRICE_USD) || 0.69;
   const REVIVE_TAX       = (window.TROLL_PAY_CONFIG && window.TROLL_PAY_CONFIG.TAX_RATE) || 0.069;
   const REVIVE_PENDING_KEY = "troll_dash_revive_pending";
+  // On-chain memo tag → the finance feed categorizes this as a game spend.
+  // Format: TR|<category>|<label>
+  const REVIVE_MEMO = "TR|game|Troll Dash revive";
   let revivePhase = "idle";        // idle | paying | ready | countdown
   let reviveCountdownTimer = null;
   let mobileReviveUrl = null;      // pre-built Solana Pay URL (mobile)
@@ -184,7 +187,7 @@
     try {
       url = await TP().solanaPayUrl({
         amountUsd: reviveTotalUsd(), token: "USDC",
-        label: "Troll Dash Revive", message: "Revive in Troll Dash",
+        label: "Troll Dash Revive", message: "Revive in Troll Dash", memo: REVIVE_MEMO,
       });
     } catch (_) {}
 
@@ -193,7 +196,7 @@
       try {
         url = await TP().solanaPayUrl({
           amountUsd: reviveTotalUsd(), token: "TROLL",
-          label: "Troll Dash Revive", message: "Revive in Troll Dash",
+          label: "Troll Dash Revive", message: "Revive in Troll Dash", memo: REVIVE_MEMO,
         });
         payToken = "TROLL";
         setReviveStatus("");
@@ -339,7 +342,7 @@
     dom.reviveButton.textContent = "Connect wallet…";
     setReviveStatus("");
     const res = await TP().pay({
-      amountUsd: REVIVE_PRICE_USD, taxRate: REVIVE_TAX, token,
+      amountUsd: REVIVE_PRICE_USD, taxRate: REVIVE_TAX, token, memo: REVIVE_MEMO,
       onProgress: (ev) => {
         if (ev.stage === "connecting") dom.reviveButton.textContent = "Connect wallet…";
         else if (ev.stage === "building") dom.reviveButton.textContent = "Building tx…";
