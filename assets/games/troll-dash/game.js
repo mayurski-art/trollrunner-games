@@ -64,7 +64,25 @@
 
   const ctx = dom.canvas.getContext("2d");
   const playerImage = new Image();
-  playerImage.src = "assets/games/troll-dash/sprites/troll-runner.png?v=2";
+  playerImage.src = "assets/animations/troll_playable_character.PNG";
+  // Offscreen canvas with black background removed (built once on load).
+  let playerImageClean = null;
+  playerImage.onload = () => { playerImageClean = stripBlackBg(playerImage, 40); };
+
+  // Strip pixels below an RGB threshold → alpha = 0, returns an offscreen canvas.
+  function stripBlackBg(img, threshold) {
+    const oc = document.createElement("canvas");
+    oc.width = img.naturalWidth; oc.height = img.naturalHeight;
+    const oc2 = oc.getContext("2d");
+    oc2.drawImage(img, 0, 0);
+    const id = oc2.getImageData(0, 0, oc.width, oc.height);
+    const d = id.data;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i] < threshold && d[i + 1] < threshold && d[i + 2] < threshold) d[i + 3] = 0;
+    }
+    oc2.putImageData(id, 0, 0);
+    return oc;
+  }
 
   const state = {
     mode: "ready",
@@ -760,30 +778,36 @@
     ctx.beginPath(); ctx.ellipse(base.x, base.y - 4, shW * shrink, shW * 0.26 * shrink, 0, 0, 6.2832); ctx.fill();
     ctx.restore();
 
-    if (!(playerImage.complete && playerImage.naturalWidth)) {
+    const drawSrc = playerImageClean || (playerImage.complete && playerImage.naturalWidth ? playerImage : null);
+    if (!drawSrc) {
       ctx.fillStyle = "#4dff73"; ctx.beginPath(); ctx.arc(base.x, base.y - 40, 26, 0, 6.2832); ctx.fill(); return;
     }
 
     const aspect = playerImage.naturalWidth / playerImage.naturalHeight;
     let drawH = base.scale * state.view.h * 0.78;
     let drawW = drawH * aspect;
-    const maxW = state.view.w * 0.46;                 // cap on narrow/portrait screens
+    const maxW = state.view.w * 0.46;
     if (drawW > maxW) { drawW = maxW; drawH = drawW / aspect; }
-    // squash/stretch: stretch up on rising jump, squash on land/roll
-    let sx = 1, sy = 1;
-    if (!p.onGround) { sy = 1 + clamp(p.vy * 0.04, -0.12, 0.14); sx = 2 - sy; }
-    if (rolling) { sy = 0.56; sx = 1.2; }
 
+    // squash/stretch on jump; barrel-roll spin when rolling
+    let sx = 1, sy = 1, rollAngle = 0;
+    if (!p.onGround) { sy = 1 + clamp(p.vy * 0.04, -0.12, 0.14); sx = 2 - sy; }
+    if (rolling) { rollAngle = p.rollT * Math.PI * 4; sx = 1; sy = 1; }
+
+    const invincible = state.elapsed < state.invincibleUntil;
     ctx.save();
     ctx.translate(base.x, base.y - bob - liftPx);
-    ctx.rotate(p.lean * 0.16);
+    ctx.rotate(rolling ? rollAngle : p.lean * 0.16);
     ctx.scale(sx, sy);
     if (rolling) ctx.translate(0, drawH * 0.32);
-    const invincible = state.elapsed < state.invincibleUntil;
     if (invincible && Math.floor(state.elapsed * 14) % 2 === 0) ctx.globalAlpha = 0.5;
-    ctx.shadowBlur = invincible ? 26 : 14;
-    ctx.shadowColor = invincible ? "#4dff73" : "rgba(140,210,255,0.55)";
-    ctx.drawImage(playerImage, -drawW / 2, -drawH, drawW, drawH);
+    // glow drawn separately so it doesn't need canvas shadow on the image rect
+    if (invincible) {
+      ctx.shadowBlur = 28; ctx.shadowColor = "#4dff73";
+      ctx.fillStyle = "rgba(0,0,0,0)"; ctx.fillRect(-drawW / 2, -drawH, drawW, drawH);
+      ctx.shadowBlur = 0;
+    }
+    ctx.drawImage(drawSrc, -drawW / 2, -drawH, drawW, drawH);
     ctx.restore();
   }
 

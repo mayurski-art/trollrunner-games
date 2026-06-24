@@ -96,7 +96,8 @@
       special: { name: "PROBLEM?", kind: "projectile", cost: 100, color: "#eaf2ff", text: "?" },
       pal: { base: "#e7eef6", dark: "#9bb1c8", light: "#ffffff", ink: "#161d2b", face: "#f4f8fc", accent: "#7fd0ff", accent2: "#ff3d6e" },
       drawHead: drawTrollHead,
-      spriteSrc: "troll.png", footFrac: 1.0,
+      spriteFullPath: "assets/animations/troll_playable_character.PNG",
+      needsBgStrip: true, footFrac: 0.97,
     },
     {
       id: "pepe", name: "PEPE", tag: "Feels good",
@@ -123,11 +124,31 @@
   // TARGET_BODY so every fighter is the same on-screen height.
   const SPRITE_DIR = "assets/games/troll-kombat/fighters/";
   const TARGET_BODY = 272;   // on-screen feet->top height, px
+
+  // Strip near-black pixels → transparent. Returns an offscreen canvas.
+  function stripBlackBg(img, threshold) {
+    const oc = document.createElement("canvas");
+    oc.width = img.naturalWidth; oc.height = img.naturalHeight;
+    const oc2 = oc.getContext("2d");
+    oc2.drawImage(img, 0, 0);
+    const id = oc2.getImageData(0, 0, oc.width, oc.height);
+    const d = id.data;
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i] < threshold && d[i + 1] < threshold && d[i + 2] < threshold) d[i + 3] = 0;
+    }
+    oc2.putImageData(id, 0, 0);
+    return oc;
+  }
+
   ROSTER.forEach(d => {
     if (!d.spriteSrc) return;
     const img = new Image();
-    img.onload = () => { d.img = img; d.spriteScale = TARGET_BODY / (img.height * (d.footFrac || 1)); };
-    img.src = SPRITE_DIR + d.spriteSrc;
+    img.onload = () => {
+      // Strip black bg for sprites that have one (flagged with needsBgStrip).
+      d.img = d.needsBgStrip ? stripBlackBg(img, 40) : img;
+      d.spriteScale = TARGET_BODY / (img.height * (d.footFrac || 1));
+    };
+    img.src = d.spriteFullPath || (SPRITE_DIR + d.spriteSrc);
   });
 
   /* ==========================================================================
