@@ -32,6 +32,13 @@
   const ROUNDS_TO_WIN = 2;      // best of 3
   const MAX_HP = 100;
   const MAX_METER = 100;
+  const MAX_STAM = 100;         // stamina pool
+
+  // Render mode: "pixel" = 2D sprite sheets, crunchy retro. "toy" = 3D pose
+  // sheets, smoother + glow. Same sim runs for both; only the art swaps.
+  let MODE = "pixel";
+  const SHEET_DIR = "assets/games/troll-kombat/characters/";
+  let currentStage = null;      // chosen STAGES entry (set at fight start)
 
   /* ==========================================================================
      AUDIO  —  tiny WebAudio synth (no asset files). Mirrors troll-dash's style.
@@ -100,20 +107,69 @@
       needsBgStrip: true, footFrac: 0.97,
     },
     {
-      id: "pepe", name: "PEPE", tag: "Feels good",
-      blurb: "Rare amphibian heavyweight. Hits with the weight of a thousand sad reaction images.",
-      special: { name: "FEELS BLAST", kind: "projectile", cost: 100, color: "#7dff52", text: "feels" },
+      id: "pepe", name: "PEPE SAMURAI", tag: "Feels good, man",
+      blurb: "Tall samurai Pepe in a kabuto helmet with a cope katana. Cuts you down, then mints your loss as a red candle.",
+      special: { name: "KATANA COPE SLASH", kind: "orb", cost: 100, color: "#9dff52", text: "" },
       pal: { base: "#5fae33", dark: "#2f6e1f", light: "#9fe05f", ink: "#10250a", face: "#5fae33", accent: "#9dff52", accent2: "#ff5dab" },
       drawHead: drawPepeHead,
-      spriteSrc: "pepe.png", footFrac: 0.955,
+      moves: { punch: "Cope Jab", kick: "Green Candle Kick", block: "Diamond Hands Guard", special: "Katana Cope Slash", finisher: "Feels Bad, Man" },
+      // 4x3 grid sheet. Logical state -> [col,row]; bboxes computed on load.
+      sheet: {
+        pixel: "pepe-samurai-2d.png", toy: "pepe-samurai-3d.png", cols: 4, rows: 3,
+        frames: {
+          idle: [0, 0], idle2: [3, 0], block: [2, 0], crouch: [1, 0], jump: [1, 0], hit: [1, 0],
+          punch: [0, 1], kick: [2, 1],
+          special: [3, 2], swordReady: [0, 2], swordSlash: [1, 2], swordThrust: [2, 2], swordOverhead: [3, 2],
+          win: [3, 2],
+        },
+      },
     },
     {
-      id: "doge", name: "DOGE", tag: "Much fight",
-      blurb: "Such muscle. Very brawl. Pelts you with 1000x coins until you are, in fact, rugged.",
-      special: { name: "1000x BONK", kind: "barrage", cost: 100, color: "#ffd84d", text: "wow" },
-      pal: { base: "#e3ad4f", dark: "#a9762a", light: "#f7d98a", ink: "#3a2406", face: "#e8b85a", accent: "#ffd84d", accent2: "#6fd0ff" },
+      id: "doge", name: "DOGE DRIP", tag: "Very fight. Much wow.",
+      blurb: "Tall Doge in a pink mink coat, black cap and square shades. Slides in, deal-with-it, pelts you with 1000x coins.",
+      special: { name: "DEAL-WITH-IT DASH", kind: "barrage", cost: 100, color: "#ffd84d", text: "$" },
+      pal: { base: "#e3ad4f", dark: "#a9762a", light: "#f7d98a", ink: "#3a2406", face: "#e8b85a", accent: "#ff6fd0", accent2: "#ffd84d" },
       drawHead: drawDogeHead,
-      spriteSrc: "doge.png", footFrac: 1.0,
+      moves: { punch: "Much Punch", kick: "Such Kick", block: "Mink Coat Guard", special: "Deal-With-It Dash", finisher: "Very Rekt. Much Wow." },
+      // 4x2 grid sheet.
+      sheet: {
+        pixel: "doge-drip-2d.png", toy: "doge-drip-3d.png", cols: 4, rows: 2,
+        frames: {
+          idle: [0, 0], idle2: [1, 0], jump: [0, 0], hit: [0, 0],
+          punch: [2, 0], kick: [0, 1], crouch: [1, 1], block: [2, 1],
+          special: [3, 1], win: [3, 1],
+        },
+      },
+    },
+    {
+      id: "elon", name: "ELON BOSS", tag: "To the moon",
+      blurb: "Parody space-tech boss. Tweets shockwaves, blue-checks your hits, and launches you when you least afford it. CPU favourite.",
+      special: { name: "TWEET SHOCKWAVE", kind: "projectile", cost: 100, color: "#1d9bf0", text: "X" },
+      pal: { base: "#cfd6de", dark: "#7c8593", light: "#ffffff", ink: "#12161d", face: "#e7ecf2", accent: "#1d9bf0", accent2: "#ff3d6e" },
+      drawHead: drawTrollHead,
+      moves: { punch: "Mars Jab", kick: "Cyber Kick", block: "Blue Check Shield", special: "Tweet Shockwave", finisher: "Launch Sequence" },
+    },
+    {
+      id: "gladiator", name: "GLADIATOR", tag: "Spartan, problem?",
+      blurb: "A swole troll in a Spartan cape. Lobs his spear with a smug grin, then finishes the job bare-fisted just to rub it in.",
+      special: { name: "TROLL SPEAR", kind: "spear", cost: 100, color: "#c9ced6", text: "", fireProgress: 0.78 },
+      pal: { base: "#e9e9ee", dark: "#9aa0ad", light: "#ffffff", ink: "#15151c", face: "#f2f2f5", accent: "#d23b3b", accent2: "#c8962a" },
+      drawHead: drawTrollHead,   // fallback only — used until the anim strips finish loading
+      portraitSrc: "gladiator/portrait.png",
+      // Frame-based PixelLab animation set (east-facing; mirrored by facing).
+      anims: {
+        dir: "gladiator/anims/", cell: 136, scale: 2.5, footFrac: 0.99,
+        defs: {
+          idle:    { frames: 8, fps: 9,  loop: true },
+          walk:    { frames: 6, fps: 12, loop: true },
+          punch:   { frames: 4, fps: 16, loop: false },
+          kick:    { frames: 7, fps: 14, loop: false },
+          jump:    { frames: 9, fps: 14, loop: false },
+          special: { frames: 6, fps: 13, loop: false },
+          hit:     { frames: 6, fps: 16, loop: false },
+          ko:      { frames: 7, fps: 10, loop: false },
+        },
+      },
     },
   ];
   const byId = id => ROSTER.find(r => r.id === id);
@@ -150,6 +206,83 @@
     };
     img.src = d.spriteFullPath || (SPRITE_DIR + d.spriteSrc);
   });
+
+  // Preload frame-based animation strips (one horizontal strip per state).
+  // A fighter with `anims` renders via drawAnimated once every strip is loaded.
+  ROSTER.forEach(d => {
+    if (!d.anims) return;
+    d.animImg = {};
+    const keys = Object.keys(d.anims.defs);
+    let loaded = 0;
+    keys.forEach(k => {
+      const img = new Image();
+      img.onload = () => { if (++loaded === keys.length) d.animReady = true; };
+      img.src = SPRITE_DIR + d.anims.dir + k + ".png";
+      d.animImg[k] = img;
+    });
+  });
+
+  /* ==========================================================================
+     GRID SHEET FIGHTERS  —  Pepe Samurai / Doge Drip each ship as one grid
+     image per mode (2D "pixel" + 3D "toy", identical pose layout). We strip the
+     black bg, then measure every named frame's true content box so each pose is
+     feet-anchored to the floor at one shared scale, no matter the cell padding.
+     The pixel variant loads eagerly (default mode + portraits); the toy variant
+     loads lazily the first time Toy Mode is chosen.
+     ========================================================================== */
+  function contentBBox(sctx, ox, oy, cw, ch) {
+    const data = sctx.getImageData(ox, oy, cw, ch).data;
+    let minX = cw, minY = ch, maxX = 0, maxY = 0, found = false;
+    for (let y = 0; y < ch; y += 2) {
+      for (let x = 0; x < cw; x += 2) {
+        if (data[(y * cw + x) * 4 + 3] > 24) {
+          found = true;
+          if (x < minX) minX = x; if (x > maxX) maxX = x;
+          if (y < minY) minY = y; if (y > maxY) maxY = y;
+        }
+      }
+    }
+    if (!found) return { sx: ox, sy: oy, w: cw, h: ch };
+    return { sx: ox + minX, sy: oy + minY, w: (maxX - minX) || 2, h: (maxY - minY) || 2 };
+  }
+
+  function buildSheetVariant(def, img) {
+    const canvas = stripBlackBg(img, 40);
+    const sctx = canvas.getContext("2d");
+    const S = def.sheet;
+    const cw = Math.floor(canvas.width / S.cols), ch = Math.floor(canvas.height / S.rows);
+    const frames = {};
+    for (const key in S.frames) {
+      const [c, r] = S.frames[key];
+      frames[key] = contentBBox(sctx, c * cw, r * ch, cw, ch);
+    }
+    const idle = frames.idle || frames[Object.keys(frames)[0]];
+    return { canvas, frames, scale: TARGET_BODY / idle.h, ready: true };
+  }
+
+  function loadSheetVariant(def, which) {
+    def.sheetImg = def.sheetImg || {};
+    if (def.sheetImg[which] || def["_loading_" + which]) return;
+    def["_loading_" + which] = true;
+    const img = new Image();
+    img.onload = () => {
+      try { def.sheetImg[which] = buildSheetVariant(def, img); } catch (e) {}
+      def["_loading_" + which] = false;
+      redrawPortraits(def);
+    };
+    img.src = SHEET_DIR + def.sheet[which];
+  }
+  ROSTER.forEach(d => { if (d.sheet) loadSheetVariant(d, "pixel"); });
+
+  // Portrait redraw hooks: select-screen thumbnails repaint when art finishes.
+  const _portraitHooks = new Map();
+  function registerPortrait(def, fn) {
+    if (!_portraitHooks.has(def)) _portraitHooks.set(def, []);
+    _portraitHooks.get(def).push(fn);
+  }
+  function redrawPortraits(def) {
+    (_portraitHooks.get(def) || []).forEach(fn => { try { fn(); } catch (e) {} });
+  }
 
   /* ==========================================================================
      LOW-LEVEL DRAWING HELPERS
@@ -329,6 +462,7 @@
       this.vy = 0;
       this.hp = MAX_HP;
       this.meter = 0;
+      this.stamina = MAX_STAM;
       this.rounds = 0;
       this.reset(x, facing);
       // animation angle state (lerped toward targets each frame)
@@ -358,20 +492,36 @@
       this.winT = 0;
       this.flash = 0;             // white hit flash
       this.hurtFace = 0;
+      this.stamina = MAX_STAM;
+      this.rektStun = 0;          // "rekt" vulnerable stun when stamina bottoms out
+      this.dashT = 0;             // active dash timer
+      this.tookDamage = false;    // for FLAWLESS detection
     }
     get grounded() { return this.y <= 0.01; }
     get feetY() { return FLOOR_Y - this.y; }
 
     canAct() {
       return this.state !== "ko" && this.state !== "win" &&
-        this.hitstun <= 0 && this.blockStun <= 0 &&
+        this.hitstun <= 0 && this.blockStun <= 0 && this.rektStun <= 0 &&
         !(this.attack && this.attack.t < this.attack.def.startup + this.attack.def.active + this.attack.def.recovery);
+    }
+
+    // Stamina bottomed out → drop guard, brief vulnerable stagger.
+    enterRekt() {
+      if (this.rektStun > 0 || this.state === "ko") return;
+      this.rektStun = 1.1;
+      this.state = "hit";
+      this.attack = null;
+      this.stamina = 0;
+      audio.whiff();
+      spark(this.x, this.feetY - 150, "#ff5a5a", 10, true);
     }
 
     startAttack(type) {
       if (type === "special") {
         if (this.meter < this.def.special.cost) { audio.whiff(); return; }
         this.meter = 0;
+        this.stamina = Math.max(0, this.stamina - 28);
         this.attack = { type, def: ATTACKS.special, t: 0, hasHit: false, fired: false };
         this.state = "attack";
         audio.special();
@@ -384,6 +534,7 @@
 
     hurt(dmg, push, fromX, blocked) {
       if (this.state === "ko") return;
+      if (this.rektStun > 0 && !blocked) dmg *= 1.25;   // rekt = extra vulnerable
       this.facing = fromX < this.x ? 1 : -1;
       if (blocked) {
         this.hp = Math.max(0, this.hp - dmg * 0.18);
@@ -395,6 +546,7 @@
         return;
       }
       this.hp = Math.max(0, this.hp - dmg);
+      this.tookDamage = true;
       this.hitstun = 0.30;
       this.flash = 0.16;
       this.hurtFace = 0.6;
@@ -419,6 +571,10 @@
       this.blockStun = Math.max(0, this.blockStun - dt);
       this.flash = Math.max(0, this.flash - dt);
       this.hurtFace = Math.max(0, this.hurtFace - dt);
+      this.dashT = Math.max(0, this.dashT - dt);
+      const wasRekt = this.rektStun > 0;
+      this.rektStun = Math.max(0, this.rektStun - dt);
+      if (wasRekt && this.rektStun === 0) this.stamina = 35;   // recover after the stagger
       this.vx = (this.vx || 0);
 
       // blink
@@ -440,7 +596,10 @@
         this.attack.t += dt;
         const A = this.attack.def;
         const inActive = this.attack.t >= A.startup && this.attack.t < A.startup + A.active;
-        if (this.attack.type === "special" && this.attack.t >= A.startup && !this.attack.fired) {
+        const fireAt = this.def.special.fireProgress != null
+          ? this.def.special.fireProgress * (A.startup + A.active + A.recovery)
+          : A.startup;
+        if (this.attack.type === "special" && this.attack.t >= fireAt && !this.attack.fired) {
           this.attack.fired = true;
           fireSpecial(this, opp);
         }
@@ -454,18 +613,32 @@
       }
 
       const acting = !this.canAct();
+      let regen = true;
       // movement / actions only when free
       if (!acting) {
+        const move = (intent.right ? 1 : 0) - (intent.left ? 1 : 0);
         if (intent.special) this.startAttack("special");
         else if (intent.kick) this.startAttack("kick");
         else if (intent.punch) this.startAttack("punch");
-        else if (intent.up && this.grounded) { this.vy = 520; this.state = "jump"; audio.jump(); }
+        else if (intent.dash && this.grounded && this.dashT <= 0 && this.stamina >= 18) {
+          const d = move !== 0 ? move : this.facing;
+          this.vx = d * 470; this.dashT = 0.26; this.stamina -= 18;
+          this.state = "walk"; this.walkDir = d * this.facing;
+          audio.blip(440, 0.12, "sawtooth", 0.1, 700); regen = false;
+        }
+        else if (intent.up && this.grounded) {
+          this.vy = 520; this.state = "jump";
+          this.stamina = Math.max(0, this.stamina - 12); audio.jump(); regen = false;
+        }
         else {
           const blocking = intent.block && this.grounded;
-          if (blocking) { this.state = "block"; this.vx *= 0.6; }
+          if (blocking) {
+            this.state = "block"; this.vx *= 0.6;
+            this.stamina -= 26 * dt; regen = false;
+            if (this.stamina <= 0) { this.stamina = 0; this.enterRekt(); }
+          }
           else if (intent.crouch && this.grounded) { this.state = "crouch"; }
           else if (this.grounded) {
-            const move = (intent.right ? 1 : 0) - (intent.left ? 1 : 0);
             if (move !== 0) {
               this.x += move * 230 * dt;
               this.state = "walk";
@@ -474,6 +647,8 @@
           }
         }
       }
+      // stamina regenerates whenever it isn't being spent
+      if (regen && this.rektStun <= 0) this.stamina = Math.min(MAX_STAM, this.stamina + 17 * dt);
       this.physics(dt);
       this.animate(dt, intent);
     }
@@ -575,13 +750,83 @@
     // ---- draw: world shadow, then sprite (if loaded) or procedural rig ----
     draw() {
       // world-space ground shadow — stays on the floor, shrinks with jump height
-      const shW = Math.max(16, 46 - this.y * 0.06) * (this.def.img ? 1.5 : 1.0);
+      const shW = Math.max(16, 46 - this.y * 0.06) * (this.def.img || this.def.anims || this.def.sheet ? 1.5 : 1.0);
       ctx.beginPath();
       ctx.ellipse(this.x, FLOOR_Y, shW, 9, 0, 0, 7);
       ctx.fillStyle = "rgba(0,0,0,0.32)"; ctx.fill();
 
+      if (this.def.sheet && this.def.sheetImg && (this.def.sheetImg.pixel || this.def.sheetImg.toy)) { this.drawSheet(); return; }
+      if (this.def.anims && this.def.animReady) { this.drawAnimated(); return; }
       if (this.def.img && this.def.spriteScale) { this.drawSprite(); return; }
       this.drawProcedural();
+    }
+
+    // Which named grid frame fits the current state.
+    sheetFrameKey() {
+      const F = this.def.sheet.frames;
+      const st = this.state;
+      if (st === "attack" && this.attack) {
+        const t = this.attack.type;
+        if (t === "special") return F.special ? "special" : "punch";
+        return F[t] ? t : "punch";
+      }
+      if (st === "ko" || st === "hit") return F.hit ? "hit" : "idle";
+      if (st === "block" && F.block) return "block";
+      if (st === "crouch" && F.crouch) return "crouch";
+      if (st === "jump" && F.jump) return "jump";
+      if (st === "win" && F.win) return "win";
+      if (st === "walk") return (F.idle2 && Math.floor(this.walkPhase / 0.42) % 2) ? "idle2" : "idle";
+      return (F.idle2 && Math.floor(this.stateT * 1.6) % 2) ? "idle2" : "idle";
+    }
+
+    // Grid-sheet sprite: feet-anchored via measured content box, mirrored by
+    // facing, with state "flavour" transforms (a single frame can't articulate).
+    drawSheet() {
+      const v = (MODE === "toy" && this.def.sheetImg.toy && this.def.sheetImg.toy.ready)
+        ? this.def.sheetImg.toy
+        : (this.def.sheetImg.pixel && this.def.sheetImg.pixel.ready ? this.def.sheetImg.pixel : null);
+      if (!v) { this.drawProcedural(); return; }
+      const f = v.frames[this.sheetFrameKey()] || v.frames.idle;
+      const sc = v.scale, dw = f.w * sc, dh = f.h * sc;
+
+      let rot = 0, tx = 0, ty = 0, alpha = 1;
+      if (this.state === "attack" && this.attack) {
+        const A = this.attack.def, at = this.attack.t;
+        const ph = at < A.startup ? at / A.startup
+          : at < A.startup + A.active ? 1
+          : 1 - (at - A.startup - A.active) / A.recovery;
+        const k = clamp(ph, 0, 1);
+        if (this.attack.type === "kick") tx = 26 * k;
+        else if (this.attack.type === "special") ty = -4 * k;
+        else tx = 30 * k;                       // punch lunge
+      } else if (this.state === "hit") { rot = -0.18; tx = -10; }
+      else if (this.state === "walk") { ty = Math.abs(Math.sin(this.walkPhase)) * -4; }
+      else if (this.state === "idle") { ty = Math.sin(this.stateT * 2.4) * 2; }
+      else if (this.state === "win") { ty = Math.abs(Math.sin(this.winT * 5)) * -14; rot = Math.sin(this.winT * 3) * 0.05; }
+      else if (this.state === "ko") { rot = this.koFall * -1.1; ty = this.koFall * 30; alpha = 1 - this.koFall * 0.1; }
+      if (this.rektStun > 0) rot += Math.sin(this.stateT * 30) * 0.04;   // dizzy shudder
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.imageSmoothingEnabled = (MODE === "toy");   // crisp pixels in 2D, smooth in toy
+      ctx.translate(this.x, this.feetY);
+      ctx.scale(this.facing, 1);
+      ctx.translate(tx, ty);
+      ctx.rotate(rot);
+      if (MODE === "toy") { ctx.shadowColor = "rgba(0,0,0,0.45)"; ctx.shadowBlur = 18; ctx.shadowOffsetY = 8; }
+      if (this.flash > 0) ctx.filter = "brightness(2.4) saturate(0.5)";
+      ctx.drawImage(v.canvas, f.sx, f.sy, f.w, f.h, -dw / 2, -dh, dw, dh);
+      ctx.filter = "none";
+      ctx.restore();
+
+      if (this.flash > 0) {
+        ctx.save();
+        ctx.globalAlpha = this.flash * 2;
+        ctx.globalCompositeOperation = "overlay";
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(this.x - dw / 2, this.feetY - dh, dw, dh);
+        ctx.restore();
+      }
     }
 
     // Static sprite: feet-anchored, mirrored by facing, with state "flavour"
@@ -682,6 +927,45 @@
         ctx.fillRect(this.x - 60, this.feetY - 200, 120, 210);
         ctx.restore();
       }
+    }
+
+    // Frame-based animated sprite (PixelLab strips). Reuses this.state + the
+    // engine's existing timers to pick an animation + frame, feet-anchored and
+    // mirrored by facing. East art faces right, so facing 1 draws as-is.
+    drawAnimated() {
+      const A = this.def.anims, cell = A.cell, sc = A.scale;
+      let key = "idle", loop = true, prog = 0;
+      const st = this.state;
+      if (st === "walk") { key = "walk"; loop = true; }
+      else if (st === "jump") { key = "jump"; loop = false; prog = clamp((520 - this.vy) / 1040, 0, 1); }
+      else if (st === "hit")  { key = "hit";  loop = false; prog = clamp(1 - this.hitstun / 0.30, 0, 1); }
+      else if (st === "ko")   { key = "ko";   loop = false; prog = this.koFall; }
+      else if (st === "attack" && this.attack) {
+        const t = this.attack.type;
+        key = (t === "punch" || t === "kick" || t === "special") ? t : "punch";
+        const ad = this.attack.def, dur = ad.startup + ad.active + ad.recovery;
+        loop = false; prog = clamp(this.attack.t / dur, 0, 1);
+      }
+      // idle / crouch / block / win / intro → idle loop
+
+      const def = A.defs[key] || A.defs.idle;
+      const n = def.frames;
+      const idx = loop ? (Math.floor(this.stateT * def.fps) % n)
+                       : clamp(Math.floor(prog * n), 0, n - 1);
+
+      const img = this.def.animImg[key] || this.def.animImg.idle;
+      if (!img || !img.complete) return;
+
+      const dw = cell * sc, dh = cell * sc;
+      const feetTop = cell * A.footFrac * sc;   // cell-top → feet, scaled
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;        // keep pixels crisp
+      ctx.translate(this.x, this.feetY);
+      ctx.scale(this.facing, 1);
+      if (this.flash > 0) ctx.filter = "brightness(2.4) saturate(0.5)";
+      ctx.drawImage(img, idx * cell, 0, cell, cell, -dw / 2, -feetTop, dw, dh);
+      ctx.filter = "none";
+      ctx.restore();
     }
   }
 
@@ -802,6 +1086,9 @@
         projectiles.push({ owner: f, x: ox, y: oy + rand(-18, 18), vx: f.facing * rand(360, 520),
           vy: rand(-40, 40), r: 16, dmg: 5, life: 2.4, color: sp.color, text: "$", hit: false, kind: "coin" });
       }
+    } else if (sp.kind === "spear") { // thrown spear
+      projectiles.push({ owner: f, x: ox, y: oy, vx: f.facing * 640, vy: 0, r: 13, dmg: 16,
+        life: 2.6, color: sp.color, hit: false, kind: "spear", facing: f.facing });
     } else { // projectile orb
       projectiles.push({ owner: f, x: ox, y: oy, vx: f.facing * 440, vy: 0, r: 24, dmg: 16,
         life: 2.4, color: sp.color, text: sp.text, hit: false, kind: "orb" });
@@ -831,6 +1118,22 @@
   function drawProjectiles() {
     for (const p of projectiles) {
       ctx.save();
+      if (p.kind === "spear") {
+        // Thrown spear — wood shaft, gold collar, steel leaf head (matches the render).
+        ctx.translate(p.x, p.y); ctx.scale(p.facing, 1);
+        ctx.fillStyle = "#6b4a2b"; ctx.fillRect(-34, -3, 54, 6);   // wooden shaft
+        ctx.fillStyle = "#54381f"; ctx.fillRect(-34, 1, 54, 2);    // underside shadow
+        ctx.fillStyle = "#8a623a"; ctx.fillRect(-34, -3, 54, 1.5); // top highlight
+        ctx.fillStyle = "#c8962a"; ctx.fillRect(17, -4, 6, 8);     // gold collar
+        ctx.fillStyle = "#a87a1e"; ctx.fillRect(17, 1, 6, 3);
+        ctx.beginPath(); ctx.moveTo(23, -7); ctx.lineTo(43, 0); ctx.lineTo(23, 7); ctx.closePath();
+        ctx.fillStyle = "#cdd2da"; ctx.fill();                      // steel head
+        ctx.lineWidth = 1.5; ctx.strokeStyle = "#3a3f47"; ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(23, -7); ctx.lineTo(43, 0); ctx.lineTo(25, 0); ctx.closePath();
+        ctx.fillStyle = "#eef1f5"; ctx.fill();                      // bevel highlight
+        ctx.fillStyle = "#9aa0ad"; ctx.fillRect(-37, -2, 4, 4);     // butt spike
+        ctx.restore(); continue;
+      }
       if (p.kind === "coin" && TROLL_COIN_IMG.complete && TROLL_COIN_IMG.naturalWidth) {
         // Gold disc with the trollface minted on it.
         ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fillStyle = "#ffd84d"; ctx.fill();
@@ -884,11 +1187,72 @@
   }
 
   /* ==========================================================================
-     STAGE BACKGROUND  —  cursed dusk meme-coin arena, parallax + chart skyline.
+     STAGES  —  image arenas from the zone art with a parallax camera (follows
+     the fighters' midpoint + slow time drift), a readability scrim, and a
+     stage-accent floor glow. Falls back to the procedural dusk arena until the
+     chosen background finishes loading.
      ========================================================================== */
+  const STAGE_DIR = "assets/games/troll-kombat/stages/";
+  const STAGES = [
+    { id: "hills",  name: "Troll Hills",     img: "zone-1.png", accent: "#4dff73", hazard: "Rolling troll boulder", pickup: "Green Candle Smoothie",   groundFrac: 0.88 },
+    { id: "market", name: "Floating Market", img: "zone-2.png", accent: "#7fd0ff", hazard: "Airship wind blast",    pickup: "Stamina Rocket",          groundFrac: 0.82 },
+    { id: "lake",   name: "Lakeside Town",   img: "zone-3.png", accent: "#34c759", hazard: "Rogue wave",            pickup: "Tidal Liquidity",         groundFrac: 0.86 },
+    { id: "palace", name: "Meme Palace",     img: "zone-4.png", accent: "#c79bff", hazard: "Fountain burst",        pickup: "Royal Liquidity Potion",  groundFrac: 0.86 },
+    { id: "ruins",  name: "Sunset Ruins",    img: "zone-5.png", accent: "#ff9f43", hazard: "Crumbling pillar",      pickup: "Relic Bag",               groundFrac: 0.87 },
+    { id: "cyber",  name: "Cyber Rain City", img: "zone-6.png", accent: "#27e0ff", hazard: "Lightning zap lane",    pickup: "Blue Glow Shield",        groundFrac: 0.84 },
+  ];
+  const stageById = id => STAGES.find(s => s.id === id);
+  function loadStageImage(s) {
+    if (!s || s.image || s._loading) return;
+    s._loading = true;
+    const img = new Image();
+    img.onload = () => { s.image = img; };
+    img.src = STAGE_DIR + s.img;
+  }
+  loadStageImage(STAGES[0]);
+  currentStage = STAGES[0];
+
+  function hexA(h, a) { const c = hx(h); return `rgba(${c[0]},${c[1]},${c[2]},${a})`; }
+
   let bgT = 0;
   function drawStage(dt) {
     bgT += dt;
+    const s = currentStage;
+    if (!s || !s.image) { drawProceduralStage(dt); return; }
+    const img = s.image;
+    let mid = W / 2;
+    if (match.fighters.length === 2) mid = (match.fighters[0].x + match.fighters[1].x) / 2;
+    const camX = (mid - W / 2) * 0.10 + Math.sin(bgT * 0.12) * 14;   // follow + slow drift
+    const camY = Math.sin(bgT * 0.08) * 6;
+    const scale = Math.max(W / img.width, H / img.height) * 1.06;
+    const dw = img.width * scale, dh = img.height * scale;
+    const groundPx = img.height * s.groundFrac * scale;             // align art ground to FLOOR_Y
+    const ox = (W - dw) / 2 - camX;
+    const oy = FLOOR_Y - groundPx + camY * 0.5;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(img, ox, oy, dw, dh);
+    // readability scrim toward the floor so fighters pop against busy art
+    const scrim = ctx.createLinearGradient(0, H * 0.42, 0, H);
+    scrim.addColorStop(0, "rgba(4,2,8,0)"); scrim.addColorStop(1, "rgba(4,2,8,0.55)");
+    ctx.fillStyle = scrim; ctx.fillRect(0, 0, W, H);
+    // stage-accent floor glow
+    const glow = ctx.createRadialGradient(W / 2, FLOOR_Y, 10, W / 2, FLOOR_Y, 460);
+    glow.addColorStop(0, hexA(s.accent, 0.20)); glow.addColorStop(1, hexA(s.accent, 0));
+    ctx.fillStyle = glow; ctx.fillRect(0, 0, W, H);
+    // playable ground band + footing line
+    const fg = ctx.createLinearGradient(0, FLOOR_Y, 0, H);
+    fg.addColorStop(0, "rgba(8,4,14,0.55)"); fg.addColorStop(1, "rgba(4,2,8,0.85)");
+    ctx.fillStyle = fg; ctx.fillRect(0, FLOOR_Y, W, H - FLOOR_Y);
+    ctx.strokeStyle = hexA(s.accent, 0.6); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, FLOOR_Y); ctx.lineTo(W, FLOOR_Y); ctx.stroke();
+    ctx.strokeStyle = hexA(s.accent, 0.10); ctx.lineWidth = 1;
+    for (let i = 0; i < 18; i++) {
+      const t = i / 18, yy = FLOOR_Y + t * t * (H - FLOOR_Y);
+      ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(W, yy); ctx.stroke();
+    }
+  }
+
+  function drawProceduralStage(dt) {
     // sky
     const sky = ctx.createLinearGradient(0, 0, 0, H);
     sky.addColorStop(0, "#1a0b2e"); sky.addColorStop(0.5, "#3a1247"); sky.addColorStop(1, "#0a0510");
@@ -948,8 +1312,8 @@
       this.t += dt; this.decideIn -= dt;
       const dist = Math.abs(opp.x - self.x);
       const dir = opp.x < self.x ? -1 : 1;
-      const aggr = [0.55, 0.8, 1.0][this.diff];
-      const react = [0.42, 0.26, 0.13][this.diff];
+      const aggr = [0.55, 0.8, 1.0, 1.3][this.diff] ?? 1.0;     // 3 = Unhinged
+      const react = [0.42, 0.26, 0.13, 0.06][this.diff] ?? 0.2;
 
       // block incoming melee / projectiles
       const oppAttacking = opp.state === "attack" && opp.attack && opp.attack.t < opp.attack.def.startup + opp.attack.def.active;
@@ -992,7 +1356,9 @@
     p1chip: document.getElementById("p1-health-chip"), p2chip: document.getElementById("p2-health-chip"),
     p1pips: document.getElementById("p1-pips"), p2pips: document.getElementById("p2-pips"),
     p1meter: document.getElementById("p1-meter"), p2meter: document.getElementById("p2-meter"),
+    p1stam: document.getElementById("p1-stamina"), p2stam: document.getElementById("p2-stamina"),
     timer: document.getElementById("round-timer"), roundLabel: document.getElementById("round-label"),
+    stageName: document.getElementById("stage-name"),
     announce: document.getElementById("tk-announce"),
   };
 
@@ -1141,6 +1507,12 @@
     els.p2chip.style.width = (p2.hp / MAX_HP * 100) + "%";
     els.p1meter.style.width = (p1.meter / MAX_METER * 100) + "%";
     els.p2meter.style.width = (p2.meter / MAX_METER * 100) + "%";
+    if (els.p1stam) {
+      els.p1stam.style.width = (p1.stamina / MAX_STAM * 100) + "%";
+      els.p2stam.style.width = (p2.stamina / MAX_STAM * 100) + "%";
+      els.p1stam.parentElement.classList.toggle("is-rekt", p1.rektStun > 0);
+      els.p2stam.parentElement.classList.toggle("is-rekt", p2.rektStun > 0);
+    }
     els.timer.textContent = Math.ceil(match.timer);
     renderPips(els.p1pips, p1.rounds);
     renderPips(els.p2pips, p2.rounds);
@@ -1169,14 +1541,15 @@
     k: "kick", K: "kick",
     l: "special", L: "special",
     " ": "block",
+    Shift: "dash",
   };
   function readPlayerIntent() {
     const i = {
       left: !!held.left, right: !!held.right, up: !!held.up, crouch: !!held.crouch,
       block: !!held.block,
-      punch: !!edge.punch, kick: !!edge.kick, special: !!edge.special,
+      punch: !!edge.punch, kick: !!edge.kick, special: !!edge.special, dash: !!edge.dash,
     };
-    edge.punch = edge.kick = edge.special = false;
+    edge.punch = edge.kick = edge.special = edge.dash = false;
     return i;
   }
   window.addEventListener("keydown", e => {
@@ -1185,7 +1558,7 @@
     const a = KEYMAP[e.key]; if (!a) return;
     e.preventDefault();
     audio.ensure();
-    if (a === "punch" || a === "kick" || a === "special") { if (!held[a]) edge[a] = true; }
+    if (a === "punch" || a === "kick" || a === "special" || a === "dash") { if (!held[a]) edge[a] = true; }
     held[a] = true;
   });
   window.addEventListener("keyup", e => {
@@ -1236,11 +1609,40 @@
     ctx = real;
     return c;
   }
-  // Thumbnail: the real sprite art if the fighter has one, else a procedural head.
+  // Sheet fighters: draw the idle frame to a canvas, repaint when art loads,
+  // procedural head as the pre-load fallback so the card never shows empty.
+  function makeSheetPortrait(def, size) {
+    const c = document.createElement("canvas");
+    c.width = size; c.height = size; c.className = "portrait";
+    const p = c.getContext("2d");
+    const paint = () => {
+      p.clearRect(0, 0, size, size);
+      const v = def.sheetImg && def.sheetImg.pixel;
+      if (v && v.ready) {
+        const f = v.frames.idle;
+        const s = Math.min(size / f.w, size / f.h) * 0.94;
+        const dw = f.w * s, dh = f.h * s;
+        p.imageSmoothingEnabled = false;
+        p.drawImage(v.canvas, f.sx, f.sy, f.w, f.h, (size - dw) / 2, size - dh - 2, dw, dh);
+      } else if (def.drawHead) {
+        const real = ctx; ctx = p;
+        p.save(); p.translate(size / 2, size * 0.56); p.scale(size / 70, size / 70);
+        def.drawHead(20, def.pal, {}); p.restore();
+        ctx = real;
+      }
+    };
+    paint();
+    registerPortrait(def, paint);
+    return c;
+  }
+
+  // Thumbnail: sheet art / sprite / procedural head, whichever the fighter has.
   function portraitEl(def, size) {
-    if (def.spriteSrc) {
+    if (def.sheet) return makeSheetPortrait(def, size);
+    const src = def.portraitSrc || def.spriteSrc;
+    if (src) {
       const im = document.createElement("img");
-      im.src = SPRITE_DIR + def.spriteSrc;
+      im.src = SPRITE_DIR + src;
       im.alt = def.name; im.className = "portrait";
       return im;
     }
@@ -1268,6 +1670,45 @@
     audio.ensure(); audio.blip(660, 0.08, "square", 0.08, 880);
   }
 
+  /* --- Mode toggle (Pixel 2D / Toy 3D) --- */
+  document.body.dataset.mode = MODE;
+  const modeButtons = document.querySelectorAll(".mode-btn");
+  modeButtons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      MODE = btn.dataset.mode;
+      document.body.dataset.mode = MODE;
+      modeButtons.forEach(b => {
+        const on = b === btn;
+        b.classList.toggle("is-active", on);
+        b.setAttribute("aria-checked", String(on));
+      });
+      audio.ensure(); audio.blip(560, 0.07, "square", 0.07, 740);
+      // Lazy-load the toy variants only when Toy Mode is actually chosen.
+      if (MODE === "toy") ROSTER.forEach(d => { if (d.sheet) loadSheetVariant(d, "toy"); });
+    });
+  });
+
+  /* --- Stage select --- */
+  const stageGrid = document.getElementById("stage-grid");
+  let selectedStage = STAGES[0];
+  STAGES.forEach((s, i) => {
+    const card = document.createElement("button");
+    card.type = "button"; card.className = "stage-pick" + (i === 0 ? " is-active" : "");
+    card.dataset.id = s.id; card.setAttribute("role", "option");
+    card.setAttribute("aria-label", s.name);
+    card.style.setProperty("--accent", s.accent);
+    card.innerHTML =
+      `<span class="stage-thumb" style="background-image:url('${STAGE_DIR + s.img}')"></span>` +
+      `<span class="stage-pick-name">${s.name}</span>`;
+    card.addEventListener("mouseenter", () => loadStageImage(s));
+    card.addEventListener("click", () => {
+      selectedStage = s; loadStageImage(s);
+      document.querySelectorAll(".stage-pick").forEach(c => c.classList.toggle("is-active", c.dataset.id === s.id));
+      audio.ensure(); audio.blip(680, 0.07, "square", 0.07, 880);
+    });
+    stageGrid.appendChild(card);
+  });
+
   fightBtn.addEventListener("click", () => {
     if (!selectedId) return;
     audio.ensure(); audio.on = true; soundBtn.classList.add("is-on"); soundBtn.setAttribute("aria-pressed", "true");
@@ -1275,6 +1716,10 @@
     const pool = ROSTER.filter(r => r.id !== selectedId);
     const p2 = pool[Math.floor(Math.random() * pool.length)];
     selCpu.textContent = p2.name;
+    currentStage = selectedStage;
+    loadStageImage(currentStage);
+    if (els.stageName) els.stageName.textContent = currentStage.name;
+    if (MODE === "toy") [p1, p2].forEach(d => { if (d.sheet) loadSheetVariant(d, "toy"); });
     document.getElementById("tk-select").classList.remove("is-visible");
     document.body.dataset.gameState = "fight";
     fightBtn.blur();   // so Space (block) can't re-activate the focused button
@@ -1307,7 +1752,7 @@
     document.getElementById("result-message").textContent = winner.def.name + " WINS";
     const finishBadge = document.getElementById("finish-badge");
     if (byKO && winner.rounds >= ROUNDS_TO_WIN) {
-      finishBadge.textContent = "FATALITY";
+      finishBadge.textContent = winner.tookDamage ? "FATALITY" : "FLAWLESS";
       finishBadge.style.display = "";
     } else finishBadge.style.display = "none";
     document.getElementById("result-detail").textContent = youWon

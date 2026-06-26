@@ -370,3 +370,97 @@ h1 {
 @media (hover: hover) and (pointer: fine) {
   .touch-controls { display: none; }
 }
+
+/* ======================================================================== *
+   OVERHAUL  —  feature chips · stamina · pre-fight setup · stage select
+ * ======================================================================== */
+
+/* hero feature chips */
+.stat-chips {
+  display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none;
+  width: min(100%, 500px);
+}
+.stat-chips li {
+  padding: 6px 11px; border: 1px solid var(--line); border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05); color: var(--muted);
+  font-family: var(--mono); font-size: 11px; font-weight: 700; text-transform: uppercase;
+}
+.stat-chips li:first-child { border-color: rgba(77, 238, 255, 0.5); color: var(--cyan); }
+
+/* stamina bar (between health + name) */
+.stamina-track {
+  height: 5px; overflow: hidden; border: 1px solid rgba(255, 216, 77, 0.3);
+  border-radius: 999px; background: rgba(0, 0, 0, 0.4);
+}
+.stamina-fill {
+  display: block; width: 100%; height: 100%;
+  background: linear-gradient(90deg, var(--gold), var(--green));
+  box-shadow: 0 0 8px rgba(255, 216, 77, 0.5); transition: width 120ms linear;
+}
+.stamina-track.is-right { direction: rtl; }
+.stamina-track.is-right .stamina-fill { background: linear-gradient(270deg, var(--gold), var(--green)); }
+.stamina-track.is-rekt { border-color: var(--red); animation: blink 0.4s steps(2) infinite; }
+.stamina-track.is-rekt .stamina-fill { background: var(--red); box-shadow: 0 0 10px rgba(255, 49, 79, 0.7); }
+
+/* current-stage chip in the HUD centre */
+.stage-name {
+  margin-top: 3px; padding: 1px 8px; border: 1px solid var(--line); border-radius: 999px;
+  background: rgba(0, 0, 0, 0.4); color: var(--muted) !important;
+  font-size: 9px !important; white-space: nowrap; max-width: 22ch; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* pre-fight setup rows */
+.setup-row { margin: 14px 0; text-align: left; }
+.setup-label {
+  display: block; margin-bottom: 8px; color: var(--green);
+  font-family: var(--mono); font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em;
+}
+
+/* mode toggle (Pixel / Toy) */
+.mode-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mode-btn {
+  display: grid; gap: 3px; justify-items: start; padding: 12px 14px; cursor: pointer; text-align: left;
+  border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: rgba(255, 255, 255, 0.05);
+  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+.mode-btn:hover, .mode-btn:focus-visible { transform: translateY(-2px); border-color: var(--cyan); outline: none; }
+.mode-btn.is-active {
+  border-color: var(--cyan); background: color-mix(in srgb, var(--cyan) 18%, transparent);
+  box-shadow: 0 0 22px rgba(77, 238, 255, 0.28);
+}
+.mode-icon { font-size: 18px; line-height: 1; color: var(--cyan); }
+.mode-btn strong { font-size: 15px; text-transform: uppercase; }
+.mode-sub { color: var(--muted); font-family: var(--mono); font-size: 10px; text-transform: uppercase; }
+
+/* stage select */
+.stage-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.stage-pick {
+  --accent: var(--green);
+  display: grid; gap: 0; padding: 0; cursor: pointer; overflow: hidden;
+  border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: rgba(255, 255, 255, 0.05);
+  transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+.stage-pick:hover, .stage-pick:focus-visible { transform: translateY(-3px); border-color: var(--accent); outline: none; }
+.stage-pick.is-active {
+  border-color: var(--accent); box-shadow: 0 0 22px color-mix(in srgb, var(--accent) 42%, transparent);
+}
+.stage-thumb {
+  display: block; width: 100%; height: 58px; background: #0a0510 center / cover no-repeat;
+}
+.stage-pick-name {
+  padding: 7px 8px 9px; font-family: var(--mono); font-size: 11px; font-weight: 700;
+  text-transform: uppercase; text-align: center;
+}
+.stage-pick.is-active .stage-pick-name { color: var(--accent); }
+
+/* toy-mode cabinet gets a cooler, glassier screen glow */
+body[data-mode="toy"] .screen-wrap { box-shadow: inset 0 0 48px rgba(77, 238, 255, 0.16); }
+
+@media (max-width: 760px) {
+  .stat-chips { width: 100%; }
+  .stage-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 430px) {
+  .stage-thumb { height: 48px; }
+  .stage-name { display: none; }
+}

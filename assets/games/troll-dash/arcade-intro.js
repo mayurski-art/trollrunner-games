@@ -48,7 +48,8 @@
     chooseGamesButton?.focus();
   }
 
-  function bootGame() {
+  // Boot animation, then hand off to the dedicated Troll Dash cabinet page.
+  function bootGame(targetUrl) {
     intro.classList.add("is-loading");
     showPanel(tvLoading);
 
@@ -61,22 +62,14 @@
 
     window.setTimeout(() => {
       window.clearInterval(lineTimer);
-      document.body.classList.add("intro-complete");
-      document.getElementById("start-overlay")?.classList.add("is-visible");
-      document.getElementById("start-button")?.focus();
-    }, 2100);
-  }
-
-  // Dev/deep-link: #play skips the cabinet intro straight to the game.
-  if (/(?:^|[#&])(play|autostart)/.test(window.location.hash)) {
-    document.body.classList.add("intro-complete");
-    document.getElementById("start-overlay")?.classList.add("is-visible");
+      window.location.href = targetUrl;
+    }, 1500);
   }
 
   takeControllerButton?.addEventListener("click", takeController);
   chooseGamesButton?.addEventListener("click", chooseGames);
   backToTvMenuButton?.addEventListener("click", backToMenu);
-  bootTrollDashButton?.addEventListener("click", bootGame);
+  bootTrollDashButton?.addEventListener("click", () => bootGame("troll-dash.html"));
 
   intro.addEventListener("keydown", event => {
     if (event.key !== "Enter" && event.key !== " ") return;

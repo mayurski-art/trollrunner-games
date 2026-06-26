@@ -4,18 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#050008">
-  <meta name="description" content="Troll Dash: Rugpull Run is a cursed meme-coin arcade endless runner from Troll Runner.">
-  <title>Troll Dash: Rugpull Run | Troll Runner Arcade</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23050008'/%3E%3Ctext x='8' y='39' font-size='18' fill='%234dff73' font-family='monospace' font-weight='900'%3E%24T%3C/text%3E%3C/svg%3E">
+  <meta name="description" content="Troll Runner Arcade — Trollrunner Game Night. Boot cursed meme-coin cabinets: Troll Dash: Rugpull Run and Troll Kombat. Take the controller.">
+  <title>Troll Runner Arcade — Game Night</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23050008'/%3E%3Ctext x='6' y='40' font-size='17' fill='%234dff73' font-family='monospace' font-weight='900'%3E%24T%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;700;900&family=DM+Mono:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/games/troll-dash/style.css?v=chooser-tiles-20260616">
+  <link rel="stylesheet" href="assets/games/troll-dash/style.css?v=hub-split-20260626">
 </head>
 <body>
   <div class="crt-overlay" aria-hidden="true"></div>
 
-  <section id="arcade-intro" class="arcade-intro" aria-label="Trollrunner game night intro">
+  <section id="arcade-intro" class="arcade-intro" aria-label="Trollrunner game night arcade hub">
     <div class="intro-cinema" aria-hidden="true">
       <img class="intro-photo" src="assets/animations/troll-gamewithmefigure.png" alt="">
       <div class="controller-rumble"></div>
@@ -64,11 +64,11 @@
               </article>
               <article class="game-select-card game-select-card-kombat">
                 <a id="boot-troll-kombat" class="game-select-hit" href="troll-kombat.html" aria-label="Play Troll Kombat"></a>
-                <img class="game-select-art game-select-art-left" src="assets/games/troll-kombat/fighters/troll.png" alt="" aria-hidden="true">
+                <img class="game-select-art game-select-art-left" src="assets/games/troll-kombat/fighters/doge.png" alt="" aria-hidden="true">
                 <img class="game-select-art game-select-art-right" src="assets/games/troll-kombat/fighters/pepe.png" alt="" aria-hidden="true">
                 <span class="game-select-number">002 · Live</span>
                 <h3>Troll Kombat</h3>
-                <p>Pick your meme champion and brawl. Best of 3. Problem?</p>
+                <p>Pixel or Toy mode. Meme champions. Moving arenas. Problem?</p>
                 <span class="game-select-boot">▶ Enter Arena</span>
               </article>
               <article class="game-select-card is-locked">
@@ -83,7 +83,7 @@
 
           <div id="tv-loading" class="tv-panel loading-panel">
             <p class="tv-kicker">Loading</p>
-            <h2>Booting Rugpull Run</h2>
+            <h2 id="loading-title">Booting cabinet</h2>
             <div class="loading-track"><span id="loading-bar"></span></div>
             <p id="loading-text">Finding support...</p>
           </div>
@@ -92,199 +92,6 @@
     </div>
   </section>
 
-  <header class="site-header">
-    <a class="brand" href="/" aria-label="Troll Runner Arcade home">
-      <span class="brand-mark">$TROLL</span>
-      <span class="brand-copy">
-        <span>Troll Runner</span>
-        <small>Arcade</small>
-      </span>
-    </a>
-    <nav class="site-nav" aria-label="Primary">
-      <a href="/">Arcade</a>
-      <a href="https://blog.trollrunner.net">Blog</a>
-      <a href="https://finance.trollrunner.net">Finances</a>
-      <a href="https://trollrunner.net">Main Site</a>
-    </nav>
-  </header>
-
-  <main id="arcade" class="arcade-shell">
-    <section class="game-hero" aria-labelledby="game-title">
-      <div class="game-copy">
-        <p class="eyebrow">Cursed meme-coin endless runner</p>
-        <h1 id="game-title">Troll Dash: Rugpull Run</h1>
-        <p class="tagline">Survive the chart. Dodge the rugs. Pay the troll toll.</p>
-        <div class="hero-stats" aria-label="Game stats">
-          <span><strong>3</strong> lanes</span>
-          <span><strong>6.9</strong> $TROLL revive</span>
-          <span><strong>1</strong> mock revive</span>
-        </div>
-      </div>
-
-      <section class="game-cabinet" aria-label="Troll Dash game cabinet">
-        <div class="cabinet-marquee">
-          <span>RUGPULL RUN</span>
-          <span class="marquee-blink">LIVE</span>
-        </div>
-
-        <div class="hud-row" aria-live="polite">
-          <div class="hud-item">
-            <span>Distance</span>
-            <strong id="score-value">0</strong>
-          </div>
-          <div class="hud-item is-coin">
-            <span>$TROLL</span>
-            <strong id="coin-value">0</strong>
-          </div>
-          <div class="hud-item">
-            <span>Best</span>
-            <strong id="high-score-value">0</strong>
-          </div>
-          <button id="sound-toggle" class="icon-btn" type="button" aria-pressed="false" title="Toggle arcade sound" aria-label="Toggle arcade sound">
-            <span class="sfx-on">🔊</span><span class="sfx-off">🔇</span>
-          </button>
-        </div>
-
-        <div class="screen-wrap">
-          <canvas id="troll-dash-canvas" width="960" height="540" aria-label="Troll Dash endless runner game"></canvas>
-
-          <div id="start-overlay" class="game-overlay start-overlay is-visible">
-            <div class="overlay-card start-card">
-              <div class="start-art" aria-hidden="true">
-                <img class="start-troll" src="assets/games/troll-dash/sprites/troll-runner.png" alt="">
-                <span class="start-coin start-coin-a">$T</span>
-                <span class="start-coin start-coin-b">$T</span>
-                <span class="start-coin start-coin-c">$T</span>
-              </div>
-              <div class="start-copy">
-                <p class="overlay-kicker">Endless temple runner</p>
-                <h2>Outrun the<br>rugpull.</h2>
-                <p>Sprint the cursed chart, scoop <strong>$TROLL</strong>, and dodge red-candle gates, FUD beams, and rugpull holes. How far can you run before you get rekt?</p>
-                <button id="start-button" class="primary-btn pulse-btn" type="button">▶ Start Run</button>
-                <div class="control-keys" aria-label="Controls">
-                  <span class="ckey"><kbd>A</kbd><kbd>D</kbd> Swap lane</span>
-                  <span class="ckey"><kbd>W</kbd>/<kbd>Space</kbd> Jump</span>
-                  <span class="ckey"><kbd>S</kbd> Roll</span>
-                </div>
-                <p class="mobile-hint">📱 Swipe ← → to switch lanes · swipe ↑ jump · swipe ↓ roll · tap to hop.</p>
-              </div>
-            </div>
-          </div>
-
-          <div id="death-overlay" class="game-overlay" aria-live="assertive">
-            <div class="overlay-card death-card">
-              <p class="overlay-kicker">Run halted</p>
-              <h2 id="death-message">RUGGED</h2>
-
-              <div class="run-stats">
-                <div>
-                  <span>Distance</span>
-                  <strong id="score-final">0</strong>
-                </div>
-                <div class="is-coin">
-                  <span>$TROLL grabbed</span>
-                  <strong id="coin-final">0</strong>
-                </div>
-              </div>
-
-              <!-- Default revive prompt (pay to revive) -->
-              <div id="revive-prompt">
-                <div class="revive-panel">
-                  <div>
-                    <span>Pay with</span>
-                    <span id="pay-token-picker" class="pay-token-picker"></span>
-                  </div>
-                  <div>
-                    <span>Revive cost</span>
-                    <strong id="revive-cost">$0.74</strong>
-                  </div>
-                </div>
-
-                <div class="overlay-actions">
-                  <button id="revive-button" class="primary-btn" type="button">Revive</button>
-                  <button id="restart-button" class="secondary-btn" type="button">↻ Run Again</button>
-                </div>
-                <p id="revive-status" class="revive-status" aria-live="polite"></p>
-              </div>
-
-              <!-- Shown after the payment confirms -->
-              <div id="revive-ready" hidden>
-                <div class="revive-plus">+1 REVIVE</div>
-                <p class="revive-ready-note">Payment confirmed. Resume when you're ready.</p>
-                <button id="revive-confirm-button" class="primary-btn" type="button">Confirm &amp; Resume</button>
-                <div id="revive-countdown" class="revive-countdown" hidden></div>
-              </div>
-
-              <details class="revive-fine">
-                <summary>Revive details</summary>
-                <p class="revive-disclaimer">Revive is a real on-chain payment of ~$0.69 + 6.9% tax, in $TROLL or USDC, approved in your Phantom wallet. Optional, non-refundable.</p>
-                <p class="treasury-note">Treasury: <span id="treasury-wallet">79vVRZ7qnZfj9xCto5d9Kwf4eAimqMDrQysZjHBbFbsA</span></p>
-                <a class="link-back" href="/">← Back to Arcade</a>
-              </details>
-            </div>
-          </div>
-
-          <div id="revived-banner" class="revived-banner" aria-live="polite">REVIVED BY $TROLL</div>
-        </div>
-
-        <div class="cabinet-footer">
-          <p><strong>Keys</strong> · A/D lanes · W/Space jump · S roll</p>
-          <p><strong>Touch</strong> · swipe to dodge · tap to hop</p>
-        </div>
-      </section>
-    </section>
-
-    <section class="arcade-rack now-playing" aria-labelledby="kombat-title">
-      <div class="section-heading">
-        <p class="eyebrow">New cabinet · Live</p>
-        <h2 id="kombat-title">Troll Kombat</h2>
-      </div>
-      <a class="kombat-promo" href="troll-kombat.html" aria-label="Play Troll Kombat">
-        <div class="kombat-stage" aria-hidden="true">
-          <img class="kp-fighter kp-left" src="assets/games/troll-kombat/fighters/troll.png" alt="" loading="lazy" decoding="async">
-          <span class="kp-vs">VS</span>
-          <img class="kp-fighter kp-right" src="assets/games/troll-kombat/fighters/pepe.png" alt="" loading="lazy" decoding="async">
-        </div>
-        <div class="kombat-copy">
-          <span class="kp-tag">Meme-coin fighter · Best of 3</span>
-          <h3>Pick your champion.<br>Trade blows.</h3>
-          <p>Big Troll, Pepe &amp; Doge brawl in cursed muscle-troll texture — specials, finishers, the works. Problem?</p>
-          <span class="kp-play">▶ Play Troll Kombat</span>
-        </div>
-      </a>
-    </section>
-
-    <section class="arcade-rack" aria-labelledby="coming-soon-title">
-      <div class="section-heading">
-        <p class="eyebrow">Next cabinets</p>
-        <h2 id="coming-soon-title">Coming Soon</h2>
-      </div>
-      <div class="game-grid">
-        <article class="coming-card">
-          <img class="coming-art" src="assets/animations/troll-wizardfigure.png" alt="" aria-hidden="true">
-          <span>001</span>
-          <h3>Troll Wizard</h3>
-          <p>Cast green candles, hex the FUD, and conjure liquidity from thin air.</p>
-        </article>
-        <article class="coming-card">
-          <img class="coming-art" src="assets/animations/troll-zeldafigure.png" alt="" aria-hidden="true">
-          <span>002</span>
-          <h3>Temple of Gains</h3>
-          <p>Raid the cursed vault past the snake-eyed guardians. Don't touch the portal.</p>
-        </article>
-        <article class="coming-card">
-          <img class="coming-art" src="assets/animations/troll-runnerfigure.png" alt="" aria-hidden="true">
-          <span>003</span>
-          <h3>Hermes Run</h3>
-          <p>Winged-sandal sprint for the money bag. U mad? Catch it if you can.</p>
-        </article>
-      </div>
-    </section>
-  </main>
-
-  <script src="assets/js/troll-pay-config.js?v=1" defer></script>
-  <script src="https://trollrunner.net/assets/js/troll-pay.js?v=5" defer></script>
-  <script src="assets/games/troll-dash/arcade-intro.js?v=temple-3d-v2-20260615" defer></script>
-  <script src="assets/games/troll-dash/game.js?v=revive-pay-8" defer></script>
+  <script src="assets/games/troll-dash/arcade-intro.js?v=hub-split-20260626" defer></script>
 </body>
 </html>
