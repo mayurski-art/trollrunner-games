@@ -74,13 +74,16 @@ h1, h2, h3, p { margin: 0; }
 .arcade-shell { width: min(1440px, 100%); margin: 0 auto; padding: clamp(12px, 2.2vw, 28px); }
 
 /* ---- Hero copy --------------------------------------------------------- */
+/* Stacked layout so the arena can span the full device width (MK-style). */
 .fight-hero {
-  display: grid;
-  grid-template-columns: minmax(260px, 0.58fr) minmax(360px, 1.42fr);
-  gap: clamp(18px, 3vw, 34px); align-items: center;
-  min-height: calc(100svh - 78px); padding-bottom: clamp(14px, 2vw, 24px);
+  display: flex; flex-direction: column; gap: clamp(10px, 1.6vw, 18px);
+  padding-bottom: clamp(14px, 2vw, 24px);
 }
-.game-copy { min-width: 0; display: grid; gap: 16px; align-content: center; }
+.game-copy {
+  min-width: 0; display: grid; gap: 12px; align-content: center;
+  width: min(1100px, 100%); margin: 0 auto; text-align: center; justify-items: center;
+}
+.hero-stats, .stat-chips { justify-content: center; }
 .eyebrow {
   color: var(--green); font-family: var(--mono); font-size: 12px; font-weight: 900;
   text-transform: uppercase; text-shadow: 0 0 16px rgba(77, 255, 115, 0.56);
@@ -102,14 +105,18 @@ h1 {
 /* ---- Cabinet ----------------------------------------------------------- */
 .fight-cabinet {
   position: relative; min-width: 0; overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 8px;
+  width: 100vw; margin-left: calc(50% - 50vw);   /* full-bleed across the device */
+  border-top: 2px solid rgba(255, 49, 79, 0.4); border-bottom: 2px solid rgba(255, 49, 79, 0.4);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent 16%),
-    linear-gradient(145deg, rgba(255, 49, 79, 0.18), rgba(154, 92, 255, 0.12) 40%, rgba(77, 255, 115, 0.1)),
-    var(--panel);
-  box-shadow: var(--shadow), 0 0 55px rgba(255, 49, 79, 0.16);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 12%),
+    radial-gradient(120% 80% at 50% 0%, rgba(255, 49, 79, 0.16), transparent 60%),
+    linear-gradient(180deg, #0b0410, #050008 60%);
+  box-shadow: var(--shadow), 0 0 70px rgba(255, 49, 79, 0.18);
 }
-.fight-cabinet::before { content: ""; position: absolute; inset: 8px; border: 1px solid rgba(255, 49, 79, 0.22); pointer-events: none; }
+.fight-cabinet::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  border-top: 1px solid rgba(255, 49, 79, 0.25); border-bottom: 1px solid rgba(255, 49, 79, 0.25);
+}
 .cabinet-marquee {
   position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 15px 18px; border-bottom: 1px solid rgba(255, 255, 255, 0.16);
@@ -173,10 +180,10 @@ h1 {
 /* ---- Screen + canvas --------------------------------------------------- */
 .screen-wrap {
   position: relative; z-index: 1;
-  width: min(calc(100% - 24px), calc(min(60svh, 660px) * 16 / 9));
-  margin: 0 auto; overflow: hidden; aspect-ratio: 16 / 9; max-height: min(60svh, 660px);
+  width: min(calc(100vw - 8px), calc(min(84svh, 900px) * 1280 / 600));
+  margin: 0 auto; overflow: hidden; aspect-ratio: 1280 / 600; max-height: min(84svh, 900px);
   border: 1px solid rgba(255, 49, 79, 0.34); background: #050008;
-  box-shadow: inset 0 0 34px rgba(255, 49, 79, 0.12);
+  box-shadow: inset 0 0 40px rgba(255, 49, 79, 0.14);
   touch-action: none; user-select: none; -webkit-user-select: none;
 }
 #tk-canvas { display: block; width: 100%; height: 100%; background: #0a0510; }
@@ -456,9 +463,23 @@ h1 {
 /* toy-mode cabinet gets a cooler, glassier screen glow */
 body[data-mode="toy"] .screen-wrap { box-shadow: inset 0 0 48px rgba(77, 238, 255, 0.16); }
 
+/* Full-bleed cabinet: align HUD + controls to the play screen, bolder MK HUD. */
+.fight-cabinet { --screenW: min(calc(100vw - 8px), calc(min(84svh, 900px) * 1280 / 600)); }
+.fight-hud, .cabinet-footer, .touch-controls {
+  width: var(--screenW); margin-left: auto; margin-right: auto;
+}
+.fight-hud { padding-top: 14px; }
+.health-track { height: 26px; border-width: 2px; }
+.hud-meta strong { font-size: clamp(14px, 1.7vw, 21px); }
+.hud-center strong { font-size: clamp(30px, 3.2vw, 48px); }
+.cabinet-marquee { font-size: clamp(14px, 1.7vw, 20px); letter-spacing: 0.1em; }
+.icon-btn { right: max(14px, calc((100vw - var(--screenW)) / 2 + 6px)); }
+
 @media (max-width: 760px) {
   .stat-chips { width: 100%; }
   .stage-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fight-hud, .cabinet-footer, .touch-controls { width: 100%; }
+  .icon-btn { right: 12px; }
 }
 @media (max-width: 430px) {
   .stage-thumb { height: 48px; }

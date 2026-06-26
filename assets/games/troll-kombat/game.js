@@ -22,10 +22,11 @@
   const H = canvas.height;  // 540
 
   // --- Stage geometry ---------------------------------------------------------
-  const FLOOR_Y = 486;          // y of the ground line (feet rest here)
-  const WALL_L = 128;           // left fighter bound (fighter centre)
-  const WALL_R = W - 128;       // right fighter bound
+  const FLOOR_Y = H - 56;       // y of the ground line (feet rest here)
+  const WALL_L = 70;            // left fighter bound (fighter centre) — roomy arena
+  const WALL_R = W - 70;        // right fighter bound
   const FIGHTER_SCALE = 1.18;   // rig is ~190px tall before scale
+  const SPAWN_L = Math.round(W * 0.30), SPAWN_R = Math.round(W * 0.70);
 
   // --- Match tuning -----------------------------------------------------------
   const ROUND_TIME = 60;        // seconds
@@ -180,7 +181,7 @@
   // procedural muscle rig. `spriteScale` maps the source top->feet span to
   // TARGET_BODY so every fighter is the same on-screen height.
   const SPRITE_DIR = "assets/games/troll-kombat/fighters/";
-  const TARGET_BODY = 272;   // on-screen feet->top height, px
+  const TARGET_BODY = 300;   // on-screen feet->top height, px
 
   // Strip near-black pixels → transparent. Returns an offscreen canvas.
   function stripBlackBg(img, threshold) {
@@ -517,7 +518,7 @@
     // Stamina bottomed out → drop guard, brief vulnerable stagger.
     enterRekt() {
       if (this.rektStun > 0 || this.state === "ko") return;
-      this.rektStun = 1.1;
+      this.rektStun = 0.8;
       this.state = "hit";
       this.attack = null;
       this.stamina = 0;
@@ -545,26 +546,31 @@
       if (this.rektStun > 0 && !blocked) dmg *= 1.25;   // rekt = extra vulnerable
       this.facing = fromX < this.x ? 1 : -1;
       if (blocked) {
-        this.hp = Math.max(0, this.hp - dmg * 0.18);
-        this.blockStun = 0.16;
-        this.vx = (this.x < fromX ? -1 : 1) * push * 0.4;
+        this.hp = Math.max(0, this.hp - dmg * 0.1);     // light chip only
+        this.blockStun = 0.12;
+        this.vx = (this.x < fromX ? -1 : 1) * push * 0.32;
         this.meter = Math.min(MAX_METER, this.meter + dmg * 0.4);
         audio.block();
-        spark(this.x + this.facing * 50, this.feetY - 150, this.pal.accent, 6, true);
+        spark(this.x + this.facing * 50, this.feetY - 150, this.pal.accent, 12, true);
         return;
       }
       this.hp = Math.max(0, this.hp - dmg);
       this.tookDamage = true;
-      this.hitstun = 0.30;
+      this.meter = Math.min(MAX_METER, this.meter + dmg * 1.1);
       this.flash = 0.16;
       this.hurtFace = 0.6;
-      this.state = "hit";
-      this.attack = null;
-      this.vx = (this.x < fromX ? -1 : 1) * push;
-      this.meter = Math.min(MAX_METER, this.meter + dmg * 1.1);
       audio.hitSpark();
       spark(this.x + (fromX < this.x ? 44 : -44), this.feetY - 150, "#fff2a8", 12, false);
       shake(Math.min(10, dmg * 0.7));
+      // Super-armor: a special in progress powers through incoming hits.
+      if (this.attack && this.attack.type === "special") {
+        this.vx = (this.x < fromX ? -1 : 1) * push * 0.25;
+      } else {
+        this.hitstun = 0.30;
+        this.state = "hit";
+        this.attack = null;
+        this.vx = (this.x < fromX ? -1 : 1) * push;
+      }
       if (this.hp <= 0) this.ko();
     }
     ko() {
@@ -582,7 +588,7 @@
       this.dashT = Math.max(0, this.dashT - dt);
       const wasRekt = this.rektStun > 0;
       this.rektStun = Math.max(0, this.rektStun - dt);
-      if (wasRekt && this.rektStun === 0) this.stamina = 35;   // recover after the stagger
+      if (wasRekt && this.rektStun === 0) this.stamina = 45;   // recover after the stagger
       this.vx = (this.vx || 0);
 
       // blink
@@ -628,27 +634,27 @@
         if (intent.special) this.startAttack("special");
         else if (intent.kick) this.startAttack("kick");
         else if (intent.punch) this.startAttack("punch");
-        else if (intent.dash && this.grounded && this.dashT <= 0 && this.stamina >= 18) {
+        else if (intent.dash && this.grounded && this.dashT <= 0 && this.stamina >= 16) {
           const d = move !== 0 ? move : this.facing;
-          this.vx = d * 470; this.dashT = 0.26; this.stamina -= 18;
+          this.vx = d * 560; this.dashT = 0.26; this.stamina -= 16;
           this.state = "walk"; this.walkDir = d * this.facing;
           audio.blip(440, 0.12, "sawtooth", 0.1, 700); regen = false;
         }
         else if (intent.up && this.grounded) {
-          this.vy = 520; this.state = "jump";
-          this.stamina = Math.max(0, this.stamina - 12); audio.jump(); regen = false;
+          this.vy = 680; this.state = "jump";
+          this.stamina = Math.max(0, this.stamina - 8); audio.jump(); regen = false;
         }
         else {
           const blocking = intent.block && this.grounded;
           if (blocking) {
             this.state = "block"; this.vx *= 0.6;
-            this.stamina -= 26 * dt; regen = false;
+            this.stamina -= 12 * dt; regen = false;
             if (this.stamina <= 0) { this.stamina = 0; this.enterRekt(); }
           }
           else if (intent.crouch && this.grounded) { this.state = "crouch"; }
           else if (this.grounded) {
             if (move !== 0) {
-              this.x += move * 230 * dt;
+              this.x += move * 280 * dt;
               this.state = "walk";
               this.walkDir = move * this.facing; // +1 forward, -1 back
             } else { this.state = "idle"; }
@@ -1388,8 +1394,8 @@
     init(p1Def, p2Def, diff) {
       this.diff = diff;
       this.fighters = [
-        new Fighter(p1Def, 320, 1, false),
-        new Fighter(p2Def, 640, -1, true),
+        new Fighter(p1Def, SPAWN_L, 1, false),
+        new Fighter(p2Def, SPAWN_R, -1, true),
       ];
       this.fighters[0].rounds = 0; this.fighters[1].rounds = 0;
       this.ai = new AI(diff);
@@ -1400,7 +1406,7 @@
     },
     startRound() {
       const [a, b] = this.fighters;
-      a.reset(320, 1); b.reset(640, -1);   // HP resets each round; meter carries over
+      a.reset(SPAWN_L, 1); b.reset(SPAWN_R, -1);   // HP resets each round; meter carries over
       this.timer = ROUND_TIME;
       this.phase = "intro"; this.phaseT = 0;
       this.finisher = false;
@@ -1491,11 +1497,13 @@
   };
   const NEUTRAL = { left: false, right: false, up: false, crouch: false, block: false, punch: false, kick: false, special: false };
 
+  // Soft, passable separation: a gentle nudge when nearly overlapping so you can
+  // still push through an opponent (no more getting cornered against a wall).
   function separate(a, b) {
-    const minGap = 100;
+    const minGap = 46;
     const dx = b.x - a.x;
     if (Math.abs(dx) < minGap && a.grounded && b.grounded) {
-      const overlap = (minGap - Math.abs(dx)) / 2;
+      const overlap = (minGap - Math.abs(dx)) / 2 * 0.28;
       const s = dx >= 0 ? 1 : -1;
       a.x -= s * overlap; b.x += s * overlap;
       a.x = clamp(a.x, WALL_L, WALL_R); b.x = clamp(b.x, WALL_L, WALL_R);
