@@ -115,12 +115,12 @@
       moves: { punch: "Cope Jab", kick: "Green Candle Kick", block: "Diamond Hands Guard", special: "Katana Cope Slash", finisher: "Feels Bad, Man" },
       // 4x3 grid sheet. Logical state -> [col,row]; bboxes computed on load.
       sheet: {
-        pixel: "pepe-samurai-2d.png", toy: "pepe-samurai-3d.png", cols: 4, rows: 3,
+        pixel: "pepe-samurai-2d.png", toy: "pepe-samurai-3d.png", cols: 6, rows: 3,
+        // 6x3 labelled grid. special = the two sword-slash frames.
         frames: {
-          idle: [0, 0], idle2: [3, 0], block: [2, 0], crouch: [1, 0], jump: [1, 0], hit: [1, 0],
-          punch: [0, 1], kick: [2, 1],
-          special: [3, 2], swordReady: [0, 2], swordSlash: [1, 2], swordThrust: [2, 2], swordOverhead: [3, 2],
-          win: [3, 2],
+          idle: [0, 0], idle2: [1, 0], walk1: [2, 0], walk2: [3, 0], punch: [4, 0], punch2: [5, 0],
+          kick: [0, 1], kick2: [1, 1], special: [2, 1], special2: [3, 1], block: [4, 1], crouch: [5, 1],
+          jump: [0, 2], hit: [1, 2], ko: [2, 2], win: [3, 2], swordReady: [4, 2], swordThrust: [5, 2],
         },
       },
     },
@@ -133,11 +133,12 @@
       moves: { punch: "Much Punch", kick: "Such Kick", block: "Mink Coat Guard", special: "Deal-With-It Dash", finisher: "Very Rekt. Much Wow." },
       // 4x2 grid sheet.
       sheet: {
-        pixel: "doge-drip-2d.png", toy: "doge-drip-3d.png", cols: 4, rows: 2,
+        pixel: "doge-drip-2d.png", toy: "doge-drip-3d.png", cols: 6, rows: 3,
+        // 6x3 labelled grid (last two cells empty).
         frames: {
-          idle: [0, 0], idle2: [1, 0], jump: [0, 0], hit: [0, 0],
-          punch: [2, 0], kick: [0, 1], crouch: [1, 1], block: [2, 1],
-          special: [3, 1], win: [3, 1],
+          idle: [0, 0], idle2: [1, 0], walk1: [2, 0], walk2: [3, 0], punch: [4, 0], punch2: [5, 0],
+          kick: [0, 1], kick2: [1, 1], special: [2, 1], special2: [3, 1], block: [4, 1], crouch: [5, 1],
+          jump: [0, 2], hit: [1, 2], ko: [2, 2], win: [3, 2],
         },
       },
     },
@@ -247,14 +248,21 @@
   }
 
   function buildSheetVariant(def, img) {
-    const canvas = stripBlackBg(img, 40);
+    // Sheets ship with real alpha (offline-cleaned), so just rasterise and
+    // measure each grid cell's content box by alpha — no colour keying (which
+    // would eat the dark armor / black cap + shades).
+    const canvas = document.createElement("canvas");
+    canvas.width = img.naturalWidth || img.width;
+    canvas.height = img.naturalHeight || img.height;
     const sctx = canvas.getContext("2d");
+    sctx.drawImage(img, 0, 0);
     const S = def.sheet;
-    const cw = Math.floor(canvas.width / S.cols), ch = Math.floor(canvas.height / S.rows);
     const frames = {};
     for (const key in S.frames) {
       const [c, r] = S.frames[key];
-      frames[key] = contentBBox(sctx, c * cw, r * ch, cw, ch);
+      const x0 = Math.round(c * canvas.width / S.cols), x1 = Math.round((c + 1) * canvas.width / S.cols);
+      const y0 = Math.round(r * canvas.height / S.rows), y1 = Math.round((r + 1) * canvas.height / S.rows);
+      frames[key] = contentBBox(sctx, x0, y0, x1 - x0, y1 - y0);
     }
     const idle = frames.idle || frames[Object.keys(frames)[0]];
     return { canvas, frames, scale: TARGET_BODY / idle.h, ready: true };
@@ -766,16 +774,22 @@
       const F = this.def.sheet.frames;
       const st = this.state;
       if (st === "attack" && this.attack) {
+        const A = this.attack.def, at = this.attack.t;
+        const second = at > (A.startup + A.active + A.recovery) * 0.4;   // wind-up -> extend
         const t = this.attack.type;
-        if (t === "special") return F.special ? "special" : "punch";
+        if (t === "special") return (second && F.special2) ? "special2" : (F.special ? "special" : "punch");
+        if (t === "punch")   return (second && F.punch2) ? "punch2" : "punch";
+        if (t === "kick")    return (second && F.kick2) ? "kick2" : "kick";
         return F[t] ? t : "punch";
       }
-      if (st === "ko" || st === "hit") return F.hit ? "hit" : "idle";
-      if (st === "block" && F.block) return "block";
-      if (st === "crouch" && F.crouch) return "crouch";
-      if (st === "jump" && F.jump) return "jump";
-      if (st === "win" && F.win) return "win";
-      if (st === "walk") return (F.idle2 && Math.floor(this.walkPhase / 0.42) % 2) ? "idle2" : "idle";
+      if (st === "ko") return F.ko ? "ko" : (F.hit ? "hit" : "idle");
+      if (st === "hit") return F.hit ? "hit" : "idle";
+      if (st === "block") return F.block ? "block" : "idle";
+      if (st === "crouch") return F.crouch ? "crouch" : "idle";
+      if (st === "jump") return F.jump ? "jump" : "idle";
+      if (st === "win") return F.win ? "win" : "idle";
+      if (st === "walk") return (F.walk2 && Math.floor(this.walkPhase / 0.32) % 2) ? "walk2"
+                              : (F.walk1 ? "walk1" : "idle");
       return (F.idle2 && Math.floor(this.stateT * 1.6) % 2) ? "idle2" : "idle";
     }
 
