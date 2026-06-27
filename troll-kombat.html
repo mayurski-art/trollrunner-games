@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;700;900&family=DM+Mono:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/games/troll-kombat/style.css?v=kombat-v11-hud-20260627">
+  <link rel="stylesheet" href="assets/games/troll-kombat/style.css?v=kombat-v12-hud-overlay">
 </head>
 <body data-game-state="select">
   <div class="crt-overlay" aria-hidden="true"></div>
@@ -53,54 +53,53 @@
           <span class="marquee-blink">VS</span>
         </div>
 
-        <div class="fight-hud" aria-live="off">
-          <!-- P1 — character-icon box + angled health panel (bar color follows the fighter) -->
-          <div class="hud-fighter is-p1" id="hud-p1">
-            <div class="hud-icon"><span class="hud-tab">P1</span><img id="p1-icon" class="hud-icon-img" alt=""></div>
-            <div class="hud-bars">
-              <div class="hud-meta">
-                <strong id="p1-label">PLAYER 1</strong>
-                <span class="hud-user" id="p1-name">FIGHTER</span>
-                <span class="round-pips" id="p1-pips" aria-label="Player 1 rounds won"></span>
-              </div>
-              <div class="health-track"><span id="p1-health" class="health-fill"></span><span id="p1-health-chip" class="health-chip"></span></div>
-              <div class="hud-sub">
-                <div class="stamina-track" title="Stamina"><span id="p1-stamina" class="stamina-fill"></span></div>
-                <div class="special-track" title="Special meter"><span id="p1-meter" class="special-fill"></span></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="hud-center">
-            <div class="timer-disc"><strong id="round-timer">60</strong></div>
-            <span id="round-label">Round 1</span>
-            <span id="stage-name" class="stage-name">Troll Hills</span>
-          </div>
-
-          <!-- P2 — mirrored -->
-          <div class="hud-fighter is-p2" id="hud-p2">
-            <div class="hud-bars">
-              <div class="hud-meta is-right">
-                <span class="round-pips" id="p2-pips" aria-label="Player 2 rounds won"></span>
-                <span class="hud-user" id="p2-name">FIGHTER</span>
-                <strong id="p2-label">PLAYER 2</strong>
-              </div>
-              <div class="health-track is-right"><span id="p2-health" class="health-fill"></span><span id="p2-health-chip" class="health-chip"></span></div>
-              <div class="hud-sub is-right">
-                <div class="stamina-track is-right" title="Stamina"><span id="p2-stamina" class="stamina-fill"></span></div>
-                <div class="special-track is-right" title="Special meter"><span id="p2-meter" class="special-fill"></span></div>
-              </div>
-            </div>
-            <div class="hud-icon"><span class="hud-tab">P2</span><img id="p2-icon" class="hud-icon-img" alt=""></div>
-          </div>
-
-          <button id="tk-sound" class="icon-btn" type="button" aria-pressed="false" title="Toggle arcade sound" aria-label="Toggle arcade sound">
-            <span class="sfx-on">🔊</span><span class="sfx-off">🔇</span>
-          </button>
-        </div>
-
         <div class="screen-wrap">
           <canvas id="tk-canvas" width="1280" height="600" aria-label="Troll Kombat fighting game"></canvas>
+
+          <!-- HUD overlay — sits on top of the canvas inside the screen -->
+          <div class="fight-hud" aria-live="off">
+            <div class="hud-fighter is-p1" id="hud-p1">
+              <div class="hud-icon"><span class="hud-tab">P1</span><img id="p1-icon" class="hud-icon-img" alt=""></div>
+              <div class="hud-bars">
+                <div class="hud-meta">
+                  <strong id="p1-label">PLAYER 1</strong>
+                  <span class="hud-user" id="p1-name">FIGHTER</span>
+                  <span class="round-pips" id="p1-pips" aria-label="Player 1 rounds won"></span>
+                </div>
+                <div class="health-track"><span id="p1-health" class="health-fill"></span><span id="p1-health-chip" class="health-chip"></span></div>
+                <div class="hud-sub">
+                  <div class="stamina-track" title="Stamina"><span id="p1-stamina" class="stamina-fill"></span></div>
+                  <div class="special-track" title="Special meter"><span id="p1-meter" class="special-fill"></span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="hud-center">
+              <div class="timer-disc"><strong id="round-timer">60</strong></div>
+              <span id="round-label">Round 1</span>
+              <span id="stage-name" class="stage-name">Troll Hills</span>
+            </div>
+
+            <div class="hud-fighter is-p2" id="hud-p2">
+              <div class="hud-bars">
+                <div class="hud-meta is-right">
+                  <span class="round-pips" id="p2-pips" aria-label="Player 2 rounds won"></span>
+                  <span class="hud-user" id="p2-name">FIGHTER</span>
+                  <strong id="p2-label">PLAYER 2</strong>
+                </div>
+                <div class="health-track is-right"><span id="p2-health" class="health-fill"></span><span id="p2-health-chip" class="health-chip"></span></div>
+                <div class="hud-sub is-right">
+                  <div class="stamina-track is-right" title="Stamina"><span id="p2-stamina" class="stamina-fill"></span></div>
+                  <div class="special-track is-right" title="Special meter"><span id="p2-meter" class="special-fill"></span></div>
+                </div>
+              </div>
+              <div class="hud-icon"><span class="hud-tab">P2</span><img id="p2-icon" class="hud-icon-img" alt=""></div>
+            </div>
+
+            <button id="tk-sound" class="icon-btn" type="button" aria-pressed="false" title="Toggle arcade sound" aria-label="Toggle arcade sound">
+              <span class="sfx-on">🔊</span><span class="sfx-off">🔇</span>
+            </button>
+          </div>
 
           <div id="tk-announce" class="tk-announce" aria-live="assertive"></div>
 
@@ -231,6 +230,6 @@
     </section>
   </main>
 
-  <script src="assets/games/troll-kombat/game.js?v=kombat-v17-hud" defer></script>
+  <script src="assets/games/troll-kombat/game.js?v=kombat-v18-hud-overlay" defer></script>
 </body>
 </html>
