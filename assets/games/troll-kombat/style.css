@@ -36,12 +36,7 @@ h1, h2, h3, p { margin: 0; }
 
 /* ---- CRT + header (shared arcade chrome) ------------------------------- */
 .crt-overlay {
-  position: fixed; inset: 0; z-index: 30; pointer-events: none;
-  background:
-    linear-gradient(rgba(255, 255, 255, 0.035) 50%, rgba(0, 0, 0, 0.08) 50%),
-    linear-gradient(90deg, rgba(255, 49, 79, 0.035), rgba(77, 255, 115, 0.025), rgba(77, 238, 255, 0.035));
-  background-size: 100% 4px, 6px 100%;
-  mix-blend-mode: screen; opacity: 0.5;
+  display: none;
 }
 .site-header {
   position: sticky; top: 0; z-index: 20;

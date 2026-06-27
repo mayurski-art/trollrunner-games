@@ -121,9 +121,7 @@ body[data-game-state="gameover"] .hud {
   content: "";
   position: absolute;
   inset: 0;
-  background:
-    linear-gradient(180deg, rgba(8, 11, 21, 0.62), rgba(8, 11, 21, 0.9)),
-    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 6px);
+  background: linear-gradient(180deg, rgba(8, 11, 21, 0.62), rgba(8, 11, 21, 0.9));
 }
 
 .start-screen {

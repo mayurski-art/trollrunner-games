@@ -200,10 +200,10 @@ body.intro-complete .arcade-intro {
   border: 1px solid rgba(77, 255, 115, 0.34);
   border-radius: 6px;
   background:
-    linear-gradient(rgba(255, 255, 255, 0.035) 50%, rgba(0, 0, 0, 0.09) 50%),
-    radial-gradient(circle at 50% 20%, rgba(77, 255, 115, 0.14), transparent 28%),
-    linear-gradient(180deg, #07000d, #14071b 54%, #030105);
-  background-size: 100% 4px, auto, auto;
+    radial-gradient(ellipse at 20% 80%, rgba(255, 49, 79, 0.18), transparent 42%),
+    radial-gradient(ellipse at 80% 10%, rgba(154, 92, 255, 0.22), transparent 40%),
+    radial-gradient(circle at 50% 20%, rgba(77, 255, 115, 0.16), transparent 30%),
+    linear-gradient(180deg, #0a0012, #160b22 50%, #050009);
 }
 
 .tv-screen::after {
@@ -313,20 +313,20 @@ body.intro-complete .arcade-intro {
 
 .game-select-card {
   position: relative;
-  min-height: 214px;
+  min-height: 260px;
   display: grid;
-  gap: 10px;
+  gap: 8px;
   align-content: end;
   overflow: hidden;
-  padding: 18px;
-  border: 1px solid rgba(77, 255, 115, 0.42);
-  border-radius: 8px;
+  padding: 20px;
+  border: 1px solid rgba(77, 255, 115, 0.55);
+  border-radius: 12px;
   background:
-    radial-gradient(circle at 78% 20%, rgba(77, 238, 255, 0.28), transparent 31%),
-    linear-gradient(135deg, rgba(77, 255, 115, 0.16), rgba(154, 92, 255, 0.12)),
-    rgba(255, 255, 255, 0.06);
-  box-shadow: inset 0 -90px 80px rgba(0, 0, 0, 0.62);
-  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+    radial-gradient(circle at 75% 15%, rgba(77, 238, 255, 0.32), transparent 38%),
+    radial-gradient(circle at 20% 90%, rgba(77, 255, 115, 0.2), transparent 32%),
+    linear-gradient(160deg, rgba(77, 255, 115, 0.14), rgba(154, 92, 255, 0.16) 60%, rgba(255, 49, 79, 0.1));
+  box-shadow: 0 0 0 0 transparent, inset 0 -100px 90px rgba(0, 0, 0, 0.72);
+  transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
 }
 
 .game-select-card::before {
@@ -335,19 +335,20 @@ body.intro-complete .arcade-intro {
   inset: 0;
   background:
     linear-gradient(180deg, rgba(5, 0, 8, 0.04), rgba(5, 0, 8, 0.82)),
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 36px);
+    linear-gradient(180deg, rgba(5, 0, 8, 0.0), rgba(5, 0, 8, 0.0));
   pointer-events: none;
   z-index: 1;
 }
 
 .game-select-card:hover,
 .game-select-card:focus-within {
-  border-color: rgba(77, 255, 115, 0.78);
+  border-color: rgba(77, 255, 115, 0.9);
   box-shadow:
-    0 0 0 2px rgba(77, 238, 255, 0.18),
-    0 16px 34px rgba(0, 0, 0, 0.32),
-    inset 0 -96px 86px rgba(0, 0, 0, 0.66);
-  transform: translateY(-2px);
+    0 0 28px -4px rgba(77, 255, 115, 0.35),
+    0 0 0 1px rgba(77, 238, 255, 0.2),
+    0 18px 40px rgba(0, 0, 0, 0.4),
+    inset 0 -100px 90px rgba(0, 0, 0, 0.74);
+  transform: translateY(-3px);
 }
 
 .game-select-card-kombat {
@@ -441,16 +442,7 @@ body.intro-complete .arcade-intro {
 }
 
 .crt-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 30;
-  pointer-events: none;
-  background:
-    linear-gradient(rgba(255, 255, 255, 0.035) 50%, rgba(0, 0, 0, 0.08) 50%),
-    linear-gradient(90deg, rgba(255, 49, 79, 0.035), rgba(77, 255, 115, 0.025), rgba(77, 238, 255, 0.035));
-  background-size: 100% 4px, 6px 100%;
-  mix-blend-mode: screen;
-  opacity: 0.55;
+  display: none;
 }
 
 .site-header {
