@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;700;900&family=DM+Mono:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/games/troll-kombat/style.css?v=kombat-v6-flow-20260626">
+  <link rel="stylesheet" href="assets/games/troll-kombat/style.css?v=kombat-v11-hud-20260627">
 </head>
 <body data-game-state="select">
   <div class="crt-overlay" aria-hidden="true"></div>
@@ -54,30 +54,44 @@
         </div>
 
         <div class="fight-hud" aria-live="off">
-          <div class="hud-fighter is-p1">
-            <div class="health-track"><span id="p1-health" class="health-fill"></span><span id="p1-health-chip" class="health-chip"></span></div>
-            <div class="stamina-track" title="Stamina"><span id="p1-stamina" class="stamina-fill"></span></div>
-            <div class="hud-meta">
-              <strong id="p1-name">P1</strong>
-              <span class="round-pips" id="p1-pips" aria-label="Player 1 rounds won"></span>
+          <!-- P1 — character-icon box + angled health panel (bar color follows the fighter) -->
+          <div class="hud-fighter is-p1" id="hud-p1">
+            <div class="hud-icon"><span class="hud-tab">P1</span><img id="p1-icon" class="hud-icon-img" alt=""></div>
+            <div class="hud-bars">
+              <div class="hud-meta">
+                <strong id="p1-label">PLAYER 1</strong>
+                <span class="hud-user" id="p1-name">FIGHTER</span>
+                <span class="round-pips" id="p1-pips" aria-label="Player 1 rounds won"></span>
+              </div>
+              <div class="health-track"><span id="p1-health" class="health-fill"></span><span id="p1-health-chip" class="health-chip"></span></div>
+              <div class="hud-sub">
+                <div class="stamina-track" title="Stamina"><span id="p1-stamina" class="stamina-fill"></span></div>
+                <div class="special-track" title="Special meter"><span id="p1-meter" class="special-fill"></span></div>
+              </div>
             </div>
-            <div class="special-track" title="Special meter"><span id="p1-meter" class="special-fill"></span></div>
           </div>
 
           <div class="hud-center">
-            <strong id="round-timer">60</strong>
+            <div class="timer-disc"><strong id="round-timer">60</strong></div>
             <span id="round-label">Round 1</span>
             <span id="stage-name" class="stage-name">Troll Hills</span>
           </div>
 
-          <div class="hud-fighter is-p2">
-            <div class="health-track is-right"><span id="p2-health" class="health-fill"></span><span id="p2-health-chip" class="health-chip"></span></div>
-            <div class="stamina-track is-right" title="Stamina"><span id="p2-stamina" class="stamina-fill"></span></div>
-            <div class="hud-meta is-right">
-              <span class="round-pips" id="p2-pips" aria-label="Player 2 rounds won"></span>
-              <strong id="p2-name">CPU</strong>
+          <!-- P2 — mirrored -->
+          <div class="hud-fighter is-p2" id="hud-p2">
+            <div class="hud-bars">
+              <div class="hud-meta is-right">
+                <span class="round-pips" id="p2-pips" aria-label="Player 2 rounds won"></span>
+                <span class="hud-user" id="p2-name">FIGHTER</span>
+                <strong id="p2-label">PLAYER 2</strong>
+              </div>
+              <div class="health-track is-right"><span id="p2-health" class="health-fill"></span><span id="p2-health-chip" class="health-chip"></span></div>
+              <div class="hud-sub is-right">
+                <div class="stamina-track is-right" title="Stamina"><span id="p2-stamina" class="stamina-fill"></span></div>
+                <div class="special-track is-right" title="Special meter"><span id="p2-meter" class="special-fill"></span></div>
+              </div>
             </div>
-            <div class="special-track is-right" title="Special meter"><span id="p2-meter" class="special-fill"></span></div>
+            <div class="hud-icon"><span class="hud-tab">P2</span><img id="p2-icon" class="hud-icon-img" alt=""></div>
           </div>
 
           <button id="tk-sound" class="icon-btn" type="button" aria-pressed="false" title="Toggle arcade sound" aria-label="Toggle arcade sound">
@@ -91,62 +105,20 @@
           <div id="tk-announce" class="tk-announce" aria-live="assertive"></div>
 
           <!-- ============ PRE-MATCH FLOW ============ -->
-          <!-- 1 · Match type: CPU vs Multiplayer -->
+          <!-- 1 · Match type: CPU vs Multiplayer (approved mockup art + hotspots) -->
           <div id="tk-matchtype" class="game-overlay flow-overlay is-visible">
-            <div class="overlay-card flow-card">
-              <p class="overlay-kicker">Match setup</p>
-              <h2>Choose Match Type</h2>
-              <div class="mt-grid">
-                <button type="button" class="mt-card is-green" data-mode="cpu">
-                  <span class="mt-icon">🤖</span>
-                  <strong>CPU Fight</strong>
-                  <span class="mt-desc">Fight the existing CPU opponent.</span>
-                  <label class="cpu-diff" data-stop>
-                    <span>CPU</span>
-                    <select id="cpu-difficulty" aria-label="CPU difficulty">
-                      <option value="0">Chill</option>
-                      <option value="1" selected>Normal</option>
-                      <option value="2">Sweaty</option>
-                      <option value="3">Unhinged</option>
-                    </select>
-                  </label>
-                </button>
-                <button type="button" class="mt-card is-gold" data-mode="mp">
-                  <span class="mt-icon">🆚</span>
-                  <strong>Multiplayer</strong>
-                  <span class="mt-desc">Local versus. Choose player count next.</span>
-                </button>
-              </div>
-              <p class="flow-note">Supports 2 players now · architecture ready for 3+ later.</p>
+            <div class="mockup-screen" style="background-image:url('assets/games/troll-kombat/ui/screen-matchtype.png?v=kombat-v8')">
+              <button type="button" class="hot" data-act="mt-cpu" style="left:4.5%;top:21%;width:43%;height:62%" aria-label="CPU Fight"></button>
+              <button type="button" class="hot" data-act="mt-mp" style="left:52.5%;top:21%;width:43%;height:62%" aria-label="Multiplayer"></button>
             </div>
           </div>
 
-          <!-- 2 · Player count (multiplayer only) -->
+          <!-- 2 · Player count (mockup art + hotspots; 2 active, 4 future) -->
           <div id="tk-playercount" class="game-overlay flow-overlay">
-            <div class="overlay-card flow-card">
-              <p class="overlay-kicker">Local multiplayer setup</p>
-              <h2>Select Number of Players</h2>
-              <div class="pc-grid">
-                <button type="button" class="pc-card" data-count="2">
-                  <strong>2 Players</strong>
-                  <span class="pc-slots"><i></i><i></i></span>
-                  <span class="pc-state">Ready</span>
-                </button>
-                <button type="button" class="pc-card is-locked" data-count="3" disabled>
-                  <strong>3 Players</strong>
-                  <span class="pc-slots"><i></i><i></i><i></i></span>
-                  <span class="pc-state">Expansion ready</span>
-                </button>
-                <button type="button" class="pc-card is-locked" data-count="4" disabled>
-                  <strong>4 Players</strong>
-                  <span class="pc-slots"><i></i><i></i><i></i><i></i></span>
-                  <span class="pc-state">Future ready</span>
-                </button>
-              </div>
-              <div class="flow-actions">
-                <button type="button" class="secondary-btn" data-flow-back="matchtype">← Back</button>
-                <button type="button" class="primary-btn" id="pc-continue">Continue →</button>
-              </div>
+            <div class="mockup-screen" style="background-image:url('assets/games/troll-kombat/ui/screen-playercount.png?v=kombat-v7')">
+              <button type="button" class="hot" data-act="pc-2" style="left:5%;top:16%;width:31%;height:58%" aria-label="2 Players"></button>
+              <button type="button" class="hot" data-act="pc-confirm" style="left:84%;top:91%;width:15%;height:8%" aria-label="Confirm"></button>
+              <button type="button" class="hot" data-act="back-matchtype" style="left:0.5%;top:91%;width:13%;height:8%" aria-label="Back"></button>
             </div>
           </div>
 
@@ -181,30 +153,32 @@
             </div>
           </div>
 
-          <!-- 4 · Stage select + random-map toggle -->
+          <!-- 4 · Stage select (mockup art + live hero preview overlay) -->
           <div id="tk-stage" class="game-overlay flow-overlay">
-            <div class="overlay-card flow-card is-wide">
-              <p class="overlay-kicker">Select the map for this brawl</p>
-              <h2>Choose Your Stage</h2>
-              <div class="stage-hero">
-                <span class="stage-hero-img" id="stage-hero-img"></span>
-                <div class="stage-hero-meta">
-                  <strong id="stage-hero-name">Troll Hills</strong>
-                  <span id="stage-hero-desc">Peaceful hills watched over by ancient memes.</span>
+            <div class="mockup-screen" style="background-image:url('assets/games/troll-kombat/ui/screen-stage.png?v=kombat-v8')">
+              <!-- live preview covering the baked panorama + name strip -->
+              <div class="stage-live">
+                <img id="stage-hero-live" alt="Selected stage preview">
+                <div class="stage-live-cap">
+                  <strong id="stage-name-live">Troll Hills</strong>
+                  <span id="stage-desc-live">Peaceful hills watched over by ancient memes.</span>
                 </div>
               </div>
-              <div class="stage-row" id="stage-row" role="listbox" aria-label="Stage select"></div>
-              <div class="stage-foot">
-                <label class="rand-toggle">
-                  <input type="checkbox" id="stage-random">
-                  <span class="rand-pill"><i></i></span>
-                  <span>Random map switching</span>
-                </label>
-                <div class="flow-actions">
-                  <button type="button" class="secondary-btn" id="stage-back">← Back</button>
-                  <button type="button" class="primary-btn pulse-btn" id="tk-fight">▶ Fight</button>
-                </div>
+              <!-- 6 thumbnail hotspots over the baked thumbnails -->
+              <button type="button" class="stage-thumb is-sel" data-stage="0" style="left:5%;top:61%;width:14.6%;height:25%" aria-label="Troll Hills"></button>
+              <button type="button" class="stage-thumb" data-stage="1" style="left:20.7%;top:61%;width:14.6%;height:25%" aria-label="Floating Market"></button>
+              <button type="button" class="stage-thumb" data-stage="2" style="left:36.4%;top:61%;width:14.6%;height:25%" aria-label="Lakeside Town"></button>
+              <button type="button" class="stage-thumb" data-stage="3" style="left:52.1%;top:61%;width:14.6%;height:25%" aria-label="Meme Palace"></button>
+              <button type="button" class="stage-thumb" data-stage="4" style="left:67.8%;top:61%;width:14.6%;height:25%" aria-label="Sunset Ruins"></button>
+              <button type="button" class="stage-thumb" data-stage="5" style="left:83.5%;top:61%;width:14.6%;height:25%" aria-label="Cyber Rain City"></button>
+              <!-- random map toggle over the baked OFF/ON pills -->
+              <div class="stage-rand">
+                <button type="button" class="rand-opt is-active" data-rand="off">OFF</button>
+                <button type="button" class="rand-opt" data-rand="on">ON</button>
               </div>
+              <!-- back + fight (no painted equivalents — visible neon buttons) -->
+              <button type="button" class="stage-btn is-back" data-act="stage-back">← Back</button>
+              <button type="button" class="stage-btn is-fight" data-act="stage-fight">▶ Fight</button>
             </div>
           </div>
 
@@ -257,6 +231,6 @@
     </section>
   </main>
 
-  <script src="assets/games/troll-kombat/game.js?v=kombat-v12-flow" defer></script>
+  <script src="assets/games/troll-kombat/game.js?v=kombat-v17-hud" defer></script>
 </body>
 </html>

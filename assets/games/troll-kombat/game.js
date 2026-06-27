@@ -105,13 +105,14 @@
      ========================================================================== */
   const ROSTER = [
     {
-      id: "pepe", name: "PEPE SAMURAI", tag: "Feels good, man",
+      id: "pepe", name: "PEPE SAMURAI", tag: "Feels good, man", bar: "#3dff5e",
       blurb: "Tall samurai Pepe in a kabuto helmet with a cope katana. Cuts you down, then mints your loss as a red candle.",
       special: { name: "KATANA COPE SLASH", kind: "orb", cost: 100, color: "#9dff52", text: "" },
       pal: { base: "#5fae33", dark: "#2f6e1f", light: "#9fe05f", ink: "#10250a", face: "#5fae33", accent: "#9dff52", accent2: "#ff5dab" },
       drawHead: drawPepeHead,   // portrait/pre-load fallback only
       moves: { punch: "Cope Jab", kick: "Green Candle Kick", block: "Diamond Hands Guard", special: "Katana Cope Slash", finisher: "Feels Bad, Man" },
       portraitSrc: "pepe-rig/portrait.png",
+      splashSrc: "pepe-samurai-splash.png",   // glossy ChatGPT render for select screens
       // PixelLab pixel rig — east-facing animation strips, mirrored by facing.
       anims: {
         dir: "pepe-rig/anims/", cell: 92, scale: 3.6, footFrac: 0.978,
@@ -129,11 +130,12 @@
       },
     },
     {
-      id: "doge", name: "DOGE DRIP", tag: "Very fight. Much wow.",
+      id: "doge", name: "DOGE DRIP", tag: "Very fight. Much wow.", bar: "#ffcf33",
       blurb: "Tall Doge in a pink mink coat, black cap and square shades. Slides in, deal-with-it, pelts you with 1000x coins.",
       special: { name: "DEAL-WITH-IT DASH", kind: "barrage", cost: 100, color: "#ffd84d", text: "$" },
       pal: { base: "#e3ad4f", dark: "#a9762a", light: "#f7d98a", ink: "#3a2406", face: "#e8b85a", accent: "#ff6fd0", accent2: "#ffd84d" },
       drawHead: drawDogeHead,
+      splashSrc: "doge-drip-splash.png",   // glossy ChatGPT render for select screens
       moves: { punch: "Much Punch", kick: "Such Kick", block: "Mink Coat Guard", special: "Deal-With-It Dash", finisher: "Very Rekt. Much Wow." },
       // 4x2 grid sheet.
       sheet: {
@@ -147,12 +149,13 @@
       },
     },
     {
-      id: "gladiator", name: "GLADIATOR", tag: "Spartan, problem?",
+      id: "gladiator", name: "GLADIATOR", tag: "Spartan, problem?", bar: "#dfe6ef",
       blurb: "A swole troll in a Spartan cape. Lobs his spear with a smug grin, then finishes the job bare-fisted just to rub it in.",
       special: { name: "TROLL SPEAR", kind: "spear", cost: 100, color: "#c9ced6", text: "", fireProgress: 0.78 },
       pal: { base: "#e9e9ee", dark: "#9aa0ad", light: "#ffffff", ink: "#15151c", face: "#f2f2f5", accent: "#d23b3b", accent2: "#c8962a" },
       drawHead: drawTrollHead,   // fallback only — used until the anim strips finish loading
       portraitSrc: "gladiator/portrait.png",
+      splashSrc: "troll-splash.png",   // glossy ChatGPT render for select screens
       // Frame-based PixelLab animation set (east-facing; mirrored by facing).
       anims: {
         dir: "gladiator/anims/", cell: 136, scale: 2.5, footFrac: 0.99,
@@ -594,9 +597,12 @@
       if (this.blinkT <= 0) { this.blink = 0.12; this.blinkT = rand(1.6, 4.5); }
       this.blink = Math.max(0, this.blink - dt);
 
-      // face the opponent when neutral
-      if (this.canAct() && phase === "fight" && this.grounded) {
-        this.facing = opp.x < this.x ? -1 : 1;
+      // Facing: while actively walking, turn the body to your movement direction
+      // (so you can spin around without having to jump across the opponent);
+      // when idle, default to facing the opponent. Works for every fighter.
+      if (this.canAct() && phase === "fight") {
+        const moveDir = (intent.right ? 1 : 0) - (intent.left ? 1 : 0);
+        this.facing = moveDir !== 0 ? moveDir : (opp.x < this.x ? -1 : 1);
       }
 
       if (this.state === "ko") { this.updateKO(dt); this.physics(dt); return; }
@@ -1389,6 +1395,9 @@
      ========================================================================== */
   const els = {
     p1name: document.getElementById("p1-name"), p2name: document.getElementById("p2-name"),
+    p1label: document.getElementById("p1-label"), p2label: document.getElementById("p2-label"),
+    p1icon: document.getElementById("p1-icon"), p2icon: document.getElementById("p2-icon"),
+    p1panel: document.getElementById("hud-p1"), p2panel: document.getElementById("hud-p2"),
     p1hp: document.getElementById("p1-health"), p2hp: document.getElementById("p2-health"),
     p1chip: document.getElementById("p1-health-chip"), p2chip: document.getElementById("p2-health-chip"),
     p1pips: document.getElementById("p1-pips"), p2pips: document.getElementById("p2-pips"),
@@ -1429,8 +1438,8 @@
       });
       this.round = 1;
       this.firstRound = true;   // round 1 gets the 3·2·1 countdown
-      els.p1name.textContent = defs[0].name;
-      els.p2name.textContent = defs[1].name;
+      setHudFighter(0, defs[0], controllers[0]);
+      setHudFighter(1, defs[1], controllers[1]);
       this.startRound();
     },
     startRound() {
@@ -1571,6 +1580,20 @@
   /* ==========================================================================
      HUD
      ========================================================================== */
+  // Paint a fighter's HUD slot at match start: bar colour follows the fighter
+  // (Pepe green / Doge gold / Troll silver), icon = its glossy splash render,
+  // top label = PLAYER n (or CPU for an AI slot), sub label = the fighter name.
+  function setHudFighter(i, def, ctrl) {
+    const panel = i === 0 ? els.p1panel : els.p2panel;
+    const icon = i === 0 ? els.p1icon : els.p2icon;
+    const label = i === 0 ? els.p1label : els.p2label;
+    const nameEl = i === 0 ? els.p1name : els.p2name;
+    if (panel) panel.style.setProperty("--bar", def.bar || def.pal.accent);
+    if (icon) { icon.src = SHEET_DIR + (def.splashSrc || def.portraitSrc); icon.alt = def.name; }
+    if (label) label.textContent = ctrl && ctrl.type === "ai" ? "CPU" : "PLAYER " + (i + 1);
+    if (nameEl) nameEl.textContent = def.name;
+  }
+
   function updateHUD() {
     const [p1, p2] = match.fighters;
     if (!p1) return;
@@ -1726,6 +1749,18 @@
     return c;
   }
 
+  // Glossy splash render (ChatGPT art) used on the pre-match SELECT screens only
+  // — deliberately fancier than the in-game pixel sprite. Falls back to the
+  // pixel portrait if a fighter has no splash yet.
+  function splashEl(def, cls) {
+    if (!def.splashSrc) return portraitEl(def, cls === "is-thumb" ? 72 : 130);
+    const im = document.createElement("img");
+    im.src = SHEET_DIR + def.splashSrc;
+    im.alt = def.name;
+    im.className = "fighter-splash" + (cls ? " " + cls : "");
+    return im;
+  }
+
   // Thumbnail: sheet art / sprite / procedural head, whichever the fighter has.
   function portraitEl(def, size) {
     if (def.sheet) return makeSheetPortrait(def, size);
@@ -1775,28 +1810,30 @@
   };
   const blip = (f, to) => { audio.ensure(); audio.blip(f, 0.08, "square", 0.08, to); };
 
-  /* --- 1 · MATCH TYPE ------------------------------------------------------- */
-  document.querySelectorAll("#tk-matchtype .mt-card").forEach(card => {
-    card.addEventListener("click", e => {
-      if (e.target.closest("[data-stop]")) return;   // ignore clicks on the CPU dropdown
-      setup.mode = card.dataset.mode;
-      setup.diff = parseInt(diffSel.value, 10);
+  /* --- 1 & 2 · MATCH TYPE + PLAYER COUNT (mockup screens w/ click hotspots) --
+     These two screens use the approved ChatGPT mockup art as a full-bleed
+     background; transparent `.hot` buttons sit over the painted controls and
+     dispatch on data-act. CPU difficulty defaults to Normal (the mockup has no
+     selector) — `diffSel` is read when present. */
+  document.querySelectorAll(".flow-overlay .hot").forEach(hot => {
+    hot.addEventListener("click", () => {
+      const act = hot.dataset.act;
       blip(660, 880);
-      if (setup.mode === "mp") { setup.playerCount = 2; flow.go("playercount"); }
-      else { setup.playerCount = 1; enterFighterSelect(); }
+      switch (act) {
+        case "mt-cpu":
+          setup.mode = "cpu"; setup.playerCount = 1;
+          setup.diff = diffSel ? parseInt(diffSel.value, 10) : 1;
+          enterFighterSelect(); break;
+        case "mt-mp":
+          setup.mode = "mp"; setup.playerCount = 2; flow.go("playercount"); break;
+        case "pc-2":
+        case "pc-confirm":
+          setup.playerCount = 2; enterFighterSelect(); break;
+        case "back-matchtype":
+          flow.go("matchtype"); break;
+      }
     });
   });
-
-  /* --- 2 · PLAYER COUNT (multiplayer) --------------------------------------- */
-  document.querySelectorAll("#tk-playercount .pc-card:not(.is-locked)").forEach(card => {
-    card.addEventListener("click", () => {
-      setup.playerCount = parseInt(card.dataset.count, 10);
-      document.querySelectorAll("#tk-playercount .pc-card").forEach(c => c.classList.toggle("is-active", c === card));
-      blip(660, 880);
-    });
-  });
-  document.querySelector("#tk-playercount .pc-card[data-count='2']").classList.add("is-active");
-  document.getElementById("pc-continue").addEventListener("click", () => enterFighterSelect());
 
   /* --- 3 · FIGHTER SELECT (synced locking in multiplayer) ------------------- */
   const fselGrid = document.getElementById("fsel-grid");
@@ -1805,7 +1842,7 @@
     cell.type = "button"; cell.className = "fsel-cell"; cell.dataset.id = def.id;
     cell.setAttribute("role", "option");
     cell.style.setProperty("--accent", def.pal.accent);
-    cell.appendChild(portraitEl(def, 72));
+    cell.appendChild(splashEl(def, "is-thumb"));
     const nm = document.createElement("span"); nm.className = "fsel-cell-name";
     nm.textContent = def.name.split(" ")[0]; cell.appendChild(nm);
     cell.addEventListener("click", () => pickFighter(def.id));
@@ -1862,7 +1899,7 @@
     panel.classList.toggle("is-current", setup.current === slot);
     const art = panel.querySelector(".fsel-portrait");
     art.innerHTML = "";
-    if (def) art.appendChild(portraitEl(def, 130));
+    if (def) art.appendChild(splashEl(def));
     panel.querySelector("strong").textContent = def ? def.name : "—";
     panel.querySelector(".fsel-status").textContent =
       def ? "Locked in ✓" : (setup.current === slot ? "Selecting…" : "Waiting…");
@@ -1874,42 +1911,45 @@
   });
   document.getElementById("fsel-continue").addEventListener("click", () => enterStageSelect());
 
-  /* --- 4 · STAGE SELECT + random-map toggle --------------------------------- */
-  const stageRow = document.getElementById("stage-row");
-  const stageHeroImg = document.getElementById("stage-hero-img");
-  const stageHeroName = document.getElementById("stage-hero-name");
-  const stageHeroDesc = document.getElementById("stage-hero-desc");
+  /* --- 4 · STAGE SELECT (mockup art + live hero preview overlay) ------------ */
+  const stageHeroLive = document.getElementById("stage-hero-live");
+  const stageNameLive = document.getElementById("stage-name-live");
+  const stageDescLive = document.getElementById("stage-desc-live");
   function showStageHero(s) {
-    stageHeroImg.style.backgroundImage = `url('${STAGE_DIR + s.img}')`;
-    stageHeroName.textContent = s.name;
-    stageHeroDesc.textContent = s.desc || "";
-    stageHeroName.style.color = s.accent;
+    stageHeroLive.src = STAGE_DIR + s.img;
+    stageHeroLive.alt = s.name;
+    stageNameLive.textContent = s.name;
+    stageDescLive.textContent = s.desc || "";
+    stageNameLive.style.color = s.accent;
   }
-  STAGES.forEach((s, i) => {
-    const tile = document.createElement("button");
-    tile.type = "button"; tile.className = "stage-tile" + (i === 0 ? " is-active" : "");
-    tile.dataset.id = s.id; tile.setAttribute("role", "option"); tile.setAttribute("aria-label", s.name);
-    tile.style.setProperty("--accent", s.accent);
-    tile.innerHTML =
-      `<span style="background-image:url('${STAGE_DIR + s.img}')"></span><small>${s.name}</small>`;
-    tile.addEventListener("mouseenter", () => { loadStageImage(s); showStageHero(s); });
-    tile.addEventListener("click", () => {
-      setup.stage = s; loadStageImage(s); showStageHero(s);
-      document.querySelectorAll(".stage-tile").forEach(c => c.classList.toggle("is-active", c.dataset.id === s.id));
-      blip(680, 880);
+  function markSelectedThumb(s) {
+    document.querySelectorAll("#tk-stage .stage-thumb").forEach(t =>
+      t.classList.toggle("is-sel", STAGES[+t.dataset.stage] === s));
+  }
+  document.querySelectorAll("#tk-stage .stage-thumb").forEach(thumb => {
+    const s = STAGES[+thumb.dataset.stage];
+    if (!s) return;
+    thumb.addEventListener("mouseenter", () => { loadStageImage(s); showStageHero(s); });
+    thumb.addEventListener("mouseleave", () => showStageHero(setup.stage));
+    thumb.addEventListener("click", () => {
+      setup.stage = s; loadStageImage(s); showStageHero(s); markSelectedThumb(s); blip(680, 880);
     });
-    stageRow.appendChild(tile);
   });
-  document.getElementById("stage-random").addEventListener("change", e => {
-    setup.randomStage = e.target.checked;
-  });
+  // random-map toggle (two pills over the baked OFF/ON)
+  function setRandom(on) {
+    setup.randomStage = on;
+    document.querySelectorAll("#tk-stage .rand-opt").forEach(o =>
+      o.classList.toggle("is-active", (o.dataset.rand === "on") === on));
+  }
+  document.querySelectorAll("#tk-stage .rand-opt").forEach(o =>
+    o.addEventListener("click", () => { setRandom(o.dataset.rand === "on"); blip(520, 640); }));
   function enterStageSelect() {
     showStageHero(setup.stage);
-    document.querySelectorAll(".stage-tile").forEach(c => c.classList.toggle("is-active", c.dataset.id === setup.stage.id));
+    markSelectedThumb(setup.stage);
     flow.go("stage");
   }
-  document.getElementById("stage-back").addEventListener("click", () => enterFighterSelect());
-  document.getElementById("tk-fight").addEventListener("click", e => { e.currentTarget.blur(); startMatch(); });
+  document.querySelector("#tk-stage [data-act='stage-back']").addEventListener("click", () => enterFighterSelect());
+  document.querySelector("#tk-stage [data-act='stage-fight']").addEventListener("click", e => { e.currentTarget.blur(); startMatch(); });
 
   /* --- launch: build fighter defs + controllers, then start the match ------- */
   function buildDefs() {
