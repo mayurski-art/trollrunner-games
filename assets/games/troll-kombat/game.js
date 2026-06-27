@@ -2022,8 +2022,13 @@
     const def = id ? byId(id) : null;
     panel.classList.toggle("is-current", setup.current === slot);
     panel.classList.toggle("is-picked", !!def);
-    // bar colour follows the fighter
-    if (def) panel.style.setProperty("--bar", def.bar || def.pal.accent);
+    // bar colour follows the fighter; --bar-rgb powers the paint-splash glow
+    if (def) {
+      const hex = (def.bar || def.pal.accent).replace("#","");
+      const r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
+      panel.style.setProperty("--bar", def.bar || def.pal.accent);
+      panel.style.setProperty("--bar-rgb", `${r},${g},${b}`);
+    }
     const art = panel.querySelector(".fsel-portrait");
     art.innerHTML = "";
     if (def) art.appendChild(splashEl(def));

@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;700;900&family=DM+Mono:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/games/troll-kombat/style.css?v=kombat-v15-fighter-select">
+  <link rel="stylesheet" href="assets/games/troll-kombat/style.css?v=kombat-v16-fsel-mockup">
 </head>
 <body data-game-state="select">
   <div class="crt-overlay" aria-hidden="true"></div>
@@ -147,16 +147,25 @@
             </div>
           </div>
 
-          <!-- 3 · Fighter select — mockup bg + live overlaid panels -->
-          <div id="tk-fighter" class="game-overlay flow-overlay">
-            <div class="mockup-screen" style="background-image:url('assets/games/troll-kombat/ui/screen-fighter.png?v=kombat-v15')">
+          <!-- 3 · Fighter select — exact match to ChatGPT mockup -->
+          <div id="tk-fighter" class="game-overlay fsel-screen">
+            <span class="fsel-corner tl" aria-hidden="true"></span>
+            <span class="fsel-corner tr" aria-hidden="true"></span>
+            <span class="fsel-corner bl" aria-hidden="true"></span>
+            <span class="fsel-corner br" aria-hidden="true"></span>
 
-              <!-- hidden kicker read by JS to update subtitle text -->
-              <span id="fsel-kicker" style="display:none">Select your fighter</span>
+            <header class="fsel-header">
+              <div class="fsel-title-row">
+                <span class="fsel-lightning" aria-hidden="true">⚡</span>
+                <h2 class="fsel-title">Choose Your Fighter</h2>
+                <span class="fsel-lightning" aria-hidden="true">⚡</span>
+              </div>
+              <p class="fsel-subtitle" id="fsel-kicker">Select Your Fighter</p>
+            </header>
 
-              <!-- P1 live panel (covers left painted area) -->
-              <div class="fsel-panel is-p1" id="fsel-p1" style="left:1.5%;top:5.5%;width:25%;height:87%">
-                <span class="fsel-pill">P1</span>
+            <div class="fsel-main">
+              <div class="fsel-panel is-p1" id="fsel-p1">
+                <span class="fsel-slot-badge">P1</span>
                 <div class="fsel-portrait" id="fsel-p1-art"></div>
                 <div class="fsel-panel-foot">
                   <strong id="fsel-p1-name">—</strong>
@@ -165,30 +174,36 @@
                 </div>
               </div>
 
-              <!-- Center roster grid -->
-              <div class="fsel-center" style="left:33%;top:49%;width:34%;height:42%">
+              <div class="fsel-center">
+                <p class="fsel-roster-label">◆ Select Your Fighter ◆</p>
                 <div class="fsel-grid" id="fsel-grid" role="listbox" aria-label="Fighter roster"></div>
-                <p class="fsel-hint" id="fsel-hint">Pick your fighter</p>
               </div>
 
-              <!-- P2 live panel (covers right painted area) -->
-              <div class="fsel-panel is-p2" id="fsel-p2" style="right:1.5%;top:5.5%;width:25%;height:87%" hidden>
-                <span class="fsel-pill">P2</span>
+              <div class="fsel-panel is-p2" id="fsel-p2" hidden>
+                <span class="fsel-slot-badge">P2</span>
                 <div class="fsel-portrait" id="fsel-p2-art"></div>
                 <div class="fsel-panel-foot">
                   <strong id="fsel-p2-name">—</strong>
+                  <span class="fsel-tag"></span>
                   <span class="fsel-status" id="fsel-p2-status">Waiting…</span>
                 </div>
               </div>
-
-              <!-- Bottom action bar -->
-              <div class="fsel-bar">
-                <button type="button" class="fsel-bar-btn" id="fsel-back">← Back</button>
-                <button type="button" class="fsel-bar-btn" id="fsel-reset">↺ Reset</button>
-                <button type="button" class="fsel-bar-btn is-primary" id="fsel-continue" disabled>Choose Stage →</button>
-              </div>
-
             </div>
+
+            <footer class="fsel-footer">
+              <div class="fsel-foot-left">
+                <button type="button" class="fsel-foot-btn" id="fsel-back">← Back</button>
+                <span class="fsel-foot-player is-p1" id="fsel-foot-p1">P1 Selecting… 🎮</span>
+              </div>
+              <div class="fsel-foot-mid">
+                <button type="button" class="fsel-foot-nav" id="fsel-reset">↺</button>
+                <span class="fsel-foot-tip" id="fsel-hint">Punch → Kick → Special for big damage</span>
+                <button type="button" class="fsel-foot-nav is-active" id="fsel-continue" disabled>→</button>
+              </div>
+              <div class="fsel-foot-right">
+                <span class="fsel-foot-player is-p2" id="fsel-foot-p2">P2 Selecting… 🎮</span>
+              </div>
+            </footer>
           </div>
 
           <!-- 4 · Stage select (mockup art + live hero preview overlay) -->
@@ -269,6 +284,6 @@
     </section>
   </main>
 
-  <script src="assets/games/troll-kombat/game.js?v=kombat-v20-fighter-select" defer></script>
+  <script src="assets/games/troll-kombat/game.js?v=kombat-v21-fsel-mockup" defer></script>
 </body>
 </html>
