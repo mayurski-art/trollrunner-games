@@ -123,6 +123,7 @@
           jump:    { frames: 9, fps: 13, loop: false },
           special: { frames: 7, fps: 14, loop: false },
           hit:     { frames: 6, fps: 16, loop: false },
+          ko:      { frames: 7, fps: 10, loop: false },
         },
       },
     },
