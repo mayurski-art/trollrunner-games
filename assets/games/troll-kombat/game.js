@@ -2021,12 +2021,19 @@
     const id = setup.picks[slot];
     const def = id ? byId(id) : null;
     panel.classList.toggle("is-current", setup.current === slot);
+    panel.classList.toggle("is-picked", !!def);
+    // bar colour follows the fighter
+    if (def) panel.style.setProperty("--bar", def.bar || def.pal.accent);
     const art = panel.querySelector(".fsel-portrait");
     art.innerHTML = "";
     if (def) art.appendChild(splashEl(def));
-    panel.querySelector("strong").textContent = def ? def.name : "—";
-    panel.querySelector(".fsel-status").textContent =
-      def ? "Locked in ✓" : (setup.current === slot ? "Selecting…" : "Waiting…");
+    const nameEl = panel.querySelector("strong");
+    if (nameEl) nameEl.textContent = def ? def.name : "—";
+    const tagEl = panel.querySelector(".fsel-tag");
+    if (tagEl) tagEl.textContent = def ? (def.tag || "") : "";
+    const statusEl = panel.querySelector(".fsel-status");
+    if (statusEl) statusEl.textContent =
+      def ? "✓  Selected" : (setup.current === slot ? "Selecting…" : "Waiting…");
   }
   document.getElementById("fsel-back").addEventListener("click", () =>
     flow.go(setup.mode === "mp" ? "playercount" : "matchtype"));
