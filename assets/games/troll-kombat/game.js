@@ -1345,47 +1345,168 @@
   }
 
   /* ==========================================================================
-     AI  —  light FSM opponent. Difficulty 0 chill / 1 normal / 2 sweaty.
+     AI  —  three-tier difficulty FSM.
+     0 = Easy   slow, predictable, rarely blocks, forgets to use special
+     1 = Medium  balanced, blocks sometimes, mixes attacks, uses specials
+     2 = Hard   fast, combos, smart spacing, blocks nearly everything
      ========================================================================== */
+
+  // Per-difficulty profile table. All behaviour is derived from these numbers
+  // so adding a 4th difficulty or tuning values is a one-line change.
+  const AI_PROFILES = [
+    // 0 · Easy ---------------------------------------------------------------
+    {
+      react: 0.55,        // seconds between decisions (slow = feels drunk)
+      reactSpread: 0.7,   // + rand(0..spread) added to react window
+      blockChance: 0.15,  // chance to block when opponent is attacking
+      kickRatio: 0.18,    // fraction of attacks that are kicks (rest = punch)
+      specialChance: 0.08,// chance to use special when meter is full
+      retreatBlock: 0.05, // chance to hold block while retreating
+      comboDelay: 0.55,   // seconds before re-attacking after a hit lands
+      jumpChance: 0.04,   // chance per decision to jump (often ill-timed)
+      approachDist: 200,  // switches from approach to attack at this dist
+      retreatDist: 50,    // retreats if closer than this (gets overcrowded)
+      smartRetreat: false,// retreats to build meter for special
+    },
+    // 1 · Medium -------------------------------------------------------------
+    {
+      react: 0.26,
+      reactSpread: 0.4,
+      blockChance: 0.55,
+      kickRatio: 0.45,
+      specialChance: 0.38,
+      retreatBlock: 0.35,
+      comboDelay: 0.28,
+      jumpChance: 0.10,
+      approachDist: 170,
+      retreatDist: 60,
+      smartRetreat: false,
+    },
+    // 2 · Hard ---------------------------------------------------------------
+    {
+      react: 0.08,
+      reactSpread: 0.14,
+      blockChance: 0.88,
+      kickRatio: 0.50,
+      specialChance: 0.62,
+      retreatBlock: 0.72,
+      comboDelay: 0.12,
+      jumpChance: 0.08,
+      approachDist: 155,
+      retreatDist: 65,
+      smartRetreat: true, // retreats to charge meter when low, then punishes
+    },
+  ];
+
   class AI {
-    constructor(diff) { this.diff = diff; this.t = 0; this.decideIn = 0; this.plan = "approach"; }
+    constructor(diff) {
+      this.p = AI_PROFILES[Math.min(diff, AI_PROFILES.length - 1)];
+      this.t = 0;
+      this.decideIn = 0;
+      this.plan = "approach";
+      this.justHit = false;    // true for one frame after we landed an attack
+      this.comboTimer = 0;     // cooldown after landing a hit
+    }
+
     think(self, opp, dt) {
-      const intent = { left: false, right: false, up: false, crouch: false, block: false, punch: false, kick: false, special: false };
+      const intent = { left: false, right: false, up: false, crouch: false, block: false, punch: false, kick: false, special: false, dash: false };
       if (self.state === "ko" || self.state === "win" || !self.canAct()) return intent;
-      this.t += dt; this.decideIn -= dt;
+
+      const p = this.p;
+      this.t += dt;
+      this.decideIn -= dt;
+      this.comboTimer = Math.max(0, this.comboTimer - dt);
+
       const dist = Math.abs(opp.x - self.x);
-      const dir = opp.x < self.x ? -1 : 1;
-      const aggr = [0.55, 0.8, 1.0, 1.3][this.diff] ?? 1.0;     // 3 = Unhinged
-      const react = [0.42, 0.26, 0.13, 0.06][this.diff] ?? 0.2;
+      const dir = opp.x < self.x ? -1 : 1;   // +1 = opp is to our right
 
-      // block incoming melee / projectiles
-      const oppAttacking = opp.state === "attack" && opp.attack && opp.attack.t < opp.attack.def.startup + opp.attack.def.active;
-      const projNear = projectiles.some(p => p.owner === opp && Math.abs(p.x - self.x) < 150 && Math.sign(p.vx) === dir * -1);
-      if ((oppAttacking && dist < 150) || projNear) {
-        if (Math.random() < aggr) { intent.block = true; return intent; }
+      // --- Reactive blocking: check BEFORE plan logic so it overrides --------
+      const oppAttacking = opp.state === "attack" && opp.attack &&
+        opp.attack.t < (opp.attack.def.startup + opp.attack.def.active);
+      const projNear = projectiles.some(q =>
+        q.owner === opp && Math.abs(q.x - self.x) < 180 && Math.sign(q.vx) === -dir);
+
+      if ((oppAttacking && dist < 160) || projNear) {
+        if (Math.random() < p.blockChance) {
+          intent.block = true;
+          // Hard: also step back while blocking for safety
+          if (p.smartRetreat && Math.random() < 0.5) {
+            dir > 0 ? intent.left = true : intent.right = true;
+          }
+          return intent;
+        }
       }
 
+      // --- Decide new plan when timer expires --------------------------------
       if (this.decideIn <= 0) {
-        this.decideIn = rand(react, react + 0.5);
+        this.decideIn = p.react + Math.random() * p.reactSpread;
         const r = Math.random();
-        if (self.meter >= self.def.special.cost && dist > 220 && r < 0.5 * aggr) this.plan = "special";
-        else if (dist > 150) this.plan = r < 0.2 ? "jump" : "approach";
-        else if (dist > 70) this.plan = r < 0.6 * aggr ? "attack" : "approach";
-        else this.plan = r < 0.5 ? "retreat" : "attack";
+
+        // Smart retreat: low on HP + meter ready → retreat until ready then punish
+        if (p.smartRetreat && self.hp < 40 && self.meter >= self.def.special.cost) {
+          this.plan = dist > 200 ? "special" : "retreat";
+        }
+        // Special: meter full and opponent in good range
+        else if (self.meter >= self.def.special.cost && dist > 140 && dist < 380 && r < p.specialChance) {
+          this.plan = "special";
+        }
+        // Far: approach or occasionally jump-in
+        else if (dist > p.approachDist) {
+          this.plan = r < p.jumpChance ? "jump" : "approach";
+        }
+        // Mid range: attack or approach
+        else if (dist > p.retreatDist) {
+          this.plan = r < 0.65 ? "attack" : "approach";
+        }
+        // Too close: retreat a little or keep attacking
+        else {
+          this.plan = r < 0.45 ? "retreat" : "attack";
+        }
       }
 
+      // --- Execute plan ------------------------------------------------------
       switch (this.plan) {
-        case "approach": dir > 0 ? intent.right = true : intent.left = true; break;
-        case "retreat": dir > 0 ? intent.left = true : intent.right = true; intent.block = Math.random() < 0.3; break;
-        case "jump": intent.up = true; dir > 0 ? intent.right = true : intent.left = true; this.plan = "approach"; break;
-        case "special": intent.special = true; this.plan = "approach"; this.decideIn = 0.6; break;
+        case "approach":
+          dir > 0 ? intent.right = true : intent.left = true;
+          break;
+
+        case "retreat":
+          dir > 0 ? intent.left = true : intent.right = true;
+          intent.block = Math.random() < p.retreatBlock;
+          break;
+
+        case "jump":
+          intent.up = true;
+          dir > 0 ? intent.right = true : intent.left = true;
+          this.plan = "approach";
+          break;
+
+        case "special":
+          if (dist < 300) {
+            intent.special = true;
+            this.plan = "approach";
+            this.decideIn = 0.5;
+          } else {
+            // Close the gap first
+            dir > 0 ? intent.right = true : intent.left = true;
+          }
+          break;
+
         case "attack":
-          if (dist < 130) {
-            if (Math.random() < 0.4) intent.kick = true; else intent.punch = true;
-            this.plan = "approach"; this.decideIn = rand(0.2, 0.5);
-          } else { dir > 0 ? intent.right = true : intent.left = true; }
+          if (dist < p.approachDist + 20) {
+            // Attack mix based on difficulty: harder = more kicks
+            if (Math.random() < p.kickRatio) intent.kick = true;
+            else intent.punch = true;
+            // After landing a hit, Hard combos quickly; Easy waits a long time
+            this.plan = "approach";
+            this.decideIn = p.comboDelay + Math.random() * 0.2;
+          } else {
+            // Close the gap
+            dir > 0 ? intent.right = true : intent.left = true;
+          }
           break;
       }
+
       return intent;
     }
   }
@@ -1794,6 +1915,7 @@
   const flow = {
     screens: {
       matchtype: document.getElementById("tk-matchtype"),
+      difficulty: document.getElementById("tk-difficulty"),
       playercount: document.getElementById("tk-playercount"),
       fighter: document.getElementById("tk-fighter"),
       stage: document.getElementById("tk-stage"),
@@ -1815,17 +1937,19 @@
      background; transparent `.hot` buttons sit over the painted controls and
      dispatch on data-act. CPU difficulty defaults to Normal (the mockup has no
      selector) — `diffSel` is read when present. */
-  document.querySelectorAll(".flow-overlay .hot").forEach(hot => {
-    hot.addEventListener("click", () => {
-      const act = hot.dataset.act;
+  document.querySelectorAll(".flow-overlay .hot, #tk-difficulty .diff-btn, #tk-difficulty .diff-back").forEach(el => {
+    el.addEventListener("click", () => {
+      const act = el.dataset.act;
       blip(660, 880);
       switch (act) {
         case "mt-cpu":
           setup.mode = "cpu"; setup.playerCount = 1;
-          setup.diff = diffSel ? parseInt(diffSel.value, 10) : 1;
-          enterFighterSelect(); break;
+          flow.go("difficulty"); break;
         case "mt-mp":
           setup.mode = "mp"; setup.playerCount = 2; flow.go("playercount"); break;
+        case "diff-easy": case "diff-med": case "diff-hard":
+          setup.diff = parseInt(el.dataset.diff, 10);
+          enterFighterSelect(); break;
         case "pc-2":
         case "pc-confirm":
           setup.playerCount = 2; enterFighterSelect(); break;

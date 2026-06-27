@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;700;900&family=DM+Mono:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/games/troll-kombat/style.css?v=kombat-v13-no-scanlines">
+  <link rel="stylesheet" href="assets/games/troll-kombat/style.css?v=kombat-v14-difficulty">
 </head>
 <body data-game-state="select">
   <div class="crt-overlay" aria-hidden="true"></div>
@@ -109,6 +109,32 @@
             <div class="mockup-screen" style="background-image:url('assets/games/troll-kombat/ui/screen-matchtype.png?v=kombat-v8')">
               <button type="button" class="hot" data-act="mt-cpu" style="left:4.5%;top:21%;width:43%;height:62%" aria-label="CPU Fight"></button>
               <button type="button" class="hot" data-act="mt-mp" style="left:52.5%;top:21%;width:43%;height:62%" aria-label="Multiplayer"></button>
+            </div>
+          </div>
+
+          <!-- 1b · CPU Difficulty select -->
+          <div id="tk-difficulty" class="game-overlay flow-overlay">
+            <div class="overlay-card flow-card diff-card">
+              <p class="overlay-kicker">CPU Match</p>
+              <h2>Choose Difficulty</h2>
+              <div class="diff-grid">
+                <button type="button" class="diff-btn is-easy"  data-act="diff-easy"   data-diff="0">
+                  <span class="diff-icon">😴</span>
+                  <strong>Easy</strong>
+                  <p>Slow reactions. Rarely blocks. Mostly punches. Good for learning the game.</p>
+                </button>
+                <button type="button" class="diff-btn is-med"   data-act="diff-med"    data-diff="1">
+                  <span class="diff-icon">😤</span>
+                  <strong>Medium</strong>
+                  <p>Balanced mix of offense and defense. Blocks sometimes. Uses specials.</p>
+                </button>
+                <button type="button" class="diff-btn is-hard"  data-act="diff-hard"   data-diff="2">
+                  <span class="diff-icon">💀</span>
+                  <strong>Hard</strong>
+                  <p>Fast reactions. Combos on every opening. Blocks almost everything. Good luck.</p>
+                </button>
+              </div>
+              <button type="button" class="diff-back" data-act="back-matchtype">← Back</button>
             </div>
           </div>
 
@@ -230,6 +256,6 @@
     </section>
   </main>
 
-  <script src="assets/games/troll-kombat/game.js?v=kombat-v18-hud-overlay" defer></script>
+  <script src="assets/games/troll-kombat/game.js?v=kombat-v19-difficulty" defer></script>
 </body>
 </html>
