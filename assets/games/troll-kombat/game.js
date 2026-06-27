@@ -134,17 +134,24 @@
       blurb: "Tall Doge in a pink mink coat, black cap and square shades. Slides in, deal-with-it, pelts you with 1000x coins.",
       special: { name: "DEAL-WITH-IT DASH", kind: "barrage", cost: 100, color: "#ffd84d", text: "$" },
       pal: { base: "#e3ad4f", dark: "#a9762a", light: "#f7d98a", ink: "#3a2406", face: "#e8b85a", accent: "#ff6fd0", accent2: "#ffd84d" },
-      drawHead: drawDogeHead,
+      drawHead: drawDogeHead,   // portrait/pre-load fallback only
+      portraitSrc: "doge-rig/portrait.png",
       splashSrc: "doge-drip-splash.png",   // glossy ChatGPT render for select screens
       moves: { punch: "Much Punch", kick: "Such Kick", block: "Mink Coat Guard", special: "Deal-With-It Dash", finisher: "Very Rekt. Much Wow." },
-      // 4x2 grid sheet.
-      sheet: {
-        pixel: "doge-drip-2d.png", toy: "doge-drip-3d.png", cols: 6, rows: 3,
-        // 6x3 labelled grid (last two cells empty).
-        frames: {
-          idle: [0, 0], idle2: [1, 0], walk1: [2, 0], walk2: [3, 0], punch: [4, 0], punch2: [5, 0],
-          kick: [0, 1], kick2: [1, 1], special: [2, 1], special2: [3, 1], block: [4, 1], crouch: [5, 1],
-          jump: [0, 2], hit: [1, 2], ko: [2, 2], win: [3, 2],
+      // PixelLab pixel rig — east-facing animation strips, mirrored by facing.
+      // 180px cells; feet measured at y156 → footFrac 0.872; scale matches Pepe height.
+      anims: {
+        dir: "doge-rig/anims/", cell: 180, scale: 2.5, footFrac: 0.872,
+        defs: {
+          idle:    { frames: 8, fps: 9,  loop: true },
+          walk:    { frames: 6, fps: 13, loop: true },
+          punch:   { frames: 3, fps: 16, loop: false },
+          kick:    { frames: 7, fps: 16, loop: false },
+          crouch:  { frames: 5, fps: 14, loop: false },
+          jump:    { frames: 7, fps: 13, loop: false },
+          special: { frames: 4, fps: 14, loop: false },
+          hit:     { frames: 6, fps: 16, loop: false },
+          ko:      { frames: 7, fps: 10, loop: false },
         },
       },
     },
