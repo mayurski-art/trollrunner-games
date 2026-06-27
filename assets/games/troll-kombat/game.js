@@ -35,8 +35,13 @@
   const MAX_METER = 100;
   const MAX_STAM = 100;         // stamina pool
 
-  // Render mode: "pixel" = 2D sprite sheets, crunchy retro. "toy" = 3D pose
-  // sheets, smoother + glow. Same sim runs for both; only the art swaps.
+  // --- Movement tuning (kept together so it's easy to tweak) -----------------
+  const WALK_SPEED = 330;       // px/s ground movement
+  const JUMP_V = 760;           // initial jump velocity — high enough to clear a body
+  const GRAVITY = 1500;         // px/s^2 fall accel
+  const JUMP_CUT = 0.5;         // releasing jump while rising cuts ascent (variable height)
+
+  // Render mode is locked to 2D pixel — the 3D "toy" mode was removed.
   let MODE = "pixel";
   const SHEET_DIR = "assets/games/troll-kombat/characters/";
   let currentStage = null;      // chosen STAGES entry (set at fight start)
@@ -99,29 +104,25 @@
      ========================================================================== */
   const ROSTER = [
     {
-      id: "troll", name: "BIG TROLL", tag: "Problem?",
-      blurb: "The OG. A swole slab of pure trollface energy. His specials are just a smug grin weaponised.",
-      special: { name: "PROBLEM?", kind: "projectile", cost: 100, color: "#eaf2ff", text: "?" },
-      pal: { base: "#e7eef6", dark: "#9bb1c8", light: "#ffffff", ink: "#161d2b", face: "#f4f8fc", accent: "#7fd0ff", accent2: "#ff3d6e" },
-      drawHead: drawTrollHead,
-      spriteFullPath: "assets/animations/troll_playable_character.PNG",
-      needsBgStrip: true, footFrac: 0.97,
-    },
-    {
       id: "pepe", name: "PEPE SAMURAI", tag: "Feels good, man",
       blurb: "Tall samurai Pepe in a kabuto helmet with a cope katana. Cuts you down, then mints your loss as a red candle.",
       special: { name: "KATANA COPE SLASH", kind: "orb", cost: 100, color: "#9dff52", text: "" },
       pal: { base: "#5fae33", dark: "#2f6e1f", light: "#9fe05f", ink: "#10250a", face: "#5fae33", accent: "#9dff52", accent2: "#ff5dab" },
-      drawHead: drawPepeHead,
+      drawHead: drawPepeHead,   // portrait/pre-load fallback only
       moves: { punch: "Cope Jab", kick: "Green Candle Kick", block: "Diamond Hands Guard", special: "Katana Cope Slash", finisher: "Feels Bad, Man" },
-      // 4x3 grid sheet. Logical state -> [col,row]; bboxes computed on load.
-      sheet: {
-        pixel: "pepe-samurai-2d.png", toy: "pepe-samurai-3d.png", cols: 6, rows: 3,
-        // 6x3 labelled grid. special = the two sword-slash frames.
-        frames: {
-          idle: [0, 0], idle2: [1, 0], walk1: [2, 0], walk2: [3, 0], punch: [4, 0], punch2: [5, 0],
-          kick: [0, 1], kick2: [1, 1], special: [2, 1], special2: [3, 1], block: [4, 1], crouch: [5, 1],
-          jump: [0, 2], hit: [1, 2], ko: [2, 2], win: [3, 2], swordReady: [4, 2], swordThrust: [5, 2],
+      portraitSrc: "pepe-rig/portrait.png",
+      // PixelLab pixel rig — east-facing animation strips, mirrored by facing.
+      anims: {
+        dir: "pepe-rig/anims/", cell: 92, scale: 3.6, footFrac: 0.978,
+        defs: {
+          idle:    { frames: 8, fps: 9,  loop: true },
+          walk:    { frames: 6, fps: 14, loop: true },
+          punch:   { frames: 6, fps: 18, loop: false },
+          kick:    { frames: 7, fps: 16, loop: false },
+          crouch:  { frames: 5, fps: 14, loop: false },
+          jump:    { frames: 9, fps: 13, loop: false },
+          special: { frames: 7, fps: 14, loop: false },
+          hit:     { frames: 6, fps: 16, loop: false },
         },
       },
     },
@@ -142,14 +143,6 @@
           jump: [0, 2], hit: [1, 2], ko: [2, 2], win: [3, 2],
         },
       },
-    },
-    {
-      id: "elon", name: "ELON BOSS", tag: "To the moon",
-      blurb: "Parody space-tech boss. Tweets shockwaves, blue-checks your hits, and launches you when you least afford it. CPU favourite.",
-      special: { name: "TWEET SHOCKWAVE", kind: "projectile", cost: 100, color: "#1d9bf0", text: "X" },
-      pal: { base: "#cfd6de", dark: "#7c8593", light: "#ffffff", ink: "#12161d", face: "#e7ecf2", accent: "#1d9bf0", accent2: "#ff3d6e" },
-      drawHead: drawTrollHead,
-      moves: { punch: "Mars Jab", kick: "Cyber Kick", block: "Blue Check Shield", special: "Tweet Shockwave", finisher: "Launch Sequence" },
     },
     {
       id: "gladiator", name: "GLADIATOR", tag: "Spartan, problem?",
@@ -216,9 +209,11 @@
     d.animImg = {};
     const keys = Object.keys(d.anims.defs);
     let loaded = 0;
+    const done = () => { if (++loaded === keys.length) d.animReady = true; };
     keys.forEach(k => {
       const img = new Image();
-      img.onload = () => { if (++loaded === keys.length) d.animReady = true; };
+      img.onload = done;
+      img.onerror = done;   // a missing strip shouldn't block the whole rig
       img.src = SPRITE_DIR + d.anims.dir + k + ".png";
       d.animImg[k] = img;
     });
@@ -504,6 +499,7 @@
       this.stamina = MAX_STAM;
       this.rektStun = 0;          // "rekt" vulnerable stun when stamina bottoms out
       this.dashT = 0;             // active dash timer
+      this.jumpCut = false;       // SSB variable-jump: ascent already cut?
       this.tookDamage = false;    // for FLAWLESS detection
     }
     get grounded() { return this.y <= 0.01; }
@@ -641,7 +637,7 @@
           audio.blip(440, 0.12, "sawtooth", 0.1, 700); regen = false;
         }
         else if (intent.up && this.grounded) {
-          this.vy = 680; this.state = "jump";
+          this.vy = JUMP_V; this.state = "jump"; this.jumpCut = false;
           this.stamina = Math.max(0, this.stamina - 8); audio.jump(); regen = false;
         }
         else {
@@ -654,12 +650,16 @@
           else if (intent.crouch && this.grounded) { this.state = "crouch"; }
           else if (this.grounded) {
             if (move !== 0) {
-              this.x += move * 280 * dt;
+              this.x += move * WALK_SPEED * dt;
               this.state = "walk";
               this.walkDir = move * this.facing; // +1 forward, -1 back
             } else { this.state = "idle"; }
           }
         }
+      }
+      // Variable jump height (SSB short-hop): releasing jump while rising cuts ascent.
+      if (this.state === "jump" && this.vy > 0 && !intent.up && !this.jumpCut) {
+        this.vy *= JUMP_CUT; this.jumpCut = true;
       }
       // stamina regenerates whenever it isn't being spent
       if (regen && this.rektStun <= 0) this.stamina = Math.min(MAX_STAM, this.stamina + 17 * dt);
@@ -670,7 +670,7 @@
     physics(dt) {
       // gravity / jump
       if (!this.grounded || this.vy > 0) {
-        this.vy -= 1500 * dt;
+        this.vy -= GRAVITY * dt;
         this.y += this.vy * dt;
         if (this.y <= 0) { this.y = 0; this.vy = 0; if (this.state === "jump") this.state = "idle"; }
       }
@@ -957,16 +957,21 @@
       let key = "idle", loop = true, prog = 0;
       const st = this.state;
       if (st === "walk") { key = "walk"; loop = true; }
-      else if (st === "jump") { key = "jump"; loop = false; prog = clamp((520 - this.vy) / 1040, 0, 1); }
+      else if (st === "crouch" && A.defs.crouch) { key = "crouch"; loop = false; prog = 1; }   // hold crouched pose
+      else if (st === "jump") { key = "jump"; loop = false; prog = clamp((JUMP_V - this.vy) / (JUMP_V * 2), 0, 1); }
       else if (st === "hit")  { key = "hit";  loop = false; prog = clamp(1 - this.hitstun / 0.30, 0, 1); }
-      else if (st === "ko")   { key = "ko";   loop = false; prog = this.koFall; }
+      else if (st === "ko")   { key = A.defs.ko ? "ko" : "hit"; loop = false; prog = A.defs.ko ? this.koFall : 1; }
       else if (st === "attack" && this.attack) {
         const t = this.attack.type;
         key = (t === "punch" || t === "kick" || t === "special") ? t : "punch";
         const ad = this.attack.def, dur = ad.startup + ad.active + ad.recovery;
         loop = false; prog = clamp(this.attack.t / dur, 0, 1);
       }
-      // idle / crouch / block / win / intro → idle loop
+      // block / win / intro → idle stance
+
+      // Fall back to idle if the chosen strip isn't loaded yet (e.g. KO pending).
+      const ready = k => A.defs[k] && this.def.animImg[k] && this.def.animImg[k].complete && this.def.animImg[k].naturalWidth;
+      if (!ready(key)) { key = "idle"; loop = true; prog = 0; }
 
       const def = A.defs[key] || A.defs.idle;
       const n = def.frames;
@@ -1692,23 +1697,8 @@
     audio.ensure(); audio.blip(660, 0.08, "square", 0.08, 880);
   }
 
-  /* --- Mode toggle (Pixel 2D / Toy 3D) --- */
+  // (3D "Toy Mode" removed — the game is locked to 2D pixel art.)
   document.body.dataset.mode = MODE;
-  const modeButtons = document.querySelectorAll(".mode-btn");
-  modeButtons.forEach(btn => {
-    btn.addEventListener("click", () => {
-      MODE = btn.dataset.mode;
-      document.body.dataset.mode = MODE;
-      modeButtons.forEach(b => {
-        const on = b === btn;
-        b.classList.toggle("is-active", on);
-        b.setAttribute("aria-checked", String(on));
-      });
-      audio.ensure(); audio.blip(560, 0.07, "square", 0.07, 740);
-      // Lazy-load the toy variants only when Toy Mode is actually chosen.
-      if (MODE === "toy") ROSTER.forEach(d => { if (d.sheet) loadSheetVariant(d, "toy"); });
-    });
-  });
 
   /* --- Stage select --- */
   const stageGrid = document.getElementById("stage-grid");
@@ -1741,7 +1731,6 @@
     currentStage = selectedStage;
     loadStageImage(currentStage);
     if (els.stageName) els.stageName.textContent = currentStage.name;
-    if (MODE === "toy") [p1, p2].forEach(d => { if (d.sheet) loadSheetVariant(d, "toy"); });
     document.getElementById("tk-select").classList.remove("is-visible");
     document.body.dataset.gameState = "fight";
     fightBtn.blur();   // so Space (block) can't re-activate the focused button

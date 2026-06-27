@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;700;900&family=DM+Mono:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/games/troll-kombat/style.css?v=kombat-v4-mk-20260626">
+  <link rel="stylesheet" href="assets/games/troll-kombat/style.css?v=kombat-v5-pepe-20260626">
 </head>
 <body data-game-state="select">
   <div class="crt-overlay" aria-hidden="true"></div>
@@ -38,13 +38,13 @@
         <h1 id="game-title">Troll Kombat</h1>
         <p class="tagline">Pick your meme champion. Trade blows. Problem?</p>
         <ul class="stat-chips" aria-label="Game features">
-          <li>2D + 3D Mode</li>
+          <li>Pixel Fighters</li>
           <li>Best of 3</li>
           <li>Rare $TROLL Coin Drops</li>
           <li>Finishers</li>
           <li>Moving Meme Arenas</li>
         </ul>
-        <p class="copy-note">A side-view brawler in the style of the classics, starring meme champions — Pepe Samurai, Doge Drip and the OG Trollface Brute. Choose Pixel or Toy mode, pick your arena, then scrap. Best of 3. Problem?</p>
+        <p class="copy-note">A side-view pixel brawler in the style of the classics, starring meme champions — Pepe Samurai, Doge Drip and the Gladiator. Pick your fighter and arena, then scrap. Best of 3. Problem?</p>
       </div>
 
       <section class="fight-cabinet" aria-label="Troll Kombat game cabinet">
@@ -90,35 +90,19 @@
 
           <div id="tk-announce" class="tk-announce" aria-live="assertive"></div>
 
-          <!-- Pre-game setup: mode · fighter · stage · difficulty -->
+          <!-- Pre-game setup: fighter · stage · difficulty -->
           <div id="tk-select" class="game-overlay select-overlay is-visible">
             <div class="overlay-card select-card">
               <p class="overlay-kicker">Pre-fight setup</p>
               <h2>Build Your Brawl</h2>
 
-              <div class="setup-row setup-mode">
-                <span class="setup-label">1 · Mode</span>
-                <div class="mode-toggle" role="radiogroup" aria-label="Render mode">
-                  <button class="mode-btn is-active" data-mode="pixel" type="button" role="radio" aria-checked="true">
-                    <span class="mode-icon" aria-hidden="true">▦</span>
-                    <strong>Pixel Mode</strong>
-                    <span class="mode-sub">2D sprites · crunchy retro</span>
-                  </button>
-                  <button class="mode-btn" data-mode="toy" type="button" role="radio" aria-checked="false">
-                    <span class="mode-icon" aria-hidden="true">◓</span>
-                    <strong>Toy Mode</strong>
-                    <span class="mode-sub">3D render · cinematic glow</span>
-                  </button>
-                </div>
-              </div>
-
               <div class="setup-row">
-                <span class="setup-label">2 · Fighter</span>
+                <span class="setup-label">1 · Fighter</span>
                 <div id="roster-grid" class="roster-grid" role="listbox" aria-label="Fighter roster"></div>
               </div>
 
               <div class="setup-row">
-                <span class="setup-label">3 · Stage</span>
+                <span class="setup-label">2 · Stage</span>
                 <div id="stage-grid" class="stage-grid" role="listbox" aria-label="Stage select"></div>
               </div>
 
@@ -193,6 +177,6 @@
     </section>
   </main>
 
-  <script src="assets/games/troll-kombat/game.js?v=kombat-v8-mk" defer></script>
+  <script src="assets/games/troll-kombat/game.js?v=kombat-v9-pepe" defer></script>
 </body>
 </html>
