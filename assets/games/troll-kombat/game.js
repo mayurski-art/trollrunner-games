@@ -105,7 +105,7 @@
      ========================================================================== */
   const ROSTER = [
     {
-      id: "pepe", name: "PEPE SAMURAI", tag: "Feels good, man", bar: "#3dff5e",
+      id: "pepe", name: "PEPE SAMURAI", title: "Samurai Warrior", tag: "Feels good, man", bar: "#3dff5e",
       blurb: "Tall samurai Pepe in a kabuto helmet with a cope katana. Cuts you down, then mints your loss as a red candle.",
       special: { name: "KATANA COPE SLASH", kind: "orb", cost: 100, color: "#9dff52", text: "" },
       pal: { base: "#5fae33", dark: "#2f6e1f", light: "#9fe05f", ink: "#10250a", face: "#5fae33", accent: "#9dff52", accent2: "#ff5dab" },
@@ -130,7 +130,7 @@
       },
     },
     {
-      id: "doge", name: "DOGE DRIP", tag: "Very fight. Much wow.", bar: "#ffcf33",
+      id: "doge", name: "DOGE DRIP", title: "Drip Master", tag: "Very fight. Much wow.", bar: "#ffcf33",
       blurb: "Tall Doge in a pink mink coat, black cap and square shades. Slides in, deal-with-it, pelts you with 1000x coins.",
       special: { name: "DEAL-WITH-IT DASH", kind: "barrage", cost: 100, color: "#ffd84d", text: "$" },
       pal: { base: "#e3ad4f", dark: "#a9762a", light: "#f7d98a", ink: "#3a2406", face: "#e8b85a", accent: "#ff6fd0", accent2: "#ffd84d" },
@@ -149,7 +149,7 @@
       },
     },
     {
-      id: "gladiator", name: "GLADIATOR", tag: "Spartan, problem?", bar: "#dfe6ef",
+      id: "gladiator", name: "GLADIATOR", title: "Troll Gladiator", tag: "Spartan, problem?", bar: "#dfe6ef",
       blurb: "A swole troll in a Spartan cape. Lobs his spear with a smug grin, then finishes the job bare-fisted just to rub it in.",
       special: { name: "TROLL SPEAR", kind: "spear", cost: 100, color: "#c9ced6", text: "", fireProgress: 0.78 },
       pal: { base: "#e9e9ee", dark: "#9aa0ad", light: "#ffffff", ink: "#15151c", face: "#f2f2f5", accent: "#d23b3b", accent2: "#c8962a" },
@@ -1960,15 +1960,14 @@
   });
 
   /* --- 3 · FIGHTER SELECT (synced locking in multiplayer) ------------------- */
+  // roster = transparent hotspots over the baked mockup thumbnails (Pepe·Doge·Troll).
+  // The PNG already paints the art + names; these just add hover/selected/locked rings.
   const fselGrid = document.getElementById("fsel-grid");
   ROSTER.forEach(def => {
     const cell = document.createElement("button");
     cell.type = "button"; cell.className = "fsel-cell"; cell.dataset.id = def.id;
     cell.setAttribute("role", "option");
-    cell.style.setProperty("--accent", def.pal.accent);
-    cell.appendChild(splashEl(def, "is-thumb"));
-    const nm = document.createElement("span"); nm.className = "fsel-cell-name";
-    nm.textContent = def.name.split(" ")[0]; cell.appendChild(nm);
+    cell.setAttribute("aria-label", def.name);
     cell.addEventListener("click", () => pickFighter(def.id));
     fselGrid.appendChild(cell);
   });
@@ -2022,20 +2021,16 @@
     const def = id ? byId(id) : null;
     panel.classList.toggle("is-current", setup.current === slot);
     panel.classList.toggle("is-picked", !!def);
-    // bar colour follows the fighter; --bar-rgb powers the paint-splash glow
-    if (def) {
-      const hex = (def.bar || def.pal.accent).replace("#","");
-      const r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
-      panel.style.setProperty("--bar", def.bar || def.pal.accent);
-      panel.style.setProperty("--bar-rgb", `${r},${g},${b}`);
-    }
+    // panel border/glow is SLOT-coloured (P1 green / P2 gold) per the mockup —
+    // handled entirely in CSS via .is-p1 / .is-p2, no per-fighter override here.
     const art = panel.querySelector(".fsel-portrait");
     art.innerHTML = "";
     if (def) art.appendChild(splashEl(def));
     const nameEl = panel.querySelector("strong");
-    if (nameEl) nameEl.textContent = def ? def.name : "—";
+    // big name = first word (PEPE / DOGE / GLADIATOR), matches the mockup
+    if (nameEl) nameEl.textContent = def ? def.name.split(" ")[0] : "—";
     const tagEl = panel.querySelector(".fsel-tag");
-    if (tagEl) tagEl.textContent = def ? (def.tag || "") : "";
+    if (tagEl) tagEl.textContent = def ? (def.title || def.tag || "") : "";
     const statusEl = panel.querySelector(".fsel-status");
     if (statusEl) statusEl.textContent =
       def ? "✓  Selected" : (setup.current === slot ? "Selecting…" : "Waiting…");
