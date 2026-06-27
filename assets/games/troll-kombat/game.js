@@ -37,6 +37,7 @@
 
   // --- Movement tuning (kept together so it's easy to tweak) -----------------
   const WALK_SPEED = 330;       // px/s ground movement
+  const AIR_SPEED = 300;        // px/s horizontal air control (drift while jumping)
   const JUMP_V = 760;           // initial jump velocity — high enough to clear a body
   const GRAVITY = 1500;         // px/s^2 fall accel
   const JUMP_CUT = 0.5;         // releasing jump while rising cuts ascent (variable height)
@@ -625,39 +626,49 @@
 
       const acting = !this.canAct();
       let regen = true;
-      // movement / actions only when free
+      const move = (intent.right ? 1 : 0) - (intent.left ? 1 : 0);
       if (!acting) {
-        const move = (intent.right ? 1 : 0) - (intent.left ? 1 : 0);
+        const grounded0 = this.grounded;
+        // Jump is its own action (not in the attack chain) so you can leap AND
+        // punch/kick on the same press, and combine with left/right (W+D, W+A).
+        if (intent.up && grounded0) {
+          this.vy = JUMP_V; this.state = "jump"; this.jumpCut = false;
+          this.stamina = Math.max(0, this.stamina - 8); audio.jump(); regen = false;
+        }
+        // Attacks (one at a time) — fire grounded OR airborne (air normals).
         if (intent.special) this.startAttack("special");
         else if (intent.kick) this.startAttack("kick");
         else if (intent.punch) this.startAttack("punch");
-        else if (intent.dash && this.grounded && this.dashT <= 0 && this.stamina >= 16) {
+        else if (intent.dash && grounded0 && this.dashT <= 0 && this.stamina >= 16) {
           const d = move !== 0 ? move : this.facing;
           this.vx = d * 560; this.dashT = 0.26; this.stamina -= 16;
           this.state = "walk"; this.walkDir = d * this.facing;
           audio.blip(440, 0.12, "sawtooth", 0.1, 700); regen = false;
         }
-        else if (intent.up && this.grounded) {
-          this.vy = JUMP_V; this.state = "jump"; this.jumpCut = false;
-          this.stamina = Math.max(0, this.stamina - 8); audio.jump(); regen = false;
-        }
-        else {
-          const blocking = intent.block && this.grounded;
-          if (blocking) {
+        else if (this.state !== "jump" && grounded0) {
+          // grounded ground states (block / crouch / walk / idle)
+          if (intent.block) {
             this.state = "block"; this.vx *= 0.6;
             this.stamina -= 12 * dt; regen = false;
             if (this.stamina <= 0) { this.stamina = 0; this.enterRekt(); }
           }
-          else if (intent.crouch && this.grounded) { this.state = "crouch"; }
-          else if (this.grounded) {
-            if (move !== 0) {
-              this.x += move * WALK_SPEED * dt;
-              this.state = "walk";
-              this.walkDir = move * this.facing; // +1 forward, -1 back
-            } else { this.state = "idle"; }
-          }
+          else if (intent.crouch) { this.state = "crouch"; }
+          else if (move !== 0) {
+            this.x += move * WALK_SPEED * dt;
+            this.state = "walk";
+            this.walkDir = move * this.facing; // +1 forward, -1 back
+          } else { this.state = "idle"; }
         }
       }
+      // Air control: drift horizontally while airborne (during jumps AND air
+      // attacks), so W+D / W+A give diagonal jumps and you can reposition mid-air.
+      if (!this.grounded && move !== 0) {
+        this.x = clamp(this.x + move * AIR_SPEED * dt, WALL_L, WALL_R);
+        this.walkDir = move * this.facing;
+      }
+      // keep the airborne pose if a mid-air action just ended
+      if (!this.grounded && (this.state === "idle" || this.state === "walk")) this.state = "jump";
+
       // Variable jump height (SSB short-hop): releasing jump while rising cuts ascent.
       if (this.state === "jump" && this.vy > 0 && !intent.up && !this.jumpCut) {
         this.vy *= JUMP_CUT; this.jumpCut = true;
