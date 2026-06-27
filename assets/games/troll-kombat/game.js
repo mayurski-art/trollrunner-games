@@ -1231,12 +1231,12 @@
      ========================================================================== */
   const STAGE_DIR = "assets/games/troll-kombat/stages/";
   const STAGES = [
-    { id: "hills",  name: "Troll Hills",     img: "zone-1.png", accent: "#4dff73", hazard: "Rolling troll boulder", pickup: "Green Candle Smoothie",   groundFrac: 0.88 },
-    { id: "market", name: "Floating Market", img: "zone-2.png", accent: "#7fd0ff", hazard: "Airship wind blast",    pickup: "Stamina Rocket",          groundFrac: 0.82 },
-    { id: "lake",   name: "Lakeside Town",   img: "zone-3.png", accent: "#34c759", hazard: "Rogue wave",            pickup: "Tidal Liquidity",         groundFrac: 0.86 },
-    { id: "palace", name: "Meme Palace",     img: "zone-4.png", accent: "#c79bff", hazard: "Fountain burst",        pickup: "Royal Liquidity Potion",  groundFrac: 0.86 },
-    { id: "ruins",  name: "Sunset Ruins",    img: "zone-5.png", accent: "#ff9f43", hazard: "Crumbling pillar",      pickup: "Relic Bag",               groundFrac: 0.87 },
-    { id: "cyber",  name: "Cyber Rain City", img: "zone-6.png", accent: "#27e0ff", hazard: "Lightning zap lane",    pickup: "Blue Glow Shield",        groundFrac: 0.84 },
+    { id: "hills",  name: "Troll Hills",     img: "zone-1.png", accent: "#4dff73", hazard: "Rolling troll boulder", pickup: "Green Candle Smoothie",   groundFrac: 0.88, desc: "Peaceful hills watched over by ancient memes." },
+    { id: "market", name: "Floating Market", img: "zone-2.png", accent: "#7fd0ff", hazard: "Airship wind blast",    pickup: "Stamina Rocket",          groundFrac: 0.82, desc: "Sky bazaar of airships and floating islands." },
+    { id: "lake",   name: "Lakeside Town",   img: "zone-3.png", accent: "#34c759", hazard: "Rogue wave",            pickup: "Tidal Liquidity",         groundFrac: 0.86, desc: "Sunlit harbor town on the meme lake." },
+    { id: "palace", name: "Meme Palace",     img: "zone-4.png", accent: "#c79bff", hazard: "Fountain burst",        pickup: "Royal Liquidity Potion",  groundFrac: 0.86, desc: "Moonlit palace of the meme dynasty." },
+    { id: "ruins",  name: "Sunset Ruins",    img: "zone-5.png", accent: "#ff9f43", hazard: "Crumbling pillar",      pickup: "Relic Bag",               groundFrac: 0.87, desc: "Golden-hour ruins of a forgotten chain." },
+    { id: "cyber",  name: "Cyber Rain City", img: "zone-6.png", accent: "#27e0ff", hazard: "Lightning zap lane",    pickup: "Blue Glow Shield",        groundFrac: 0.84, desc: "Neon downpour over a sleepless metropolis." },
   ];
   const stageById = id => STAGES.find(s => s.id === id);
   function loadStageImage(s) {
@@ -1400,36 +1400,59 @@
   };
 
   const match = {
-    phase: "select",         // select intro fight roundend matchend
+    phase: "select",         // select countdown intro fight roundend matchend
     round: 1,
     timer: ROUND_TIME,
     phaseT: 0,
     fighters: [],
-    ai: null,
+    controllers: [],         // per-fighter: {type:"human", slot} | {type:"ai"}
+    mode: "cpu",             // "cpu" | "mp"
     diff: 1,
     finisher: false,
-    init(p1Def, p2Def, diff) {
+    // The opponent of a given fighter (2-player today; nearest-other later).
+    other(f) { return this.fighters[0] === f ? this.fighters[1] : this.fighters[0]; },
+    // defs[] = fighter definitions, controllers[] = input owner per slot.
+    // Kept array-driven (not p1/p2 hardcoded) so 3+ players slot in later.
+    init(defs, controllers, diff) {
       this.diff = diff;
-      this.fighters = [
-        new Fighter(p1Def, SPAWN_L, 1, false),
-        new Fighter(p2Def, SPAWN_R, -1, true),
-      ];
-      this.fighters[0].rounds = 0; this.fighters[1].rounds = 0;
-      this.ai = new AI(diff);
+      this.controllers = controllers;
+      this.mode = controllers.some(c => c.type === "ai") ? "cpu" : "mp";
+      const humans = controllers.filter(c => c.type === "human").length;
+      setupInputs(humans);
+      this.fighters = defs.map((def, i) => {
+        const c = controllers[i];
+        const f = new Fighter(def, i === 0 ? SPAWN_L : SPAWN_R, i === 0 ? 1 : -1, c.type === "ai");
+        f.rounds = 0;
+        f.inputSlot = c.type === "human" ? c.slot : -1;     // -1 = AI-controlled
+        f.ai = c.type === "ai" ? new AI(diff) : null;
+        return f;
+      });
       this.round = 1;
-      els.p1name.textContent = p1Def.name;
-      els.p2name.textContent = p2Def.name;
+      this.firstRound = true;   // round 1 gets the 3·2·1 countdown
+      els.p1name.textContent = defs[0].name;
+      els.p2name.textContent = defs[1].name;
       this.startRound();
     },
     startRound() {
       const [a, b] = this.fighters;
       a.reset(SPAWN_L, 1); b.reset(SPAWN_R, -1);   // HP resets each round; meter carries over
       this.timer = ROUND_TIME;
-      this.phase = "intro"; this.phaseT = 0;
       this.finisher = false;
       projectiles = []; particles = [];
-      announce(`ROUND ${this.round}`, 1.0);
+      // Random map switching: re-roll the stage between rounds when enabled.
+      if (!this.firstRound && this.randomStage) {
+        const pool = STAGES.filter(s => s !== currentStage);
+        currentStage = pool[Math.floor(Math.random() * pool.length)];
+        loadStageImage(currentStage);
+        if (els.stageName) els.stageName.textContent = currentStage.name;
+      }
       els.roundLabel.textContent = `Round ${this.round}`;
+      if (this.firstRound) {
+        this.phase = "countdown"; this.phaseT = 0; this._cd = 4;
+      } else {
+        this.phase = "intro"; this.phaseT = 0;
+        announce(`ROUND ${this.round}`, 1.0);
+      }
     },
     beginFight() {
       this.phase = "fight"; this.phaseT = 0;
@@ -1452,6 +1475,16 @@
       const [p1, p2] = this.fighters;
       this.phaseT += dt;
 
+      // Animated 3 · 2 · 1 · FIGHT! before the match begins. Fighters stand
+      // ready (spawned on the chosen stage) until control is handed over.
+      if (this.phase === "countdown") {
+        for (const f of this.fighters) f.update(dt, NEUTRAL, this.other(f), "intro");
+        const n = 3 - Math.floor(this.phaseT / 0.75);   // 3,2,1, then 0
+        if (n < this._cd && n > 0) { this._cd = n; announce(String(n), 0.7, true); audio.blip(440, 0.14, "square", 0.12); }
+        if (this.phaseT >= 2.25) { this.firstRound = false; this.beginFight(); }
+        return;
+      }
+
       if (this.phase === "intro") {
         // hold fighters; advance to fight
         p1.update(dt, NEUTRAL, p2, "intro");
@@ -1462,10 +1495,11 @@
 
       if (this.phase === "fight") {
         this.timer = Math.max(0, this.timer - dt);
-        const p1Intent = readPlayerIntent();
-        const p2Intent = this.ai.think(p2, p1, dt);
-        p1.update(dt, p1Intent, p2, "fight");
-        p2.update(dt, p2Intent, p1, "fight");
+        // Each fighter pulls intent from its own controller (human slot or AI),
+        // so input/state ownership stays cleanly per-player.
+        const fs = this.fighters;
+        const intents = fs.map(f => f.ai ? f.ai.think(f, this.other(f), dt) : readIntent(f.inputSlot));
+        fs.forEach((f, i) => f.update(dt, intents[i], this.other(f), "fight"));
         // separation: stop overlap
         separate(p1, p2);
         // win checks
@@ -1504,7 +1538,7 @@
     },
     endMatch() {
       this.phase = "matchend";
-      showResult(this.winnerIdx, this.byKO, this.fighters);
+      showResult(this.winnerIdx, this.byKO, this.fighters, this.mode);
     },
     draw(dt) {
       const [p1, p2] = this.fighters;
@@ -1567,56 +1601,76 @@
   }
 
   /* ==========================================================================
-     INPUT  —  keyboard + on-screen touch buttons feed a shared intent object.
+     INPUT  —  one {held, edge} context PER PLAYER SLOT so each fighter owns its
+     own keys cleanly. `keymaps[slot]` maps a key → action for that slot; it's
+     rebuilt at match start from the human count (1 = solo CPU, 2 = local versus).
+     Adding a 3rd slot later is just another keymap entry — no engine rewrite.
      ========================================================================== */
-  const held = {};   // continuous keys
-  const edge = {};   // one-shot (consumed) buttons: punch/kick/special
-  const KEYMAP = {
-    ArrowLeft: "left", a: "left", A: "left",
-    ArrowRight: "right", d: "right", D: "right",
-    ArrowUp: "up", w: "up", W: "up",
-    ArrowDown: "crouch", s: "crouch", S: "crouch",
-    j: "punch", J: "punch",
-    k: "kick", K: "kick",
-    l: "special", L: "special",
-    " ": "block",
-    Shift: "dash",
+  const inputs = [{ held: {}, edge: {} }, { held: {}, edge: {} }, { held: {}, edge: {} }, { held: {}, edge: {} }];
+  const ATK = a => a === "punch" || a === "kick" || a === "special" || a === "dash";
+
+  // P1 cluster. In solo (CPU) play the arrows also drive P1 for comfort; in local
+  // versus the arrows belong to P2, so we use the WASD-only variant.
+  const P1_KEYS = {
+    a: "left", A: "left", d: "right", D: "right", w: "up", W: "up", s: "crouch", S: "crouch",
+    j: "punch", J: "punch", k: "kick", K: "kick", l: "special", L: "special", " ": "block", Shift: "dash",
   };
-  function readPlayerIntent() {
+  const P1_KEYS_SOLO = {
+    ...P1_KEYS, ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "crouch",
+  };
+  // P2 cluster: arrows to move + the number cluster for attacks.
+  const P2_KEYS = {
+    ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "crouch",
+    "1": "punch", "2": "kick", "3": "special", "0": "block", "5": "dash",
+  };
+  let keymaps = [];   // active key→action maps, one per human slot
+
+  function setupInputs(humanCount) {
+    inputs.forEach(s => { s.held = {}; s.edge = {}; });
+    keymaps = humanCount >= 2 ? [P1_KEYS, P2_KEYS] : [P1_KEYS_SOLO];
+  }
+  function readIntent(slot) {
+    const s = inputs[slot] || inputs[0];
     const i = {
-      left: !!held.left, right: !!held.right, up: !!held.up, crouch: !!held.crouch,
-      block: !!held.block,
-      punch: !!edge.punch, kick: !!edge.kick, special: !!edge.special, dash: !!edge.dash,
+      left: !!s.held.left, right: !!s.held.right, up: !!s.held.up, crouch: !!s.held.crouch,
+      block: !!s.held.block,
+      punch: !!s.edge.punch, kick: !!s.edge.kick, special: !!s.edge.special, dash: !!s.edge.dash,
     };
-    edge.punch = edge.kick = edge.special = edge.dash = false;
+    s.edge.punch = s.edge.kick = s.edge.special = s.edge.dash = false;
     return i;
   }
   window.addEventListener("keydown", e => {
     const tag = e.target && e.target.tagName;
     if (tag === "SELECT" || tag === "INPUT" || tag === "TEXTAREA") return;
-    const a = KEYMAP[e.key]; if (!a) return;
-    e.preventDefault();
-    audio.ensure();
-    if (a === "punch" || a === "kick" || a === "special" || a === "dash") { if (!held[a]) edge[a] = true; }
-    held[a] = true;
+    for (let slot = 0; slot < keymaps.length; slot++) {
+      const a = keymaps[slot][e.key]; if (!a) continue;
+      e.preventDefault(); audio.ensure();
+      const s = inputs[slot];
+      if (ATK(a)) { if (!s.held[a]) s.edge[a] = true; }
+      s.held[a] = true;
+      return;   // a key belongs to exactly one slot
+    }
   });
   window.addEventListener("keyup", e => {
-    const a = KEYMAP[e.key]; if (!a) return;
-    held[a] = false;
+    for (let slot = 0; slot < keymaps.length; slot++) {
+      const a = keymaps[slot][e.key];
+      if (a) { inputs[slot].held[a] = false; return; }
+    }
   });
-  // touch buttons
+  // touch buttons drive slot 0 (P1) — mobile is single-player / CPU.
   document.querySelectorAll(".tbtn").forEach(btn => {
     const key = btn.dataset.key;
     const map = { left: "left", right: "right", up: "up", crouch: "crouch", block: "block" };
+    const s = inputs[0];
     const down = e => {
       e.preventDefault(); audio.ensure();
-      if (key === "punch" || key === "kick" || key === "special") { edge[key] = true; held[key] = true; }
-      else held[map[key]] = true;
+      if (key === "punch" || key === "kick" || key === "special") { s.edge[key] = true; s.held[key] = true; }
+      else s.held[map[key]] = true;
       btn.classList.add("is-down");
     };
     const up = e => {
       e.preventDefault();
-      if (map[key]) held[map[key]] = false; else held[key] = false;
+      if (map[key]) s.held[map[key]] = false; else s.held[key] = false;
       btn.classList.remove("is-down");
     };
     btn.addEventListener("touchstart", down, { passive: false });
@@ -1627,13 +1681,10 @@
   });
 
   /* ==========================================================================
-     CHARACTER SELECT  +  page roster cards
+     PRE-MATCH FLOW  +  portraits  +  page roster cards
+     Screen order: matchtype → (playercount) → fighter → stage → countdown.
+     `setup` holds the choices; `flow` swaps the overlays.
      ========================================================================== */
-  let selectedId = null;
-  const rosterGrid = document.getElementById("roster-grid");
-  const fightBtn = document.getElementById("tk-fight-button");
-  const selYou = document.getElementById("select-you");
-  const selCpu = document.getElementById("select-cpu");
   const diffSel = document.getElementById("cpu-difficulty");
 
   function portrait(def, size) {
@@ -1688,66 +1739,204 @@
     return portrait(def, size);
   }
 
-  ROSTER.forEach(def => {
-    const card = document.createElement("button");
-    card.type = "button"; card.className = "roster-pick"; card.dataset.id = def.id;
-    card.setAttribute("role", "option");
-    card.style.setProperty("--accent", def.pal.accent);
-    const port = portraitEl(def, 96);
-    card.appendChild(port);
-    const nm = document.createElement("strong"); nm.textContent = def.name; card.appendChild(nm);
-    const tg = document.createElement("span"); tg.className = "pick-tag"; tg.textContent = def.tag; card.appendChild(tg);
-    card.addEventListener("click", () => selectFighter(def.id));
-    rosterGrid.appendChild(card);
-  });
-
-  function selectFighter(id) {
-    selectedId = id;
-    document.querySelectorAll(".roster-pick").forEach(c => c.classList.toggle("is-active", c.dataset.id === id));
-    selYou.textContent = byId(id).name;
-    fightBtn.disabled = false;
-    audio.ensure(); audio.blip(660, 0.08, "square", 0.08, 880);
-  }
-
   // (3D "Toy Mode" removed — the game is locked to 2D pixel art.)
   document.body.dataset.mode = MODE;
 
-  /* --- Stage select --- */
-  const stageGrid = document.getElementById("stage-grid");
-  let selectedStage = STAGES[0];
-  STAGES.forEach((s, i) => {
-    const card = document.createElement("button");
-    card.type = "button"; card.className = "stage-pick" + (i === 0 ? " is-active" : "");
-    card.dataset.id = s.id; card.setAttribute("role", "option");
-    card.setAttribute("aria-label", s.name);
-    card.style.setProperty("--accent", s.accent);
-    card.innerHTML =
-      `<span class="stage-thumb" style="background-image:url('${STAGE_DIR + s.img}')"></span>` +
-      `<span class="stage-pick-name">${s.name}</span>`;
-    card.addEventListener("mouseenter", () => loadStageImage(s));
-    card.addEventListener("click", () => {
-      selectedStage = s; loadStageImage(s);
-      document.querySelectorAll(".stage-pick").forEach(c => c.classList.toggle("is-active", c.dataset.id === s.id));
-      audio.ensure(); audio.blip(680, 0.07, "square", 0.07, 880);
+  /* --- setup state: every choice the pre-match flow collects ---------------- */
+  const setup = {
+    mode: "cpu",            // "cpu" | "mp"
+    playerCount: 1,         // number of HUMAN players (cpu=1, mp=2…)
+    picks: [],              // fighter id per human slot
+    current: 0,             // slot currently choosing (-1 = all done)
+    stage: STAGES[0],
+    randomStage: false,
+    diff: 1,
+  };
+  const humanCount = () => setup.mode === "mp" ? setup.playerCount : 1;
+  const SLOT_LABEL = ["P1", "P2", "P3", "P4"];
+
+  /* --- flow controller: shows exactly one screen overlay at a time ---------- */
+  const flow = {
+    screens: {
+      matchtype: document.getElementById("tk-matchtype"),
+      playercount: document.getElementById("tk-playercount"),
+      fighter: document.getElementById("tk-fighter"),
+      stage: document.getElementById("tk-stage"),
+    },
+    current: "matchtype",
+    go(name) {
+      Object.values(this.screens).forEach(el => el && el.classList.remove("is-visible"));
+      if (this.screens[name]) this.screens[name].classList.add("is-visible");
+      this.current = name;
+      document.body.dataset.gameState = "select";
+      match.phase = "select";
+    },
+    hideAll() { Object.values(this.screens).forEach(el => el && el.classList.remove("is-visible")); },
+  };
+  const blip = (f, to) => { audio.ensure(); audio.blip(f, 0.08, "square", 0.08, to); };
+
+  /* --- 1 · MATCH TYPE ------------------------------------------------------- */
+  document.querySelectorAll("#tk-matchtype .mt-card").forEach(card => {
+    card.addEventListener("click", e => {
+      if (e.target.closest("[data-stop]")) return;   // ignore clicks on the CPU dropdown
+      setup.mode = card.dataset.mode;
+      setup.diff = parseInt(diffSel.value, 10);
+      blip(660, 880);
+      if (setup.mode === "mp") { setup.playerCount = 2; flow.go("playercount"); }
+      else { setup.playerCount = 1; enterFighterSelect(); }
     });
-    stageGrid.appendChild(card);
   });
 
-  fightBtn.addEventListener("click", () => {
-    if (!selectedId) return;
-    audio.ensure(); audio.on = true; soundBtn.classList.add("is-on"); soundBtn.setAttribute("aria-pressed", "true");
-    const p1 = byId(selectedId);
-    const pool = ROSTER.filter(r => r.id !== selectedId);
-    const p2 = pool[Math.floor(Math.random() * pool.length)];
-    selCpu.textContent = p2.name;
-    currentStage = selectedStage;
+  /* --- 2 · PLAYER COUNT (multiplayer) --------------------------------------- */
+  document.querySelectorAll("#tk-playercount .pc-card:not(.is-locked)").forEach(card => {
+    card.addEventListener("click", () => {
+      setup.playerCount = parseInt(card.dataset.count, 10);
+      document.querySelectorAll("#tk-playercount .pc-card").forEach(c => c.classList.toggle("is-active", c === card));
+      blip(660, 880);
+    });
+  });
+  document.querySelector("#tk-playercount .pc-card[data-count='2']").classList.add("is-active");
+  document.getElementById("pc-continue").addEventListener("click", () => enterFighterSelect());
+
+  /* --- 3 · FIGHTER SELECT (synced locking in multiplayer) ------------------- */
+  const fselGrid = document.getElementById("fsel-grid");
+  ROSTER.forEach(def => {
+    const cell = document.createElement("button");
+    cell.type = "button"; cell.className = "fsel-cell"; cell.dataset.id = def.id;
+    cell.setAttribute("role", "option");
+    cell.style.setProperty("--accent", def.pal.accent);
+    cell.appendChild(portraitEl(def, 72));
+    const nm = document.createElement("span"); nm.className = "fsel-cell-name";
+    nm.textContent = def.name.split(" ")[0]; cell.appendChild(nm);
+    cell.addEventListener("click", () => pickFighter(def.id));
+    fselGrid.appendChild(cell);
+  });
+
+  function enterFighterSelect() {
+    setup.picks = [];
+    setup.current = 0;
+    document.getElementById("fsel-p2").hidden = humanCount() < 2;
+    renderFighterSelect();
+    flow.go("fighter");
+  }
+  // advance `current` to the next human slot without a pick (-1 when all chosen).
+  function advanceCurrent() {
+    setup.current = -1;
+    for (let i = 0; i < humanCount(); i++) {
+      if (!setup.picks[i]) { setup.current = i; break; }
+    }
+  }
+  function pickFighter(id) {
+    if (setup.current < 0) return;
+    if (setup.picks.includes(id)) { blip(180, 120); return; }   // locked by another player
+    setup.picks[setup.current] = id;
+    advanceCurrent();
+    blip(720, 940);
+    renderFighterSelect();
+  }
+  function renderFighterSelect() {
+    const mp = humanCount() >= 2;
+    document.getElementById("fsel-kicker").textContent = mp ? `Multiplayer · ${humanCount()} players` : "Select your fighter";
+    // grid: lock taken fighters, badge them with the owning player
+    document.querySelectorAll(".fsel-cell").forEach(cell => {
+      const owner = setup.picks.indexOf(cell.dataset.id);
+      const taken = owner >= 0;
+      cell.classList.toggle("is-locked", taken);
+      cell.classList.toggle("taken-1", owner === 0);
+      cell.classList.toggle("taken-2", owner === 1);
+      if (taken) cell.dataset.by = SLOT_LABEL[owner]; else cell.removeAttribute("data-by");
+    });
+    // per-player panels
+    setPanel(0, "fsel-p1");
+    if (mp) setPanel(1, "fsel-p2");
+    // hint + continue gate
+    const hint = document.getElementById("fsel-hint");
+    const allPicked = setup.current < 0;
+    hint.textContent = allPicked ? "Ready — choose your stage." : `${SLOT_LABEL[setup.current]}, pick your fighter`;
+    document.getElementById("fsel-continue").disabled = !allPicked;
+  }
+  function setPanel(slot, panelId) {
+    const panel = document.getElementById(panelId);
+    const id = setup.picks[slot];
+    const def = id ? byId(id) : null;
+    panel.classList.toggle("is-current", setup.current === slot);
+    const art = panel.querySelector(".fsel-portrait");
+    art.innerHTML = "";
+    if (def) art.appendChild(portraitEl(def, 130));
+    panel.querySelector("strong").textContent = def ? def.name : "—";
+    panel.querySelector(".fsel-status").textContent =
+      def ? "Locked in ✓" : (setup.current === slot ? "Selecting…" : "Waiting…");
+  }
+  document.getElementById("fsel-back").addEventListener("click", () =>
+    flow.go(setup.mode === "mp" ? "playercount" : "matchtype"));
+  document.getElementById("fsel-reset").addEventListener("click", () => {
+    setup.picks = []; setup.current = 0; renderFighterSelect(); blip(300, 200);
+  });
+  document.getElementById("fsel-continue").addEventListener("click", () => enterStageSelect());
+
+  /* --- 4 · STAGE SELECT + random-map toggle --------------------------------- */
+  const stageRow = document.getElementById("stage-row");
+  const stageHeroImg = document.getElementById("stage-hero-img");
+  const stageHeroName = document.getElementById("stage-hero-name");
+  const stageHeroDesc = document.getElementById("stage-hero-desc");
+  function showStageHero(s) {
+    stageHeroImg.style.backgroundImage = `url('${STAGE_DIR + s.img}')`;
+    stageHeroName.textContent = s.name;
+    stageHeroDesc.textContent = s.desc || "";
+    stageHeroName.style.color = s.accent;
+  }
+  STAGES.forEach((s, i) => {
+    const tile = document.createElement("button");
+    tile.type = "button"; tile.className = "stage-tile" + (i === 0 ? " is-active" : "");
+    tile.dataset.id = s.id; tile.setAttribute("role", "option"); tile.setAttribute("aria-label", s.name);
+    tile.style.setProperty("--accent", s.accent);
+    tile.innerHTML =
+      `<span style="background-image:url('${STAGE_DIR + s.img}')"></span><small>${s.name}</small>`;
+    tile.addEventListener("mouseenter", () => { loadStageImage(s); showStageHero(s); });
+    tile.addEventListener("click", () => {
+      setup.stage = s; loadStageImage(s); showStageHero(s);
+      document.querySelectorAll(".stage-tile").forEach(c => c.classList.toggle("is-active", c.dataset.id === s.id));
+      blip(680, 880);
+    });
+    stageRow.appendChild(tile);
+  });
+  document.getElementById("stage-random").addEventListener("change", e => {
+    setup.randomStage = e.target.checked;
+  });
+  function enterStageSelect() {
+    showStageHero(setup.stage);
+    document.querySelectorAll(".stage-tile").forEach(c => c.classList.toggle("is-active", c.dataset.id === setup.stage.id));
+    flow.go("stage");
+  }
+  document.getElementById("stage-back").addEventListener("click", () => enterFighterSelect());
+  document.getElementById("tk-fight").addEventListener("click", e => { e.currentTarget.blur(); startMatch(); });
+
+  /* --- launch: build fighter defs + controllers, then start the match ------- */
+  function buildDefs() {
+    if (setup.mode === "cpu") {
+      const p1 = byId(setup.picks[0]);
+      const pool = ROSTER.filter(r => r.id !== p1.id);
+      const cpu = pool[Math.floor(Math.random() * pool.length)];
+      return [p1, cpu];
+    }
+    return setup.picks.slice(0, setup.playerCount).map(byId);
+  }
+  function buildControllers() {
+    if (setup.mode === "cpu") return [{ type: "human", slot: 0 }, { type: "ai" }];
+    return setup.picks.slice(0, setup.playerCount).map((_, i) => ({ type: "human", slot: i }));
+  }
+  function startMatch() {
+    audio.ensure(); audio.on = true;
+    soundBtn.classList.add("is-on"); soundBtn.setAttribute("aria-pressed", "true");
+    if (setup.randomStage) setup.stage = STAGES[Math.floor(Math.random() * STAGES.length)];
+    currentStage = setup.stage;
     loadStageImage(currentStage);
     if (els.stageName) els.stageName.textContent = currentStage.name;
-    document.getElementById("tk-select").classList.remove("is-visible");
+    flow.hideAll();
     document.body.dataset.gameState = "fight";
-    fightBtn.blur();   // so Space (block) can't re-activate the focused button
-    match.init(p1, p2, parseInt(diffSel.value, 10));
-  });
+    match.randomStage = setup.randomStage;
+    match.init(buildDefs(), buildControllers(), setup.diff);
+  }
 
   // page roster cards (the "Know Your Memes" section)
   const rosterCards = document.getElementById("roster-cards");
@@ -1768,34 +1957,36 @@
      RESULT OVERLAY
      ========================================================================== */
   const resultOverlay = document.getElementById("tk-result");
-  function showResult(winnerIdx, byKO, fighters) {
+  function showResult(winnerIdx, byKO, fighters, mode) {
     const winner = fighters[winnerIdx];
+    const isMP = mode === "mp";
+    // In CPU mode, "you" are P1. In versus, frame it by player number.
     const youWon = winnerIdx === 0;
-    document.getElementById("result-kicker").textContent = youWon ? "You win" : "You lose";
+    document.getElementById("result-kicker").textContent =
+      isMP ? `Player ${winnerIdx + 1} wins` : (youWon ? "You win" : "You lose");
     document.getElementById("result-message").textContent = winner.def.name + " WINS";
     const finishBadge = document.getElementById("finish-badge");
     if (byKO && winner.rounds >= ROUNDS_TO_WIN) {
       finishBadge.textContent = winner.tookDamage ? "FATALITY" : "FLAWLESS";
       finishBadge.style.display = "";
     } else finishBadge.style.display = "none";
-    document.getElementById("result-detail").textContent = youWon
-      ? `${winner.def.name} stands. "${winner.def.tag}"`
+    document.getElementById("result-detail").textContent =
+      isMP ? `Player ${winnerIdx + 1}'s ${winner.def.name} stands. "${winner.def.tag}"`
+      : youWon ? `${winner.def.name} stands. "${winner.def.tag}"`
       : `Rugged by the CPU's ${winner.def.name}. Run it back?`;
-    resultOverlay.classList.toggle("is-loss", !youWon);
+    resultOverlay.classList.toggle("is-loss", !isMP && !youWon);
     resultOverlay.classList.add("is-visible");
     document.getElementById("tk-rematch").focus();
   }
   document.getElementById("tk-rematch").addEventListener("click", e => {
     resultOverlay.classList.remove("is-visible");
     e.currentTarget.blur();
-    const p1 = match.fighters[0].def, p2 = match.fighters[1].def;
-    match.init(p1, p2, parseInt(diffSel.value, 10));
+    // Re-run the same matchup with the same controllers (same defs + slots).
+    match.init(match.fighters.map(f => f.def), match.controllers, match.diff);
   });
   document.getElementById("tk-change").addEventListener("click", () => {
     resultOverlay.classList.remove("is-visible");
-    document.getElementById("tk-select").classList.add("is-visible");
-    document.body.dataset.gameState = "select";
-    match.phase = "select";
+    flow.go("matchtype");
   });
 
   // sound toggle
