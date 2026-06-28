@@ -485,6 +485,8 @@
       this.meter = 0;
       this.stamina = MAX_STAM;
       this.rounds = 0;
+      this.dmgDealt = 0;          // cumulative damage dealt this match (leaderboard stat)
+      this.kos = 0;               // rounds won by KO this match (leaderboard stat)
       this.reset(x, facing);
       // animation angle state (lerped toward targets each frame)
       this.a = this.restAngles();
@@ -728,7 +730,9 @@
       if (dx < 76 && dy < 130 && Math.sign(opp.x - this.x) === this.facing) {
         const blocking = (opp.state === "block") && (opp.facing !== this.facing);
         this.attack.hasHit = true;
+        const before = opp.hp;
         opp.hurt(A.dmg, A.push, this.x, blocking);
+        this.dmgDealt += before - opp.hp;   // attribute actual HP lost to the attacker
         this.meter = Math.min(MAX_METER, this.meter + A.meter);
         if (!blocking) hitstop(0.06);
       }
@@ -1160,7 +1164,9 @@
         if (dx < 54 + p.r && dy < 120) {
           p.hit = true;
           const blocking = opp.state === "block" && opp.facing !== p.owner.facing;
+          const before = opp.hp;
           opp.hurt(p.dmg, 360, p.owner.x, blocking);
+          if (p.owner) p.owner.dmgDealt += before - opp.hp;   // credit the projectile's owner
           spark(p.x, p.y, p.color, 16, true); shake(7);
           p.life = 0;
         }
@@ -1627,6 +1633,7 @@
     endRound(winnerIdx, byKO) {
       if (this.phase === "roundend" || this.phase === "matchend") return;
       this.fighters[winnerIdx].rounds++;
+      if (byKO) this.fighters[winnerIdx].kos++;   // count KO finishes for the leaderboard
       const winner = this.fighters[winnerIdx];
       const loser = this.fighters[1 - winnerIdx];
       const matchWon = winner.rounds >= ROUNDS_TO_WIN;
@@ -1719,6 +1726,18 @@
     },
     endMatch() {
       this.phase = "matchend";
+      // Feed the local player's result to the shared arcade leaderboard.
+      // Slot 0 is "you" on this device; no-op if the engine isn't loaded.
+      const you = this.fighters[0];
+      if (you && window.TrollLeaderboard) {
+        window.TrollLeaderboard.record("troll-kombat", {
+          char: you.def.id,
+          won: this.winnerIdx === 0,
+          kos: you.kos,
+          damage: Math.round(you.dmgDealt),
+          mode: this.mode,
+        });
+      }
       showResult(this.winnerIdx, this.byKO, this.fighters, this.mode);
     },
     draw(dt) {

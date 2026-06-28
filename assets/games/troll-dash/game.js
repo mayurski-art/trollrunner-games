@@ -277,6 +277,12 @@
     state.shake = 18; state.hitFlash = 0.32;
     state.highScore = Math.max(state.highScore, Math.floor(state.distance));
     localStorage.setItem(HIGH_SCORE_KEY, String(state.highScore));
+    // Feed this run to the shared arcade leaderboard (no-op if engine absent).
+    if (window.TrollLeaderboard) {
+      window.TrollLeaderboard.record("troll-dash", {
+        distance: Math.floor(state.distance), coins: state.coins,
+      });
+    }
     if (dom.deathMessage) dom.deathMessage.textContent = pick(DEATH_MESSAGES);
     if (dom.scoreFinal) dom.scoreFinal.textContent = Math.floor(state.distance).toLocaleString();
     if (dom.coinFinal) dom.coinFinal.textContent = state.coins.toLocaleString();

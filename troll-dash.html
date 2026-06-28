@@ -10,6 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;700;900&family=DM+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/troll-leaderboard.css?v=lb-engine-v1">
   <link rel="stylesheet" href="assets/games/troll-dash/style.css?v=dash-split-20260626">
 </head>
 <body class="intro-complete">
@@ -157,6 +158,18 @@
       </section>
     </section>
 
+    <!-- Weekly leaderboard (shared arcade engine). Markup built by the engine
+         into #lb-root; prizes are placeholder/mock-only. -->
+    <section class="arcade-rack leaderboard-rack" aria-labelledby="lb-title">
+      <div class="section-heading">
+        <p class="eyebrow">Weekly ladder</p>
+        <h2 id="lb-title">Top Runners</h2>
+      </div>
+      <div id="lb-root" class="lb-root">
+        <p class="lb-foot">Loading leaderboard…</p>
+      </div>
+    </section>
+
     <section class="arcade-rack" aria-labelledby="more-title">
       <div class="section-heading">
         <p class="eyebrow">More cabinets</p>
@@ -181,7 +194,9 @@
 
   <script src="assets/js/troll-pay-config.js?v=1" defer></script>
   <script src="https://trollrunner.net/assets/js/troll-pay.js?v=5" defer></script>
-  <script src="assets/games/troll-dash/game.js?v=revive-pay-8" defer></script>
+  <script src="assets/js/troll-leaderboard.js?v=lb-engine-v1" defer></script>
+  <script src="assets/games/troll-dash/leaderboard.js?v=dash-lb-v1" defer></script>
+  <script src="assets/games/troll-dash/game.js?v=revive-pay-9" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://mayurski-art.github.io/assets/js/troll-notis.js"></script>
 </body>

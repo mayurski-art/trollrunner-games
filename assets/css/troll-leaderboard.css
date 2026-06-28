@@ -1,0 +1,93 @@
+/* ============================================================================
+   TROLL RUNNER ARCADE  —  Shared Weekly Leaderboard styles
+   Used by every game's leaderboard (engine: assets/js/troll-leaderboard.js).
+   Relies on the arcade theme vars (--green/--gold/--cyan/--muted/--line/etc.)
+   that each game page already defines.
+   ============================================================================ */
+.lb-root {
+  border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)), rgba(14, 5, 18, 0.6);
+}
+
+/* top bar: week window + reset countdown + data source */
+.lb-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+  padding: 12px 16px; border-bottom: 1px solid var(--line); background: rgba(154, 92, 255, 0.08);
+}
+.lb-week { display: flex; flex-direction: column; line-height: 1.15; }
+.lb-week-label { font-weight: 900; text-transform: uppercase; font-size: 15px; }
+.lb-week-id { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.lb-reset { margin-left: auto; display: flex; align-items: baseline; gap: 7px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.lb-reset-time { color: var(--cyan); font-size: 14px; }
+.lb-source {
+  padding: 3px 9px; border-radius: 999px; font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+  border: 1px solid var(--gold); color: var(--gold); background: rgba(255, 216, 77, 0.1);
+}
+
+/* prize preview — placeholder/mock only, never wired to payouts */
+.lb-prizes { padding: 14px 16px; border-bottom: 1px solid var(--line); background: rgba(255, 49, 79, 0.05); }
+.lb-prize-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.lb-prize-kicker { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+.lb-prize-pool { font-size: clamp(18px, 2.6vw, 24px); color: var(--gold); text-shadow: 0 0 22px rgba(255, 216, 77, 0.35); }
+.lb-prize-badge {
+  padding: 4px 10px; border-radius: 999px; font-family: var(--mono); font-size: 10px; font-weight: 900; letter-spacing: 0.1em;
+  border: 1px solid var(--red); color: var(--red); background: rgba(255, 49, 79, 0.12);
+}
+.lb-prize-tiers { list-style: none; margin: 12px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.lb-prize-tier {
+  display: grid; justify-items: center; gap: 2px; padding: 10px 8px; text-align: center;
+  border: 1px solid var(--line); border-radius: 9px; background: rgba(255, 255, 255, 0.04);
+}
+.lb-prize-r1 { border-color: rgba(255, 216, 77, 0.6); background: rgba(255, 216, 77, 0.08); }
+.lb-prize-r2 { border-color: rgba(220, 226, 235, 0.45); }
+.lb-prize-r3 { border-color: rgba(205, 127, 50, 0.5); }
+.lb-medal { font-size: 22px; }
+.lb-prize-rank { font-family: var(--mono); font-size: 11px; color: var(--muted); text-transform: uppercase; }
+.lb-prize-usdc { font-size: 15px; color: var(--ink); }
+.lb-prize-troll { font-family: var(--mono); font-size: 11px; color: var(--green); }
+.lb-prize-note { margin-top: 11px; font-size: 11px; line-height: 1.45; color: var(--muted); }
+
+/* table */
+.lb-table-wrap { overflow-x: auto; }
+.lb-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 540px; }
+.lb-table th, .lb-table td { padding: 9px 10px; text-align: left; border-bottom: 1px solid rgba(255, 255, 255, 0.07); }
+.lb-table thead th {
+  position: sticky; top: 0; font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--muted); background: rgba(8, 3, 12, 0.92); border-bottom-color: var(--line); white-space: nowrap;
+}
+.lb-table tbody tr:hover { background: rgba(255, 255, 255, 0.035); }
+.lb-num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lb-table th.lb-num { text-align: right; }
+
+/* per-column accent classes (config: column.accent: "green" | "gold" | ...) */
+.lb-acc-green { color: var(--green); }
+.lb-acc-gold { color: var(--gold); }
+.lb-acc-cyan { color: var(--cyan); }
+.lb-acc-red { color: var(--red); }
+.lb-acc-purple { color: var(--purple); }
+.lb-acc-muted { color: var(--muted); }
+
+.lb-rank { width: 52px; white-space: nowrap; }
+.lb-rank-n { font-family: var(--mono); font-weight: 700; color: var(--muted); }
+.lb-rank-medal { margin-left: 3px; }
+.lb-player { min-width: 180px; }
+.lb-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 8px; vertical-align: middle; box-shadow: 0 0 8px currentColor; }
+.lb-name { font-weight: 700; }
+.lb-char { display: block; margin-left: 17px; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.lb-tag {
+  margin-left: 7px; padding: 1px 6px; border-radius: 5px; font-family: var(--mono); font-size: 9px; font-weight: 900; letter-spacing: 0.06em;
+  border: 1px solid var(--cyan); color: var(--cyan); background: rgba(77, 238, 255, 0.12); vertical-align: middle;
+}
+.lb-table tbody tr.lb-you { background: rgba(77, 238, 255, 0.09); box-shadow: inset 3px 0 0 var(--cyan); }
+.lb-table tbody tr.lb-you:hover { background: rgba(77, 238, 255, 0.14); }
+.lb-foot { padding: 12px 16px; margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
+.lb-foot strong { color: var(--cyan); }
+
+@media (max-width: 760px) {
+  .lb-hide-sm { display: none; }
+  .lb-table { min-width: 0; font-size: 13px; }
+  .lb-reset { margin-left: 0; }
+}
+@media (max-width: 430px) {
+  .lb-prize-tiers { grid-template-columns: 1fr; }
+}

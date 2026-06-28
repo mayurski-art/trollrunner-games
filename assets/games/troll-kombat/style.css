@@ -453,6 +453,8 @@ h1 {
 .special-line { font-family: var(--mono); font-size: 12px; }
 .special-line strong { color: var(--gold); }
 
+/* Weekly leaderboard styles now live in the shared assets/css/troll-leaderboard.css */
+
 @keyframes blink { 50% { opacity: 0.25; } }
 
 /* ---- Responsive -------------------------------------------------------- */
