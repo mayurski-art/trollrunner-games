@@ -651,13 +651,22 @@ body[data-mode="toy"] .screen-wrap { box-shadow: inset 0 0 48px rgba(77, 238, 25
 /* focus-visible: same as selected ring so keyboard nav is clear */
 .stage-thumb:focus-visible { box-shadow: 0 0 0 3px rgba(77,255,115,0.8), 0 0 22px 4px rgba(77,255,115,0.4); }
 
-.stage-rand { position: absolute; left: 19.4%; top: 90%; width: 15%; height: 8%; display: flex; gap: 5px; }
+/* random-map toggle — opaque pills sit exactly over the baked OFF/ON so the
+   live state (not the baked art) is the source of truth. OFF = warm, ON = green. */
+.stage-rand { position: absolute; left: 19.4%; top: 90.8%; width: 13.4%; height: 5.8%; display: flex; gap: 4px; }
 .rand-opt {
-  flex: 1; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(0, 0, 0, 0.55);
-  color: var(--muted); font-family: var(--mono); font-weight: 700; font-size: 12px;
-  border-radius: 7px; cursor: pointer; transition: all 140ms ease;
+  flex: 1; border: 1px solid rgba(255, 255, 255, 0.18); background: #15100c;
+  color: var(--muted); font-family: var(--mono); font-weight: 700; font-size: clamp(10px, 1.1vw, 13px);
+  border-radius: 999px; cursor: pointer; transition: all 140ms ease;
 }
-.rand-opt.is-active { background: var(--green); color: #04130a; border-color: var(--green); box-shadow: 0 0 16px rgba(77, 255, 115, 0.5); }
+.rand-opt:hover { border-color: rgba(255, 255, 255, 0.4); }
+.rand-opt[data-rand="off"].is-active {
+  background: linear-gradient(180deg, #ff8a3d, #df451c); color: #190a04;
+  border-color: #ff8a3d; box-shadow: 0 0 16px rgba(255, 110, 50, 0.55);
+}
+.rand-opt[data-rand="on"].is-active {
+  background: var(--green); color: #04130a; border-color: var(--green); box-shadow: 0 0 16px rgba(77, 255, 115, 0.5);
+}
 
 .stage-btn {
   position: absolute; border: 0; border-radius: 9px; cursor: pointer;
@@ -772,14 +781,16 @@ body[data-mode="toy"] .screen-wrap { box-shadow: inset 0 0 48px rgba(77, 238, 25
   cursor: pointer; outline: none; -webkit-tap-highlight-color: transparent;
   transition: box-shadow 150ms ease, border-color 150ms ease;
 }
-/* positions over the 3 baked thumbs (Pepe · Doge · Troll) */
-.fsel-mock .fsel-cell:nth-child(1) { left: 30.2%; top: 55.8%; width: 9%; height: 27%; --ring: 61,255,94; }
-.fsel-mock .fsel-cell:nth-child(2) { left: 39.9%; top: 55.8%; width: 9%; height: 27%; --ring: 255,184,0; }
-.fsel-mock .fsel-cell:nth-child(3) { left: 49.5%; top: 55.8%; width: 9%; height: 27%; --ring: 207,214,224; }
+/* positions wrap the 3 baked thumbs exactly (Pepe · Doge · Troll), so the hover
+   ring sits right on each thumbnail's border — no left-offset. Per-fighter glow:
+   Pepe green, Doge yellow, Troll white. */
+.fsel-mock .fsel-cell:nth-child(1) { left: 31.0%; top: 56.3%; width: 11.2%; height: 27.8%; --ring: 61,255,94; }   /* Pepe  — green  */
+.fsel-mock .fsel-cell:nth-child(2) { left: 43.8%; top: 56.3%; width: 11.2%; height: 27.8%; --ring: 255,184,0; }  /* Doge  — yellow */
+.fsel-mock .fsel-cell:nth-child(3) { left: 56.6%; top: 56.3%; width: 11.2%; height: 27.8%; --ring: 245,248,255; } /* Troll — white  */
 .fsel-mock .fsel-cell:hover:not(.is-locked),
 .fsel-mock .fsel-cell:focus-visible:not(.is-locked) {
-  border-color: rgba(var(--ring),0.9);
-  box-shadow: 0 0 22px 3px rgba(var(--ring),0.45), inset 0 0 18px rgba(var(--ring),0.2);
+  border-color: rgb(var(--ring));
+  box-shadow: 0 0 18px 2px rgba(var(--ring),0.55), 0 0 34px 8px rgba(var(--ring),0.30), inset 0 0 14px rgba(var(--ring),0.18);
 }
 .fsel-mock .fsel-cell.taken-1 { border-color: var(--green); box-shadow: 0 0 22px 3px rgba(61,255,94,0.5); }
 .fsel-mock .fsel-cell.taken-2 { border-color: var(--gold);  box-shadow: 0 0 22px 3px rgba(255,184,0,0.5); }

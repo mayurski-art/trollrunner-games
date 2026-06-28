@@ -32,6 +32,11 @@
   const ROUND_TIME = 60;        // seconds
   const ROUNDS_TO_WIN = 2;      // best of 3
   const MAX_HP = 100;
+  // Random map switching (Phase 6): when the setting is ON, the arena re-rolls
+  // mid-fight on this interval. Tweak the range/lead-time here to taste.
+  const MAP_SHIFT_MIN = 12;     // sec — soonest a mid-fight shift can fire
+  const MAP_SHIFT_MAX = 20;     // sec — longest gap between shifts
+  const MAP_SHIFT_WARN = 1.3;   // sec — "MAP SHIFTING…" warning before the swap
   const MAX_METER = 100;
   const MAX_STAM = 100;         // stamina pool
 
@@ -1546,6 +1551,9 @@
     mode: "cpu",             // "cpu" | "mp"
     diff: 1,
     finisher: false,
+    randomStage: false,      // mirror of setup.randomStage for this match
+    mapShiftT: 0,            // countdown (sec) to the next mid-fight map shift
+    mapShiftWarned: false,   // has the "MAP SHIFTING…" warning fired this cycle?
     // The opponent of a given fighter (2-player today; nearest-other later).
     other(f) { return this.fighters[0] === f ? this.fighters[1] : this.fighters[0]; },
     // defs[] = fighter definitions, controllers[] = input owner per slot.
@@ -1576,13 +1584,9 @@
       this.timer = ROUND_TIME;
       this.finisher = false;
       projectiles = []; particles = [];
-      // Random map switching: re-roll the stage between rounds when enabled.
-      if (!this.firstRound && this.randomStage) {
-        const pool = STAGES.filter(s => s !== currentStage);
-        currentStage = pool[Math.floor(Math.random() * pool.length)];
-        loadStageImage(currentStage);
-        if (els.stageName) els.stageName.textContent = currentStage.name;
-      }
+      // Random map switching: re-roll the stage between rounds when enabled
+      // (silent — the round intro covers it; no mid-fight warning needed here).
+      if (!this.firstRound && this.randomStage) this.shiftStage(false);
       els.roundLabel.textContent = `Round ${this.round}`;
       if (this.firstRound) {
         this.phase = "countdown"; this.phaseT = 0; this._cd = 4;
@@ -1595,6 +1599,28 @@
       this.phase = "fight"; this.phaseT = 0;
       announce("FIGHT!", 0.7, true);
       audio.bell();
+      if (this.randomStage) this.scheduleMapShift();   // arm the mid-fight timer
+    },
+    // Pick the next mid-fight shift time (sec) and re-arm the warning.
+    scheduleMapShift() {
+      this.mapShiftT = MAP_SHIFT_MIN + Math.random() * (MAP_SHIFT_MAX - MAP_SHIFT_MIN);
+      this.mapShiftWarned = false;
+    },
+    // Swap to a different arena. Floor/walls are stage-independent constants, so
+    // positions, collisions, health and match state are untouched — we only swap
+    // the backdrop and clamp fighters back inside the (unchanged) arena bounds.
+    shiftStage(announceIt) {
+      const pool = STAGES.filter(s => s !== currentStage);
+      if (!pool.length) return;
+      currentStage = pool[Math.floor(Math.random() * pool.length)];
+      loadStageImage(currentStage);
+      if (els.stageName) els.stageName.textContent = currentStage.name;
+      for (const f of this.fighters) f.x = clamp(f.x, WALL_L, WALL_R);  // safe re-anchor
+      if (announceIt) {
+        announce(currentStage.name.toUpperCase(), 1.0, true);
+        shake(8);
+        audio.blip(330, 0.18, "sawtooth", 0.1);
+      }
     },
     endRound(winnerIdx, byKO) {
       if (this.phase === "roundend" || this.phase === "matchend") return;
@@ -1632,6 +1658,22 @@
 
       if (this.phase === "fight") {
         this.timer = Math.max(0, this.timer - dt);
+        // Mid-fight random map switching (Phase 6). Only runs in the "fight"
+        // phase, so it never fires during countdown/intro/round-end/match-end
+        // (and there is no pause to collide with). We also leave the final
+        // seconds alone so a swap never overlaps an incoming TIME/KO.
+        if (this.randomStage) {
+          this.mapShiftT -= dt;
+          const canShift = this.timer > 3.5;
+          if (canShift && !this.mapShiftWarned && this.mapShiftT <= MAP_SHIFT_WARN) {
+            this.mapShiftWarned = true;
+            announce("MAP SHIFTING…", MAP_SHIFT_WARN, true);
+          }
+          if (this.mapShiftT <= 0) {
+            if (canShift) this.shiftStage(true);
+            this.scheduleMapShift();   // re-arm regardless, so the cycle continues
+          }
+        }
         // Each fighter pulls intent from its own controller (human slot or AI),
         // so input/state ownership stays cleanly per-player.
         const fs = this.fighters;
