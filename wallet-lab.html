@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <title>Wallet Lab (sandbox) | Troll Runner Arcade</title>
+  <meta name="description" content="Phase 10 sandbox — wallet / payments / rewards utility layer in mock mode. No real money.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;700;900&family=DM+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/troll-wallet.css?v=lab-v1">
+  <style>
+    :root{
+      --green:#4dff73;--gold:#ffd84d;--cyan:#4deeff;--red:#ff314f;--purple:#9a5cff;
+      --ink:#f7fff8;--muted:rgba(247,255,248,.72);--line:rgba(255,255,255,.16);
+      --font:"DM Sans",system-ui,sans-serif;--mono:"DM Mono",monospace;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;font-family:var(--font);color:var(--ink);
+      background:radial-gradient(circle at 50% 0%,rgba(154,92,255,.18),transparent 40%),linear-gradient(160deg,#040005,#120615 50%,#030106);}
+    .wrap{width:min(820px,100%);margin:0 auto;padding:clamp(14px,3vw,32px);}
+    h1{font-size:clamp(26px,5vw,40px);margin:0 0 4px;text-transform:uppercase}
+    .sub{color:var(--muted);margin:0 0 18px;font-size:14px}
+    .banner{display:flex;gap:10px;align-items:center;padding:12px 14px;border:1px solid var(--gold);
+      border-radius:12px;background:rgba(255,216,77,.1);color:var(--gold);font-weight:700;margin-bottom:22px}
+    .card{border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:18px;
+      background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));}
+    .card h2{font-size:16px;text-transform:uppercase;letter-spacing:.04em;margin:0 0 12px}
+    .row{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+    .flags{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
+    .flag{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;
+      padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:rgba(255,255,255,.03)}
+    .flag input{accent-color:var(--cyan)}
+    .flag.real{border-color:rgba(255,49,79,.4)}
+    .pill{font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+    .ko{display:grid;gap:12px;justify-items:start}
+    .ko-msg{font-weight:900;font-size:22px;color:var(--red)}
+    .btn{font:inherit;cursor:pointer;min-height:44px;padding:11px 18px;border-radius:10px;
+      border:1px solid var(--line);background:rgba(255,255,255,.08);color:var(--ink);font-weight:700}
+    .btn.primary{border-color:var(--gold);color:var(--gold)}
+    .btn:hover,.btn:focus-visible{outline:none;filter:brightness(1.12)}
+    .status{font-family:var(--mono);font-size:13px;color:var(--muted);min-height:18px}
+    .status.ok{color:var(--green)} .status.bad{color:var(--red)}
+    .log{font-family:var(--mono);font-size:11px;color:var(--muted);white-space:pre-wrap;
+      max-height:160px;overflow:auto;border:1px solid var(--line);border-radius:9px;padding:10px;background:rgba(0,0,0,.3)}
+    label.chk{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--muted)}
+    a.back{color:var(--cyan);font-family:var(--mono);font-size:12px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Wallet Lab</h1>
+    <p class="sub">Phase 10 sandbox for the wallet / payments / rewards utility layer. <a class="back" href="/">← Arcade</a></p>
+
+    <div class="banner">🧪 SANDBOX · MOCK MODE — all real-money flags are OFF by default. No real wallet opens and no tokens move here.</div>
+
+    <!-- Feature flags -->
+    <div class="card">
+      <h2>Feature flags <span class="pill" id="mode-pill">mock</span></h2>
+      <div class="flags" id="flags"></div>
+      <p class="sub" style="margin:12px 0 0">Toggling a real flag here only affects this page. Real payments still cannot complete — the on-chain library and backend are intentionally not loaded in the sandbox.</p>
+    </div>
+
+    <!-- Wallet -->
+    <div class="card">
+      <h2>Wallet</h2>
+      <div class="row" id="wallet-status"></div>
+    </div>
+
+    <!-- First utility use case: Pay 6.9 TROLL to Revive -->
+    <div class="card">
+      <h2>First utility · Pay 6.9 TROLL to Revive</h2>
+      <div class="ko" id="ko-panel">
+        <div class="ko-msg">💀 You got rekt.</div>
+        <div class="row">
+          <button class="btn" id="no-revive">Continue without revive</button>
+          <button class="btn primary" id="do-revive">Pay 6.9 TROLL to Revive</button>
+        </div>
+        <label class="chk"><input type="checkbox" id="sim-fail"> Simulate payment failure</label>
+        <div class="status" id="revive-status"></div>
+      </div>
+    </div>
+
+    <!-- Rewards -->
+    <div class="card">
+      <h2>Token rewards</h2>
+      <div id="rewards-panel"></div>
+    </div>
+
+    <!-- Event log -->
+    <div class="card">
+      <h2>Backend event log <span class="pill">mock</span></h2>
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+
+  <!-- Order matters: flags → backend → wallet → payments → rewards.
+       NOTE: troll-pay.js (the real on-chain lib) is deliberately NOT loaded. -->
+  <script src="assets/js/troll-arcade-flags.js?v=phase10-v1" defer></script>
+  <script src="assets/js/troll-pay-config.js?v=1" defer></script>
+  <script src="assets/js/backend-api.js?v=phase10-v1" defer></script>
+  <script src="assets/js/wallet.js?v=phase10-v1" defer></script>
+  <script src="assets/js/payments.js?v=phase10-v1" defer></script>
+  <script src="assets/js/tokenRewards.js?v=phase10-v1" defer></script>
+  <script defer>
+    document.addEventListener("DOMContentLoaded", () => {
+      const F = window.TROLL_FLAGS, W = window.TrollWallet, P = window.TrollPayments, R = window.TrollRewards, B = window.TrollBackend;
+      const $ = (s) => document.querySelector(s);
+
+      // --- flags UI -------------------------------------------------------
+      const FLAG_KEYS = ["ENABLE_WALLET_CONNECT","ENABLE_REAL_PAYMENTS","ENABLE_REAL_REWARDS","ENABLE_REAL_CLAIMS","ENABLE_MOCK_PAYMENTS","ENABLE_MOCK_REWARDS"];
+      let unmountWallet = () => {};
+      function renderFlags() {
+        $("#flags").innerHTML = FLAG_KEYS.map(k => {
+          const real = k.startsWith("ENABLE_REAL") || k === "ENABLE_WALLET_CONNECT";
+          return `<label class="flag ${real ? "real" : ""}"><input type="checkbox" data-k="${k}" ${F[k] ? "checked" : ""}> ${k}</label>`;
+        }).join("");
+        $("#flags").querySelectorAll("input").forEach(cb => cb.addEventListener("change", () => {
+          F[cb.dataset.k] = cb.checked;
+          refreshAll();
+        }));
+        $("#mode-pill").textContent = (F.ENABLE_REAL_PAYMENTS ? "REAL payments" : "mock");
+      }
+      function remountWallet() { unmountWallet(); $("#wallet-status").innerHTML = ""; unmountWallet = W.mountStatus("#wallet-status"); }
+      let refreshRewards = () => {};
+      function refreshAll() { renderFlags(); remountWallet(); refreshRewards = R.mountPanel("#rewards-panel", { wallet: W.getAddress() }); renderLog(); }
+
+      // --- revive demo ----------------------------------------------------
+      $("#sim-fail").addEventListener("change", (e) => P.configure({ simulateFailure: e.target.checked }));
+      $("#no-revive").addEventListener("click", () => setRevive("You chose to continue without reviving.", ""));
+      $("#do-revive").addEventListener("click", async () => {
+        setRevive("Opening confirmation…", "");
+        const res = await P.requestPayment({
+          action: "Revive Player", token: "TROLL", amount: 6.9, amountUsd: 0.69,
+          memo: "Troll Dash revive (sandbox)", dedupeKey: "revive",
+        });
+        if (res.ok) setRevive(`✅ Revived! ${res.mock ? "(mock)" : ""} tx ${res.txSig}`, "ok");
+        else setRevive(`❌ Not revived — ${res.message || res.reason}`, res.reason === "cancelled" ? "" : "bad");
+        renderLog();
+      });
+      function setRevive(msg, cls) { const el = $("#revive-status"); el.textContent = msg; el.className = "status " + (cls || ""); }
+
+      // --- log ------------------------------------------------------------
+      function renderLog() { $("#log").textContent = B.getLog().slice(-12).map(e => `${new Date(e.ts).toLocaleTimeString()}  ${e.event}`).join("\n") || "(no events yet)"; }
+
+      refreshAll();
+    });
+  </script>
+</body>
+</html>
