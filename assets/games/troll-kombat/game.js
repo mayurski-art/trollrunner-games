@@ -1559,6 +1559,8 @@
     // defs[] = fighter definitions, controllers[] = input owner per slot.
     // Kept array-driven (not p1/p2 hardcoded) so 3+ players slot in later.
     init(defs, controllers, diff) {
+      pause.reset();
+      if (pauseEls.btn) pauseEls.btn.hidden = false;   // pause is available in-match
       this.diff = diff;
       this.controllers = controllers;
       this.mode = controllers.some(c => c.type === "ai") ? "cpu" : "mp";
@@ -1835,6 +1837,7 @@
   window.addEventListener("keydown", e => {
     const tag = e.target && e.target.tagName;
     if (tag === "SELECT" || tag === "INPUT" || tag === "TEXTAREA") return;
+    if (pause.active) return;   // frozen: ignore fight input (keyup still clears held keys)
     for (let slot = 0; slot < keymaps.length; slot++) {
       const a = keymaps[slot][e.key]; if (!a) continue;
       e.preventDefault(); audio.ensure();
@@ -1857,6 +1860,7 @@
     const s = inputs[0];
     const down = e => {
       e.preventDefault(); audio.ensure();
+      if (pause.active) return;   // frozen: swallow touch input too
       if (key === "punch" || key === "kick" || key === "special") { s.edge[key] = true; s.held[key] = true; }
       else s.held[map[key]] = true;
       btn.classList.add("is-down");
@@ -1871,6 +1875,234 @@
     btn.addEventListener("touchcancel", up, { passive: false });
     btn.addEventListener("mousedown", down);
     window.addEventListener("mouseup", up);
+  });
+
+  /* ==========================================================================
+     PAUSE  (Phase 7)
+     Solo / CPU: a pause key freezes the match instantly. Local versus: one
+     player REQUESTS, the others must agree — gameplay keeps running until the
+     vote passes, then the match freezes for everyone. The approval bar is a
+     majority of the human players, which is naturally unanimous at 2 players
+     and a true majority at 3+. Requests expire on a timer and each requester
+     gets a short cooldown so pause can't be spammed. The original requester
+     (or a resume majority at 3+) lifts the pause.
+
+     On one shared keyboard, the only unambiguous way to attribute a vote to a
+     specific player is "press YOUR own key", so each slot owns a pause key and
+     the same key requests / approves / resumes depending on the current state.
+     ========================================================================== */
+  const PAUSE_REQ_TIMEOUT = 8;   // sec a pending request lives before expiring
+  const PAUSE_COOLDOWN    = 5;   // sec before the same player can ask again
+  // Pause key per slot (mirrors the fight keymaps). Slots 2/3 are wired for the
+  // future 3–4 player roster; only 0/1 are reachable today.
+  const PAUSE_KEYS = [
+    { Escape: 1, p: 1, P: 1 },   // P1 / solo
+    { Enter: 1 },                // P2
+    { "/": 1, "?": 1 },          // P3 (future)
+    { End: 1 },                  // P4 (future)
+  ];
+
+  const pauseEls = {
+    btn:       document.getElementById("tk-pause"),
+    req:       document.getElementById("tk-pause-req"),
+    reqWho:    document.getElementById("pb-requester"),
+    reqNeed:   document.getElementById("pb-need"),
+    reqVotes:  document.getElementById("pb-votes"),
+    reqHint:   document.getElementById("pb-hint"),
+    reqTimer:  document.getElementById("pb-timer-fill"),
+    reqCancel: document.getElementById("pb-cancel"),
+    overlay:   document.getElementById("tk-paused"),
+    by:        document.getElementById("pause-by"),
+    resumeHint:document.getElementById("pause-resume-hint"),
+    resumeBtn: document.getElementById("pause-resume"),
+    quitBtn:   document.getElementById("pause-quit"),
+  };
+  // Friendly key label per slot, for on-screen prompts.
+  const PAUSE_KEY_LABEL = ["Esc / P", "Enter", "/", "End"];
+  const playerLabel = slot => "Player " + (slot + 1);
+
+  const pause = {
+    active: false,        // approved pause — the sim is frozen
+    pending: false,       // versus request awaiting votes
+    requester: -1,        // slot that asked
+    approvals: new Set(), // slots that approved (the requester counts as one)
+    resumes: new Set(),   // slots voting to resume (3+ player override)
+    needed: 0,            // approvals required for this request
+    reqT: 0,              // pending request countdown (sec)
+    cooldownUntil: {},    // slot -> performance.now() ms it can ask again
+
+    // Human-controlled slots for the current match (AI slots can't vote).
+    humans() { return match.controllers.filter(c => c.type === "human").map(c => c.slot); },
+    isMP() { return match.mode === "mp"; },
+    // Pause is only meaningful during a live round (not menus / result screen).
+    canControl() { return match.phase !== "select" && match.phase !== "matchend"; },
+
+    // A pause key (or the on-screen button) was triggered by `slot`.
+    press(slot) {
+      if (!this.canControl()) return;
+      if (this.active)  return this.tryResume(slot);
+      if (this.pending) return this.approve(slot);
+      this.request(slot);
+    },
+
+    request(slot) {
+      const now = performance.now();
+      if ((this.cooldownUntil[slot] || 0) > now) {   // spam guard
+        announce("PAUSE ON COOLDOWN", 0.9);
+        audio.blip(180, 0.1, "square", 0.08, 120);
+        return;
+      }
+      const n = this.humans().length;
+      this.requester = slot;
+      this.approvals = new Set([slot]);              // asking == approving
+      this.resumes = new Set();
+      this.needed = Math.floor(n / 2) + 1;           // majority (unanimous at 2P)
+      // Solo / CPU, or a one-player majority — pause immediately.
+      if (!this.isMP() || this.approvals.size >= this.needed) { this.activate(); return; }
+      this.pending = true;
+      this.reqT = PAUSE_REQ_TIMEOUT;
+      announce("PAUSE?", 0.6);
+      audio.blip(440, 0.1, "square", 0.1, 660);
+      this.renderReq();
+    },
+
+    approve(slot) {
+      if (!this.pending || this.approvals.has(slot)) return;
+      this.approvals.add(slot);
+      audio.blip(620, 0.08, "square", 0.1, 880);
+      if (this.approvals.size >= this.needed) { this.activate(); return; }
+      this.renderReq();
+    },
+
+    activate() {
+      this.pending = false;
+      this.active = true;
+      this.reqT = 0;
+      // Drop any buffered fight input so nothing fires on resume.
+      inputs.forEach(s => { s.held = {}; s.edge = {}; });
+      this.hideReq();
+      this.renderPaused();
+      document.body.dataset.paused = "1";
+      audio.bell();
+    },
+
+    tryResume(slot) {
+      // CPU/solo, or the original requester, can always resume.
+      if (!this.isMP() || slot === this.requester) return this.resume();
+      // 3+ players: a resume majority can override a stalling requester.
+      this.resumes.add(slot);
+      if (this.resumes.size >= this.needed) return this.resume();
+      this.renderPaused();
+    },
+
+    // Unconditional lift used by the on-screen Resume button (single shared screen).
+    resume() {
+      const who = this.requester;
+      this.active = false;
+      this.pending = false;
+      this.approvals.clear();
+      this.resumes.clear();
+      if (who >= 0) this.cooldownUntil[who] = performance.now() + PAUSE_COOLDOWN * 1000;
+      this.requester = -1;
+      document.body.dataset.paused = "";
+      this.hidePaused();
+      if (this.canControl()) { announce("RESUME", 0.5); audio.bell(); }
+    },
+
+    // A pending request expired or was cancelled.
+    cancel(reason) {
+      if (!this.pending) return;
+      const who = this.requester;
+      this.pending = false;
+      if (who >= 0) this.cooldownUntil[who] = performance.now() + PAUSE_COOLDOWN * 1000;
+      this.requester = -1;
+      this.approvals.clear();
+      this.hideReq();
+      if (reason) announce(reason, 1.0);
+      audio.blip(200, 0.12, "sawtooth", 0.1, 90);
+    },
+
+    // Wipe all pause state (match (re)start or returning to a menu).
+    reset() {
+      this.active = this.pending = false;
+      this.requester = -1; this.needed = 0; this.reqT = 0;
+      this.approvals.clear(); this.resumes.clear();
+      this.hideReq(); this.hidePaused();
+      document.body.dataset.paused = "";
+    },
+
+    // Real-time tick (runs even while the sim is frozen) — only the request timer.
+    tick(dt) {
+      if (!this.pending) return;
+      this.reqT -= dt;
+      if (this.reqT <= 0) { this.cancel("PAUSE DENIED"); return; }
+      if (pauseEls.reqTimer) pauseEls.reqTimer.style.width = Math.max(0, this.reqT / PAUSE_REQ_TIMEOUT * 100) + "%";
+    },
+
+    /* ---- UI ------------------------------------------------------------- */
+    renderReq() {
+      if (!pauseEls.req) return;
+      pauseEls.reqWho.textContent = `${playerLabel(this.requester)} wants to pause`;
+      const have = this.approvals.size;
+      pauseEls.reqNeed.textContent = `${have} / ${this.needed} approved`;
+      // one chip per human: requester = gold, approved = green, waiting = grey
+      pauseEls.reqVotes.innerHTML = "";
+      this.humans().forEach(slot => {
+        const li = document.createElement("li");
+        li.textContent = playerLabel(slot) + (slot === this.requester ? " ✦" : this.approvals.has(slot) ? " ✓" : " …");
+        li.className = slot === this.requester ? "is-req" : this.approvals.has(slot) ? "is-yes" : "";
+        pauseEls.reqVotes.appendChild(li);
+      });
+      const waiting = this.humans().filter(s => !this.approvals.has(s));
+      pauseEls.reqHint.textContent = waiting.length
+        ? "To approve: " + waiting.map(s => `${playerLabel(s)} press ${PAUSE_KEY_LABEL[s]}`).join(" · ")
+        : "Approved!";
+      pauseEls.reqTimer.style.width = "100%";
+      pauseEls.req.hidden = false;
+    },
+    hideReq() { if (pauseEls.req) pauseEls.req.hidden = true; },
+
+    renderPaused() {
+      if (!pauseEls.overlay) return;
+      pauseEls.by.textContent = this.requester >= 0 ? `Paused by ${playerLabel(this.requester)}` : "Match paused";
+      if (this.isMP()) {
+        const lbl = this.requester >= 0 ? PAUSE_KEY_LABEL[this.requester] : "their key";
+        pauseEls.resumeHint.innerHTML = this.humans().length > 2
+          ? `${playerLabel(this.requester)} resumes (<kbd>${lbl}</kbd>), or a majority can vote to resume`
+          : `${playerLabel(this.requester)} resumes — press <kbd>${lbl}</kbd>`;
+      } else {
+        pauseEls.resumeHint.innerHTML = `Press <kbd>Esc</kbd> / <kbd>P</kbd> to resume`;
+      }
+      pauseEls.overlay.hidden = false;
+      if (pauseEls.resumeBtn) pauseEls.resumeBtn.focus();
+    },
+    hidePaused() { if (pauseEls.overlay) pauseEls.overlay.hidden = true; },
+  };
+
+  // Pause key listener — separate from the fight input so it works mid-freeze.
+  window.addEventListener("keydown", e => {
+    const tag = e.target && e.target.tagName;
+    if (tag === "SELECT" || tag === "INPUT" || tag === "TEXTAREA") return;
+    if (!pause.canControl()) return;
+    const live = new Set(pause.humans());
+    for (let slot = 0; slot < PAUSE_KEYS.length; slot++) {
+      if (!PAUSE_KEYS[slot][e.key]) continue;
+      if (!live.has(slot)) continue;          // only real players for this match
+      e.preventDefault();
+      pause.press(slot);
+      return;                                 // a key belongs to exactly one slot
+    }
+  });
+
+  // On-screen / touch pause button acts as P1 (slot 0 — the local/solo player).
+  if (pauseEls.btn) pauseEls.btn.addEventListener("click", e => { e.currentTarget.blur(); pause.press(0); });
+  if (pauseEls.reqCancel) pauseEls.reqCancel.addEventListener("click", () => pause.cancel("PAUSE CANCELLED"));
+  if (pauseEls.resumeBtn) pauseEls.resumeBtn.addEventListener("click", e => { e.currentTarget.blur(); pause.resume(); });
+  if (pauseEls.quitBtn) pauseEls.quitBtn.addEventListener("click", () => {
+    pause.reset();
+    match.phase = "select";
+    match.fighters = [];
+    flow.go("matchtype");
   });
 
   /* ==========================================================================
@@ -1971,6 +2203,8 @@
     },
     current: "matchtype",
     go(name) {
+      pause.reset();
+      if (pauseEls.btn) pauseEls.btn.hidden = true;   // no pausing on the menus
       Object.values(this.screens).forEach(el => el && el.classList.remove("is-visible"));
       if (this.screens[name]) this.screens[name].classList.add("is-visible");
       this.current = name;
@@ -2178,6 +2412,8 @@
      ========================================================================== */
   const resultOverlay = document.getElementById("tk-result");
   function showResult(winnerIdx, byKO, fighters, mode) {
+    pause.reset();
+    if (pauseEls.btn) pauseEls.btn.hidden = true;   // match's over — no pause on the result screen
     const winner = fighters[winnerIdx];
     const isMP = mode === "mp";
     // In CPU mode, "you" are P1. In versus, frame it by player number.
@@ -2228,23 +2464,32 @@
     lastT = now;
     dt = Math.min(dt, 0.05);
 
+    // The pause request timer ticks in real time, even while the sim is frozen.
+    pause.tick(dt);
+
+    // An approved pause freezes the whole simulation (movement, attacks, timers,
+    // map switching, CPU behaviour) — we keep rendering the last frame so the
+    // arena stays on screen behind the PAUSED overlay.
+    const live = match.phase !== "select";
+    const frozen = live && pause.active;
+
     // hitstop freezes sim but not rendering
     let simDt = dt;
-    if (hitstopT > 0) { hitstopT -= dt; simDt = 0.0005; }
+    if (!frozen && hitstopT > 0) { hitstopT -= dt; simDt = 0.0005; }
 
-    if (match.phase !== "select") {
+    if (live && !frozen) {
       match.update(simDt);
       updateProjectiles(simDt, match.fighters);
     }
-    updateParticles(dt);
+    if (!frozen) updateParticles(dt);
 
-    // camera shake
+    // camera shake (held still while frozen)
     ctx.save();
-    if (shakeAmt > 0) {
+    if (!frozen && shakeAmt > 0) {
       ctx.translate(rand(-shakeAmt, shakeAmt), rand(-shakeAmt, shakeAmt));
       shakeAmt = Math.max(0, shakeAmt - dt * 60);
     }
-    drawStage(dt);
+    drawStage(frozen ? 0 : dt);
     if (match.fighters.length) {
       match.draw(dt);
       drawProjectiles();
@@ -2252,7 +2497,7 @@
     drawParticles();
     ctx.restore();
 
-    if (match.phase !== "select") updateHUD();
+    if (live) updateHUD();
 
     requestAnimationFrame(loop);
   }

@@ -347,6 +347,61 @@ h1 {
 .link-back { display: inline-block; margin-top: 14px; color: var(--green); font-family: var(--mono); font-size: 12px; }
 .link-back:hover { text-decoration: underline; }
 
+/* ---- Pause ------------------------------------------------------------- */
+/* pause icon button sits just left of the sound toggle (.icon-btn forces
+   display:grid, so [hidden] alone won't hide it — force it) */
+.pause-btn { right: 64px; }
+.pause-btn[hidden] { display: none; }
+@media (max-width: 760px) { .pause-btn { right: 60px; } }
+
+/* PAUSED overlay (active pause — reuses .game-overlay, shown/hidden via [hidden].
+   .game-overlay forces display:grid, so [hidden] alone won't hide it — force it. */
+.pause-overlay { opacity: 1; pointer-events: auto; }
+.pause-overlay[hidden] { display: none; }
+.pause-card { text-align: center; }
+.pause-card h2 { color: var(--cyan); text-shadow: 3px 0 0 rgba(255, 49, 79, 0.3), 0 0 28px rgba(77, 238, 255, 0.5); }
+.pause-by { margin-top: 10px; color: var(--gold); font-family: var(--mono); font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; }
+.pause-resume-hint { margin-top: 8px; color: var(--muted); font-size: 14px; }
+.pause-card kbd {
+  display: inline-block; padding: 1px 7px; margin: 0 1px;
+  border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px;
+  background: rgba(255, 255, 255, 0.08); font-family: var(--mono); font-size: 12px; color: var(--ink);
+}
+
+/* pause REQUEST banner — top-centred, non-blocking (gameplay continues) */
+.pause-banner {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 9;
+  display: grid; justify-items: center; padding: 12px; pointer-events: none;
+}
+.pause-banner[hidden] { display: none; }
+.pause-banner-card {
+  pointer-events: auto; width: min(420px, 94%); text-align: center;
+  padding: 12px 16px 14px; border: 1px solid var(--purple); border-radius: 10px;
+  background: linear-gradient(180deg, rgba(154, 92, 255, 0.18), rgba(14, 5, 18, 0.96));
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55); animation: pbDrop 240ms cubic-bezier(0.18, 1.2, 0.4, 1) both;
+}
+@keyframes pbDrop { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
+.pb-head { display: grid; gap: 2px; }
+.pb-kicker { color: var(--purple); font-family: var(--mono); font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; }
+.pb-head strong { font-size: 17px; text-transform: uppercase; }
+.pb-need { margin-top: 6px; color: var(--gold); font-family: var(--mono); font-size: 12px; }
+.pb-votes { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.pb-votes li {
+  padding: 3px 9px; border-radius: 999px; font-family: var(--mono); font-size: 11px; font-weight: 700;
+  border: 1px solid var(--line); color: var(--muted); background: rgba(255, 255, 255, 0.05);
+}
+.pb-votes li.is-yes { border-color: var(--green); color: var(--green); background: rgba(77, 255, 115, 0.14); }
+.pb-votes li.is-req { border-color: var(--gold); color: var(--gold); background: rgba(255, 216, 77, 0.14); }
+.pb-hint { margin-top: 8px; color: var(--muted); font-size: 12px; }
+.pb-timer { margin-top: 9px; height: 5px; border-radius: 999px; overflow: hidden; background: rgba(255, 255, 255, 0.12); }
+.pb-timer span { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, var(--purple), var(--red)); transition: width 120ms linear; }
+.pb-cancel {
+  margin-top: 11px; min-height: 34px; padding: 7px 14px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 8px; color: var(--ink);
+  background: rgba(255, 255, 255, 0.07); font-family: var(--mono); font-size: 12px;
+}
+.pb-cancel:hover, .pb-cancel:focus-visible { border-color: var(--red); color: var(--red); outline: none; }
+
 /* ---- Touch controls ---------------------------------------------------- */
 .touch-controls {
   position: relative; z-index: 1; display: none; align-items: center; justify-content: space-between;

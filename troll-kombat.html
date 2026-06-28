@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;700;900&family=DM+Mono:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/games/troll-kombat/style.css?v=kombat-v18-select-align">
+  <link rel="stylesheet" href="assets/games/troll-kombat/style.css?v=kombat-v19-pause">
 </head>
 <body data-game-state="select">
   <div class="crt-overlay" aria-hidden="true"></div>
@@ -96,6 +96,7 @@
               <div class="hud-icon"><span class="hud-tab">P2</span><img id="p2-icon" class="hud-icon-img" alt=""></div>
             </div>
 
+            <button id="tk-pause" class="icon-btn pause-btn" type="button" title="Pause (Esc / P)" aria-label="Pause game" hidden>⏸</button>
             <button id="tk-sound" class="icon-btn" type="button" aria-pressed="false" title="Toggle arcade sound" aria-label="Toggle arcade sound">
               <span class="sfx-on">🔊</span><span class="sfx-off">🔇</span>
             </button>
@@ -231,6 +232,37 @@
               <a class="link-back" href="/">← Back to Arcade</a>
             </div>
           </div>
+
+          <!-- ============ PAUSE ============ -->
+          <!-- Multiplayer pause REQUEST banner — gameplay keeps running until the
+               vote passes, so this is a non-blocking banner, not a full modal. -->
+          <div id="tk-pause-req" class="pause-banner" role="status" aria-live="polite" hidden>
+            <div class="pause-banner-card">
+              <div class="pb-head">
+                <span class="pb-kicker">Pause requested</span>
+                <strong id="pb-requester">Player 2 wants to pause</strong>
+              </div>
+              <p class="pb-need" id="pb-need">Needs 2 approvals</p>
+              <ul class="pb-votes" id="pb-votes" aria-label="Approvals"></ul>
+              <p class="pb-hint" id="pb-hint">Others: press your approve key</p>
+              <div class="pb-timer" aria-hidden="true"><span id="pb-timer-fill"></span></div>
+              <button type="button" class="pb-cancel" id="pb-cancel">Cancel request</button>
+            </div>
+          </div>
+
+          <!-- Approved pause overlay — freezes the match for everyone. -->
+          <div id="tk-paused" class="game-overlay pause-overlay" aria-live="assertive" hidden>
+            <div class="overlay-card pause-card">
+              <span class="overlay-kicker">Match paused</span>
+              <h2>Paused</h2>
+              <p id="pause-by" class="pause-by">Paused by Player 1</p>
+              <p id="pause-resume-hint" class="pause-resume-hint">Press <kbd>Esc</kbd> / <kbd>P</kbd> to resume</p>
+              <div class="overlay-actions">
+                <button id="pause-resume" class="primary-btn" type="button">▶ Resume</button>
+                <button id="pause-quit" class="secondary-btn" type="button">Quit to menu</button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Touch controls -->
@@ -253,6 +285,7 @@
           <p><strong>P1</strong> · A/D move · W jump · S crouch · J punch · K kick · L special · Space block · Shift dash</p>
           <p><strong>P2</strong> · ←/→ move · ↑ jump · ↓ crouch · 1 punch · 2 kick · 3 special · 0 block · 5 dash</p>
           <p><strong>Touch</strong> · pad to move · 👊 punch · 🦵 kick · ✨ special · 🛡 block</p>
+          <p><strong>Pause</strong> · P1 Esc/P · P2 Enter · vs-mode needs the other player to approve · same key resumes</p>
         </div>
       </section>
     </section>
@@ -266,7 +299,7 @@
     </section>
   </main>
 
-  <script src="assets/games/troll-kombat/game.js?v=kombat-v24-mapshift" defer></script>
+  <script src="assets/games/troll-kombat/game.js?v=kombat-v25-pause" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://mayurski-art.github.io/assets/js/troll-notis.js"></script>
 </body>
