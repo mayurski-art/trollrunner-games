@@ -87,6 +87,17 @@ h1 {
   max-width: 9ch; font-size: clamp(42px, 5.7vw, 82px); line-height: 0.88; text-transform: uppercase;
   text-shadow: 4px 0 0 rgba(255, 49, 79, 0.54), -4px 0 0 rgba(77, 238, 255, 0.38), 0 0 30px rgba(154, 92, 255, 0.42);
 }
+/* Fighting-game title — Mortal-Kombat-style extruded gold lettering */
+#game-title {
+  font-family: "Black Ops One", var(--font); font-weight: 400;
+  max-width: 8ch; font-size: clamp(54px, 8.5vw, 116px); line-height: 0.92; letter-spacing: 0.01em;
+  color: #ffd24a;
+  text-shadow:
+    2px 2px 0 #6e0a16,
+    4px 4px 0 #4a0610,
+    0 0 26px rgba(255, 49, 79, 0.55),
+    0 0 12px rgba(255, 159, 69, 0.5);
+}
 .tagline { max-width: 30ch; color: rgba(247, 255, 248, 0.86); font-size: clamp(17px, 1.8vw, 24px); font-weight: 900; line-height: 1.18; }
 .copy-note { max-width: 42ch; color: var(--muted); font-size: 14px; line-height: 1.5; }
 .hero-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(108px, 1fr)); gap: 10px; width: min(100%, 460px); }
