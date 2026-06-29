@@ -38,25 +38,37 @@
     const wrap = document.createElement("div");
     wrap.className = "kombat-wager";
     wrap.innerHTML = `
+      <div class="kw-topline">
+        <span class="kw-kicker">Optional stake</span>
+        <span class="kw-mode ${modeReal ? "is-real" : "is-mock"}">${modeReal ? "REAL MAINNET" : "MOCK MODE"}</span>
+      </div>
       <div class="kw-row">
-        <span class="kw-label">💰 Wager <span class="kw-mode ${modeReal ? "is-real" : "is-mock"}">${modeReal ? "REAL" : "MOCK"}</span></span>
+        <span class="kw-label"><span class="kw-coin">¤</span> Kombat wager</span>
         <div class="kw-toggle" role="group" aria-label="Wager on or off">
           <button type="button" class="kw-opt is-active" data-w="off">OFF</button>
           <button type="button" class="kw-opt" data-w="on">ON</button>
         </div>
       </div>
       <div class="kw-body" hidden>
-        <div class="kw-amount">
-          <input type="number" id="kw-input" min="0" step="any" inputmode="decimal" placeholder="Amount" aria-label="Wager amount">
-          <div class="kw-tokens" role="group" aria-label="Token">
-            <button type="button" class="kw-tok is-active" data-t="USDC">USDC</button>
-            <button type="button" class="kw-tok" data-t="TROLL">$TROLL</button>
+        <div class="kw-field">
+          <label class="kw-field-label" for="kw-input">Stake amount</label>
+          <div class="kw-amount">
+            <input type="number" id="kw-input" min="0" step="any" inputmode="decimal" placeholder="0.00" aria-label="Wager amount">
+            <div class="kw-tokens" role="group" aria-label="Token">
+              <button type="button" class="kw-tok is-active" data-t="USDC">USDC</button>
+              <button type="button" class="kw-tok" data-t="TROLL">$TROLL</button>
+            </div>
           </div>
+        </div>
+        <div class="kw-safety">
+          <span>Confirm screen first</span>
+          <span>Phantom approval required</span>
+          <span>Manual payout review</span>
         </div>
         <div class="kw-wallet" id="kw-wallet"></div>
         <p class="kw-note">${modeReal
-          ? "Real on-chain payment to the treasury when you hit Fight. Winnings are <strong>not</strong> automatic — settled separately."
-          : "Mock mode — no real payment. For testing the flow."}</p>
+          ? "You approve a real transfer to the treasury only after the confirmation screen. Winnings are <strong>manual</strong>: send your win for dev approval after the match."
+          : "Mock mode — test the wager dashboard with no real payment."}</p>
         <p class="kw-status" id="kw-status" aria-live="polite"></p>
       </div>`;
     host.appendChild(wrap);
