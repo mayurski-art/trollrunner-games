@@ -1,49 +1,46 @@
 /* ============================================================================
-   TROLL KOMBAT  —  Wager control (real payment to the treasury)
+   TROLL KOMBAT - Manual wager approval flow
 
-   A pre-match "Wager" toggle in the stage-select screen (mirrors the random-map
-   ON/OFF control). When ON, the player types a custom USDC / $TROLL amount; on
-   Fight it runs the shared payment flow (confirmation screen → Phantom → real
-   on-chain transfer to the treasury).
+   A pre-match "Wager" toggle in the stage-select screen lets players declare
+   the amount/token they are willing to wager. It DOES NOT charge a wallet and it
+   DOES NOT move tokens automatically.
 
-   SCOPE / SAFETY
-   - This pays money IN (player → treasury) only, via the audited TrollPay lib
-     and the Phase 10 TrollPayments flow (always shows a confirmation screen
-     first; Phantom never opens until the player confirms).
-   - Winnings/payouts are NOT automated here. Paying a player from the treasury
-     needs a server-held signer (a private key must never live in the browser),
-     and is out of scope for this client. The wager is a real payment; any
-     settlement is handled separately. See docs/PHASE10-WALLET-UTILITY.md.
-   - Isolated from the fight engine: game.js only calls beforeFight() from the
-     stage→Fight launcher, and reacts to the boolean result.
+   At match end, the winner can submit the match + wager details for manual
+   approval. The request is saved by KombatWagerStore (local browser queue first,
+   optional Supabase insert through TrollPayouts when available).
+
+   Settlement remains manual: the developer reviews the match, confirms the
+   wager terms, and handles any token movement outside the browser.
    ============================================================================ */
 (() => {
   "use strict";
 
-  const state = { enabled: false, amount: "", token: "USDC", mounted: false };
-  let activeWager = null;   // the paid stake for the current match (consumed at result)
-  const uid = (p) => p + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const state = {
+    enabled: false,
+    amount: "",
+    token: "USDC",
+    termsAccepted: false,
+    mounted: false,
+  };
+  let activeWager = null;
 
-  function ready() {
-    return !!(window.TrollPayments && window.TrollWallet && window.TROLL_FLAGS);
-  }
+  const uid = prefix => prefix + "_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
   function mount() {
     if (state.mounted) return;
     const host = document.querySelector("#tk-stage .mockup-screen");
-    if (!host || !ready()) return;
+    if (!host) return;
     state.mounted = true;
 
-    const modeReal = window.TrollPayments.mode() === "real";
     const wrap = document.createElement("div");
     wrap.className = "kombat-wager";
     wrap.innerHTML = `
       <div class="kw-topline">
-        <span class="kw-kicker">Optional stake</span>
-        <span class="kw-mode ${modeReal ? "is-real" : "is-mock"}">${modeReal ? "REAL MAINNET" : "MOCK MODE"}</span>
+        <span class="kw-kicker">Manual review</span>
+        <span class="kw-mode is-manual">NO AUTO PAY</span>
       </div>
       <div class="kw-row">
-        <span class="kw-label"><span class="kw-coin">¤</span> Kombat wager</span>
+        <span class="kw-label"><span class="kw-coin">$</span> Kombat wager</span>
         <div class="kw-toggle" role="group" aria-label="Wager on or off">
           <button type="button" class="kw-opt is-active" data-w="off">OFF</button>
           <button type="button" class="kw-opt" data-w="on">ON</button>
@@ -51,7 +48,7 @@
       </div>
       <div class="kw-body" hidden>
         <div class="kw-field">
-          <label class="kw-field-label" for="kw-input">Stake amount</label>
+          <label class="kw-field-label" for="kw-input">Wager amount</label>
           <div class="kw-amount">
             <input type="number" id="kw-input" min="0" step="any" inputmode="decimal" placeholder="0.00" aria-label="Wager amount">
             <div class="kw-tokens" role="group" aria-label="Token">
@@ -60,119 +57,166 @@
             </div>
           </div>
         </div>
+        <label class="kw-check">
+          <input type="checkbox" id="kw-terms">
+          <span>Both players agree this wager is for manual approval after the match.</span>
+        </label>
         <div class="kw-safety">
-          <span>Confirm screen first</span>
-          <span>Phantom approval required</span>
-          <span>Manual payout review</span>
+          <span>No wallet opens</span>
+          <span>No tokens move now</span>
+          <span>Submit after match</span>
         </div>
-        <div class="kw-wallet" id="kw-wallet"></div>
-        <p class="kw-note">${modeReal
-          ? "You approve a real transfer to the treasury only after the confirmation screen. Winnings are <strong>manual</strong>: send your win for dev approval after the match."
-          : "Mock mode — test the wager dashboard with no real payment."}</p>
+        <p class="kw-note">When Fight starts, the wager is only recorded for this match. The winner sends it for approval on the result screen.</p>
         <p class="kw-status" id="kw-status" aria-live="polite"></p>
       </div>`;
     host.appendChild(wrap);
 
     const body = wrap.querySelector(".kw-body");
-    wrap.querySelectorAll(".kw-opt").forEach(b => b.addEventListener("click", () => {
-      state.enabled = b.dataset.w === "on";
-      wrap.querySelectorAll(".kw-opt").forEach(o => o.classList.toggle("is-active", o === b));
+    wrap.querySelectorAll(".kw-opt").forEach(button => button.addEventListener("click", () => {
+      state.enabled = button.dataset.w === "on";
+      wrap.querySelectorAll(".kw-opt").forEach(option => option.classList.toggle("is-active", option === button));
       body.hidden = !state.enabled;
+      status(state.enabled ? "Enter wager terms before starting." : "", "");
     }));
-    wrap.querySelectorAll(".kw-tok").forEach(b => b.addEventListener("click", () => {
-      state.token = b.dataset.t;
-      wrap.querySelectorAll(".kw-tok").forEach(o => o.classList.toggle("is-active", o === b));
+    wrap.querySelectorAll(".kw-tok").forEach(button => button.addEventListener("click", () => {
+      state.token = button.dataset.t;
+      wrap.querySelectorAll(".kw-tok").forEach(option => option.classList.toggle("is-active", option === button));
     }));
-    wrap.querySelector("#kw-input").addEventListener("input", e => { state.amount = e.target.value; });
-    window.TrollWallet.mountStatus("#kw-wallet");
+    wrap.querySelector("#kw-input").addEventListener("input", event => { state.amount = event.target.value; });
+    wrap.querySelector("#kw-terms").addEventListener("change", event => { state.termsAccepted = event.target.checked; });
   }
 
-  function status(msg, cls) {
+  function status(message, cls) {
     const el = document.getElementById("kw-status");
-    if (el) { el.textContent = msg || ""; el.className = "kw-status " + (cls || ""); }
+    if (!el) return;
+    el.textContent = message || "";
+    el.className = "kw-status " + (cls || "");
   }
 
   const isEnabled = () => state.enabled;
 
-  // Called by game.js before a match starts. Returns true to proceed, false to abort.
   async function beforeFight() {
-    if (!state.enabled || !ready()) return true;
-    const amt = Number(state.amount);
-    if (!(amt > 0)) { status("Enter a wager amount, or switch Wager OFF.", "bad"); return false; }
-
-    // Real mode needs a connected wallet first (mock connect is a no-op fake).
-    if (window.TrollPayments.mode() === "real" && !window.TrollWallet.isConnected()) {
-      try { await window.TrollWallet.connect(); }
-      catch (e) { status("Wallet not connected — " + (e.message || "rejected"), "bad"); return false; }
-    }
-
-    status("Opening confirmation…", "");
-    const res = await window.TrollPayments.requestPayment({
-      action: "Troll Kombat Wager", token: state.token, amount: amt,
-      memo: "TR|game|Troll Kombat wager", dedupeKey: "kombat-wager",
-    });
-    if (res.ok) {
-      // Remember the paid stake so a win can be submitted for manual approval.
-      activeWager = {
-        matchId: uid("match"), token: state.token, amount: amt, usd: res.amountUsd != null ? res.amountUsd : null,
-        txSig: res.txSig, mock: !!res.mock,
-        wallet: (window.TrollWallet.getAddress && window.TrollWallet.getAddress()) || null,
-        network: (window.TROLL_PAY_CONFIG && window.TROLL_PAY_CONFIG.SOLANA_NETWORK) || "mainnet-beta",
-      };
-      status(`✅ Wager placed: ${amt} ${state.token}${res.mock ? " (mock)" : ""}.`, "ok");
+    if (!state.enabled) {
+      activeWager = null;
       return true;
     }
-    status(`❌ Wager not placed — ${res.message || res.reason}.`, res.reason === "cancelled" ? "" : "bad");
-    return false;   // do NOT start the match if payment didn't succeed
+
+    const amount = Number(state.amount);
+    if (!(amount > 0)) {
+      status("Enter a wager amount, or switch Wager OFF.", "bad");
+      return false;
+    }
+    if (!state.termsAccepted) {
+      status("Confirm both players agree to manual review.", "bad");
+      return false;
+    }
+
+    activeWager = {
+      matchId: uid("match"),
+      wagerId: uid("wager"),
+      token: state.token,
+      amount,
+      createdAt: new Date().toISOString(),
+      paymentStatus: "not_collected",
+      settlement: "manual_approval",
+    };
+    status(`Wager recorded: ${amount} ${state.token}. No tokens moved.`, "ok");
+    return true;
   }
 
-  /* ==========================================================================
-     RESULT → "Send win for approval"
-     Called by game.js when a match ends. If this match had a paid wager and the
-     local player won, show a button that submits the match + stake details to
-     the dev-only payout queue (TrollPayouts). Winners are paid MANUALLY.
-     ========================================================================== */
+  function resultWinnerLabel(r) {
+    if (!r) return "unknown";
+    if (r.mode === "mp") return "p" + (r.winnerIdx + 1);
+    return r.winnerIdx === 0 ? "player" : "cpu";
+  }
+
+  function buildApprovalRecord(wager, r, payoutWallet) {
+    const winnerIsP1 = r.winnerIdx === 0;
+    const winnerRounds = winnerIsP1 ? r.p1rounds : r.p2rounds;
+    const loserRounds = winnerIsP1 ? r.p2rounds : r.p1rounds;
+    return {
+      game: "troll-kombat",
+      match_id: wager.matchId,
+      wallet: payoutWallet || null,
+      stake_token: wager.token,
+      stake_amount: wager.amount,
+      stake_usd: null,
+      stake_tx: null,
+      network: "manual-review",
+      mode: r.mode,
+      difficulty: r.mode === "cpu" ? r.diff : null,
+      player_fighter: winnerIsP1 ? r.p1char : r.p2char,
+      opponent_fighter: winnerIsP1 ? r.p2char : r.p1char,
+      stage: r.stage,
+      won: true,
+      winner: resultWinnerLabel(r),
+      rounds_won: winnerRounds,
+      rounds_lost: loserRounds,
+      kos: winnerIsP1 ? r.p1kos : r.p2kos,
+      damage: winnerIsP1 ? r.p1damage : r.p2damage,
+      app_version: "kombat-manual-wager-v1",
+      wager_id: wager.wagerId,
+      payment_status: wager.paymentStatus,
+      settlement: wager.settlement,
+    };
+  }
+
   function onResult(r) {
     const card = document.querySelector("#tk-result .overlay-card");
-    if (card) { const old = card.querySelector(".kw-claim"); if (old) old.remove(); }
-    const aw = activeWager;
-    activeWager = null;                 // consume — a rematch is a fresh (unwagered) match
-    if (!card || !aw) return;
+    if (card) {
+      const old = card.querySelector(".kw-claim");
+      if (old) old.remove();
+    }
+    const wager = activeWager;
+    activeWager = null;
+    if (!card || !wager) return;
 
-    const won = r && r.winnerIdx === 0; // local player is slot 0
+    const cpuWon = r && r.mode === "cpu" && r.winnerIdx !== 0;
+    const winnerLabel = resultWinnerLabel(r).toUpperCase();
     const panel = document.createElement("div");
     panel.className = "kw-claim";
-    if (!won) {
-      panel.innerHTML = `<p class="kw-claim-lost">Wager lost — ${aw.amount} ${aw.token} staked. No payout.</p>`;
+
+    if (cpuWon) {
+      panel.innerHTML = `
+        <p class="kw-claim-lost">CPU won. The ${wager.amount} ${wager.token} wager was not submitted for payout.</p>
+        <p class="kw-claim-status">No tokens moved.</p>`;
       card.appendChild(panel);
       return;
     }
+
     panel.innerHTML = `
-      <p class="kw-claim-win">🏆 You won your ${aw.amount} ${aw.token} wager!</p>
-      <button type="button" class="kw-claim-btn">Send win for approval</button>
-      <p class="kw-claim-status" aria-live="polite"></p>`;
+      <p class="kw-claim-win">${winnerLabel} won a ${wager.amount} ${wager.token} manual wager.</p>
+      <label class="kw-claim-field">
+        <span>Winner payout wallet or note</span>
+        <input type="text" class="kw-claim-input" placeholder="Wallet address, Discord name, or review note">
+      </label>
+      <button type="button" class="kw-claim-btn">Submit for approval</button>
+      <p class="kw-claim-status" aria-live="polite">This saves a review request. It does not transfer tokens.</p>`;
     card.appendChild(panel);
+
     const btn = panel.querySelector(".kw-claim-btn");
-    const st = panel.querySelector(".kw-claim-status");
+    const input = panel.querySelector(".kw-claim-input");
+    const out = panel.querySelector(".kw-claim-status");
     btn.addEventListener("click", async () => {
-      if (!window.TrollPayouts) { st.textContent = "Approval service unavailable."; st.className = "kw-claim-status bad"; return; }
-      btn.disabled = true; btn.textContent = "Submitting…";
-      const winnerLabel = r.mode === "mp" ? "p" + (r.winnerIdx + 1) : "player";
-      const out = await window.TrollPayouts.submit({
-        game: "troll-kombat", match_id: aw.matchId, wallet: aw.wallet,
-        stake_token: aw.token, stake_amount: aw.amount, stake_usd: aw.usd, stake_tx: aw.txSig, network: aw.network,
-        mode: r.mode, difficulty: r.mode === "cpu" ? r.diff : null,
-        player_fighter: r.p1char, opponent_fighter: r.p2char, stage: r.stage,
-        won: true, winner: winnerLabel, rounds_won: r.p1rounds, rounds_lost: r.p2rounds,
-        kos: r.p1kos, damage: r.p1damage,
-        app_version: "kombat-wager-v1",
-      });
-      if (out.ok) {
-        st.textContent = `✅ Sent for approval (ref ${out.ref}). The dev will verify your stake and pay you manually.`;
-        st.className = "kw-claim-status ok"; btn.textContent = "Submitted ✓";
+      btn.disabled = true;
+      btn.textContent = "Submitting...";
+      const record = buildApprovalRecord(wager, r, input.value.trim());
+      const store = window.KombatWagerStore;
+      const result = store && store.submit
+        ? await store.submit(record)
+        : { ok: false, reason: "missing-store", message: "Approval storage is unavailable." };
+
+      if (result.ok) {
+        out.textContent = result.remote
+          ? `Saved for approval. Ref ${result.ref || result.localRef}.`
+          : `Saved locally for approval. Ref ${result.localRef}.`;
+        out.className = "kw-claim-status ok";
+        btn.textContent = "Submitted";
       } else {
-        st.textContent = `❌ Could not submit (${out.message || out.reason}). Your stake tx: ${aw.txSig || "—"}. Keep it as proof.`;
-        st.className = "kw-claim-status bad"; btn.disabled = false; btn.textContent = "Retry";
+        out.textContent = `Could not save approval request: ${result.message || result.reason}.`;
+        out.className = "kw-claim-status bad";
+        btn.disabled = false;
+        btn.textContent = "Retry";
       }
     });
   }

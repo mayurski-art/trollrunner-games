@@ -97,7 +97,17 @@ Client-side here is convenience only; the **server** must enforce:
 - Verify the claiming wallet (no spoofing); rate-limit; log payment/claim events
   with tx IDs for review (`TrollBackend.getLog()` is a client-side aid only).
 
-## ACTIVATED: Troll Kombat wager (real mainnet, money-IN only)
+## SUPERSEDED: Old Troll Kombat wager notes
+
+Current Troll Kombat builds use a declared manual-review wager, not an up-front
+treasury payment. `troll-kombat.html` no longer loads `troll-pay.js`,
+`wallet.js`, or `payments.js`; `assets/games/troll-kombat/wager.js` records
+USDC/$TROLL wager terms and `assets/games/troll-kombat/wager-store.js` saves
+post-match approval requests locally first, with optional Supabase mirroring
+through `TrollPayouts.submit`. No wallet opens and no tokens move automatically.
+
+The notes below describe the previous real-payment concept and should not be
+used as the current Kombat behavior.
 
 The first real use case is live on the **Troll Kombat** page: a **Wager** control
 in stage-select (mirrors the random-map ON/OFF toggle).

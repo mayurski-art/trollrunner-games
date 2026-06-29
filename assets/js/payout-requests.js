@@ -1,10 +1,10 @@
 /* ============================================================================
    TROLL RUNNER ARCADE  —  Payout requests  →  window.TrollPayouts
 
-   A player who staked a real wager and won can "Send win for approval". This
-   submits the match + stake details to a dev-only Supabase table
-   (`payout_requests`) so the developer can verify the on-chain stake and pay
-   the winner MANUALLY. There are NO automated payouts (a treasury signer must
+   A player who won a manually reviewed wager can submit the result for approval.
+   This submits match + declared wager details to a dev-only Supabase table
+   (`payout_requests`) so the developer can review the match and handle any
+   settlement MANUALLY. There are NO automated payouts (a treasury signer must
    never live in the browser — see docs/PHASE10-WALLET-UTILITY.md).
 
    ACCESS MODEL (row-level security): the public anon key can INSERT a claim but

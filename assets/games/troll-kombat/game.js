@@ -116,7 +116,7 @@
       pal: { base: "#5fae33", dark: "#2f6e1f", light: "#9fe05f", ink: "#10250a", face: "#5fae33", accent: "#9dff52", accent2: "#ff5dab" },
       drawHead: drawPepeHead,   // portrait/pre-load fallback only
       moves: { punch: "Cope Jab", kick: "Green Candle Kick", block: "Diamond Hands Guard", special: "Katana Cope Slash", finisher: "Feels Bad, Man" },
-      portraitSrc: "pepe-rig/portrait.png",
+      portraitSrc: "pepe-rig/anims/portrait.png",
       splashSrc: "pepe-samurai-splash.png",   // glossy ChatGPT render for select screens
       // PixelLab pixel rig — east-facing animation strips, mirrored by facing.
       anims: {
@@ -2380,9 +2380,9 @@
   document.querySelector("#tk-stage [data-act='stage-back']").addEventListener("click", () => enterFighterSelect());
   document.querySelector("#tk-stage [data-act='stage-fight']").addEventListener("click", async e => {
     e.currentTarget.blur();
-    // Optional wager (isolated module): take the real payment before the match
-    // starts; abort the launch if it's cancelled/fails. No money logic lives in
-    // the fight engine — this is the pre-match launcher only.
+    // Optional wager (isolated module): validate manual-review terms before the match
+    // starts; abort the launch if the terms are incomplete.
+    // No wallet, payment, or settlement logic lives in the fight engine.
     if (window.KombatWager && KombatWager.isEnabled()) {
       const ok = await KombatWager.beforeFight();
       if (!ok) return;
@@ -2465,7 +2465,9 @@
         mode, winnerIdx, byKO, diff: match.diff,
         p1char: fighters[0].def.id, p2char: fighters[1].def.id,
         p1rounds: fighters[0].rounds, p2rounds: fighters[1].rounds,
-        p1kos: fighters[0].kos, p1damage: Math.round(fighters[0].dmgDealt),
+        p1kos: fighters[0].kos, p2kos: fighters[1].kos,
+        p1damage: Math.round(fighters[0].dmgDealt),
+        p2damage: Math.round(fighters[1].dmgDealt),
         stage: currentStage && currentStage.name,
       });
     }

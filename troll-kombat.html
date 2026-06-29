@@ -13,10 +13,6 @@
   <link rel="stylesheet" href="assets/css/troll-leaderboard.css?v=lb-engine-v1">
   <link rel="stylesheet" href="assets/css/troll-wallet.css?v=lab-v1">
   <link rel="stylesheet" href="assets/games/troll-kombat/style.css?v=kombat-v24-wager-ui">
-  <!-- Per-page opt-in: enable REAL wallet + payments for the Troll Kombat wager
-       only. Every other page keeps the shared defaults (OFF). Runs before the
-       flags module so it can apply the override. -->
-  <script>window.TROLL_FLAGS_OVERRIDE = { ENABLE_WALLET_CONNECT: true, ENABLE_REAL_PAYMENTS: true };</script>
 </head>
 <body data-game-state="select">
   <div class="crt-overlay" aria-hidden="true"></div>
@@ -307,15 +303,12 @@
     </section>
   </main>
 
-  <!-- Real payment stack for the wager (config BEFORE the lib). -->
-  <script src="assets/js/troll-pay-config.js?v=1" defer></script>
-  <script src="https://trollrunner.net/assets/js/troll-pay.js?v=5" defer></script>
+  <!-- Manual wager approval stack. No wallet or payment scripts are loaded here. -->
   <script src="assets/js/troll-arcade-flags.js?v=phase10-v1" defer></script>
   <script src="assets/js/backend-api.js?v=phase10-v1" defer></script>
-  <script src="assets/js/wallet.js?v=phase10-v1" defer></script>
-  <script src="assets/js/payments.js?v=phase10-v2" defer></script>
   <script src="assets/js/payout-requests.js?v=phase10-v1" defer></script>
-  <script src="assets/games/troll-kombat/wager.js?v=kombat-wager-v3-ui" defer></script>
+  <script src="assets/games/troll-kombat/wager-store.js?v=kombat-wager-manual-v1" defer></script>
+  <script src="assets/games/troll-kombat/wager.js?v=kombat-wager-manual-v1" defer></script>
   <script src="assets/js/troll-leaderboard.js?v=lb-engine-v1" defer></script>
   <script src="assets/games/troll-kombat/leaderboard.js?v=kombat-lb-v2" defer></script>
   <script src="assets/games/troll-kombat/game.js?v=kombat-v29-wager-claim" defer></script>
