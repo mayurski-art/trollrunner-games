@@ -42,6 +42,11 @@
     configure(partial) { if (partial) Object.assign(this, partial); return this; },
   };
 
+  // Per-page opt-in: a page may set `window.TROLL_FLAGS_OVERRIDE = {...}` in an
+  // inline <head> script BEFORE this module loads to enable real features on
+  // that page only (shared defaults above stay OFF for every other page).
+  if (window.TROLL_FLAGS_OVERRIDE) flags.configure(window.TROLL_FLAGS_OVERRIDE);
+
   // Loud console note so it's obvious in any deployment what's active.
   try {
     if (flags.anyRealLive() || flags.walletConnectLive()) {

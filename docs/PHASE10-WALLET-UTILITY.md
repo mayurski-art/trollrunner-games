@@ -97,6 +97,67 @@ Client-side here is convenience only; the **server** must enforce:
 - Verify the claiming wallet (no spoofing); rate-limit; log payment/claim events
   with tx IDs for review (`TrollBackend.getLog()` is a client-side aid only).
 
+## ACTIVATED: Troll Kombat wager (real mainnet, money-IN only)
+
+The first real use case is live on the **Troll Kombat** page: a **Wager** control
+in stage-select (mirrors the random-map ON/OFF toggle).
+
+- Files: `assets/games/troll-kombat/wager.js` + CSS in the Kombat stylesheet.
+  `troll-kombat.html` loads `troll-pay.js` + the Phase 10 stack and enables real
+  flags **for that page only** via `window.TROLL_FLAGS_OVERRIDE` (every other page
+  stays mock/OFF). The fight engine is untouched — `game.js` only calls
+  `KombatWager.beforeFight()` from the stage→Fight launcher.
+- Flow: turn Wager ON → type a custom **USDC** or **$TROLL** amount → Connect
+  Phantom → hit Fight → **confirmation screen** → Phantom → real transfer to the
+  treasury → match starts only on success (cancel/fail/reject ⇒ no match, clear
+  message). Duplicate-guard prevents double-charge.
+- Pricing: USDC is 1:1; $TROLL is converted to USD via the Jupiter price feed,
+  then paid through `TrollPay`.
+
+### ⚠️ Money-OUT (winnings/payouts) is NOT built — on purpose
+
+This wager pays money **IN** (player → treasury) only. It does **not** pay
+winners. Two hard reasons:
+
+1. **Security:** sending tokens *from* the treasury requires the treasury's
+   private key to sign. In a static site that key would have to live in browser
+   JS — anyone could read it and drain the wallet. It must never be client-side.
+   Payouts require a **server-held signer / backend escrow**.
+2. **Legal:** staking real crypto to win real crypto on a game outcome is
+   **gambling**, which carries licensing/jurisdiction/age-verification
+   obligations. That's a product+legal decision, not a code toggle.
+
+So today the wager is effectively a **real stake/entry payment**; any settlement
+to winners is **manual / off-platform** until a backend escrow + compliance exist.
+The UI says winnings are not automatic. Do not wire automated payouts without
+that backend and a deliberate legal review.
+
+### Manual winnings approval queue (dev-only)
+
+A wagered **winner** sees a **"Send win for approval"** button on the result
+screen. It submits the match + stake details to a dev-only Supabase table so the
+developer can verify and pay the winner **by hand**.
+
+- Module: `assets/js/payout-requests.js` (`TrollPayouts.submit`). Uses the same
+  Supabase project as TrollNotis/chat. Run **`docs/payout_requests.sql`** once to
+  create the table.
+- **Access:** row-level security lets the public anon key **INSERT only** — no one
+  can read claims with the public key. You review them in the **Supabase
+  dashboard → Table Editor → `payout_requests`** (or via a service-role tool).
+- **Stored per claim:** `game`, `match_id`, `wallet` (payout address), the stake
+  (`stake_token`, `stake_amount`, `stake_usd`, **`stake_tx`** = the on-chain
+  signature to verify, `network`), match context (`mode`, `difficulty`,
+  `player_fighter`, `opponent_fighter`, `stage`), outcome (`won`, `winner`,
+  `rounds_won`, `rounds_lost`, `kos`, `damage`), and bookkeeping (`claim_nonce`,
+  `app_version`, `user_agent`, `created_at`, `status` default `pending`).
+- **Your review flow:** open a `pending` row → check `stake_tx` on Solscan landed
+  in the treasury for `stake_amount` → confirm `won` → pay `wallet` manually →
+  set `status` to `paid`. The `stake_tx` unique index helps de-dupe replays; the
+  client also keeps a local backup so a claim is never silently lost.
+
+This is a manual queue, **not** an automated payout — no treasury key is ever in
+the browser.
+
 ## Turning real ON later (checklist — do not do casually)
 
 1. Stand up a real backend implementing every `TrollBackend` endpoint with real
