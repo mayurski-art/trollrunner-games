@@ -238,11 +238,10 @@
 
   /* ==========================================================================
      GRID SHEET FIGHTERS  —  Pepe Samurai / Doge Drip each ship as one grid
-     image per mode (2D "pixel" + 3D "toy", identical pose layout). We strip the
-     black bg, then measure every named frame's true content box so each pose is
-     feet-anchored to the floor at one shared scale, no matter the cell padding.
-     The pixel variant loads eagerly (default mode + portraits); the toy variant
-     loads lazily the first time Toy Mode is chosen.
+     legacy single-sheet pixel sprites. We measure each named frame's true
+     content box so each pose is feet-anchored to the floor at one shared scale,
+     no matter the cell padding.
+     The pixel variant loads eagerly for the default mode and portraits.
      ========================================================================== */
   function contentBBox(sctx, ox, oy, cw, ch) {
     const data = sctx.getImageData(ox, oy, cw, ch).data;
@@ -803,7 +802,7 @@
       ctx.ellipse(this.x, FLOOR_Y, shW, 9, 0, 0, 7);
       ctx.fillStyle = "rgba(0,0,0,0.32)"; ctx.fill();
 
-      if (this.def.sheet && this.def.sheetImg && (this.def.sheetImg.pixel || this.def.sheetImg.toy)) { this.drawSheet(); return; }
+      if (this.def.sheet && this.def.sheetImg && this.def.sheetImg.pixel) { this.drawSheet(); return; }
       if (this.def.anims && this.def.animReady) { this.drawAnimated(); return; }
       if (this.def.img && this.def.spriteScale) { this.drawSprite(); return; }
       this.drawProcedural();
@@ -836,9 +835,7 @@
     // Grid-sheet sprite: feet-anchored via measured content box, mirrored by
     // facing, with state "flavour" transforms (a single frame can't articulate).
     drawSheet() {
-      const v = (MODE === "toy" && this.def.sheetImg.toy && this.def.sheetImg.toy.ready)
-        ? this.def.sheetImg.toy
-        : (this.def.sheetImg.pixel && this.def.sheetImg.pixel.ready ? this.def.sheetImg.pixel : null);
+      const v = this.def.sheetImg.pixel && this.def.sheetImg.pixel.ready ? this.def.sheetImg.pixel : null;
       if (!v) { this.drawProcedural(); return; }
       const f = v.frames[this.sheetFrameKey()] || v.frames.idle;
       const sc = v.scale, dw = f.w * sc, dh = f.h * sc;
@@ -862,12 +859,11 @@
 
       ctx.save();
       ctx.globalAlpha = alpha;
-      ctx.imageSmoothingEnabled = (MODE === "toy");   // crisp pixels in 2D, smooth in toy
+      ctx.imageSmoothingEnabled = false;
       ctx.translate(this.x, this.feetY);
       ctx.scale(this.facing, 1);
       ctx.translate(tx, ty);
       ctx.rotate(rot);
-      if (MODE === "toy") { ctx.shadowColor = "rgba(0,0,0,0.45)"; ctx.shadowBlur = 18; ctx.shadowOffsetY = 8; }
       if (this.flash > 0) ctx.filter = "brightness(2.4) saturate(0.5)";
       ctx.drawImage(v.canvas, f.sx, f.sy, f.w, f.h, -dw / 2, -dh, dw, dh);
       ctx.filter = "none";
