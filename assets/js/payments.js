@@ -143,35 +143,45 @@
         return { ok: true, mock: true, txSig, intentId: intent.intentId, action, token, amount };
       }
 
-      // --- 3b) REAL path (dormant by default; fails closed) --------------
+      // --- 3b) REAL path -------------------------------------------------
+      // Money-IN only (player -> treasury). Client-only authorization: the
+      // confirmed on-chain transfer IS the proof, exactly like the existing
+      // TrollPay revive/tip. If a real backend is configured we ALSO verify;
+      // otherwise we accept the on-chain tx (documented trust model). This is
+      // safe for payments TO the treasury — it must NEVER be reused to pay
+      // players (that needs a server-held signer; see PHASE10 doc).
       if (!window.TrollWallet || !window.TrollWallet.isConnected())
         return { ok: false, reason: "unavailable", message: "Connect a wallet first." };
       if (!window.TrollPay)
         return { ok: false, reason: "unavailable", message: "Payment library unavailable." };
-      if (!window.TrollBackend || !window.TrollBackend.isReal())
-        return { ok: false, reason: "unverified", message: "Backend verification unavailable — real payment blocked." };
-      if (amountUsd == null)
-        return { ok: false, reason: "unavailable", message: "Real payments need a USD amount (fixed-token pricing not wired)." };
+
+      // Resolve the USD amount TrollPay needs (it is USD-denominated).
+      const usd = await resolveUsd(token, amount, amountUsd);
+      if (!(usd > 0))
+        return { ok: false, reason: "unavailable", message: "Could not price this payment — try again." };
 
       // Delegate the on-chain transfer to the audited TrollPay lib. Phantom
       // opens here — only now, only after explicit confirmation.
       let pay;
       try {
-        pay = await window.TrollPay.pay({ amountUsd, token, onProgress });
+        if (window.TrollPay.setToken) window.TrollPay.setToken(token);
+        pay = await window.TrollPay.pay({ amountUsd: usd, token, onProgress });
       } catch (e) {
         return { ok: false, reason: "failed", message: friendlyErr(e) };
       }
       if (!pay || !pay.ok) return mapPayFailure(pay);
 
-      // Server must verify the tx landed before we consider it valid.
-      const v = await window.TrollBackend.verifyTransaction({
-        intentId: intent.intentId, txSig: pay.txSig, wallet: window.TrollWallet.getAddress(),
-        token, amount,
-      });
-      if (!v || !v.verified) return { ok: false, reason: "unverified", txSig: pay.txSig,
-        message: "Payment sent but not yet verified by backend." };
-
-      return { ok: true, txSig: pay.txSig, intentId: intent.intentId, action, token };
+      // Optional server verification — required only if a real backend exists.
+      if (window.TrollBackend && window.TrollBackend.isReal()) {
+        const v = await window.TrollBackend.verifyTransaction({
+          intentId: intent.intentId, txSig: pay.txSig, wallet: window.TrollWallet.getAddress(),
+          token, amount,
+        });
+        if (!v || !v.verified) return { ok: false, reason: "unverified", txSig: pay.txSig,
+          message: "Payment sent but not yet verified by backend." };
+      }
+      if (window.TrollBackend) window.TrollBackend.record("payment_real_ok", { action, token, amount, amountUsd: usd, txSig: pay.txSig });
+      return { ok: true, txSig: pay.txSig, intentId: intent.intentId, action, token, amount, amountUsd: usd };
     } finally {
       _inFlight = false;
     }
@@ -197,5 +207,27 @@
     return "The transaction failed. Please try again.";
   }
 
-  window.TrollPayments = { requestPayment, showConfirm, configure, config, mode };
+  // TrollPay is USD-denominated, so a token amount must be converted to USD.
+  // USDC is 1:1; $TROLL is priced from the Jupiter feed in TROLL_PAY_CONFIG.
+  async function trollUsdPrice() {
+    const cfg = window.TROLL_PAY_CONFIG || {};
+    if (!cfg.PRICE_FEED_URL || !cfg.TROLL_MINT) return null;
+    try {
+      const r = await fetch(cfg.PRICE_FEED_URL + cfg.TROLL_MINT);
+      const j = await r.json();
+      const p = j && j[cfg.TROLL_MINT] && Number(j[cfg.TROLL_MINT].usdPrice);
+      return p > 0 ? p : null;
+    } catch (_) { return null; }
+  }
+  async function resolveUsd(token, amount, amountUsd) {
+    if (amountUsd != null) return Number(amountUsd);
+    if (amount == null) return null;
+    const a = Number(amount);
+    if (!(a > 0)) return null;
+    if (token === "USDC") return a;                 // 1:1
+    if (token === "TROLL") { const p = await trollUsdPrice(); return p ? a * p : null; }
+    return null;
+  }
+
+  window.TrollPayments = { requestPayment, showConfirm, configure, config, mode, trollUsdPrice };
 })();

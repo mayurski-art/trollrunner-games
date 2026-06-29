@@ -2382,7 +2382,17 @@
     flow.go("stage");
   }
   document.querySelector("#tk-stage [data-act='stage-back']").addEventListener("click", () => enterFighterSelect());
-  document.querySelector("#tk-stage [data-act='stage-fight']").addEventListener("click", e => { e.currentTarget.blur(); startMatch(); });
+  document.querySelector("#tk-stage [data-act='stage-fight']").addEventListener("click", async e => {
+    e.currentTarget.blur();
+    // Optional wager (isolated module): take the real payment before the match
+    // starts; abort the launch if it's cancelled/fails. No money logic lives in
+    // the fight engine — this is the pre-match launcher only.
+    if (window.KombatWager && KombatWager.isEnabled()) {
+      const ok = await KombatWager.beforeFight();
+      if (!ok) return;
+    }
+    startMatch();
+  });
 
   /* --- launch: build fighter defs + controllers, then start the match ------- */
   function buildDefs() {
@@ -2452,6 +2462,17 @@
     resultOverlay.classList.toggle("is-loss", !isMP && !youWon);
     resultOverlay.classList.add("is-visible");
     document.getElementById("tk-rematch").focus();
+    // Wager payout hook (isolated): lets a wagered winner submit for manual
+    // approval. No money logic here — wager.js owns it.
+    if (window.KombatWager && window.KombatWager.onResult) {
+      window.KombatWager.onResult({
+        mode, winnerIdx, byKO, diff: match.diff,
+        p1char: fighters[0].def.id, p2char: fighters[1].def.id,
+        p1rounds: fighters[0].rounds, p2rounds: fighters[1].rounds,
+        p1kos: fighters[0].kos, p1damage: Math.round(fighters[0].dmgDealt),
+        stage: currentStage && currentStage.name,
+      });
+    }
   }
   document.getElementById("tk-rematch").addEventListener("click", e => {
     resultOverlay.classList.remove("is-visible");
