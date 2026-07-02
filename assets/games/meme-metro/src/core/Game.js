@@ -113,6 +113,12 @@ export class Game {
     }
   }
 
+  // Rebuild the runner's mesh for a newly selected character.
+  setCharacter(id) {
+    const def = CHARACTERS[id] || CHARACTERS[DEFAULT_CHARACTER];
+    this.player.buildMesh(def);
+  }
+
   exitToMenu() {
     this.state = 'menu';
     this.obstacles.reset();

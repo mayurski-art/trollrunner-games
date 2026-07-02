@@ -49,6 +49,78 @@ export class Player {
     this.legR.position.x = 0.16;
 
     this.group.add(body, head, chain, this.armL, this.armR, this.legL, this.legR);
+    this.addAccessories(def, { headMat, accentMat, trimMat });
+  }
+
+  // Per-character silhouette accessories so each runner reads instantly
+  // even on the placeholder rig. Final models replace all of this.
+  addAccessories(def, { accentMat, trimMat }) {
+    switch (def.id) {
+      case 'pepe': {
+        // Red scarf + hoodie bump.
+        const scarf = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.09, 8, 14), trimMat);
+        scarf.rotation.x = Math.PI / 2;
+        scarf.position.y = 1.24;
+        const hood = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 10), new THREE.MeshStandardMaterial({ color: 0x2b4faa, roughness: 0.8 }));
+        hood.position.set(0, 1.4, -0.28);
+        this.group.add(scarf, hood);
+        break;
+      }
+      case 'doge': {
+        // Shiba ears + cap brim + shades bar.
+        const earGeo = new THREE.ConeGeometry(0.11, 0.26, 8);
+        const earMat = new THREE.MeshStandardMaterial({ color: 0xd9a441, roughness: 0.7 });
+        for (const x of [-0.2, 0.2]) {
+          const ear = new THREE.Mesh(earGeo, earMat);
+          ear.position.set(x, 1.9, -0.04);
+          this.group.add(ear);
+        }
+        const brim = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.05, 0.3), new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.6 }));
+        brim.position.set(0, 1.72, 0.24);
+        const shades = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.1, 0.06), new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.25 }));
+        shades.position.set(0, 1.58, 0.32);
+        this.group.add(brim, shades);
+        break;
+      }
+      case 'skyrunner': {
+        // Sunglasses + rocket boots with cyan thrusters.
+        const shades = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.11, 0.06), new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.2 }));
+        shades.position.set(0, 1.58, 0.32);
+        this.group.add(shades);
+        const thrustGeo = new THREE.CylinderGeometry(0.07, 0.11, 0.16, 10);
+        for (const leg of [this.legL, this.legR]) {
+          const boot = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.14, 0.3), new THREE.MeshStandardMaterial({ color: 0x222831, roughness: 0.4, metalness: 0.5 }));
+          boot.position.set(0, -0.24, 0.03);
+          leg.add(boot);
+          const thrust = new THREE.Mesh(thrustGeo, accentMat);
+          thrust.position.set(0, -0.36, 0.03);
+          leg.add(thrust);
+        }
+        break;
+      }
+      case 'laserexec': {
+        // Gold tie + red laser eyes.
+        const tie = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.4, 0.05), accentMat);
+        tie.position.set(0, 0.95, 0.23);
+        this.group.add(tie);
+        const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff2038, toneMapped: false });
+        for (const x of [-0.13, 0.13]) {
+          const eye = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), eyeMat);
+          eye.position.set(x, 1.6, 0.33);
+          this.group.add(eye);
+        }
+        break;
+      }
+      default: {
+        // Trollface: wide white grin plate on the head front.
+        const grin = new THREE.Mesh(
+          new THREE.BoxGeometry(0.34, 0.1, 0.05),
+          new THREE.MeshStandardMaterial({ color: 0x1c1c1c, roughness: 0.4 }),
+        );
+        grin.position.set(0, 1.42, 0.32);
+        this.group.add(grin);
+      }
+    }
   }
 
   reset() {

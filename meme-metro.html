@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,500;0,700;0,900;1,900&family=DM+Mono:wght@500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/games/meme-metro/styles.css?v=mm-phase3-1">
+  <link rel="stylesheet" href="assets/games/meme-metro/styles.css?v=mm-phase4-1">
 </head>
 <body>
   <div id="mm-root">
@@ -51,8 +51,8 @@
 
         <button id="btn-start" class="btn-primary" type="button">▶ START</button>
 
-        <div class="menu-nav" aria-label="Coming soon sections">
-          <button class="menu-nav-btn" type="button" disabled>Characters<small>Soon</small></button>
+        <div class="menu-nav" aria-label="Game sections">
+          <button id="btn-characters" class="menu-nav-btn" type="button">Characters<small>New</small></button>
           <button class="menu-nav-btn" type="button" disabled>Shop<small>Soon</small></button>
           <button class="menu-nav-btn" type="button" disabled>Missions<small>Soon</small></button>
           <button class="menu-nav-btn" type="button" disabled>Leaderboard<small>Soon</small></button>
@@ -67,6 +67,19 @@
         </div>
 
         <a class="menu-back" href="/">← Back to Arcade</a>
+      </div>
+    </section>
+
+    <!-- Character select -->
+    <section id="screen-characters" class="screen" aria-label="Character select">
+      <div class="char-panel">
+        <header class="char-header">
+          <button id="btn-char-back" class="char-back" type="button" aria-label="Back to menu">←</button>
+          <h2 class="char-title">SELECT YOUR RUNNER</h2>
+          <div class="char-wallet"><span class="hud-ico ico-coin">🧌</span><strong id="char-coins">0</strong></div>
+        </header>
+        <div id="char-grid" class="char-grid"></div>
+        <p class="char-hint">Collect Troll Coins in runs to unlock new runners.</p>
       </div>
     </section>
 
@@ -107,7 +120,7 @@
   <script type="importmap">
     { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
   </script>
-  <script type="module" src="assets/games/meme-metro/src/main.js?v=mm-phase3-1"></script>
+  <script type="module" src="assets/games/meme-metro/src/main.js?v=mm-phase4-1"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://mayurski-art.github.io/assets/js/troll-notis.js"></script>
 </body>

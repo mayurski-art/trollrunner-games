@@ -7,7 +7,7 @@ export class UIManager {
   constructor() {
     this.el = {};
     const ids = [
-      'screen-menu', 'screen-pause', 'screen-gameover', 'hud',
+      'screen-menu', 'screen-pause', 'screen-gameover', 'screen-characters', 'hud',
       'menu-highscore', 'menu-coins',
       'hud-score', 'hud-best', 'hud-run-coins', 'hud-total-coins', 'hud-multiplier',
       'go-score', 'go-coins', 'go-distance', 'go-best', 'go-newbest', 'go-cause',
@@ -76,10 +76,14 @@ export class UIManager {
   }
 
   showOnly(name) {
-    for (const s of ['screen-menu', 'screen-pause', 'screen-gameover']) {
+    for (const s of ['screen-menu', 'screen-pause', 'screen-gameover', 'screen-characters']) {
       this.el[s].classList.toggle('is-visible', s === name);
     }
     this.el.hud.classList.toggle('is-visible', name === null || name === 'screen-pause');
+  }
+
+  showCharacters() {
+    this.showOnly('screen-characters');
   }
 
   showMenu({ highScore, totalCoins }) {

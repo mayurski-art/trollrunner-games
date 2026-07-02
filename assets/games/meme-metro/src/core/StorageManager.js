@@ -49,6 +49,24 @@ export class StorageManager {
   get settings() { return this.data.settings; }
   get selectedCharacter() { return this.data.selectedCharacter; }
 
+  isUnlocked(id) { return this.data.unlocked.includes(id); }
+
+  // Deducts the price and unlocks; false if already owned or short on coins.
+  unlockCharacter(id, price) {
+    if (this.isUnlocked(id) || this.data.totalCoins < price) return false;
+    this.data.totalCoins -= price;
+    this.data.unlocked.push(id);
+    this.save();
+    return true;
+  }
+
+  selectCharacter(id) {
+    if (!this.isUnlocked(id)) return false;
+    this.data.selectedCharacter = id;
+    this.save();
+    return true;
+  }
+
   // Returns true when the run set a new best.
   recordRun({ score, coins }) {
     const newBest = score > this.data.highScore;
