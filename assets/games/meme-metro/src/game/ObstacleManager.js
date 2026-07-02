@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { LANES, SPAWN_Z, DESPAWN_Z } from '../core/constants.js';
 import { OBSTACLE_TYPES, PATTERNS } from '../data/obstacles.js';
+import { makeTollSignTexture, makeTrainFaceTexture, makeDogeSignTexture } from './textures.js';
 
 // Spawns, scrolls and recycles obstacles. Visual builders here are
 // placeholder primitives shaped/colored per the concept sheets; each is a
@@ -17,6 +18,12 @@ export class ObstacleManager {
       goldTrim: new THREE.MeshStandardMaterial({ color: 0xffb300, emissive: 0xffb300, emissiveIntensity: 0.5, roughness: 0.35 }),
       rug: new THREE.MeshStandardMaterial({ color: 0x7a1024, roughness: 0.9 }),
       neonPurple: new THREE.MeshBasicMaterial({ color: 0xb84dff, toneMapped: false }),
+      flame: new THREE.MeshBasicMaterial({ color: 0xffa028, toneMapped: false }),
+      bone: new THREE.MeshStandardMaterial({ color: 0xe8d9a0, roughness: 0.55 }),
+      tollSign: new THREE.MeshBasicMaterial({ map: makeTollSignTexture(), transparent: true, toneMapped: false }),
+      trainFace: new THREE.MeshBasicMaterial({ map: makeTrainFaceTexture(), toneMapped: false }),
+      dogeSign: new THREE.MeshBasicMaterial({ map: makeDogeSignTexture(), transparent: true, toneMapped: false }),
+      window: new THREE.MeshBasicMaterial({ color: 0xffd890, toneMapped: false }),
     };
     this.reset();
   }
@@ -74,8 +81,8 @@ export class ObstacleManager {
         gate.position.y = 1.2;
         const bar = new THREE.Mesh(new THREE.BoxGeometry(2.05, 0.16, 0.55), this.mats.neonPurple);
         bar.position.y = 2.45;
-        const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.5), this.mats.goldTrim);
-        sign.position.set(0, 1.6, 0.28);
+        const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.85), this.mats.tollSign);
+        sign.position.set(0, 1.55, 0.28);
         g.add(gate, bar, sign);
         break;
       }
@@ -99,7 +106,9 @@ export class ObstacleManager {
           const h = 0.5 + Math.random() * 0.35;
           const candle = new THREE.Mesh(new THREE.BoxGeometry(0.3, h, 0.3), this.mats.redGlow);
           candle.position.set(-0.72 + i * 0.48, 0.18 + h / 2, 0);
-          g.add(candle);
+          const flame = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.2, 8), this.mats.flame);
+          flame.position.set(candle.position.x, 0.18 + h + 0.1, 0);
+          g.add(candle, flame);
         }
         break;
       }
@@ -119,16 +128,49 @@ export class ObstacleManager {
       case 'bearTrain': {
         const body = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.9, 16), this.mats.trainBody);
         body.position.y = 1.45;
-        const face = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 2.6), this.mats.dark);
-        face.position.set(0, 1.5, 8.01);
+        const face = new THREE.Mesh(new THREE.PlaneGeometry(2.0, 2.6), this.mats.trainFace);
+        face.position.set(0, 1.6, 8.01);
         const lightGeo = new THREE.CircleGeometry(0.18, 12);
         const lampL = new THREE.Mesh(lightGeo, this.mats.laser);
-        lampL.position.set(-0.7, 0.7, 8.02);
+        lampL.position.set(-0.7, 0.5, 8.02);
         const lampR = lampL.clone();
         lampR.position.x = 0.7;
-        const chart = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 0.8), this.mats.redGlow);
-        chart.position.set(0, 2.0, 8.02);
-        g.add(body, face, lampL, lampR, chart);
+        g.add(body, face, lampL, lampR);
+        // Lit windows down both flanks.
+        const winGeo = new THREE.PlaneGeometry(1.6, 0.55);
+        for (const side of [-1, 1]) {
+          for (let i = 0; i < 6; i++) {
+            const win = new THREE.Mesh(winGeo, this.mats.window);
+            win.position.set(side * 1.101, 1.9, 5.6 - i * 2.4);
+            win.rotation.y = side * Math.PI / 2;
+            g.add(win);
+          }
+        }
+        break;
+      }
+      case 'dogeBone': {
+        // Giant crossbar bone between two gold posts, doge medallion center.
+        const postGeo = new THREE.CylinderGeometry(0.09, 0.11, 0.75, 10);
+        for (const x of [-0.85, 0.85]) {
+          const post = new THREE.Mesh(postGeo, this.mats.goldTrim);
+          post.position.set(x, 0.375, 0);
+          g.add(post);
+        }
+        const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 1.7, 10), this.mats.bone);
+        shaft.rotation.z = Math.PI / 2;
+        shaft.position.y = 0.62;
+        g.add(shaft);
+        const knobGeo = new THREE.SphereGeometry(0.2, 12, 10);
+        for (const x of [-0.85, 0.85]) {
+          for (const dy of [-0.11, 0.11]) {
+            const knob = new THREE.Mesh(knobGeo, this.mats.bone);
+            knob.position.set(x, 0.62 + dy, 0);
+            g.add(knob);
+          }
+        }
+        const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.5), this.mats.dogeSign);
+        sign.position.set(0, 0.62, 0.16);
+        g.add(sign);
         break;
       }
     }

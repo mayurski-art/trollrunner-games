@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { LANES, SPAWN_Z, DESPAWN_Z } from '../core/constants.js';
 import { OBSTACLE_TYPES } from '../data/obstacles.js';
+import { makeCoinFaceTexture } from './textures.js';
 
 const COIN_RADIUS = 0.34;
 
@@ -11,10 +12,16 @@ export class CoinManager {
     this.scene = scene;
     this.coins = [];
     this.geo = new THREE.CylinderGeometry(COIN_RADIUS, COIN_RADIUS, 0.08, 18);
-    this.mat = new THREE.MeshStandardMaterial({
+    const rim = new THREE.MeshStandardMaterial({
       color: 0xffc233, emissive: 0xff9500, emissiveIntensity: 0.55,
       roughness: 0.25, metalness: 0.7,
     });
+    // Troll emoji face on both caps; rim stays metallic gold.
+    const face = new THREE.MeshStandardMaterial({
+      map: makeCoinFaceTexture(), emissive: 0xff9500, emissiveIntensity: 0.22,
+      roughness: 0.3, metalness: 0.4,
+    });
+    this.mat = [rim, face, face]; // Cylinder groups: side, top, bottom.
     this.time = 0;
   }
 

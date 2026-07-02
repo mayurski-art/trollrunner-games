@@ -97,7 +97,11 @@ export class Effects {
     for (const s of this.sparkles) {
       if (s.life <= 0) continue;
       s.life -= dt;
-      if (s.life <= 0) { s.mesh.visible = false; continue; }
+      if (s.life <= 0 || s.mesh.position.z > 4) {
+        s.life = 0;
+        s.mesh.visible = false;
+        continue;
+      }
       s.vel.y -= 7 * dt;
       s.mesh.position.addScaledVector(s.vel, dt);
       s.mesh.position.z += speed * dt;
@@ -114,7 +118,12 @@ export class Effects {
     for (const d of this.dust) {
       if (d.life <= 0) continue;
       d.life -= dt;
-      if (d.life <= 0) { d.mesh.visible = false; continue; }
+      // Kill puffs before they billboard into the camera at high speed.
+      if (d.life <= 0 || d.mesh.position.z > 3.5) {
+        d.life = 0;
+        d.mesh.visible = false;
+        continue;
+      }
       d.mesh.position.z += speed * dt * 0.9;
       d.mesh.position.y += dt * 0.55;
       d.mesh.scale.multiplyScalar(1 + dt * 2.4);

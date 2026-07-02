@@ -54,6 +54,15 @@ export const OBSTACLE_TYPES = {
     tier: 2,
     collider: { w: 2.2, h: 3.2, d: 16, y: 0 },
   },
+  dogeBone: {
+    id: 'dogeBone',
+    name: 'Doge Bone Barrier',
+    action: 'jump',
+    hard: true,
+    soft: false,
+    tier: 1,
+    collider: { w: 2.0, h: 0.8, d: 0.6, y: 0 },
+  },
 };
 
 const rndLane = () => Math.floor(Math.random() * 3);
@@ -73,6 +82,15 @@ export const PATTERNS = [
   { tier: 1, build: () => [{ lane: rndLane(), type: 'tollGate' }] },
   { tier: 1, build: () => [{ lane: rndLane(), type: 'redCandle' }] },
   { tier: 1, build: () => [{ lane: rndLane(), type: 'rugPull' }] },
+  { tier: 1, build: () => [{ lane: rndLane(), type: 'dogeBone' }] },
+  {
+    // Bone + gate: jump one lane or take the free one.
+    tier: 2,
+    build: () => {
+      const [a, b] = twoLanes();
+      return [{ lane: a, type: 'dogeBone' }, { lane: b, type: 'tollGate' }];
+    },
+  },
   {
     // Two lanes gated, one free.
     tier: 2,

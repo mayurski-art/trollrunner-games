@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { DESPAWN_Z } from '../core/constants.js';
+import { makeBillboardTextures, makeSkylineTexture } from './textures.js';
 
 const SEG_LEN = 18;
 const SEG_COUNT = 12;
@@ -56,6 +57,17 @@ export class WorldManager {
       scene.add(divider, edge);
     }
 
+    // Distant skyline + moon, rendered fog-free so it stays crisp.
+    const skyline = new THREE.Mesh(
+      new THREE.PlaneGeometry(340, 85),
+      new THREE.MeshBasicMaterial({
+        map: makeSkylineTexture(), transparent: true, fog: false, toneMapped: false,
+      }),
+    );
+    skyline.position.set(0, 30, -235);
+    scene.add(skyline);
+
+    this.billboardTextures = makeBillboardTextures();
     this.neonColors = stage.neon.map((c) => new THREE.Color(c));
     this.segments = [];
     this.sleeperMat = new THREE.MeshStandardMaterial({ color: stage.sleeper, roughness: 0.95 });
@@ -81,7 +93,7 @@ export class WorldManager {
       seg.add(sleeper);
     }
 
-    // Tunnel walls left/right with neon billboards facing the track.
+    // Tunnel walls left/right with meme billboards facing the track.
     for (const side of [-1, 1]) {
       const height = 6 + Math.random() * 5;
       const wall = new THREE.Mesh(new THREE.BoxGeometry(1.6, height, SEG_LEN), this.wallMat);
@@ -92,14 +104,39 @@ export class WorldManager {
       for (let n = 0; n < count; n++) {
         const neon = new THREE.Mesh(
           this.neonGeo,
-          new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }),
+          new THREE.MeshBasicMaterial({ toneMapped: false, transparent: true }),
         );
-        neon.scale.set(1.6 + Math.random() * 2.6, 0.9 + Math.random() * 1.8, 1);
-        neon.position.set(side * 6.55, 1.4 + Math.random() * 3.4, (Math.random() - 0.5) * (SEG_LEN - 3));
+        const w = 2.2 + Math.random() * 2.2;
+        neon.scale.set(w, w / 2, 1); // Billboard textures are 2:1.
+        neon.position.set(side * 6.55, 1.6 + Math.random() * 3.2, (Math.random() - 0.5) * (SEG_LEN - 3));
         neon.rotation.y = -side * Math.PI / 2;
         seg.add(neon);
         seg.userData.neons.push(neon);
       }
+    }
+
+    // Overhead gantry: dark frame spanning the track with a neon underglow
+    // strip — sells tunnel depth the way the concept sheets do.
+    if (Math.random() < 0.65) {
+      const gantry = new THREE.Group();
+      const beamMat = this.wallMat;
+      const postGeo = new THREE.BoxGeometry(0.5, 7.2, 0.5);
+      for (const side of [-1, 1]) {
+        const post = new THREE.Mesh(postGeo, beamMat);
+        post.position.set(side * 6.4, 3.6, 0);
+        gantry.add(post);
+      }
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(13.3, 0.55, 0.55), beamMat);
+      beam.position.y = 7.0;
+      const strip = new THREE.Mesh(
+        new THREE.BoxGeometry(13.3, 0.07, 0.07),
+        new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }),
+      );
+      strip.position.y = 6.68;
+      gantry.add(beam, strip);
+      gantry.position.z = (Math.random() - 0.5) * (SEG_LEN - 4);
+      seg.add(gantry);
+      seg.userData.gantryStrip = strip;
     }
 
     this.recolorSegment(seg);
@@ -108,8 +145,12 @@ export class WorldManager {
 
   recolorSegment(seg) {
     for (const neon of seg.userData.neons) {
+      neon.material.map = this.billboardTextures[Math.floor(Math.random() * this.billboardTextures.length)];
+      neon.material.needsUpdate = true;
+    }
+    if (seg.userData.gantryStrip) {
       const color = this.neonColors[Math.floor(Math.random() * this.neonColors.length)];
-      neon.material.color.copy(color).multiplyScalar(0.85 + Math.random() * 0.5);
+      seg.userData.gantryStrip.material.color.copy(color);
     }
   }
 
