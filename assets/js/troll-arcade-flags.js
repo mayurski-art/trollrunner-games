@@ -27,6 +27,13 @@
     ENABLE_MOCK_PAYMENTS:  true,    // simulate payments with no wallet/money
     ENABLE_MOCK_REWARDS:   true,    // simulate rewards/claims with no wallet/money
 
+    // --- gameplay/cosmetic switches (DEFAULT OFF, no money involved) -------
+    // Troll Kombat bespoke per-character finisher cinematics (Phase 11). Off
+    // by default so the existing generic FINISH!/coinBurst flourish keeps
+    // playing until the sequencer has been proven out per-character. See
+    // trollrunner-games/docs/PHASE11-BESPOKE-FINISHERS.md.
+    ENABLE_BESPOKE_FINISHERS: true,
+
     // --- helpers (read-only intent) ----------------------------------------
     // A real path is only "live" if its flag is on AND mock isn't forcing sim.
     walletConnectLive() { return this.ENABLE_WALLET_CONNECT === true; },

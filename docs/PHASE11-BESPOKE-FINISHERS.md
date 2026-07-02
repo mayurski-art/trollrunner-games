@@ -40,6 +40,30 @@ flows, or leaderboard/payout hooks.
 - This is a result overlay badge, not an end-of-match cinematic or character
   finisher sequence.
 
+## Asset status (2026-07-01)
+
+Bespoke `finisher` pixel-art strips now exist for all three roster fighters,
+generated via PixelLab (v3 custom mode, east direction only, 9 frames each —
+frame 0 is a neutral reference frame, frames 1-8 are the animated pose, same
+pattern as the existing `jumping-1` strips):
+
+- Pepe Samurai — katana sheath-slash, `fighters/pepe-rig/anims/finisher.png`
+- Doge Drip — cocky point-and-taunt, `fighters/doge-rig/anims/finisher.png`
+- Gladiator — bare-fisted victory roar, `fighters/gladiator/anims/finisher.png`
+
+Each roster entry's `anims.defs` in `game.js` now includes
+`finisher: { frames: 9, fps: 12, loop: false }`, so the strip preloads
+automatically (the preload loop iterates `Object.keys(d.anims.defs)` and is
+asset-generic — no engine code changed beyond the data entry).
+
+**This art is inert.** No code path sets `state === "finisher"`, reads the new
+strip, or triggers it from `roundend`/`matchend`. The generic `FINISH!` +
+`coinBurst` flourish and `FATALITY`/`FLAWLESS` badge described below are still
+the only things that happen on a match-ending KO. Wiring this art into a real
+per-character cinematic still requires the `FinisherSequencer` scaffold
+(Phase 11B) described below — do not gate `roundend` on `state === "finisher"`
+without it.
+
 ## Current verdict
 
 Troll Kombat has a **safe generic KO flourish**, a **KO animation state**, and a
@@ -126,25 +150,130 @@ engine should stay stable.
 - Keep the existing generic flourish active.
 - No new match-loop behavior beyond reading the data for debug output.
 
-### Phase 11B — Sequencer scaffold behind a flag
+### Phase 11B — Sequencer scaffold behind a flag (DONE, 2026-07-01)
 
-- Add `ENABLE_BESPOKE_FINISHERS: false` to arcade flags.
-- Implement `FinisherSequencer` in its own isolated section/file.
-- When the flag is off, keep the current generic flourish.
+- Added `ENABLE_BESPOKE_FINISHERS: false` to `assets/js/troll-arcade-flags.js`
+  (default off; every other flag/behavior in that file untouched).
+- Implemented `FinisherSequencer` as its own file,
+  `assets/games/troll-kombat/finisher-sequencer.js`, loaded in
+  `troll-kombat.html` between `leaderboard.js` and `game.js`. Public API
+  matches the design above: `canStart(roundCtx)`, `start(roundCtx)`,
+  `update(dt)`, `draw(ctx)`, `isDone()`, `cancel(reason)`.
+- Wired three minimal call sites in `game.js`, all no-ops when the flag is off:
+  - `startRound()` calls `FinisherSequencer.cancel("round-reset")` so nothing
+    can bleed into the next round or a rematch.
+  - `roundend`'s existing `matchWon && byKO && !this.finisher` branch now
+    tries `seq.canStart({winner, loser})` first; only on `true` does it call
+    `seq.start(...)` instead of the original `announce("FINISH!", ...)`. The
+    `coinBurst`/shake flourish a beat later is untouched and still fires
+    either way.
+  - `loop()` calls `FinisherSequencer.update(simDt)` alongside `match.update`
+    (same freeze/hitstop gating) and `FinisherSequencer.draw(ctx)` right after
+    `match.draw(dt)`, inside the existing shake-transformed `ctx.save/restore`
+    block.
+- The sequencer never touches `fighter.state`; `draw()` only overlay-paints the
+  winner's `finisher` strip on top of whatever the normal fighter render
+  already drew at the same `x`/`feetY`/`facing`, reading `fighter.def` only.
+  Nothing it does can affect hitboxes, AI, physics, pause, wallet, wager, or
+  leaderboard code.
+- Verified: `node --check` passes on `game.js`, `finisher-sequencer.js`, and
+  `troll-arcade-flags.js`. Flag is still `false` by default, so live behavior
+  (generic `FINISH!` + `coinBurst`) is unchanged until a page opts in via
+  `window.TROLL_FLAGS_OVERRIDE = { ENABLE_BESPOKE_FINISHERS: true }` — that
+  opt-in and its manual test pass belong to Phase 11C below, not this one.
 
-### Phase 11C — One character proof of concept
+### Phase 11C — Proof of concept + live verification (DONE, 2026-07-01)
 
-- Implement one safe, short finisher for one character.
-- Use existing states/effects first, then add a dedicated pixel strip only if the
-  asset pipeline is ready.
-- Verify timeout KOs, non-KO match wins, rematch, pause reset, wager approval,
-  leaderboard recording, and result overlay still work.
+Since Phase 11A already gave all three fighters real bespoke `finisher` art
+(not just one), 11C's scope narrowed to verifying the flag-on path is safe
+under real gameplay, in an actual browser (headless Chromium via Playwright —
+`chromium-cli` wasn't available in this environment), with
+`window.TROLL_FLAGS_OVERRIDE = { ENABLE_BESPOKE_FINISHERS: true }`:
 
-### Phase 11D — Expand per character
+- **Timeout (non-KO) wins**: not live-tested — provably unreachable by
+  inspection, since `game.js`'s `roundend` block only calls
+  `FinisherSequencer.canStart()`/`.start()` inside the existing
+  `this.matchWon && this.byKO` condition. A timeout win can't set `byKO`, so
+  the sequencer is structurally never invoked for it.
+- **Pause mid-fight**: `Escape` correctly shows `#tk-paused`; `Escape` again
+  correctly hides it and gameplay resumes. No interference from the
+  sequencer being loaded.
+- **Pause on the result screen**: correctly a no-op (`pause.canControl()`
+  already excludes `phase === "matchend"`; unrelated to this feature, still
+  verified unaffected).
+- **Real KO → cinematic path → result overlay**: played a full CPU match to
+  an actual `FATALITY` finish with the flag on. Zero console/page errors
+  through the entire `roundend` → `matchend` → result-overlay pipeline.
+- **Rematch**: clicking `#tk-rematch` after a bespoke-path win starts a clean
+  new match; `FinisherSequencer` reads back `{ active: false, hasWinner:
+  false }` immediately after — confirms `cancel("round-reset")` in
+  `startRound()` actually prevents state bleed between matches, not just in
+  theory.
+- **Second match after rematch**: hammered a second CPU match to another real
+  `FATALITY` finish on the same page load — same clean result, still zero
+  errors, confirming the sequencer is safe to trigger repeatedly in one
+  session, not just once.
+- **Wager/leaderboard code paths**: not touched by this feature (confirmed by
+  code review — `FinisherSequencer` never references `wager.js`,
+  `leaderboard.js`, or `payout-requests.js`), and no errors surfaced from
+  those systems while `endMatch()` ran during either verified match.
 
-- Add one bespoke finisher per character via the data format.
-- Keep a shared fallback for characters without bespoke assets.
-- Document asset requirements for each finisher strip.
+All of the above passed with the flag left at its default `false` in the
+codebase — the override was only ever set from the *test's* init script, so
+none of this changes production behavior on its own.
+
+### Phase 11D — Expand per character (DONE, 2026-07-01)
+
+- **Bespoke finisher per character**: already complete as of Phase 11A — all
+  three current roster fighters (Pepe Samurai, Doge Drip, Gladiator) have a
+  `finisher` strip and `anims.defs.finisher` entry.
+- **Shared fallback for characters without bespoke assets**: already true by
+  construction, verified by code read (no new code needed). A future
+  character added to `ROSTER` without a `finisher` entry, or with one whose
+  image hasn't finished loading, makes
+  `FinisherSequencer.canStart()` return `false` (`anim`/`img` guard in
+  `finisher-sequencer.js`), so `game.js`'s `roundend` block falls through to
+  the original `announce("FINISH!", 1.2, true)` banner automatically. No
+  per-character opt-in list or extra branching is required — silence in the
+  data is the fallback.
+- **Asset requirements, documented here** so a future character's finisher
+  can be added without re-deriving the pattern:
+  1. Character must already exist in PixelLab with a completed rotation set
+     (same character ID used for its other Troll Kombat anims).
+  2. Generate one more animation via `animate_character`: `mode: "v3"`,
+     `directions: ["east"]` only (matches every other strip in this rig —
+     mirrored by facing in-engine, so only east is ever needed),
+     `frame_count: 8`, a short `action_description` of the finishing pose,
+     `animation_name: "finisher"`. Cost is ~1-4 gens depending on character
+     complexity — check `get_balance` first per
+     [[feedback-minimize-pixellab-generations]].
+  3. The returned strip is 9 frames (frame 0 is PixelLab's neutral reference
+     frame, frames 1-8 are the animated pose — same shape as this rig's
+     existing `jumping-1` strips). Download all 9 `east/*.png` frames and
+     stitch them into one horizontal strip, cell width/height equal to the
+     character's existing `anims.cell` (92 for Pepe-sized rigs, 180 for
+     Doge-sized, 136 for Gladiator-sized — whatever that character's other
+     strips already use), saved as
+     `assets/games/troll-kombat/fighters/<rig>/anims/finisher.png`.
+  4. Add `finisher: { frames: 9, fps: 12, loop: false }` to that character's
+     `anims.defs` in `game.js`. Nothing else needs to change — the preload
+     loop, `FinisherSequencer.canStart()`, and the `roundend` trigger are all
+     already generic over `Object.keys(anims.defs)` / whichever fighter won.
+  5. Re-run the Phase 11C verification pass (pause mid-fight, real KO to
+     result, rematch, second match) with
+     `window.TROLL_FLAGS_OVERRIDE = { ENABLE_BESPOKE_FINISHERS: true }`
+     before considering the new character's finisher shippable.
+
+## Live status
+
+`ENABLE_BESPOKE_FINISHERS` is now `true` in `assets/js/troll-arcade-flags.js`
+(flipped 2026-07-01, by explicit user decision after the Phase 11C
+verification pass). Real players on a match-ending KO now see the winning
+character's bespoke finisher pose in place of the generic "FINISH!" text
+banner; the `coinBurst`/shake beat still fires on the same timer either way,
+since that branch in `roundend` was left untouched. If a regression ever
+needs to be ruled out fast, setting the flag back to `false` restores the
+original generic-only flourish with no other code changes required.
 
 ## Non-goals for this pass
 

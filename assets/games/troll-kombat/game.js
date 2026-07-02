@@ -131,6 +131,7 @@
           special: { frames: 7, fps: 14, loop: false },
           hit:     { frames: 6, fps: 16, loop: false },
           ko:      { frames: 7, fps: 10, loop: false },
+          finisher:{ frames: 9, fps: 12, loop: false },
         },
       },
     },
@@ -157,6 +158,7 @@
           special: { frames: 4, fps: 14, loop: false },
           hit:     { frames: 6, fps: 16, loop: false },
           ko:      { frames: 7, fps: 10, loop: false },
+          finisher:{ frames: 9, fps: 12, loop: false },
         },
       },
     },
@@ -180,6 +182,7 @@
           special: { frames: 6, fps: 13, loop: false },
           hit:     { frames: 6, fps: 16, loop: false },
           ko:      { frames: 7, fps: 10, loop: false },
+          finisher:{ frames: 9, fps: 12, loop: false },
         },
       },
     },
@@ -1587,6 +1590,7 @@
       a.reset(SPAWN_L, 1); b.reset(SPAWN_R, -1);   // HP resets each round; meter carries over
       this.timer = ROUND_TIME;
       this.finisher = false;
+      if (window.FinisherSequencer) window.FinisherSequencer.cancel("round-reset");
       projectiles = []; particles = [];
       // Random map switching: re-roll the stage between rounds when enabled
       // (silent — the round intro covers it; no mid-fight warning needed here).
@@ -1700,10 +1704,16 @@
         const win = this.fighters[this.winnerIdx], lose = this.fighters[1 - this.winnerIdx];
         win.update(dt, NEUTRAL, lose, "roundend");
         lose.update(dt, NEUTRAL, win, "roundend");
-        // match-ending KO -> finisher flourish
+        // match-ending KO -> finisher flourish. Bespoke per-character cinematic
+        // (Phase 11) is attempted first, behind ENABLE_BESPOKE_FINISHERS; when
+        // the flag is off or the asset isn't ready, canStart() returns false
+        // and this falls back to the original generic FINISH! banner.
         if (this.matchWon && this.byKO && !this.finisher && this.phaseT > 1.1) {
           this.finisher = true;
-          announce("FINISH!", 1.2, true);
+          const seq = window.FinisherSequencer;
+          const roundCtx = { winner: win, loser: lose };
+          if (seq && seq.canStart(roundCtx)) seq.start(roundCtx);
+          else announce("FINISH!", 1.2, true);
         }
         if (this.matchWon && this.byKO && this.finisher && this.phaseT > 1.7 && !this.finBurst) {
           this.finBurst = true;
@@ -2518,6 +2528,7 @@
     if (live && !frozen) {
       match.update(simDt);
       updateProjectiles(simDt, match.fighters);
+      if (window.FinisherSequencer) window.FinisherSequencer.update(simDt);
     }
     if (!frozen) updateParticles(dt);
 
@@ -2531,6 +2542,7 @@
     if (match.fighters.length) {
       match.draw(dt);
       drawProjectiles();
+      if (window.FinisherSequencer) window.FinisherSequencer.draw(ctx);
     }
     drawParticles();
     ctx.restore();
