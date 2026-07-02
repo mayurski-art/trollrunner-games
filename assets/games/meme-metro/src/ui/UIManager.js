@@ -13,12 +13,43 @@ export class UIManager {
       'go-score', 'go-coins', 'go-distance', 'go-best', 'go-newbest', 'go-cause',
       'btn-start', 'btn-pause', 'btn-resume', 'btn-restart-pause', 'btn-exit-pause',
       'btn-restart', 'btn-exit',
-      'fx-flash', 'countdown',
+      'fx-flash', 'countdown', 'hud-powerups',
     ];
     for (const id of ids) this.el[id] = document.getElementById(id);
     this.flashTimeout = null;
     this.bumpTimeout = null;
     this.countdownShown = 0;
+    this.puChips = {}; // emoji -> { root, time } active powerup chips
+  }
+
+  // Reconcile the active-powerup chips (icon + countdown) without
+  // rebuilding DOM every frame.
+  updatePowerups(list) {
+    const holder = this.el['hud-powerups'];
+    const seen = new Set();
+    for (const p of list) {
+      seen.add(p.emoji);
+      let chip = this.puChips[p.emoji];
+      if (!chip) {
+        const root = document.createElement('div');
+        root.className = 'hud-chip hud-powerup';
+        const ico = document.createElement('span');
+        ico.className = 'hud-ico';
+        ico.textContent = p.emoji;
+        const time = document.createElement('strong');
+        root.append(ico, time);
+        holder.appendChild(root);
+        chip = this.puChips[p.emoji] = { root, time };
+      }
+      const label = p.remain === null ? '1 HIT' : `${Math.ceil(p.remain)}s`;
+      if (chip.time.textContent !== label) chip.time.textContent = label;
+    }
+    for (const emoji of Object.keys(this.puChips)) {
+      if (!seen.has(emoji)) {
+        this.puChips[emoji].root.remove();
+        delete this.puChips[emoji];
+      }
+    }
   }
 
   // Brief red vignette on hits; intensity 0..1.

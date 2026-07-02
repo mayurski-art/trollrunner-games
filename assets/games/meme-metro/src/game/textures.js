@@ -191,6 +191,25 @@ export function makeDogeSignTexture() {
   return toTexture(c);
 }
 
+// Powerup pickup icon: emoji in a glowing ring, tinted per powerup.
+export function makePowerupTexture(emoji, color) {
+  const [c, ctx] = makeCanvas(128, 128);
+  const hex = `#${color.toString(16).padStart(6, '0')}`;
+  ctx.strokeStyle = hex;
+  ctx.lineWidth = 7;
+  ctx.shadowColor = hex;
+  ctx.shadowBlur = 14;
+  ctx.beginPath();
+  ctx.arc(64, 64, 52, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = '58px "Segoe UI Emoji", sans-serif';
+  ctx.fillText(emoji, 64, 68);
+  return toTexture(c);
+}
+
 // Distant city skyline with lit windows and a moon, kept crisp above the fog.
 export function makeSkylineTexture() {
   const [c, ctx] = makeCanvas(1024, 256);

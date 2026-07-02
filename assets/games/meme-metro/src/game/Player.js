@@ -50,6 +50,18 @@ export class Player {
 
     this.group.add(body, head, chain, this.armL, this.armR, this.legL, this.legR);
     this.addAccessories(def, { headMat, accentMat, trimMat });
+
+    // Diamond Hands shield bubble, toggled by PowerupManager state.
+    this.shieldMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(1.15, 20, 14),
+      new THREE.MeshBasicMaterial({
+        color: 0x35d6ff, transparent: true, opacity: 0.22,
+        blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false,
+      }),
+    );
+    this.shieldMesh.position.y = 1.0;
+    this.shieldMesh.visible = false;
+    this.group.add(this.shieldMesh);
   }
 
   // Per-character silhouette accessories so each runner reads instantly
@@ -132,6 +144,8 @@ export class Player {
     this.slideTimer = 0;
     this.runTime = 0;
     this.buffered = null; // { action: 'jump' | 'slide', t }
+    this.flying = false; // Rocket Boost: hover above the track
+    if (this.shieldMesh) this.shieldMesh.visible = false;
     this.group.position.set(this.x, 0, 0);
     this.group.rotation.set(0, 0, 0);
     this.group.scale.set(1, 1, 1);
@@ -189,8 +203,12 @@ export class Player {
     const targetX = LANES[this.lane];
     this.x += (targetX - this.x) * Math.min(1, LANE_LERP * dt);
 
-    // Vertical physics.
-    if (!this.grounded || this.vy > 0) {
+    // Vertical physics. Rocket flight overrides gravity with a hover lerp.
+    if (this.flying && this.state !== 'dead') {
+      this.vy = 0;
+      if (this.state === 'sliding') this.state = 'running';
+      this.y += (2.7 - this.y) * Math.min(1, 6 * dt);
+    } else if (!this.grounded || this.vy > 0) {
       this.vy += GRAVITY * dt;
       this.y = Math.max(0, this.y + this.vy * dt);
       if (this.y === 0) {

@@ -99,6 +99,17 @@ export class CoinManager {
     }
   }
 
+  // Magnet powerup: pull nearby coins (any lane) toward the player.
+  attract(px, py, dt) {
+    const k = Math.min(1, 9 * dt);
+    for (const c of this.coins) {
+      if (c.popping) continue;
+      if (c.z < -14 || c.z > 4) continue;
+      c.x += (px - c.x) * k;
+      c.baseY += (py - c.baseY) * k;
+    }
+  }
+
   // Returns how many coins the player grabbed this frame. onGrab(x, y, z)
   // fires per coin so effects can burst at the pickup point.
   collect(playerBox, onGrab) {

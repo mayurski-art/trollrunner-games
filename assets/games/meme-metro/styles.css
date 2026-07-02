@@ -142,6 +142,19 @@ html, body {
 .hud-chip { transition: transform 0.14s ease; }
 .hud-chip.is-bump { transform: scale(1.12); border-color: var(--gold); }
 
+#hud-powerups { display: flex; flex-direction: column; gap: 7px; }
+.hud-powerup {
+  min-width: 96px;
+  border-color: rgba(53, 214, 255, 0.45);
+  animation: powerup-in 0.22s ease;
+}
+.hud-powerup .hud-ico { font-size: 15px; }
+.hud-powerup strong { color: #7fd4ff; font-size: 14px; }
+@keyframes powerup-in {
+  from { transform: translateX(-14px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
 /* ---------- Screens ---------- */
 
 .screen {

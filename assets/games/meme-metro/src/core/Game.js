@@ -8,6 +8,7 @@ import { ObstacleManager } from '../game/ObstacleManager.js';
 import { CoinManager } from '../game/CoinManager.js';
 import { CollisionManager } from '../game/CollisionManager.js';
 import { Effects } from '../game/Effects.js';
+import { PowerupManager } from '../game/PowerupManager.js';
 import { CHARACTERS, DEFAULT_CHARACTER } from '../data/characters.js';
 import { STAGES, DEFAULT_STAGE } from '../data/stages.js';
 
@@ -39,6 +40,7 @@ export class Game {
     this.coins = new CoinManager(this.scene);
     this.collisions = new CollisionManager();
     this.effects = new Effects(this.scene);
+    this.powerups = new PowerupManager(this.scene);
 
     this.score = 0;
     this.runCoins = 0;
@@ -78,6 +80,7 @@ export class Game {
     this.obstacles.reset();
     this.coins.reset();
     this.effects.reset();
+    this.powerups.reset();
     this.player.reset();
     this.score = 0;
     this.runCoins = 0;
@@ -124,6 +127,7 @@ export class Game {
     this.obstacles.reset();
     this.coins.reset();
     this.effects.reset();
+    this.powerups.reset();
     this.player.reset();
     this.ui.showMenu({
       highScore: this.storage.highScore,
@@ -161,16 +165,27 @@ export class Game {
 
     if (this.state === 'running') {
       this.difficulty.update(dt);
-      const speed = this.difficulty.currentSpeed;
+      const speed = this.difficulty.currentSpeed * this.powerups.speedMultiplier;
       speedT = this.difficulty.speedT;
+      this.player.flying = this.powerups.rocketActive;
+      this.player.shieldMesh.visible = this.powerups.shielded;
       this.world.update(dt, speed);
       this.player.update(dt, speed);
 
       const pattern = this.obstacles.update(dt, speed, this.difficulty);
-      if (pattern) this.coins.decoratePattern(pattern);
+      if (pattern) {
+        this.coins.decoratePattern(pattern);
+        this.powerups.maybeSpawn(pattern, this.difficulty);
+      }
       this.coins.update(dt, speed);
 
       const box = this.player.getCollider();
+      const picked = this.powerups.update(dt, speed, box);
+      if (picked) this.powerups.activate(picked, this.audio);
+      if (this.powerups.magnetActive) {
+        this.coins.attract(this.player.x, this.player.y + 0.95, dt);
+      }
+
       const grabbed = this.coins.collect(box, (x, y, z) => this.effects.coinBurst(x, y, z));
       if (grabbed) {
         this.runCoins += grabbed;
@@ -181,18 +196,23 @@ export class Game {
       // Distance points scale with the level multiplier shown on the HUD.
       this.score += speed * dt * (4 + 2 * this.difficulty.level);
 
-      const hit = this.collisions.check(box, this.obstacles.active);
-      if (hit) {
+      const hit = this.collisions.check(box, this.obstacles.active, speed * dt);
+      if (hit && !this.powerups.invincible) {
         if (hit.def.soft) {
           this.difficulty.applyStumble();
           this.cameraCtrl.shake(0.3, 0.3);
           this.ui.flash(0.25);
+        } else if (this.powerups.absorbHit(this.audio)) {
+          // Diamond Hands ate the hit.
+          this.cameraCtrl.shake(0.45, 0.35);
+          this.ui.flash(0.3);
         } else {
           this.onCrash(hit);
         }
       }
 
       this.effects.update(dt, speed, speedT, this.player, this.camera);
+      this.ui.updatePowerups(this.powerups.hudStatus());
       this.ui.updateHUD({
         score: Math.floor(this.score),
         best: Math.max(this.storage.highScore, Math.floor(this.score)),
