@@ -31,6 +31,7 @@
   // --- Match tuning -----------------------------------------------------------
   const ROUND_TIME = 60;        // seconds
   const ROUNDS_TO_WIN = 2;      // best of 3
+  const SUDDEN_DEATH_TIME = 15; // seconds; tied HP at time-out -> next hit wins
   const MAX_HP = 100;
   // Random map switching (Phase 6): when the setting is ON, the arena re-rolls
   // mid-fight on this interval. Tweak the range/lead-time here to taste.
@@ -1589,6 +1590,7 @@
       const [a, b] = this.fighters;
       a.reset(SPAWN_L, 1); b.reset(SPAWN_R, -1);   // HP resets each round; meter carries over
       this.timer = ROUND_TIME;
+      this.suddenDeath = false;
       this.finisher = false;
       if (window.FinisherSequencer) window.FinisherSequencer.cancel("round-reset");
       projectiles = []; particles = [];
@@ -1643,6 +1645,16 @@
       else announce("TIME", 1.2, true);
       winner.win();
     },
+    // Equal HP at time-out: instead of a coin flip deciding the round (and
+    // possibly the match), drop both fighters to 1 HP and keep the clock
+    // running — next hit landed wins the round outright. If nobody connects
+    // before the sudden-death clock runs out, it just re-arms and continues.
+    startSuddenDeath() {
+      if (!this.suddenDeath) { announce("SUDDEN DEATH", 1.3, true); shake(8); }
+      this.suddenDeath = true;
+      this.timer = SUDDEN_DEATH_TIME;
+      for (const f of this.fighters) f.hp = 1;
+    },
     update(dt) {
       const [p1, p2] = this.fighters;
       this.phaseT += dt;
@@ -1694,8 +1706,8 @@
         if (p1.hp <= 0 && p1.state === "ko") this.endRound(1, true);
         else if (p2.hp <= 0 && p2.state === "ko") this.endRound(0, true);
         else if (this.timer <= 0) {
-          const w = p1.hp === p2.hp ? (Math.random() < 0.5 ? 0 : 1) : (p1.hp > p2.hp ? 0 : 1);
-          this.endRound(w, false);
+          if (p1.hp === p2.hp) this.startSuddenDeath();
+          else this.endRound(p1.hp > p2.hp ? 0 : 1, false);
         }
         return;
       }

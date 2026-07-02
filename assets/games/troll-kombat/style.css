@@ -788,8 +788,6 @@ body[data-mode="toy"] .screen-wrap { box-shadow: inset 0 0 48px rgba(77, 238, 25
   cursor: pointer; border-radius: 10px; -webkit-tap-highlight-color: transparent;
   outline: none; transition: box-shadow 150ms ease;
 }
-/* hover: outer glow only — no visible box */
-.stage-thumb:hover { box-shadow: 0 0 0 2px rgba(77,255,115,0.55), 0 0 22px 4px rgba(77,255,115,0.35); }
 /* selected: inset ring + outer glow */
 .stage-thumb.is-sel { box-shadow: 0 0 0 3px var(--green), 0 0 26px 4px rgba(77,255,115,0.5); }
 /* focus-visible: same as selected ring so keyboard nav is clear */
