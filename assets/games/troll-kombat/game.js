@@ -2425,6 +2425,10 @@
     document.body.dataset.gameState = "fight";
     match.randomStage = setup.randomStage;
     match.init(buildDefs(), buildControllers(), setup.diff);
+    // The pre-fight flow (match type -> difficulty -> fighter -> stage) is
+    // tall enough that players scroll down to reach "Fight" — bring the
+    // cabinet back into view so the HUD isn't left above the fold.
+    canvas.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
   // page roster cards (the "Know Your Memes" section)
