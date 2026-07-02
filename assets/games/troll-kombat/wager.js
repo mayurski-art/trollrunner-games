@@ -32,58 +32,101 @@
     if (!host) return;
     state.mounted = true;
 
-    const wrap = document.createElement("div");
-    wrap.className = "kombat-wager";
-    wrap.innerHTML = `
-      <div class="kw-topline">
-        <span class="kw-kicker">Manual review</span>
-        <span class="kw-mode is-manual">NO AUTO PAY</span>
-      </div>
-      <div class="kw-row">
-        <span class="kw-label"><span class="kw-coin">$</span> Kombat wager</span>
-        <div class="kw-toggle" role="group" aria-label="Wager on or off">
-          <button type="button" class="kw-opt is-active" data-w="off">OFF</button>
-          <button type="button" class="kw-opt" data-w="on">ON</button>
+    // Small trigger button sits on the stage-select screen next to the
+    // random-map toggle; the full form lives in a popup so it doesn't cover
+    // the map thumbnails.
+    const trigger = document.createElement("button");
+    trigger.type = "button";
+    trigger.className = "kw-trigger";
+    trigger.innerHTML = `<span class="kw-trigger-ico">$</span><span class="kw-trigger-label">Kombat Wager</span><span class="kw-trigger-state" id="kw-trigger-state">OFF</span>`;
+    host.appendChild(trigger);
+
+    const backdrop = document.createElement("div");
+    backdrop.className = "kw-modal-backdrop";
+    backdrop.innerHTML = `
+      <div class="kombat-wager kw-modal" role="dialog" aria-modal="true" aria-label="Kombat wager settings">
+        <button type="button" class="kw-modal-close" aria-label="Close wager settings">✕</button>
+        <div class="kw-topline">
+          <span class="kw-kicker">Manual review</span>
+          <span class="kw-mode is-manual">NO AUTO PAY</span>
         </div>
-      </div>
-      <div class="kw-body" hidden>
-        <div class="kw-field">
-          <label class="kw-field-label" for="kw-input">Wager amount</label>
-          <div class="kw-amount">
-            <input type="number" id="kw-input" min="0" step="any" inputmode="decimal" placeholder="0.00" aria-label="Wager amount">
-            <div class="kw-tokens" role="group" aria-label="Token">
-              <button type="button" class="kw-tok is-active" data-t="USDC">USDC</button>
-              <button type="button" class="kw-tok" data-t="TROLL">$TROLL</button>
-            </div>
+        <div class="kw-row">
+          <span class="kw-label"><span class="kw-coin">$</span> Kombat wager</span>
+          <div class="kw-toggle" role="group" aria-label="Wager on or off">
+            <button type="button" class="kw-opt is-active" data-w="off">OFF</button>
+            <button type="button" class="kw-opt" data-w="on">ON</button>
           </div>
         </div>
-        <label class="kw-check">
-          <input type="checkbox" id="kw-terms">
-          <span>Both players agree this wager is for manual approval after the match.</span>
-        </label>
-        <div class="kw-safety">
-          <span>No wallet opens</span>
-          <span>No tokens move now</span>
-          <span>Submit after match</span>
+        <div class="kw-body" hidden>
+          <div class="kw-field">
+            <label class="kw-field-label" for="kw-input">Wager amount</label>
+            <div class="kw-amount">
+              <input type="number" id="kw-input" min="0" step="any" inputmode="decimal" placeholder="0.00" aria-label="Wager amount">
+              <div class="kw-tokens" role="group" aria-label="Token">
+                <button type="button" class="kw-tok is-active" data-t="USDC">USDC</button>
+                <button type="button" class="kw-tok" data-t="TROLL">$TROLL</button>
+              </div>
+            </div>
+          </div>
+          <label class="kw-check">
+            <input type="checkbox" id="kw-terms">
+            <span>Both players agree this wager is for manual approval after the match.</span>
+          </label>
+          <div class="kw-safety">
+            <span>No wallet opens</span>
+            <span>No tokens move now</span>
+            <span>Submit after match</span>
+          </div>
+          <p class="kw-note">When Fight starts, the wager is only recorded for this match. The winner sends it for approval on the result screen.</p>
+          <p class="kw-status" id="kw-status" aria-live="polite"></p>
         </div>
-        <p class="kw-note">When Fight starts, the wager is only recorded for this match. The winner sends it for approval on the result screen.</p>
-        <p class="kw-status" id="kw-status" aria-live="polite"></p>
       </div>`;
-    host.appendChild(wrap);
+    document.body.appendChild(backdrop);
 
+    const wrap = backdrop.querySelector(".kombat-wager");
     const body = wrap.querySelector(".kw-body");
+
+    function openModal() { backdrop.classList.add("is-open"); }
+    function closeModal() { backdrop.classList.remove("is-open"); }
+
+    trigger.addEventListener("click", openModal);
+    wrap.querySelector(".kw-modal-close").addEventListener("click", closeModal);
+    backdrop.addEventListener("click", event => { if (event.target === backdrop) closeModal(); });
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape" && backdrop.classList.contains("is-open")) closeModal();
+    });
+    // Leaving stage select (back to fighter pick, or launching the fight)
+    // should close the popup along with it.
+    document.addEventListener("click", event => {
+      if (event.target.closest("#tk-stage [data-act='stage-back'], #tk-stage [data-act='stage-fight']")) closeModal();
+    });
+
     wrap.querySelectorAll(".kw-opt").forEach(button => button.addEventListener("click", () => {
       state.enabled = button.dataset.w === "on";
       wrap.querySelectorAll(".kw-opt").forEach(option => option.classList.toggle("is-active", option === button));
       body.hidden = !state.enabled;
       status(state.enabled ? "Enter wager terms before starting." : "", "");
+      updateTrigger();
     }));
     wrap.querySelectorAll(".kw-tok").forEach(button => button.addEventListener("click", () => {
       state.token = button.dataset.t;
       wrap.querySelectorAll(".kw-tok").forEach(option => option.classList.toggle("is-active", option === button));
+      updateTrigger();
     }));
-    wrap.querySelector("#kw-input").addEventListener("input", event => { state.amount = event.target.value; });
+    wrap.querySelector("#kw-input").addEventListener("input", event => { state.amount = event.target.value; updateTrigger(); });
     wrap.querySelector("#kw-terms").addEventListener("change", event => { state.termsAccepted = event.target.checked; });
+  }
+
+  function updateTrigger() {
+    const el = document.getElementById("kw-trigger-state");
+    if (!el) return;
+    if (!state.enabled) {
+      el.textContent = "OFF";
+      el.classList.remove("is-on");
+    } else {
+      el.textContent = state.amount ? `ON · ${state.amount} ${state.token}` : "ON";
+      el.classList.add("is-on");
+    }
   }
 
   function status(message, cls) {

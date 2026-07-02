@@ -2506,7 +2506,10 @@
   });
   document.getElementById("tk-change").addEventListener("click", () => {
     resultOverlay.classList.remove("is-visible");
-    flow.go("matchtype");
+    // Jump straight to fighter select — same mode/difficulty/player count,
+    // just re-pick who's fighting. Use "fsel-back" to fall back to matchtype
+    // for a full setup change instead.
+    enterFighterSelect();
   });
 
   // sound toggle

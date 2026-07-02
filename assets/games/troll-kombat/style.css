@@ -467,9 +467,35 @@ h1 {
 /* Weekly leaderboard styles now live in the shared assets/css/troll-leaderboard.css */
 
 /* ---- Wager control (stage-select) ------------------------------------- */
+/* Small trigger chip, sits next to the random-map toggle on the stage-select
+   mockup instead of a full panel covering the map thumbnails. */
+.kw-trigger {
+  position: absolute; left: 35%; top: 90.8%; width: 22%; height: 5.8%; z-index: 5;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  border-radius: 999px; border: 1px solid rgba(255, 216, 77, 0.5); cursor: pointer;
+  background: linear-gradient(180deg, rgba(255, 216, 77, 0.16), rgba(0, 0, 0, 0.42));
+  color: var(--gold); font-family: var(--mono); font-weight: 900; letter-spacing: 0.03em;
+  font-size: clamp(9px, 1.05vw, 12px); text-transform: uppercase;
+  box-shadow: 0 0 14px rgba(255, 216, 77, 0.14);
+}
+.kw-trigger:hover, .kw-trigger:focus-visible { outline: none; filter: brightness(1.14); transform: translateY(-1px); }
+.kw-trigger-ico {
+  display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%;
+  color: #231405; background: radial-gradient(circle at 32% 26%, #fff7b0, var(--gold) 58%, #b86818);
+  font-size: 10px;
+}
+.kw-trigger-label { white-space: nowrap; }
+.kw-trigger-state { padding: 2px 7px; border-radius: 999px; background: rgba(0, 0, 0, 0.4); font-size: 9px; color: var(--muted); }
+.kw-trigger-state.is-on { color: var(--green); background: rgba(77, 255, 115, 0.14); }
+
+/* Popup that hosts the full wager form (opened by .kw-trigger). */
+.kw-modal-backdrop {
+  position: fixed; inset: 0; z-index: 500; display: none; align-items: center; justify-content: center;
+  padding: 20px; background: rgba(0, 0, 0, 0.72); backdrop-filter: blur(3px);
+}
+.kw-modal-backdrop.is-open { display: flex; }
 .kombat-wager {
-  position: absolute; z-index: 5; left: 50%; top: clamp(8px, 2.2%, 18px); transform: translateX(-50%);
-  width: min(520px, 94%); padding: 12px; overflow: hidden;
+  width: min(520px, 94%); padding: 16px 14px 14px; overflow: hidden;
   border: 1px solid rgba(255, 216, 77, 0.62); border-radius: 18px;
   background:
     radial-gradient(circle at 12% 0%, rgba(255, 216, 77, 0.22), transparent 36%),
@@ -477,7 +503,14 @@ h1 {
     linear-gradient(180deg, rgba(30, 14, 7, 0.94), rgba(7, 3, 12, 0.96));
   box-shadow: 0 18px 46px rgba(0, 0, 0, 0.62), 0 0 24px rgba(255, 216, 77, 0.16), inset 0 1px 0 rgba(255,255,255,0.12);
   color: var(--ink); backdrop-filter: blur(10px);
+  max-height: 90vh; overflow-y: auto;
 }
+.kw-modal-close {
+  position: absolute; top: 10px; right: 10px; z-index: 2; width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(0, 0, 0, 0.4); color: var(--ink);
+  font-size: 13px; cursor: pointer;
+}
+.kw-modal-close:hover, .kw-modal-close:focus-visible { outline: none; background: rgba(255, 255, 255, 0.14); }
 .kombat-wager::before {
   content: ""; position: absolute; inset: 0; pointer-events: none;
   background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
@@ -622,22 +655,6 @@ h1 {
   font-family: var(--mono); font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em;
 }
 
-/* mode toggle (Pixel / Toy) */
-.mode-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.mode-btn {
-  display: grid; gap: 3px; justify-items: start; padding: 12px 14px; cursor: pointer; text-align: left;
-  border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: rgba(255, 255, 255, 0.05);
-  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
-}
-.mode-btn:hover, .mode-btn:focus-visible { transform: translateY(-2px); border-color: var(--cyan); outline: none; }
-.mode-btn.is-active {
-  border-color: var(--cyan); background: color-mix(in srgb, var(--cyan) 18%, transparent);
-  box-shadow: 0 0 22px rgba(77, 238, 255, 0.28);
-}
-.mode-icon { font-size: 18px; line-height: 1; color: var(--cyan); }
-.mode-btn strong { font-size: 15px; text-transform: uppercase; }
-.mode-sub { color: var(--muted); font-family: var(--mono); font-size: 10px; text-transform: uppercase; }
-
 /* stage select */
 .stage-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .stage-pick {
@@ -658,9 +675,6 @@ h1 {
   text-transform: uppercase; text-align: center;
 }
 .stage-pick.is-active .stage-pick-name { color: var(--accent); }
-
-/* toy-mode cabinet gets a cooler, glassier screen glow */
-body[data-mode="toy"] .screen-wrap { box-shadow: inset 0 0 48px rgba(77, 238, 255, 0.16); }
 
 /* Full-bleed cabinet: align controls to the play screen, bolder MK HUD. */
 .fight-cabinet { --screenW: min(calc(100vw - 8px), calc(min(84svh, 900px) * 1280 / 600)); }
