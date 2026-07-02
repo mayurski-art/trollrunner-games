@@ -6,6 +6,9 @@ const JUMP_VELOCITY = 11.8;
 const FAST_FALL_VELOCITY = -22;
 const SLIDE_DURATION = 0.75;
 const LANE_LERP = 13;
+// An action pressed slightly too early (e.g. jump just before landing)
+// fires automatically within this window instead of being dropped.
+const INPUT_BUFFER = 0.16;
 
 // Placeholder runner built from primitives (body, head, limbs, coin chain).
 // Final character models swap in via buildMesh without touching state logic.
@@ -56,6 +59,7 @@ export class Player {
     this.state = 'running'; // running | jumping | sliding | dead
     this.slideTimer = 0;
     this.runTime = 0;
+    this.buffered = null; // { action: 'jump' | 'slide', t }
     this.group.position.set(this.x, 0, 0);
     this.group.rotation.set(0, 0, 0);
     this.group.scale.set(1, 1, 1);
@@ -78,9 +82,14 @@ export class Player {
   }
 
   jump() {
-    if (this.state === 'dead' || !this.grounded) return false;
+    if (this.state === 'dead') return false;
+    if (!this.grounded) {
+      this.buffered = { action: 'jump', t: INPUT_BUFFER };
+      return false;
+    }
     this.state = 'jumping';
     this.slideTimer = 0;
+    this.buffered = null;
     this.vy = JUMP_VELOCITY;
     return true;
   }
@@ -88,12 +97,14 @@ export class Player {
   slide() {
     if (this.state === 'dead') return false;
     if (!this.grounded) {
-      // Air slam: cancel the jump and drop fast.
+      // Air slam: cancel the jump, drop fast, then roll on landing.
       this.vy = FAST_FALL_VELOCITY;
+      this.buffered = { action: 'slide', t: INPUT_BUFFER * 2 };
       return true;
     }
     this.state = 'sliding';
     this.slideTimer = SLIDE_DURATION;
+    this.buffered = null;
     return true;
   }
 
@@ -120,6 +131,19 @@ export class Player {
     if (this.state === 'sliding') {
       this.slideTimer -= dt;
       if (this.slideTimer <= 0) this.state = 'running';
+    }
+
+    // Fire a buffered action the moment it becomes legal.
+    if (this.buffered && this.state !== 'dead') {
+      this.buffered.t -= dt;
+      if (this.buffered.t <= 0) {
+        this.buffered = null;
+      } else if (this.grounded) {
+        const { action } = this.buffered;
+        this.buffered = null;
+        if (action === 'jump') this.jump();
+        else this.slide();
+      }
     }
 
     // Run-cycle animation.

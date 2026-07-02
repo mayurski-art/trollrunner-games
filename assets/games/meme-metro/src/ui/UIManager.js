@@ -13,8 +13,50 @@ export class UIManager {
       'go-score', 'go-coins', 'go-distance', 'go-best', 'go-newbest', 'go-cause',
       'btn-start', 'btn-pause', 'btn-resume', 'btn-restart-pause', 'btn-exit-pause',
       'btn-restart', 'btn-exit',
+      'fx-flash', 'countdown',
     ];
     for (const id of ids) this.el[id] = document.getElementById(id);
+    this.flashTimeout = null;
+    this.bumpTimeout = null;
+    this.countdownShown = 0;
+  }
+
+  // Brief red vignette on hits; intensity 0..1.
+  flash(intensity = 0.4) {
+    const el = this.el['fx-flash'];
+    clearTimeout(this.flashTimeout);
+    el.style.opacity = String(intensity);
+    el.classList.add('is-on');
+    this.flashTimeout = setTimeout(() => {
+      el.style.opacity = '0';
+      el.classList.remove('is-on');
+    }, 90);
+  }
+
+  showCountdown(n) {
+    const el = this.el.countdown;
+    el.hidden = false;
+    if (n !== this.countdownShown) {
+      this.countdownShown = n;
+      el.textContent = n;
+      // Retrigger the pop animation.
+      el.classList.remove('is-pop');
+      void el.offsetWidth;
+      el.classList.add('is-pop');
+    }
+  }
+
+  hideCountdown() {
+    this.el.countdown.hidden = true;
+    this.countdownShown = 0;
+  }
+
+  // Quick scale pulse on the run-coin chip when coins are grabbed.
+  bumpCoins() {
+    const chip = this.el['hud-run-coins'].parentElement;
+    clearTimeout(this.bumpTimeout);
+    chip.classList.add('is-bump');
+    this.bumpTimeout = setTimeout(() => chip.classList.remove('is-bump'), 160);
   }
 
   bind(cb) {

@@ -7,13 +7,15 @@ import { DifficultyManager } from '../game/DifficultyManager.js';
 import { ObstacleManager } from '../game/ObstacleManager.js';
 import { CoinManager } from '../game/CoinManager.js';
 import { CollisionManager } from '../game/CollisionManager.js';
+import { Effects } from '../game/Effects.js';
 import { CHARACTERS, DEFAULT_CHARACTER } from '../data/characters.js';
 import { STAGES, DEFAULT_STAGE } from '../data/stages.js';
 
 const MENU_SCROLL_SPEED = 7;
+const COUNTDOWN_STEP = 0.6; // seconds per tick of the 3-2-1 resume count
 
 // Owns the renderer, scene, game state machine and the per-frame loop.
-// States: menu | running | paused | gameover.
+// States: menu | running | paused | countdown | gameover.
 export class Game {
   constructor(canvas, { ui, storage, audio }) {
     this.ui = ui;
@@ -36,9 +38,11 @@ export class Game {
     this.obstacles = new ObstacleManager(this.scene);
     this.coins = new CoinManager(this.scene);
     this.collisions = new CollisionManager();
+    this.effects = new Effects(this.scene);
 
     this.score = 0;
     this.runCoins = 0;
+    this.countdownT = 0;
 
     this.input = new InputManager(canvas, {
       left: () => this.playerAction('left'),
@@ -73,6 +77,7 @@ export class Game {
     this.difficulty.reset();
     this.obstacles.reset();
     this.coins.reset();
+    this.effects.reset();
     this.player.reset();
     this.score = 0;
     this.runCoins = 0;
@@ -89,19 +94,30 @@ export class Game {
 
   resume() {
     if (this.state !== 'paused') return;
-    this.state = 'running';
+    // 3-2-1 countdown before control returns, so an unpause never
+    // dumps the player straight into an obstacle.
+    this.state = 'countdown';
+    this.countdownT = COUNTDOWN_STEP * 3;
     this.ui.showHUD();
+    this.ui.showCountdown(3);
   }
 
   togglePause() {
     if (this.state === 'running') this.pause();
     else if (this.state === 'paused') this.resume();
+    else if (this.state === 'countdown') {
+      // Re-pause mid-countdown.
+      this.ui.hideCountdown();
+      this.state = 'paused';
+      this.ui.showPause();
+    }
   }
 
   exitToMenu() {
     this.state = 'menu';
     this.obstacles.reset();
     this.coins.reset();
+    this.effects.reset();
     this.player.reset();
     this.ui.showMenu({
       highScore: this.storage.highScore,
@@ -115,6 +131,7 @@ export class Game {
     this.audio.play('crash');
     this.audio.play('gameOver');
     this.cameraCtrl.shake(0.9, 0.6);
+    this.ui.flash(0.55);
 
     const score = Math.floor(this.score);
     const newBest = this.storage.recordRun({ score, coins: this.runCoins });
@@ -134,10 +151,12 @@ export class Game {
 
   tick() {
     const dt = Math.min(this.clock.getDelta(), 0.05);
+    let speedT = 0;
 
     if (this.state === 'running') {
       this.difficulty.update(dt);
       const speed = this.difficulty.currentSpeed;
+      speedT = this.difficulty.speedT;
       this.world.update(dt, speed);
       this.player.update(dt, speed);
 
@@ -146,11 +165,12 @@ export class Game {
       this.coins.update(dt, speed);
 
       const box = this.player.getCollider();
-      const grabbed = this.coins.collect(box);
+      const grabbed = this.coins.collect(box, (x, y, z) => this.effects.coinBurst(x, y, z));
       if (grabbed) {
         this.runCoins += grabbed;
         this.score += grabbed * 30;
         this.audio.play('coin');
+        this.ui.bumpCoins();
       }
       // Distance points scale with the level multiplier shown on the HUD.
       this.score += speed * dt * (4 + 2 * this.difficulty.level);
@@ -159,11 +179,14 @@ export class Game {
       if (hit) {
         if (hit.def.soft) {
           this.difficulty.applyStumble();
+          this.cameraCtrl.shake(0.3, 0.3);
+          this.ui.flash(0.25);
         } else {
           this.onCrash(hit);
         }
       }
 
+      this.effects.update(dt, speed, speedT, this.player, this.camera);
       this.ui.updateHUD({
         score: Math.floor(this.score),
         best: Math.max(this.storage.highScore, Math.floor(this.score)),
@@ -171,15 +194,26 @@ export class Game {
         totalCoins: this.storage.totalCoins,
         multiplier: this.difficulty.level,
       });
+    } else if (this.state === 'countdown') {
+      this.countdownT -= dt;
+      if (this.countdownT <= 0) {
+        this.state = 'running';
+        this.ui.hideCountdown();
+      } else {
+        this.ui.showCountdown(Math.ceil(this.countdownT / COUNTDOWN_STEP));
+      }
+      this.player.update(dt, 0); // Keep the run cycle alive, world frozen.
     } else if (this.state === 'menu') {
       // Live backdrop: world scrolls slowly, runner jogs in place.
       this.world.update(dt, MENU_SCROLL_SPEED);
       this.player.idle(dt);
+      this.effects.update(dt, MENU_SCROLL_SPEED, 0, this.player, this.camera);
     } else if (this.state === 'gameover') {
       this.player.update(dt, 0); // Finish the fall animation.
+      this.effects.update(dt, 0, 0, null, this.camera);
     }
 
-    this.cameraCtrl.update(dt, this.player);
+    this.cameraCtrl.update(dt, this.player, speedT);
     this.renderer.render(this.scene, this.camera);
   }
 }

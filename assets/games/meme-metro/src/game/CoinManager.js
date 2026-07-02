@@ -92,8 +92,9 @@ export class CoinManager {
     }
   }
 
-  // Returns how many coins the player grabbed this frame.
-  collect(playerBox) {
+  // Returns how many coins the player grabbed this frame. onGrab(x, y, z)
+  // fires per coin so effects can burst at the pickup point.
+  collect(playerBox, onGrab) {
     let got = 0;
     for (const c of this.coins) {
       if (c.popping) continue;
@@ -102,6 +103,7 @@ export class CoinManager {
       if (c.baseY + COIN_RADIUS < playerBox.minY || c.baseY - COIN_RADIUS > playerBox.maxY) continue;
       c.popping = true;
       got++;
+      if (onGrab) onGrab(c.x, c.baseY, c.z);
     }
     return got;
   }

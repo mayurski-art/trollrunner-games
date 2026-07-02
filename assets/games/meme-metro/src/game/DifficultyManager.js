@@ -25,6 +25,11 @@ export class DifficultyManager {
     return 4;
   }
 
+  // 0..1 progress from base speed to max speed (drives FOV/streak effects).
+  get speedT() {
+    return (this.currentSpeed - this.baseSpeed) / (this.maxSpeed - this.baseSpeed);
+  }
+
   // Distance between obstacle patterns shrinks as speed rises, so reaction
   // time stays roughly constant instead of collapsing at high speed.
   get gapDistance() {

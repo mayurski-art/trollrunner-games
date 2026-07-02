@@ -10,11 +10,15 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,500;0,700;0,900;1,900&family=DM+Mono:wght@500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/games/meme-metro/styles.css?v=mm-phase1-1">
+  <link rel="stylesheet" href="assets/games/meme-metro/styles.css?v=mm-phase2-1">
 </head>
 <body>
   <div id="mm-root">
     <canvas id="mm-canvas" aria-label="Troll Dash: Meme Metro endless runner"></canvas>
+
+    <!-- Hit flash + resume countdown overlays -->
+    <div id="fx-flash" aria-hidden="true"></div>
+    <div id="countdown" aria-live="assertive" hidden>3</div>
 
     <!-- In-game HUD -->
     <div id="hud" aria-live="polite">
@@ -103,7 +107,7 @@
   <script type="importmap">
     { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
   </script>
-  <script type="module" src="assets/games/meme-metro/src/main.js?v=mm-phase1-1"></script>
+  <script type="module" src="assets/games/meme-metro/src/main.js?v=mm-phase2-1"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://mayurski-art.github.io/assets/js/troll-notis.js"></script>
 </body>
