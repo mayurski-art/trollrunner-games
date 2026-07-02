@@ -501,6 +501,76 @@ button:disabled { opacity: 0.45; cursor: default; }
 }
 .go-stats dd.is-coin { color: var(--gold-hi); }
 
+/* ---------- Settings ---------- */
+
+.settings-list { display: flex; flex-direction: column; gap: 8px; text-align: left; }
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 14px;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 14px;
+  font-weight: 700;
+}
+.settings-toggle {
+  min-width: 64px;
+  padding: 7px 0;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ink-dim);
+  font-family: "DM Mono", monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+.settings-toggle.is-on {
+  background: rgba(72, 255, 122, 0.14);
+  border-color: rgba(72, 255, 122, 0.55);
+  color: #48ff7a;
+}
+.settings-quality { display: flex; gap: 5px; }
+.settings-quality button {
+  padding: 7px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ink-dim);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.settings-quality button.is-on {
+  border-color: var(--gold);
+  color: var(--gold-hi);
+  background: rgba(255, 179, 0, 0.1);
+}
+.is-danger-text { color: #ff8a97 !important; }
+
+/* ---------- Revive ---------- */
+
+.dialog-title.is-gold {
+  color: var(--gold-hi);
+  text-shadow: 0 0 22px rgba(255, 179, 0, 0.5);
+}
+.revive-blurb { margin: -6px 0 14px; color: var(--ink-dim); font-size: 14px; }
+.revive-bank {
+  margin-bottom: 4px;
+  padding: 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+.revive-bank strong { font-family: "DM Mono", monospace; color: var(--gold-hi); }
+
 /* ---------- Mobile ---------- */
 
 @media (max-width: 620px) {

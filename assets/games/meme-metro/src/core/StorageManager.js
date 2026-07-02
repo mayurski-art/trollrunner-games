@@ -51,6 +51,14 @@ export class StorageManager {
 
   isUnlocked(id) { return this.data.unlocked.includes(id); }
 
+  // Spend from the coin bank; false if it can't cover the cost.
+  spendCoins(n) {
+    if (this.data.totalCoins < n) return false;
+    this.data.totalCoins -= n;
+    this.save();
+    return true;
+  }
+
   // Deducts the price and unlocks; false if already owned or short on coins.
   unlockCharacter(id, price) {
     if (this.isUnlocked(id) || this.data.totalCoins < price) return false;

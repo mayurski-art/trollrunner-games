@@ -14,9 +14,10 @@ import { STAGES, DEFAULT_STAGE } from '../data/stages.js';
 
 const MENU_SCROLL_SPEED = 7;
 const COUNTDOWN_STEP = 0.6; // seconds per tick of the 3-2-1 resume count
+const REVIVE_COST = 50; // Troll Coins (bank), once per run
 
 // Owns the renderer, scene, game state machine and the per-frame loop.
-// States: menu | running | paused | countdown | gameover.
+// States: menu | running | paused | countdown | revive | gameover.
 export class Game {
   constructor(canvas, { ui, storage, audio }) {
     this.ui = ui;
@@ -25,8 +26,7 @@ export class Game {
     this.state = 'menu';
 
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.applyQuality(storage.settings.quality);
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 260);
@@ -45,6 +45,8 @@ export class Game {
     this.score = 0;
     this.runCoins = 0;
     this.countdownT = 0;
+    this.usedRevive = false;
+    this.lastCrashCause = '';
 
     this.input = new InputManager(canvas, {
       left: () => this.playerAction('left'),
@@ -66,6 +68,13 @@ export class Game {
     this.clock = new THREE.Clock();
   }
 
+  // Graphics quality: scales render resolution.
+  applyQuality(q) {
+    const ratio = q === 'low' ? 0.7 : q === 'medium' ? 1 : Math.min(window.devicePixelRatio, 2);
+    this.renderer.setPixelRatio(ratio);
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+
   playerAction(action) {
     if (this.state !== 'running') return;
     const did = action === 'left' ? this.player.moveLeft()
@@ -84,6 +93,7 @@ export class Game {
     this.player.reset();
     this.score = 0;
     this.runCoins = 0;
+    this.usedRevive = false;
     this.state = 'running';
     this.audio.play('click');
     this.ui.showHUD();
@@ -137,12 +147,23 @@ export class Game {
 
   onCrash(obstacle) {
     this.player.die();
-    this.state = 'gameover';
     this.audio.play('crash');
-    this.audio.play('gameOver');
     this.cameraCtrl.shake(0.9, 0.6);
     this.ui.flash(0.55);
+    this.lastCrashCause = obstacle.def.name;
 
+    // Offer one coin-paid revive per run (mock currency, no wallet).
+    if (!this.usedRevive && this.storage.totalCoins >= REVIVE_COST) {
+      this.state = 'revive';
+      this.ui.showRevive({ cost: REVIVE_COST, bank: this.storage.totalCoins });
+    } else {
+      this.finishRun();
+    }
+  }
+
+  finishRun() {
+    this.state = 'gameover';
+    this.audio.play('gameOver');
     const score = Math.floor(this.score);
     const newBest = this.storage.recordRun({ score, coins: this.runCoins });
     this.ui.showGameOver({
@@ -151,8 +172,33 @@ export class Game {
       distance: this.difficulty.distance,
       best: this.storage.highScore,
       newBest,
-      cause: obstacle.def.name,
+      cause: this.lastCrashCause,
     });
+  }
+
+  revive() {
+    if (this.state !== 'revive') return;
+    if (!this.storage.spendCoins(REVIVE_COST)) {
+      this.finishRun();
+      return;
+    }
+    this.usedRevive = true;
+    // Clear the field, stand the runner back up with a fresh shield,
+    // then count back in.
+    this.obstacles.reset();
+    this.powerups.reset();
+    this.powerups.shielded = true;
+    this.player.reset();
+    this.audio.play('powerup');
+    this.state = 'countdown';
+    this.countdownT = COUNTDOWN_STEP * 3;
+    this.ui.showHUD();
+    this.ui.showCountdown(3);
+  }
+
+  declineRevive() {
+    if (this.state !== 'revive') return;
+    this.finishRun();
   }
 
   start() {
@@ -234,7 +280,7 @@ export class Game {
       this.world.update(dt, MENU_SCROLL_SPEED);
       this.player.idle(dt);
       this.effects.update(dt, MENU_SCROLL_SPEED, 0, this.player, this.camera);
-    } else if (this.state === 'gameover') {
+    } else if (this.state === 'gameover' || this.state === 'revive') {
       this.player.update(dt, 0); // Finish the fall animation.
       this.effects.update(dt, 0, 0, null, this.camera);
     }

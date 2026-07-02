@@ -7,7 +7,8 @@ export class UIManager {
   constructor() {
     this.el = {};
     const ids = [
-      'screen-menu', 'screen-pause', 'screen-gameover', 'screen-characters', 'hud',
+      'screen-menu', 'screen-pause', 'screen-gameover', 'screen-characters',
+      'screen-settings', 'screen-revive', 'revive-bank', 'revive-cost', 'hud',
       'menu-highscore', 'menu-coins',
       'hud-score', 'hud-best', 'hud-run-coins', 'hud-total-coins', 'hud-multiplier',
       'go-score', 'go-coins', 'go-distance', 'go-best', 'go-newbest', 'go-cause',
@@ -107,7 +108,11 @@ export class UIManager {
   }
 
   showOnly(name) {
-    for (const s of ['screen-menu', 'screen-pause', 'screen-gameover', 'screen-characters']) {
+    const screens = [
+      'screen-menu', 'screen-pause', 'screen-gameover', 'screen-characters',
+      'screen-settings', 'screen-revive',
+    ];
+    for (const s of screens) {
       this.el[s].classList.toggle('is-visible', s === name);
     }
     this.el.hud.classList.toggle('is-visible', name === null || name === 'screen-pause');
@@ -115,6 +120,16 @@ export class UIManager {
 
   showCharacters() {
     this.showOnly('screen-characters');
+  }
+
+  showSettings() {
+    this.showOnly('screen-settings');
+  }
+
+  showRevive({ cost, bank }) {
+    this.el['revive-cost'].textContent = fmt(cost);
+    this.el['revive-bank'].textContent = fmt(bank);
+    this.showOnly('screen-revive');
   }
 
   showMenu({ highScore, totalCoins }) {
