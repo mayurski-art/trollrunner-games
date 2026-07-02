@@ -358,6 +358,13 @@ body.intro-complete .arcade-intro {
     rgba(255, 255, 255, 0.06);
 }
 
+.game-select-card-metro {
+  background:
+    radial-gradient(circle at 78% 20%, rgba(255, 179, 0, 0.26), transparent 36%),
+    linear-gradient(135deg, rgba(154, 92, 255, 0.22), rgba(10, 6, 22, 0.4)),
+    rgba(255, 255, 255, 0.06);
+}
+
 .game-select-card.is-locked {
   opacity: 0.64;
   filter: grayscale(0.42);
