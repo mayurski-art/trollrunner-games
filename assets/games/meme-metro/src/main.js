@@ -1,6 +1,7 @@
 import { Game } from './core/Game.js';
 import { StorageManager } from './core/StorageManager.js';
 import { AudioManager } from './core/AudioManager.js';
+import { ReviveController } from './core/Revive.js';
 import { UIManager } from './ui/UIManager.js';
 import { CharacterSelect } from './ui/CharacterSelect.js';
 import { SettingsMenu } from './ui/SettingsMenu.js';
@@ -49,9 +50,19 @@ document.getElementById('btn-settings-reset').addEventListener('click', () => {
   }
 });
 
-// Revive (mock Troll Coin bank — no wallet).
-document.getElementById('btn-revive').addEventListener('click', () => game.revive());
-document.getElementById('btn-revive-no').addEventListener('click', () => game.declineRevive());
+// Revive — real on-chain payment via the shared TrollPay lib.
+game.revive = new ReviveController({
+  audio,
+  onResume: () => game.reviveGranted(),
+  onDecline: () => game.declineRevive(),
+});
+
+// Leaderboard (shared arcade engine, mounted into #lb-root on load).
+document.getElementById('btn-leaderboard').addEventListener('click', () => {
+  ui.showLeaderboard();
+  audio.play('click');
+});
+document.getElementById('btn-lb-back').addEventListener('click', () => game.exitToMenu());
 
 game.exitToMenu();
 game.start();

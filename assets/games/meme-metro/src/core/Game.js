@@ -14,7 +14,6 @@ import { STAGES, DEFAULT_STAGE } from '../data/stages.js';
 
 const MENU_SCROLL_SPEED = 7;
 const COUNTDOWN_STEP = 0.6; // seconds per tick of the 3-2-1 resume count
-const REVIVE_COST = 50; // Troll Coins (bank), once per run
 
 // Owns the renderer, scene, game state machine and the per-frame loop.
 // States: menu | running | paused | countdown | revive | gameover.
@@ -47,6 +46,7 @@ export class Game {
     this.countdownT = 0;
     this.usedRevive = false;
     this.lastCrashCause = '';
+    this.revive = null; // ReviveController, wired in by main.js
 
     this.input = new InputManager(canvas, {
       left: () => this.playerAction('left'),
@@ -152,10 +152,11 @@ export class Game {
     this.ui.flash(0.55);
     this.lastCrashCause = obstacle.def.name;
 
-    // Offer one coin-paid revive per run (mock currency, no wallet).
-    if (!this.usedRevive && this.storage.totalCoins >= REVIVE_COST) {
+    // Offer one real on-chain revive per run (via the shared TrollPay lib).
+    if (!this.usedRevive) {
       this.state = 'revive';
-      this.ui.showRevive({ cost: REVIVE_COST, bank: this.storage.totalCoins });
+      this.revive?.open();
+      this.ui.showRevive();
     } else {
       this.finishRun();
     }
@@ -166,6 +167,9 @@ export class Game {
     this.audio.play('gameOver');
     const score = Math.floor(this.score);
     const newBest = this.storage.recordRun({ score, coins: this.runCoins });
+    if (window.TrollLeaderboard) {
+      window.TrollLeaderboard.record('meme-metro', { score, coins: this.runCoins });
+    }
     this.ui.showGameOver({
       score,
       coins: this.runCoins,
@@ -176,12 +180,10 @@ export class Game {
     });
   }
 
-  revive() {
+  // Called by ReviveController once the on-chain payment is confirmed and
+  // the player taps "Confirm & Resume".
+  reviveGranted() {
     if (this.state !== 'revive') return;
-    if (!this.storage.spendCoins(REVIVE_COST)) {
-      this.finishRun();
-      return;
-    }
     this.usedRevive = true;
     // Clear the field, stand the runner back up with a fresh shield,
     // then count back in.
