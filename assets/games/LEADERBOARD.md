@@ -6,7 +6,7 @@ results. Do **not** copy/rewrite the leaderboard per game.
 
 - Engine: [`assets/js/troll-leaderboard.js`](../js/troll-leaderboard.js) — `window.TrollLeaderboard`
 - Styles: [`assets/css/troll-leaderboard.css`](../css/troll-leaderboard.css)
-- Live examples: `troll-kombat/leaderboard.js` (fighter), `troll-dash/leaderboard.js` (runner)
+- Live examples: `troll-kombat/leaderboard.js` (fighter), `meme-metro/leaderboard.js` (runner)
 
 ## ⚠️ Safety (do not break)
 Prizes are **display-only placeholders**. There is **no** wallet code, claim flow,

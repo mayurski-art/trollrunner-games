@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#050008">
-  <meta name="description" content="Troll Runner Arcade — Trollrunner Game Night. Boot cursed meme-coin cabinets: Troll Dash: Rugpull Run, Troll Kombat, and Troll Dash: Meme Metro. Take the controller.">
+  <meta name="description" content="Troll Runner Arcade — Trollrunner Game Night. Boot cursed meme-coin cabinets: Troll Dash: Meme Metro and Troll Kombat. Take the controller.">
   <title>Troll Runner Arcade — Game Night</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23050008'/%3E%3Ctext x='6' y='40' font-size='17' fill='%234dff73' font-family='monospace' font-weight='900'%3E%24T%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -54,13 +54,13 @@
               <button id="back-to-tv-menu" class="tv-back-btn" type="button">Back</button>
             </div>
             <div class="game-scroll-list" tabindex="0" aria-label="Available Trollrunner games">
-              <article class="game-select-card game-select-card-dash">
-                <button id="boot-troll-dash" class="game-select-hit" type="button" aria-label="Boot Troll Dash: Rugpull Run"></button>
-                <img class="game-select-art" src="assets/games/troll-dash/sprites/troll-runner.png" alt="" aria-hidden="true">
+              <article class="game-select-card game-select-card-metro">
+                <a id="boot-meme-metro" class="game-select-hit" href="meme-metro.html" aria-label="Play Troll Dash: Meme Metro"></a>
+                <img class="game-select-art" src="assets/animations/troll_playable_character.PNG" alt="" aria-hidden="true">
                 <span class="game-select-number">001 · Live</span>
-                <h3>Troll Dash: Rugpull Run</h3>
-                <p>Survive the chart. Dodge the rugs. Pay the troll toll.</p>
-                <span class="game-select-boot">▶ Boot Dash</span>
+                <h3>Troll Dash: Meme Metro</h3>
+                <p>3D endless runner. Dodge rugs, bear trains and laser gates. Stack Troll Coins.</p>
+                <span class="game-select-boot">▶ Ride the Metro</span>
               </article>
               <article class="game-select-card game-select-card-kombat">
                 <a id="boot-troll-kombat" class="game-select-hit" href="troll-kombat.html" aria-label="Play Troll Kombat"></a>
@@ -71,29 +71,14 @@
                 <p>Pixel or Toy mode. Meme champions. Moving arenas. Problem?</p>
                 <span class="game-select-boot">▶ Enter Arena</span>
               </article>
-              <article class="game-select-card game-select-card-metro">
-                <a id="boot-meme-metro" class="game-select-hit" href="meme-metro.html" aria-label="Play Troll Dash: Meme Metro"></a>
-                <img class="game-select-art" src="assets/animations/troll_playable_character.PNG" alt="" aria-hidden="true">
-                <span class="game-select-number">003 · Live</span>
-                <h3>Troll Dash: Meme Metro</h3>
-                <p>3D endless runner. Dodge rugs, bear trains and laser gates. Stack Troll Coins.</p>
-                <span class="game-select-boot">▶ Ride the Metro</span>
-              </article>
               <article class="game-select-card is-locked">
                 <img class="game-select-art" src="assets/animations/troll-wizardfigure.png" alt="" aria-hidden="true">
-                <span class="game-select-number">004 · Soon</span>
+                <span class="game-select-number">003 · Soon</span>
                 <h3>Troll Wizard</h3>
                 <p>Cast green candles. Hex the FUD. Coming soon.</p>
                 <span class="game-select-boot">Locked</span>
               </article>
             </div>
-          </div>
-
-          <div id="tv-loading" class="tv-panel loading-panel">
-            <p class="tv-kicker">Loading</p>
-            <h2 id="loading-title">Booting cabinet</h2>
-            <div class="loading-track"><span id="loading-bar"></span></div>
-            <p id="loading-text">Finding support...</p>
           </div>
         </div>
       </div>

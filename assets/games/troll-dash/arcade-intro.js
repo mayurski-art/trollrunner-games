@@ -7,22 +7,12 @@
   const takeControllerButton = document.getElementById("take-controller-button");
   const chooseGamesButton = document.getElementById("choose-games-button");
   const backToTvMenuButton = document.getElementById("back-to-tv-menu");
-  const bootTrollDashButton = document.getElementById("boot-troll-dash");
+  const bootMemeMetroButton = document.getElementById("boot-meme-metro");
   const tvMainMenu = document.getElementById("tv-main-menu");
   const tvGameSelect = document.getElementById("tv-game-select");
-  const tvLoading = document.getElementById("tv-loading");
-  const loadingText = document.getElementById("loading-text");
-
-  const loadingLines = [
-    "Finding support...",
-    "Checking candles...",
-    "Dodging rugs...",
-    "Summoning $TROLL...",
-    "Entering the chart...",
-  ];
 
   function showPanel(panel) {
-    [tvMainMenu, tvGameSelect, tvLoading].forEach(node => {
+    [tvMainMenu, tvGameSelect].forEach(node => {
       node?.classList.toggle("is-active", node === panel);
     });
   }
@@ -36,40 +26,20 @@
 
   function chooseGames() {
     intro.classList.add("is-selecting");
-    intro.classList.remove("is-loading");
     showPanel(tvGameSelect);
-    bootTrollDashButton?.focus();
+    bootMemeMetroButton?.focus();
   }
 
   function backToMenu() {
-    intro.classList.remove("is-selecting", "is-loading");
+    intro.classList.remove("is-selecting");
     intro.classList.add("is-menu");
     showPanel(tvMainMenu);
     chooseGamesButton?.focus();
   }
 
-  // Boot animation, then hand off to the dedicated Troll Dash cabinet page.
-  function bootGame(targetUrl) {
-    intro.classList.add("is-loading");
-    showPanel(tvLoading);
-
-    let lineIndex = 0;
-    loadingText.textContent = loadingLines[lineIndex];
-    const lineTimer = window.setInterval(() => {
-      lineIndex = Math.min(lineIndex + 1, loadingLines.length - 1);
-      loadingText.textContent = loadingLines[lineIndex];
-    }, 360);
-
-    window.setTimeout(() => {
-      window.clearInterval(lineTimer);
-      window.location.href = targetUrl;
-    }, 1500);
-  }
-
   takeControllerButton?.addEventListener("click", takeController);
   chooseGamesButton?.addEventListener("click", chooseGames);
   backToTvMenuButton?.addEventListener("click", backToMenu);
-  bootTrollDashButton?.addEventListener("click", () => bootGame("troll-dash.html"));
 
   intro.addEventListener("keydown", event => {
     if (event.key !== "Enter" && event.key !== " ") return;
