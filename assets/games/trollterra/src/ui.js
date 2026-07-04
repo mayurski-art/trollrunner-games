@@ -1,10 +1,11 @@
 /* TrollTerra — DOM UI layer: HUD (hearts, breath, hotbar, clock/depth),
    inventory + crafting panel, chest panel, tooltips, drag & drop. */
 
-import { ITEMS, DAY_LEN, CYCLE, TILE, STATION_SCAN } from "./defs.js";
+import { ITEMS, TILES, T, DAY_LEN, CYCLE, TILE, STATION_SCAN, WORLD_W, WORLD_H } from "./defs.js";
 import { getIcon } from "./icons.js";
 import { fmtClock } from "./util.js";
 import { SURFACE_BASE } from "./worldgen.js";
+import { saveGame, saveSettings } from "./save.js";
 
 export class UI {
   constructor(game) {
@@ -32,6 +33,14 @@ export class UI {
       bossBar: document.getElementById("boss-bar"),
       bossName: document.getElementById("boss-name"),
       bossFill: document.getElementById("boss-fill"),
+      minimap: document.getElementById("minimap"),
+      bigmap: document.getElementById("bigmap"),
+      screenTitle: document.getElementById("screen-title"),
+      screenPause: document.getElementById("screen-pause"),
+      screenDeath: document.getElementById("screen-death"),
+      screenLb: document.getElementById("screen-lb"),
+      deathCause: document.getElementById("death-cause"),
+      btnContinue: document.getElementById("btn-continue"),
     };
     this._hudDirty = true;
     this._invDirty = true;
@@ -63,6 +72,156 @@ export class UI {
       if (this.dialogNpc) this.el.dialogText.textContent = this.dialogNpc.nextTip();
     });
     document.getElementById("dialog-close").addEventListener("click", () => this.closeDialog());
+
+    /* menu buttons */
+    this.bigMapOpen = false;
+    this._hadSave = false;
+    this._mapAcc = 0;
+    this._tileLUT = null;
+    this.el.btnContinue.addEventListener("click", () => game.enterPlay());
+    document.getElementById("btn-new").addEventListener("click", () => game.startNewWorld());
+    document.getElementById("btn-title-lb").addEventListener("click", () => {
+      this.showScreens({ lb: true });
+    });
+    document.getElementById("btn-lb-back").addEventListener("click", () => this.showTitle(this._hadSave));
+    document.getElementById("btn-resume").addEventListener("click", () => game.enterPlay());
+    document.getElementById("btn-save").addEventListener("click", e => {
+      const ok = saveGame(game);
+      e.target.textContent = ok ? "💾 Saved ✓" : "💾 Save failed";
+      setTimeout(() => { e.target.textContent = "💾 Save world"; }, 1500);
+    });
+    document.getElementById("btn-quit").addEventListener("click", () => game.quitToTitle());
+    const vol = document.getElementById("vol-slider");
+    vol.value = Math.round((game.settings.volume !== undefined ? game.settings.volume : 0.6) * 100);
+    vol.addEventListener("input", () => {
+      const v = vol.value / 100;
+      game.sfx.setVolume(v);
+      game.settings.volume = v;
+      saveSettings(game.settings);
+    });
+  }
+
+  /* ------------------------------------------------------------ screens */
+  showScreens({ title, pause, death, lb } = {}) {
+    this.el.screenTitle.hidden = !title;
+    this.el.screenPause.hidden = !pause;
+    this.el.screenDeath.hidden = !death;
+    this.el.screenLb.hidden = !lb;
+    this.el.hud.hidden = !!(title || lb);
+  }
+
+  showTitle(hasSave) {
+    this._hadSave = hasSave;
+    this.el.btnContinue.hidden = !hasSave;
+    this.showScreens({ title: true });
+  }
+
+  showDeath(cause) {
+    this.el.deathCause.textContent = "Slain by " + (cause || "the world") + ".";
+    this.showScreens({ death: true });
+  }
+
+  /* --------------------------------------------------------------- maps */
+  tileLUT() {
+    if (this._tileLUT) return this._tileLUT;
+    const lut = new Array(TILES.length).fill(null);
+    for (let id = 1; id < TILES.length; id++) {
+      const d = TILES[id];
+      if (d && d.pal) {
+        const p = parseInt(d.pal[1].slice(1), 16);
+        lut[id] = [p >> 16, (p >> 8) & 255, p & 255];
+      } else {
+        lut[id] = [150, 120, 70];
+      }
+    }
+    lut[T.TREE] = [80, 120, 60];
+    this._tileLUT = lut;
+    return lut;
+  }
+
+  /* Write one map pixel into an ImageData buffer. */
+  mapPixel(data, o, world, tx, ty, explored) {
+    if (!explored) { data[o] = 5; data[o + 1] = 4; data[o + 2] = 10; data[o + 3] = 255; return; }
+    const i = ty * world.w + tx;
+    const liq = world.liquid[i];
+    let c;
+    if (liq > 2) {
+      c = world.liquidType[i] === 1 ? [255, 94, 20] : [52, 118, 216];
+    } else {
+      const id = world.tiles[i];
+      if (id === T.AIR) {
+        if (ty < world.topSolid[tx]) c = [116, 166, 222];
+        else c = world.walls[i] ? [42, 33, 26] : [12, 10, 18];
+      } else {
+        c = this.tileLUT()[id] || [150, 120, 70];
+      }
+    }
+    data[o] = c[0]; data[o + 1] = c[1]; data[o + 2] = c[2]; data[o + 3] = 255;
+  }
+
+  paintMinimap() {
+    const g = this.game;
+    if (!g.player || !g.explored) return;
+    const cv = this.el.minimap;
+    const ctx = cv.getContext("2d");
+    const W = cv.width, H = cv.height;          // 1 px = 2 tiles
+    const img = this._mmImg || (this._mmImg = ctx.createImageData(W, H));
+    const data = img.data;
+    const ptx = Math.floor(g.player.cx / TILE), pty = Math.floor(g.player.cy / TILE);
+    const x0 = ptx - W, y0 = pty - H;           // *2 tiles per px, centered
+    const w4 = WORLD_W >> 2;
+    for (let py = 0; py < H; py++) {
+      const ty = y0 + py * 2;
+      for (let px = 0; px < W; px++) {
+        const tx = x0 + px * 2;
+        const o = (py * W + px) * 4;
+        if (tx < 0 || ty < 0 || tx >= g.world.w || ty >= g.world.h) {
+          data[o] = 5; data[o + 1] = 4; data[o + 2] = 10; data[o + 3] = 255;
+          continue;
+        }
+        const exp = g.explored[(ty >> 2) * w4 + (tx >> 2)];
+        this.mapPixel(data, o, g.world, tx, ty, exp);
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    /* player dot */
+    ctx.fillStyle = "#ffb300";
+    ctx.fillRect(W / 2 - 1, H / 2 - 1, 3, 3);
+  }
+
+  toggleBigMap(force) {
+    this.bigMapOpen = force !== undefined ? force : !this.bigMapOpen;
+    const cv = this.el.bigmap;
+    cv.hidden = !this.bigMapOpen;
+    if (!this.bigMapOpen) return;
+    const g = this.game;
+    const W = WORLD_W >> 1, H = WORLD_H >> 1;    // 1 px = 2 tiles, whole world
+    const off = this._bigOff || (this._bigOff = document.createElement("canvas"));
+    off.width = W; off.height = H;
+    const octx = off.getContext("2d");
+    const img = octx.createImageData(W, H);
+    const data = img.data;
+    const w4 = WORLD_W >> 2;
+    for (let py = 0; py < H; py++) {
+      const ty = py * 2;
+      for (let px = 0; px < W; px++) {
+        const tx = px * 2;
+        const exp = g.explored[(ty >> 2) * w4 + (tx >> 2)];
+        this.mapPixel(data, (py * W + px) * 4, g.world, tx, ty, exp);
+      }
+    }
+    octx.putImageData(img, 0, 0);
+    if (g.player) {
+      octx.fillStyle = "#ffb300";
+      octx.fillRect((g.player.cx / TILE / 2) - 2, (g.player.cy / TILE / 2) - 2, 4, 4);
+    }
+    /* fit on screen */
+    const scale = Math.min((window.innerWidth * 0.86) / W, (window.innerHeight * 0.82) / H);
+    cv.width = Math.round(W * scale);
+    cv.height = Math.round(H * scale);
+    const ctx = cv.getContext("2d");
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(off, 0, 0, cv.width, cv.height);
   }
 
   /* ------------------------------------------------------------ dialog */
@@ -457,11 +616,20 @@ export class UI {
     const input = g.input;
 
     if (input.hit("KeyE")) this.toggleInventory();
+    if (input.hit("KeyM")) this.toggleBigMap();
     if (input.hit("Escape")) {
-      if (this.dialogNpc) this.closeDialog();
+      if (this.bigMapOpen) this.toggleBigMap(false);
+      else if (this.dialogNpc) this.closeDialog();
       else if (this.invOpen) this.toggleInventory(false);
     }
     this.updateBossBar();
+
+    /* minimap refresh */
+    this._mapAcc += dt;
+    if (this._mapAcc >= 0.5) {
+      this._mapAcc = 0;
+      this.paintMinimap();
+    }
 
     /* close dialog when the guide wanders off */
     if (this.dialogNpc && g.player) {

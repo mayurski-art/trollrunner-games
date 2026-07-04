@@ -5,8 +5,8 @@
 */
 
 import {
-  T, TILES, W, ITEMS, ENEMIES, TILE, ZOOM, CYCLE, DAY_LEN, WORLD_W, REACH,
-  STATION_SCAN, STARTER_ITEMS,
+  T, TILES, W, ITEMS, ENEMIES, TILE, ZOOM, CYCLE, DAY_LEN, WORLD_W, WORLD_H,
+  REACH, STATION_SCAN, STARTER_ITEMS,
 } from "./defs.js";
 import { hashStr, clamp, lerp, fmtClock, aabb } from "./util.js";
 import { generateWorld, biomeAt } from "./worldgen.js";
@@ -20,6 +20,11 @@ import { UI } from "./ui.js";
 import { SFX } from "./audio.js";
 import { TrollKing } from "./boss.js";
 import { GuideTroll } from "./npc.js";
+import {
+  saveGame, loadSaveData, applyWorldLayers, clearSave,
+  loadSettings, saveSettings,
+} from "./save.js";
+import { rleDecode, b64ToU16 } from "./util.js";
 
 const FIXED_DT = 1 / 60;
 
@@ -30,7 +35,7 @@ class Game {
     this.ctx.imageSmoothingEnabled = false;
     this.input = new Input(canvas);
 
-    this.state = "play";           // menu | play | pause (menus arrive in phase 7)
+    this.state = "title";          // title | play | pause
     this.time = 60;                // seconds into the day/night cycle
     this.dayCount = 1;
     this.trollMoon = false;
@@ -54,10 +59,27 @@ class Game {
     this._fpsAcc = 0; this._fpsN = 0;
     this._wallProg = { idx: -1, t: 0 };
 
-    this.newWorld("troll-runner-" + Math.floor(Math.random() * 1e9));
+    this._autosaveAcc = 0;
+    this._exploreAcc = 0;
+    this._recorded = { blocksMined: 0, bossKills: 0 };
+    this.settings = loadSettings();
+    this.sfx.setVolume(this.settings.volume !== undefined ? this.settings.volume : 0.6);
+
+    /* boot into the last save if there is one, else a fresh world */
+    this.saveData = loadSaveData();
+    if (this.saveData) {
+      this.applySave(this.saveData);
+    } else {
+      this.newWorld("troll-runner-" + Math.floor(Math.random() * 1e9));
+    }
     this.ui = new UI(this);
+    this.ui.dirtyInv();
+    this.ui.showTitle(!!this.saveData);
     this.resize();
     window.addEventListener("resize", () => this.resize());
+    window.addEventListener("beforeunload", () => {
+      if (this.state === "play" || this.state === "pause") saveGame(this);
+    });
 
     this._last = performance.now();
     this._acc = 0;
@@ -75,13 +97,102 @@ class Game {
     this.entities = [];
     this.enemies = [];
     this.npcs = [];
+    this.time = 60;
+    this.dayCount = 1;
+    this.trollMoon = false;
+    this.stats = { blocksMined: 0, deepest: 0, bossKills: 0, playSec: 0 };
+    this.flags = { bossDown: false };
+    this._recorded = { blocksMined: 0, bossKills: 0 };
+    this.explored = new Uint8Array((WORLD_W >> 2) * (WORLD_H >> 2));
     this.inventory = new Inventory();
     for (const s of STARTER_ITEMS) this.inventory.add(s.id, s.n);
     this.player = new Player(spawn.x, spawn.y + 1);
     this.cam.x = this.player.cx - 400;
     this.cam.y = this.player.cy - 260;
     this.spawnGuide();
+    this.revealAround(this.player.cx, this.player.cy);
     if (this.ui) this.ui.dirtyInv();
+  }
+
+  /* Restore a saved world on top of a re-generated one (same seed). */
+  applySave(data) {
+    this.newWorld(data.seedStr);
+    applyWorldLayers(this.world, data);
+    this.renderer.chunks.clear();
+    this.world.dirtyChunks.clear();
+    this.time = data.time || 60;
+    this.dayCount = data.dayCount || 1;
+    this.trollMoon = !!data.trollMoon;
+    this.spawn = data.spawn || this.spawn;
+    this.stats = Object.assign(this.stats, data.stats);
+    this.flags = Object.assign(this.flags, data.flags);
+    this._recorded = { blocksMined: this.stats.blocksMined, bossKills: this.stats.bossKills };
+    if (data.explored) {
+      try {
+        this.explored.set(rleDecode(b64ToU16(data.explored), this.explored.length));
+      } catch (e) { /* old save — explored resets */ }
+    }
+    this.inventory = Inventory.from(data.inv);
+    if (data.player) {
+      this.player.x = data.player.x;
+      this.player.y = data.player.y;
+      this.player.hp = data.player.hp;
+      this.player.maxHp = data.player.maxHp;
+    }
+    this.cam.x = this.player.cx - this.viewW / 2;
+    this.cam.y = this.player.cy - this.viewH / 2;
+    if (this.ui) this.ui.dirtyInv();
+  }
+
+  startNewWorld() {
+    clearSave();
+    this.newWorld("troll-runner-" + Math.floor(Math.random() * 1e9));
+    if (this.ui) this.ui.dirtyInv();
+    this.enterPlay();
+  }
+
+  enterPlay() {
+    this.state = "play";
+    if (this.ui) this.ui.showScreens({});
+  }
+
+  quitToTitle() {
+    saveGame(this);
+    this.recordProgress("quit");
+    this.state = "title";
+    if (this.ui) {
+      this.ui.toggleInventory(false);
+      this.ui.showTitle(true);
+    }
+  }
+
+  /* Mark map cells (quarter resolution) explored around a world point. */
+  revealAround(wx, wy) {
+    if (!this.explored) return;
+    const cx = Math.floor(wx / TILE / 4), cy = Math.floor(wy / TILE / 4);
+    const R = 11;
+    const w4 = WORLD_W >> 2, h4 = WORLD_H >> 2;
+    for (let dy = -R; dy <= R; dy++) {
+      for (let dx = -R; dx <= R; dx++) {
+        if (dx * dx + dy * dy > R * R) continue;
+        const x = cx + dx, y = cy + dy;
+        if (x >= 0 && y >= 0 && x < w4 && y < h4) this.explored[y * w4 + x] = 1;
+      }
+    }
+  }
+
+  /* Report session progress to the shared arcade leaderboard (deltas). */
+  recordProgress(reason) {
+    const lb = window.TrollLeaderboard;
+    if (!lb || !lb.record) return;
+    const s = this.stats;
+    const ev = {
+      depth: Math.max(0, Math.round(s.deepest)),
+      blocks: Math.max(0, s.blocksMined - this._recorded.blocksMined),
+      bossKills: Math.max(0, s.bossKills - this._recorded.bossKills),
+    };
+    try { lb.record("trollterra", ev); } catch (e) { /* engine hiccups are non-fatal */ }
+    this._recorded = { blocksMined: s.blocksMined, bossKills: s.bossKills };
   }
 
   resize() {
@@ -113,6 +224,16 @@ class Game {
   }
 
   update(dt) {
+    /* pause toggling works from play + pause (panels get Esc first) */
+    if (this.input.hit("Escape")) {
+      if (this.state === "pause") {
+        this.enterPlay();
+      } else if (this.state === "play" && this.ui &&
+                 !this.ui.invOpen && !this.ui.dialogNpc && !this.ui.bigMapOpen) {
+        this.state = "pause";
+        this.ui.showScreens({ pause: true });
+      }
+    }
     if (this.state !== "play") return;
 
     /* time of day */
@@ -140,6 +261,19 @@ class Game {
       this.world.simSand();
     }
 
+    /* autosave + map exploration */
+    this._autosaveAcc += dt;
+    if (this._autosaveAcc >= 60) {
+      this._autosaveAcc = 0;
+      saveGame(this);
+      this.recordProgress("autosave");
+    }
+    this._exploreAcc += dt;
+    if (this._exploreAcc >= 0.4 && this.player && !this.player.dead) {
+      this._exploreAcc = 0;
+      this.revealAround(this.player.cx, this.player.cy);
+    }
+
     if (this.input.hit("F3")) this.debug = !this.debug;
     if (this.input.hit("F4")) this.freeCam = !this.freeCam;
 
@@ -149,7 +283,10 @@ class Game {
     if (this.player) {
       if (this.player.dead) {
         this.deathTimer -= dt;
-        if (this.deathTimer <= 0) this.player.respawn(this);
+        if (this.deathTimer <= 0) {
+          this.player.respawn(this);
+          this.ui && this.ui.showScreens({});
+        }
       } else {
         this.player.update(dt, this);
         this.stats.deepest = Math.max(
@@ -615,7 +752,8 @@ class Game {
   announce(text) {
     if (this.player) this.floatText(this.player.cx, this.player.y - 24, text, "#ffb300");
     if (window.TrollNotis && window.TrollNotis.show) {
-      try { window.TrollNotis.show({ title: "TrollTerra", text }); } catch (e) { /* non-fatal */ }
+      try { window.TrollNotis.show({ platform: "x", summary: "TrollTerra — " + text }); }
+      catch (e) { /* non-fatal */ }
     }
   }
 
@@ -634,8 +772,9 @@ class Game {
   onPlayerDeath(cause) {
     this.deathTimer = 4;
     burst(this, this.player.cx, this.player.cy, "#e8e4da", 18, { spread: 260 });
-    this.floatText(this.player.cx, this.player.y - 10, "YOU GOT TROLLED", "#ff4d5e");
     this.sfx && this.sfx.death();
+    this.recordProgress("death");
+    if (this.ui) this.ui.showDeath(cause);
   }
 
   /* Dynamic light sources: held torch, glowing entities. */

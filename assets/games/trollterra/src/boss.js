@@ -127,6 +127,7 @@ export class TrollKing extends Entity {
     game.flags.bossDown = true;
     game.sfx && game.sfx.fanfare();
     game.announce("👑 The Troll King has been trolled!");
+    game.recordProgress && game.recordProgress("boss");
   }
 
   draw(ctx) {

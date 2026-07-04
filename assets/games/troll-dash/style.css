@@ -365,6 +365,13 @@ body.intro-complete .arcade-intro {
     rgba(255, 255, 255, 0.06);
 }
 
+.game-select-card-terra {
+  background:
+    radial-gradient(circle at 78% 22%, rgba(87, 189, 92, 0.28), transparent 36%),
+    linear-gradient(135deg, rgba(122, 90, 51, 0.28), rgba(10, 6, 22, 0.42)),
+    rgba(255, 255, 255, 0.06);
+}
+
 .game-select-card.is-locked {
   opacity: 0.64;
   filter: grayscale(0.42);
