@@ -26,6 +26,12 @@ export class UI {
       cursor: document.getElementById("cursor-item"),
       tooltip: document.getElementById("tooltip"),
       dialog: document.getElementById("dialog"),
+      dialogName: document.getElementById("dialog-name"),
+      dialogText: document.getElementById("dialog-text"),
+      dialogFace: document.getElementById("dialog-face"),
+      bossBar: document.getElementById("boss-bar"),
+      bossName: document.getElementById("boss-name"),
+      bossFill: document.getElementById("boss-fill"),
     };
     this._hudDirty = true;
     this._invDirty = true;
@@ -50,6 +56,43 @@ export class UI {
       this._mx = e.clientX; this._my = e.clientY;
       if (this.cursor) this.moveCursorEl();
     });
+
+    /* NPC dialog buttons */
+    this.dialogNpc = null;
+    document.getElementById("dialog-next").addEventListener("click", () => {
+      if (this.dialogNpc) this.el.dialogText.textContent = this.dialogNpc.nextTip();
+    });
+    document.getElementById("dialog-close").addEventListener("click", () => this.closeDialog());
+  }
+
+  /* ------------------------------------------------------------ dialog */
+  openDialog(npc) {
+    this.dialogNpc = npc;
+    this.el.dialogName.textContent = npc.name;
+    this.el.dialogText.textContent = npc.tips[npc.tipIdx];
+    /* use the gladiator portrait, hue-shifted to match his in-world look */
+    this.el.dialogFace.innerHTML =
+      '<img src="assets/games/troll-kombat/fighters/gladiator/portrait.png" alt="" ' +
+      'style="filter:hue-rotate(105deg) saturate(0.8)">';
+    this.el.dialog.hidden = false;
+  }
+
+  closeDialog() {
+    this.dialogNpc = null;
+    this.el.dialog.hidden = true;
+    this.pointerOver = false;
+  }
+
+  /* ---------------------------------------------------------- boss bar */
+  updateBossBar() {
+    const boss = this.game.enemies.find(e => e.boss && !e.dead);
+    if (boss) {
+      this.el.bossBar.hidden = false;
+      this.el.bossName.textContent = boss.enraged ? boss.name + " · TILTED" : boss.name;
+      this.el.bossFill.style.width = Math.max(0, (boss.hp / boss.maxHp) * 100).toFixed(1) + "%";
+    } else if (!this.el.bossBar.hidden) {
+      this.el.bossBar.hidden = true;
+    }
   }
 
   dirtyHud() { this._hudDirty = true; }
@@ -415,7 +458,14 @@ export class UI {
 
     if (input.hit("KeyE")) this.toggleInventory();
     if (input.hit("Escape")) {
-      if (this.invOpen) this.toggleInventory(false);
+      if (this.dialogNpc) this.closeDialog();
+      else if (this.invOpen) this.toggleInventory(false);
+    }
+    this.updateBossBar();
+
+    /* close dialog when the guide wanders off */
+    if (this.dialogNpc && g.player) {
+      if (Math.abs(this.dialogNpc.cx - g.player.cx) > TILE * 10) this.closeDialog();
     }
 
     /* auto-close chest when walking away */

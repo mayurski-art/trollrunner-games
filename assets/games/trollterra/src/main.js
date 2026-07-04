@@ -18,6 +18,8 @@ import { Inventory } from "./inventory.js";
 import { ItemDrop, DamageText, burst, Enemy, Projectile } from "./entities.js";
 import { UI } from "./ui.js";
 import { SFX } from "./audio.js";
+import { TrollKing } from "./boss.js";
+import { GuideTroll } from "./npc.js";
 
 const FIXED_DT = 1 / 60;
 
@@ -42,6 +44,7 @@ class Game {
     this.deathTimer = 0;
 
     this.stats = { blocksMined: 0, deepest: 0, bossKills: 0, playSec: 0 };
+    this.flags = { bossDown: false };
 
     this.cam = { x: 0, y: 0 };
     this.lighting = new Lighting();
@@ -77,6 +80,7 @@ class Game {
     this.player = new Player(spawn.x, spawn.y + 1);
     this.cam.x = this.player.cx - 400;
     this.cam.y = this.player.cy - 260;
+    this.spawnGuide();
     if (this.ui) this.ui.dirtyInv();
   }
 
@@ -554,6 +558,41 @@ class Game {
 
   onKill(enemy) {
     /* hook for boss + future stats */
+  }
+
+  /* Place the Guide Troll on solid ground near spawn. */
+  spawnGuide() {
+    const sx = this.spawn.x + 4;
+    for (let y = this.spawn.y - 6; y < this.spawn.y + 10; y++) {
+      if (!this.world.isSolid(sx, y) && !this.world.isSolid(sx, y - 1) && this.world.isSolid(sx, y + 1)) {
+        this.npcs.push(new GuideTroll(sx, y + 1));
+        return;
+      }
+    }
+    this.npcs.push(new GuideTroll(this.spawn.x, this.spawn.y + 1));
+  }
+
+  /* Use a Troll Totem: wake the king (night only, one at a time). */
+  trySummonBoss() {
+    const st = skyState(this.time);
+    const p = this.player;
+    if (!p) return;
+    if (this.enemies.some(e => e.boss && !e.dead)) {
+      this.floatText(p.cx, p.y - 12, "He's already awake!", "#ff9500");
+      return;
+    }
+    if (!st.isNight) {
+      this.floatText(p.cx, p.y - 12, "The Troll King only wakes at night…", "#9a92b8");
+      return;
+    }
+    this.inventory.useSelected();
+    this.ui && this.ui.dirtyHud();
+    this.sfx && this.sfx.summon();
+    this.announce("👑 THE TROLL KING HAS AWOKEN!");
+    const side = Math.random() < 0.5 ? -1 : 1;
+    const tx = Math.floor(p.cx / TILE) + side * 24;
+    const sy = this.world.topSolid[clamp(tx, 0, this.world.w - 1)];
+    this.enemies.push(new TrollKing(tx * TILE + 8, sy * TILE));
   }
 
   /* Console/testing helper: spawn an enemy near the player. */
