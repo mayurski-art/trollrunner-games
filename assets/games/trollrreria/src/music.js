@@ -1,4 +1,4 @@
-/* TrollTerra — generative chiptune music. All material is procedural and
+/* Trollrreria — generative chiptune music. All material is procedural and
    original: each theme is a chord progression + mood knobs, and the lead
    line is a seeded random walk over the scale, regenerated every loop.
    Shares the SFX AudioContext; its own gain so music/SFX mix separately. */

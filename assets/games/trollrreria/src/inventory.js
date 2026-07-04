@@ -1,4 +1,4 @@
-/* TrollTerra — inventory model: 10 hotbar + 40 backpack slots, 3 armor
+/* Trollrreria — inventory model: 10 hotbar + 40 backpack slots, 3 armor
    slots, stacking, crafting checks. Slot = { id, n } or null. */
 
 import { ITEMS, RECIPES } from "./defs.js";

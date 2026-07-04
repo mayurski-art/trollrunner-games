@@ -1,4 +1,4 @@
-/* TrollTerra — keyboard + mouse state. */
+/* Trollrreria — keyboard + mouse state. */
 
 export class Input {
   constructor(canvas) {

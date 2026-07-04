@@ -1,4 +1,4 @@
-/* TrollTerra — world entities: item drops, particles, damage text,
+/* Trollrreria — world entities: item drops, particles, damage text,
    enemies, projectiles. (The Troll King boss lives in boss.js.) */
 
 import { TILE, ITEMS, ENEMIES, GRAVITY, MAX_FALL } from "./defs.js";

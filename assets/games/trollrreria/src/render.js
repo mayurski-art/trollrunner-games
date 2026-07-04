@@ -1,4 +1,4 @@
-/* TrollTerra — renderer: procedural tile atlas, cached chunk canvases,
+/* Trollrreria — renderer: procedural tile atlas, cached chunk canvases,
    sky/sun/moon/stars, parallax hills, tree canopies, liquid + light overlays.
    World-space methods assume the caller has already applied the camera
    transform (ZOOM scale + translate); screen-space methods reset it.     */

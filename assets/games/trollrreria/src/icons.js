@@ -1,4 +1,4 @@
-/* TrollTerra — procedural item icons (32x32 canvases, cached).
+/* Trollrreria — procedural item icons (32x32 canvases, cached).
    Blocks reuse the tile-noise look; tools/weapons/armor are pictograms. */
 
 import { ITEMS, TILES, WALLS } from "./defs.js";

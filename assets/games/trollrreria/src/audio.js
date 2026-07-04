@@ -1,4 +1,4 @@
-/* TrollTerra — synthesized sound effects (WebAudio, no assets).
+/* Trollrreria — synthesized sound effects (WebAudio, no assets).
    The context unlocks on the first user gesture; every call is fail-safe. */
 
 export class SFX {

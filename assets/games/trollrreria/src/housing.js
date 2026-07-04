@@ -1,4 +1,4 @@
-/* TrollTerra — housing: is this hole in the ground a HOME?
+/* Trollrreria — housing: is this hole in the ground a HOME?
    A valid house is an enclosed air region (bounded by solid tiles and
    closed doors), 18–140 tiles big, mostly backed by walls, containing a
    torch (light), a comfort item (bed or workbench), with a door on the

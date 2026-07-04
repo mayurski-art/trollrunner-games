@@ -1,4 +1,4 @@
-/* TrollTerra — procedural world generation.
+/* Trollrreria — procedural world generation.
    Layout (y grows downward, world 1600x800):
      ~0-230   sky
      ~230-300 surface terrain (biomes: snow | forest | desert by x)

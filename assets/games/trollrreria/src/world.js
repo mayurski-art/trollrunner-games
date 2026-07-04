@@ -1,4 +1,4 @@
-/* TrollTerra — World: tile/wall/liquid layers, chunk invalidation, chests,
+/* Trollrreria — World: tile/wall/liquid layers, chunk invalidation, chests,
    trees, tile damage, and the per-column "first solid" cache for sky light. */
 
 import { T, TILES, WORLD_W, WORLD_H, CHUNK } from "./defs.js";

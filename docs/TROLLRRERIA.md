@@ -1,8 +1,8 @@
-# TrollTerra — 2D sandbox survival
+# Trollrreria — 2D sandbox survival
 
 Original Terraria-genre sandbox for the Troll Runner arcade. Vanilla JS +
 Canvas 2D, ES modules, no frameworks, no build step. Launcher:
-`trollterra.html` · source: `assets/games/trollterra/`.
+`trollrreria.html` · source: `assets/games/trollrreria/`.
 
 ## Controls
 | Key | Action |
@@ -44,7 +44,7 @@ trollium gear → craft an **Emperor Sigil** (8 trollium bars + 10 bones +
 - **Boss**: Troll King — hop-charge AI, kingling adds, enrage at 50% with
   troll-tear volleys, flees at dawn.
 - **Persistence**: RLE+base64 world saves in localStorage
-  (`trollterra:world1`), autosave every 60 s + on unload, explored-map fog,
+  (`trollrreria:world1`), autosave every 60 s + on unload, explored-map fog,
   minimap + full map.
 - **Arcade wiring**: shared weekly leaderboard (`leaderboard.js` config —
   depth / blocks mined / boss kills), TrollNotis toasts for boss events.

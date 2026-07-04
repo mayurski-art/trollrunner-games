@@ -1,19 +1,19 @@
 /* ============================================================================
-   TROLLTERRA — leaderboard CONFIG for the shared arcade engine.
+   TROLLRRERIA — leaderboard CONFIG for the shared arcade engine.
 
    The engine (assets/js/troll-leaderboard.js) does all the work; this file
-   only describes TrollTerra's stats. The game feeds sessions via:
-       TrollLeaderboard.record("trollterra", { depth, blocks, bossKills })
+   only describes Trollrreria's stats. The game feeds sessions via:
+       TrollLeaderboard.record("trollrreria", { depth, blocks, bossKills })
    ============================================================================ */
 (() => {
   "use strict";
   const LB = window.TrollLeaderboard;
-  if (!LB) { console.warn("[trollterra] leaderboard engine not loaded"); return; }
+  if (!LB) { console.warn("[trollrreria] leaderboard engine not loaded"); return; }
   const fInt = LB.fmt.int;
 
   LB.register({
-    gameId: "trollterra",
-    gameName: "TrollTerra",
+    gameId: "trollrreria",
+    gameName: "Trollrreria",
     mount: "#lb-root",
 
     blank: () => ({ sessions: 0, deepest: 0, blocksMined: 0, bossKills: 0 }),
@@ -46,7 +46,7 @@
     footNote: "Rivals are simulated for now. <strong>Your</strong> row is real — deepest dig, blocks mined and Troll King takedowns, reset every Monday.",
 
     prizes: {
-      poolLabel: "Mock prize pool · TrollTerra",
+      poolLabel: "Mock prize pool · Trollrreria",
       pool: "500 USDC  +  1M $TROLL",
     },
   });

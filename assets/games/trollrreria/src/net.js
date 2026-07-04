@@ -1,4 +1,4 @@
-/* TrollTerra — co-op networking (v1: shared-world sync).
+/* Trollrreria — co-op networking (v1: shared-world sync).
    What syncs: world layers on join (exact RLE snapshot), live tile/wall/
    wire edits, chest contents, host clock/flags, player ghosts, and
    announcements. What stays local: enemies, drops, liquids settling and
@@ -17,7 +17,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 class BroadcastTransport {
   constructor() { this.kind = "tabs"; }
   connect(room, onMsg) {
-    this.ch = new BroadcastChannel("trollterra:" + room);
+    this.ch = new BroadcastChannel("trollrreria:" + room);
     this.ch.onmessage = e => onMsg(e.data);
     return Promise.resolve(true);
   }
@@ -35,7 +35,7 @@ class SupabaseTransport {
           auth: { persistSession: false },
           realtime: { params: { eventsPerSecond: 24 } },
         });
-        this.chan = this.client.channel("trollterra:" + room, {
+        this.chan = this.client.channel("trollrreria:" + room, {
           config: { broadcast: { self: false } },
         });
         this.chan.on("broadcast", { event: "tt" }, p => onMsg(p.payload));

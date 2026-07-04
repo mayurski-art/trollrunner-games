@@ -1,4 +1,4 @@
-/* TrollTerra — the player: physics, mining/placing/using, health, breath,
+/* Trollrreria — the player: physics, mining/placing/using, health, breath,
    fall damage. Sprite = the Troll Kombat gladiator rig (trollface approved),
    feet-anchored, with a drawn fallback while sheets load. */
 

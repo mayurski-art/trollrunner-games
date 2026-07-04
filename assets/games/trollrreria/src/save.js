@@ -1,4 +1,4 @@
-/* TrollTerra — world persistence: RLE + base64 into localStorage.
+/* Trollrreria — world persistence: RLE + base64 into localStorage.
    A full 1600x800 world compresses to a few hundred KB, well under quota. */
 
 import { SAVE_KEY, SETTINGS_KEY } from "./defs.js";
@@ -43,7 +43,7 @@ export function saveGame(game) {
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     return true;
   } catch (e) {
-    console.warn("[trollterra] save failed:", e);
+    console.warn("[trollrreria] save failed:", e);
     return false;
   }
 }
@@ -56,7 +56,7 @@ export function loadSaveData() {
     if (!data || data.v !== 1 || !data.tiles) return null;
     return data;
   } catch (e) {
-    console.warn("[trollterra] corrupt save discarded:", e);
+    console.warn("[trollrreria] corrupt save discarded:", e);
     return null;
   }
 }

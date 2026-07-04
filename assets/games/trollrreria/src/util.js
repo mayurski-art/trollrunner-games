@@ -1,4 +1,4 @@
-/* TrollTerra — utilities: seeded RNG, value noise, math helpers, RLE + base64. */
+/* Trollrreria — utilities: seeded RNG, value noise, math helpers, RLE + base64. */
 
 export function hashStr(str) {
   let h = 2166136261 >>> 0;

@@ -1,4 +1,4 @@
-/* TrollTerra — bootstrap + game loop + world-interaction rules.
+/* Trollrreria — bootstrap + game loop + world-interaction rules.
    Draw order per frame:
      sky -> parallax -> [world transform: tiles -> canopies -> entities ->
      player -> particles -> cracks -> liquids] -> light overlay -> HUD (DOM)
@@ -276,7 +276,7 @@ class Game {
       blocks: Math.max(0, s.blocksMined - this._recorded.blocksMined),
       bossKills: Math.max(0, s.bossKills - this._recorded.bossKills),
     };
-    try { lb.record("trollterra", ev); } catch (e) { /* engine hiccups are non-fatal */ }
+    try { lb.record("trollrreria", ev); } catch (e) { /* engine hiccups are non-fatal */ }
     this._recorded = { blocksMined: s.blocksMined, bossKills: s.bossKills };
   }
 
@@ -1018,7 +1018,7 @@ class Game {
   announce(text) {
     if (this.player) this.floatText(this.player.cx, this.player.y - 24, text, "#ffb300");
     if (window.TrollNotis && window.TrollNotis.show) {
-      try { window.TrollNotis.show({ platform: "x", summary: "TrollTerra — " + text }); }
+      try { window.TrollNotis.show({ platform: "x", summary: "Trollrreria — " + text }); }
       catch (e) { /* non-fatal */ }
     }
   }
@@ -1150,7 +1150,7 @@ class Game {
 /* ------------------------------------------------------------------ boot */
 function boot() {
   const canvas = document.getElementById("tt-canvas");
-  if (!canvas) { console.error("[trollterra] canvas missing"); return; }
+  if (!canvas) { console.error("[trollrreria] canvas missing"); return; }
   window.TT = new Game(canvas);
 }
 

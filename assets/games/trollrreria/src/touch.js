@@ -1,4 +1,4 @@
-/* TrollTerra — touch controls. Appears on coarse-pointer devices (or the
+/* Trollrreria — touch controls. Appears on coarse-pointer devices (or the
    first touch). Buttons write straight into the shared Input state so the
    player/game code needs zero changes:
      ◀ ▶  -> KeyA / KeyD        ⬆ -> Space        ⬇ -> KeyS

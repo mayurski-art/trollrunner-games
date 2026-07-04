@@ -1,4 +1,4 @@
-/* TrollTerra — game data: constants, tiles, walls, items, recipes, enemies.
+/* Trollrreria — game data: constants, tiles, walls, items, recipes, enemies.
    Everything here is plain data; systems live in the other modules. */
 
 /* ---------------------------------------------------------------- constants */
@@ -17,8 +17,8 @@ export const PLAYER_W = 22;           // hitbox world px
 export const PLAYER_H = 44;
 export const REACH = 6.5;             // tiles
 
-export const SAVE_KEY = "trollterra:world1";
-export const SETTINGS_KEY = "trollterra:settings";
+export const SAVE_KEY = "trollrreria:world1";
+export const SETTINGS_KEY = "trollrreria:settings";
 
 /* ------------------------------------------------------------------- tiles */
 export const T = {

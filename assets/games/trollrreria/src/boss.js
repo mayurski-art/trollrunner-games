@@ -1,4 +1,4 @@
-/* TrollTerra — THE TROLL KING. Summoned by a Troll Totem at night.
+/* Trollrreria — THE TROLL KING. Summoned by a Troll Totem at night.
    Hops in huge arcs, spawns kingling slimes, and once he's tilted
    (below half HP) he spits troll tears. Flees at dawn. */
 

@@ -1,4 +1,4 @@
-/* TrollTerra — Guide Troll: a friendly local who loiters near spawn and
+/* Trollrreria — Guide Troll: a friendly local who loiters near spawn and
    dispenses questionable wisdom. Reuses the gladiator rig, hue-shifted
    so he reads as his own troll. He cannot be hurt (he's seen worse). */
 

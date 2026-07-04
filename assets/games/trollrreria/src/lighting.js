@@ -1,4 +1,4 @@
-/* TrollTerra — viewport lighting.
+/* Trollrreria — viewport lighting.
    Every frame we flood-fill light over the visible tile region (+ margin):
    sources are sky-exposed air (scaled by time of day), light-emitting tiles
    (torch, furnace, glowshroom, troll heart) and lava. Light decays fast

@@ -1,4 +1,4 @@
-/* TrollTerra — DOM UI layer: HUD (hearts, breath, hotbar, clock/depth),
+/* Trollrreria — DOM UI layer: HUD (hearts, breath, hotbar, clock/depth),
    inventory + crafting panel, chest panel, tooltips, drag & drop. */
 
 import {
