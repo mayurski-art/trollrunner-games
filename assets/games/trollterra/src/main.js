@@ -18,7 +18,7 @@ import { Inventory } from "./inventory.js";
 import { ItemDrop, DamageText, burst, Enemy, Projectile } from "./entities.js";
 import { UI } from "./ui.js";
 import { SFX } from "./audio.js";
-import { TrollKing } from "./boss.js";
+import { TrollKing, TrollEmperor } from "./boss.js";
 import { GuideTroll, MerchantTroll } from "./npc.js";
 import { findHouseNear } from "./housing.js";
 import {
@@ -813,7 +813,9 @@ class Game {
 
       if (flyer) {
         if (world.isSolid(tx, ty) || world.isSolid(tx, ty - 1) || world.isSolid(tx + 1, ty)) continue;
-        this.enemies.push(new Enemy(type, tx * TILE + 8, ty * TILE + d.h));
+        const e = new Enemy(type, tx * TILE + 8, ty * TILE + d.h);
+        if (this.flags.hardmode && Math.random() < 0.4) e.makeElite();
+        this.enemies.push(e);
         return;
       }
       /* grounded: walk down to a floor */
@@ -823,7 +825,9 @@ class Game {
         if (tallOk && world.isSolid(tx, y + 1)) {
           const i = y * world.w + tx;
           if (world.liquid[i] > 3) break;
-          this.enemies.push(new Enemy(type, tx * TILE + 8, (y + 1) * TILE));
+          const e = new Enemy(type, tx * TILE + 8, (y + 1) * TILE);
+          if (this.flags.hardmode && Math.random() < 0.4) e.makeElite();
+          this.enemies.push(e);
           return;
         }
       }
@@ -858,27 +862,60 @@ class Game {
     this.npcs.push(new GuideTroll(this.spawn.x, this.spawn.y + 1));
   }
 
-  /* Use a Troll Totem: wake the king (night only, one at a time). */
-  trySummonBoss() {
+  /* Use a summon item: wake a boss (night only, one at a time). */
+  trySummonBoss(itemId = "trollTotem") {
     const st = skyState(this.time);
     const p = this.player;
     if (!p) return;
     if (this.enemies.some(e => e.boss && !e.dead)) {
-      this.floatText(p.cx, p.y - 12, "He's already awake!", "#ff9500");
+      this.floatText(p.cx, p.y - 12, "One royal at a time!", "#ff9500");
       return;
     }
     if (!st.isNight) {
-      this.floatText(p.cx, p.y - 12, "The Troll King only wakes at night…", "#9a92b8");
+      this.floatText(p.cx, p.y - 12, "Royals only wake at night…", "#9a92b8");
+      return;
+    }
+    if (itemId === "emperorSigil" && !this.flags.hardmode) {
+      this.floatText(p.cx, p.y - 12, "The sigil is silent… defeat the King first.", "#9a92b8");
       return;
     }
     this.inventory.useSelected();
     this.ui && this.ui.dirtyHud();
     this.sfx && this.sfx.summon();
-    this.announce("👑 THE TROLL KING HAS AWOKEN!");
     const side = Math.random() < 0.5 ? -1 : 1;
     const tx = Math.floor(p.cx / TILE) + side * 24;
     const sy = this.world.topSolid[clamp(tx, 0, this.world.w - 1)];
-    this.enemies.push(new TrollKing(tx * TILE + 8, sy * TILE));
+    if (itemId === "emperorSigil") {
+      this.announce("👑👑 THE TROLL EMPEROR DESCENDS!");
+      this.enemies.push(new TrollEmperor(tx * TILE + 8, (sy - 12) * TILE));
+    } else {
+      this.announce("👑 THE TROLL KING HAS AWOKEN!");
+      this.enemies.push(new TrollKing(tx * TILE + 8, sy * TILE));
+    }
+  }
+
+  /* First King kill: the world hardens. Trollium erupts through deep stone. */
+  enterHardmode() {
+    if (this.flags.hardmode) return;
+    this.flags.hardmode = true;
+    const world = this.world;
+    let veins = 0, guard = 0;
+    while (veins < 240 && guard++ < 6000) {
+      let x = 20 + Math.floor(Math.random() * (world.w - 40));
+      let y = 480 + Math.floor(Math.random() * (world.h - 500));
+      let placed = 0;
+      const size = 3 + Math.floor(Math.random() * 5);
+      for (let s = 0; s < size; s++) {
+        if (world.inBounds(x, y) && world.get(x, y) === T.STONE) {
+          world.set(x, y, T.TROLLIUM);
+          placed++;
+        }
+        x += Math.floor(Math.random() * 3) - 1;
+        y += Math.floor(Math.random() * 3) - 1;
+      }
+      if (placed > 0) veins++;
+    }
+    this.announce("⛏ The world hums… TROLLIUM erupts in the deep!");
   }
 
   /* Console/testing helper: spawn an enemy near the player. */

@@ -2,7 +2,7 @@
    Hops in huge arcs, spawns kingling slimes, and once he's tilted
    (below half HP) he spits troll tears. Flees at dawn. */
 
-import { TILE, BOSS, GRAVITY, MAX_FALL } from "./defs.js";
+import { TILE, BOSS, BOSS2, GRAVITY, MAX_FALL } from "./defs.js";
 import { Entity, Projectile, Enemy, burst } from "./entities.js";
 import { skyState } from "./render.js";
 import { clamp, aabb } from "./util.js";
@@ -24,6 +24,11 @@ export class TrollKing extends Entity {
     this.wobble = 0;
     this.dir = 1;
     this.light = 60;             // menacing glow
+    this.dropsTable = BOSS.drops;
+    this.deathLine = "👑 The Troll King has been trolled!";
+    this.baseFilter = null;
+    this.enrageFilter = "sepia(0.4) hue-rotate(-28deg) saturate(2.2)";
+    this.crownScale = 1;
     this.img = new Image();
     this.imgReady = false;
     this.img.onload = () => { this.imgReady = true; };
@@ -117,26 +122,33 @@ export class TrollKing extends Entity {
     this.dead = true;
     burst(game, this.cx, this.cy, "#e8e4da", 40, { spread: 420, up: 300 });
     burst(game, this.cx, this.cy, "#ffb300", 24, { spread: 340 });
-    for (const [id, min, max, chance] of BOSS.drops) {
+    for (const [id, min, max, chance] of this.dropsTable) {
       if (Math.random() < chance) {
         const n = min + Math.floor(Math.random() * (max - min + 1));
         game.spawnDrop(this.cx, this.cy - 20, id, n);
       }
     }
     game.stats.bossKills++;
-    game.flags.bossDown = true;
     game.sfx && game.sfx.fanfare();
-    game.announce("👑 The Troll King has been trolled!");
+    game.announce(this.deathLine);
+    this.onDefeat(game);
     game.recordProgress && game.recordProgress("boss");
   }
 
+  onDefeat(game) {
+    game.flags.bossDown = true;
+    if (!game.flags.hardmode && game.enterHardmode) game.enterHardmode();
+  }
+
+  /* shared by both bosses */
   draw(ctx) {
     const squash = this.onGround ? 1 + Math.sin(this.wobble * 6) * 0.02 : clamp(1 - this.vy / 2400, 0.9, 1.12);
     const drawH = 104 * squash, drawW = 88 / squash;
     const x = this.cx - drawW / 2, y = this.y + this.h - drawH;
     ctx.save();
     if (this.hitFlash > 0) ctx.filter = "brightness(2)";
-    else if (this.enraged) ctx.filter = "sepia(0.4) hue-rotate(-28deg) saturate(2.2)";
+    else if (this.enraged) ctx.filter = this.enrageFilter;
+    else if (this.baseFilter) ctx.filter = this.baseFilter;
     if (this.dir < 0) { ctx.translate(this.cx, 0); ctx.scale(-1, 1); ctx.translate(-this.cx, 0); }
     if (this.imgReady) {
       ctx.drawImage(this.img, x, y, drawW, drawH);
@@ -157,7 +169,8 @@ export class TrollKing extends Entity {
     /* crown (always upright) */
     ctx.save();
     if (this.hitFlash > 0) ctx.filter = "brightness(2)";
-    const cw = 34, chh = 16, cx0 = this.cx - cw / 2, cy0 = y - chh + 6;
+    const cw = 34 * this.crownScale, chh = 16 * this.crownScale;
+    const cx0 = this.cx - cw / 2, cy0 = y - chh + 6;
     ctx.fillStyle = "#f4c64c";
     ctx.beginPath();
     ctx.moveTo(cx0, cy0 + chh);
@@ -173,5 +186,129 @@ export class TrollKing extends Entity {
     ctx.fillStyle = "#ff2d55";
     ctx.fillRect(this.cx - 3, cy0 + 8, 5, 5);
     ctx.restore();
+  }
+}
+
+/* ============================================================ THE EMPEROR
+   Hardmode boss. He does not hop — he floats, he judges, he dashes.
+   Cycle: hover above the player -> telegraph flash -> dash. Every third
+   cycle he emits a radial ring of troll tears; enraged (<40%) he adds a
+   dart ring and dashes harder. Flees at dawn like his cousin.          */
+export class TrollEmperor extends TrollKing {
+  constructor(x, y) {
+    super(x, y);
+    this.name = "TROLL EMPEROR";
+    this.hp = this.maxHp = BOSS2.hp;
+    this.defense = BOSS2.def;
+    this.dropsTable = BOSS2.drops;
+    this.deathLine = "👑👑 The Troll Emperor has abdicated!";
+    this.baseFilter = "hue-rotate(235deg) saturate(1.5) brightness(0.92)";
+    this.enrageFilter = "hue-rotate(280deg) saturate(2.4) brightness(1.05)";
+    this.crownScale = 1.5;
+    this.light = 110;
+    this.phase = "hover";        // hover | telegraph | dash
+    this.phaseT = 2;
+    this.cycles = 0;
+  }
+
+  get enraged() { return this.hp < this.maxHp * 0.4; }
+
+  update(dt, game) {
+    const p = game.player;
+    this.hitFlash = Math.max(0, this.hitFlash - dt);
+    this.wobble += dt;
+
+    const st = skyState(game.time);
+    if (!st.isNight && this.state !== "flee") {
+      this.state = "flee";
+      game.announce("The Troll Emperor departs with the stars…");
+    }
+    if (this.state === "flee") {
+      this.vy -= 900 * dt;
+      this.y += this.vy * dt;
+      if (this.y < -400) this.dead = true;
+      return;
+    }
+    if (!p || p.dead) {
+      this._boredom = (this._boredom || 0) + dt;
+      if (this._boredom > 6) this.state = "flee";
+      this.y += Math.sin(this.wobble * 2) * 12 * dt;
+      return;
+    }
+    this._boredom = 0;
+
+    this.phaseT -= dt;
+    const enr = this.enraged;
+    switch (this.phase) {
+      case "hover": {
+        /* float toward a perch above the player; no tile collision — he's royalty */
+        const tx = p.cx + Math.sin(this.wobble * 1.4) * 90;
+        const ty = p.cy - 150;
+        this.vx += clamp(tx - this.cx, -600, 600) * 1.6 * dt;
+        this.vy += clamp(ty - this.cy, -600, 600) * 1.6 * dt;
+        this.vx *= 0.94; this.vy *= 0.94;
+        this.dir = Math.sign(p.cx - this.cx) || 1;
+        if (this.phaseT <= 0) {
+          this.phase = "telegraph";
+          this.phaseT = enr ? 0.3 : 0.5;
+          this.vx = this.vy = 0;
+          game.sfx && game.sfx.summon();
+        }
+        break;
+      }
+      case "telegraph": {
+        /* shiver in place, then commit */
+        this.x += Math.sin(this.wobble * 60) * 1.5;
+        if (this.phaseT <= 0) {
+          this.phase = "dash";
+          this.phaseT = 0.55;
+          const ang = Math.atan2(p.cy - this.cy, p.cx - this.cx);
+          const spd = enr ? 620 : 470;
+          this.vx = Math.cos(ang) * spd;
+          this.vy = Math.sin(ang) * spd;
+          game.sfx && game.sfx.roar();
+        }
+        break;
+      }
+      case "dash": {
+        if (this.phaseT <= 0) {
+          this.phase = "hover";
+          this.phaseT = enr ? 1.1 : 1.8;
+          this.cycles++;
+          if (this.cycles % 3 === 0) this.tearRing(game, enr);
+          if (this.cycles % 4 === 0) {
+            game.enemies.push(new Enemy("eye", this.cx - 30, this.cy));
+            game.enemies.push(new Enemy("eye", this.cx + 30, this.cy));
+          }
+        }
+        break;
+      }
+    }
+
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+    /* stay inside the world, above the floor */
+    this.x = clamp(this.x, TILE * 2, (game.world.w - 8) * TILE);
+    this.y = clamp(this.y, TILE * 4, (game.world.h - 20) * TILE);
+
+    if (p && !p.dead && aabb(this.box, p.box)) {
+      p.hurt(game, BOSS2.contactDmg, "the Troll Emperor", this.cx);
+    }
+  }
+
+  tearRing(game, enraged) {
+    const n = enraged ? 12 : 8;
+    for (let k = 0; k < n; k++) {
+      const ang = (k / n) * Math.PI * 2;
+      game.entities.push(new Projectile(
+        this.cx, this.cy, Math.cos(ang) * 240, Math.sin(ang) * 240,
+        { dmg: BOSS2.tearDmg, hostile: true, kind: "tear", gravity: 0.08, life: 3.2 }
+      ));
+    }
+    game.sfx && game.sfx.splash();
+  }
+
+  onDefeat(game) {
+    game.flags.emperorDown = true;
   }
 }

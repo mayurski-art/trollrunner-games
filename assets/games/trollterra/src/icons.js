@@ -7,7 +7,8 @@ import { hash2 } from "./util.js";
 const cache = new Map();
 
 const METAL = {
-  wood: "#8a5a2b", copper: "#e28448", iron: "#cfc9bd", silver: "#e3eaf0", gold: "#f4c64c",
+  wood: "#8a5a2b", copper: "#e28448", iron: "#cfc9bd", silver: "#e3eaf0",
+  gold: "#f4c64c", trollium: "#57e87a",
 };
 
 function metalOf(id) {
@@ -16,6 +17,7 @@ function metalOf(id) {
   if (id.startsWith("iron")) return METAL.iron;
   if (id.startsWith("silver")) return METAL.silver;
   if (id.startsWith("gold")) return METAL.gold;
+  if (id.startsWith("trollium") || id === "emperorEdge") return METAL.trollium;
   return "#b9a6d9";
 }
 

@@ -195,7 +195,7 @@ export class Enemy extends Entity {
 
     /* contact damage */
     if (p && !p.dead && aabb(this.box, p.box)) {
-      p.hurt(game, this.def.dmg, this.def.name, this.cx);
+      p.hurt(game, this.contactDmg, (this.elite ? "an elite " : "") + this.def.name, this.cx);
     }
 
     /* despawn far from the player */
@@ -243,6 +243,16 @@ export class Enemy extends Entity {
     }
   }
 
+  /* Hardmode spice: tougher, meaner, faintly glowing. */
+  makeElite() {
+    this.elite = true;
+    this.hp = this.maxHp = Math.round(this.hp * 1.8);
+    this.eliteDmg = Math.round(this.def.dmg * 1.5);
+    this.light = 46;
+  }
+
+  get contactDmg() { return this.elite ? this.eliteDmg : this.def.dmg; }
+
   hurt(game, dmg, fromX, knock = 1) {
     const final = Math.max(1, Math.round(dmg - this.def.def / 2 + (Math.random() * 2 - 1)));
     this.hp -= final;
@@ -263,7 +273,8 @@ export class Enemy extends Entity {
     game.sfx && game.sfx.kill();
     for (const [id, min, max, chance] of this.def.drops) {
       if (Math.random() < chance) {
-        const n = min + Math.floor(Math.random() * (max - min + 1));
+        let n = min + Math.floor(Math.random() * (max - min + 1));
+        if (this.elite) n *= 2;
         if (n > 0) game.spawnDrop(this.cx, this.cy, id, n);
       }
     }
@@ -272,6 +283,14 @@ export class Enemy extends Entity {
 
   /* ------------------------------------------------- procedural sprites */
   draw(ctx) {
+    if (this.elite) {
+      /* faint royal aura so elites read at a glance */
+      const pulse = 0.16 + Math.sin(this.wobble * 5) * 0.05;
+      ctx.fillStyle = `rgba(87,232,122,${pulse.toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(this.cx, this.cy, Math.max(this.w, this.h) * 0.85, 0, 7);
+      ctx.fill();
+    }
     ctx.save();
     if (this.hitFlash > 0) { ctx.globalAlpha = 0.85; ctx.filter = "brightness(2.2)"; }
     const d = this.def;

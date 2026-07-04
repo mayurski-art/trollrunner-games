@@ -246,7 +246,7 @@ export class Player extends Entity {
         }
         break;
       case "summon":
-        if (fresh && game.trySummonBoss) game.trySummonBoss();
+        if (fresh && game.trySummonBoss) game.trySummonBoss(sel.id);
         break;
     }
   }
