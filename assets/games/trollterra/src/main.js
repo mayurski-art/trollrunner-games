@@ -94,9 +94,11 @@ class Game {
     while (this._acc >= FIXED_DT) {
       this.update(FIXED_DT);
       this._acc -= FIXED_DT;
+      /* one-shot input (pressed/clicked/wheel) must not repeat across
+         multiple fixed steps within a single frame */
+      this.input.flush();
     }
     this.render();
-    this.input.flush();
 
     this._fpsAcc += raw; this._fpsN++;
     if (this._fpsAcc >= 0.5) { this.fps = Math.round(this._fpsN / this._fpsAcc); this._fpsAcc = 0; this._fpsN = 0; }
