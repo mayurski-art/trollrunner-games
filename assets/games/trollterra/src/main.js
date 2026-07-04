@@ -17,6 +17,7 @@ import { Player } from "./player.js";
 import { Inventory } from "./inventory.js";
 import { ItemDrop, DamageText, burst, Enemy, Projectile } from "./entities.js";
 import { UI } from "./ui.js";
+import { SFX } from "./audio.js";
 
 const FIXED_DT = 1 / 60;
 
@@ -44,6 +45,8 @@ class Game {
 
     this.cam = { x: 0, y: 0 };
     this.lighting = new Lighting();
+    this.sfx = new SFX();
+    this._fluidAcc = 0;
     this.fps = 0;
     this._fpsAcc = 0; this._fpsN = 0;
     this._wallProg = { idx: -1, t: 0 };
@@ -124,6 +127,14 @@ class Game {
     }
     this.stats.playSec += dt;
     this.updateSpawns(dt);
+
+    /* liquids + falling sand tick at 12.5 Hz */
+    this._fluidAcc += dt;
+    while (this._fluidAcc >= 0.08) {
+      this._fluidAcc -= 0.08;
+      this.world.simLiquids();
+      this.world.simSand();
+    }
 
     if (this.input.hit("F3")) this.debug = !this.debug;
     if (this.input.hit("F4")) this.freeCam = !this.freeCam;

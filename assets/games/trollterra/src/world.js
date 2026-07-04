@@ -17,7 +17,9 @@ export class World {
     this.damage = new Map();                  // tileIndex -> remaining hp
     this.dirtyChunks = new Set();             // chunk keys needing re-render
     this.liquidActive = new Set();            // tile indices with settling liquid
+    this.sandActive = new Set();              // sand tiles that may fall
     this.growth = [];                         // future use (regrowth timers)
+    this._liquidTick = 0;
     this.chunksX = Math.ceil(w / CHUNK);
     this.chunksY = Math.ceil(h / CHUNK);
   }
@@ -55,6 +57,9 @@ export class World {
     this.markDirty(x, y);
     this.updateTopSolid(x);
     this.wakeLiquids(x, y);
+    /* wake sand that may now be unsupported (this cell + the one above) */
+    if (id === T.SAND) this.sandActive.add(i);
+    if (y > 0 && this.tiles[i - this.w] === T.SAND) this.sandActive.add(i - this.w);
   }
 
   setWall(x, y, id) {
@@ -153,6 +158,138 @@ export class World {
 
   addChest(x, y, items) {
     this.chests.set(this.chestKey(x, y), { items: items || new Array(24).fill(null) });
+  }
+
+  /* ------------------------------------------------------ simulations */
+  /* One cellular pass over settling liquids. Amounts are 0..8 per cell.
+     Water flows every pass; lava every other pass (it's sluggish).
+     Water touching lava quenches it into obsidian. Returns cells moved. */
+  simLiquids(budget = 3000) {
+    this._liquidTick++;
+    const w = this.w, tiles = this.tiles, liq = this.liquid, typ = this.liquidType;
+    const active = Array.from(this.liquidActive);
+    if (active.length > budget) active.length = budget;
+    let moved = 0;
+
+    const solidAt = i => {
+      const d = TILES[tiles[i]];
+      return !!(d && d.solid);
+    };
+
+    for (const i of active) {
+      const a = liq[i];
+      if (a === 0) { this.liquidActive.delete(i); continue; }
+      const isLava = typ[i] === 1;
+      if (isLava && (this._liquidTick & 1)) continue;   // lava at half speed
+
+      const x = i % w, y = (i / w) | 0;
+
+      /* lava + adjacent water -> obsidian right here */
+      if (isLava) {
+        let quench = false;
+        for (const j of [i - 1, i + 1, i - w, i + w]) {
+          if (j >= 0 && j < liq.length && liq[j] > 0 && typ[j] === 0) {
+            liq[j] = Math.max(0, liq[j] - 2);
+            quench = true;
+          }
+        }
+        if (quench) {
+          liq[i] = 0;
+          this.liquidActive.delete(i);
+          this.set(x, y, T.OBSIDIAN);
+          moved++;
+          continue;
+        }
+      }
+
+      let changed = false;
+
+      /* pour down */
+      if (y + 1 < this.h) {
+        const b = i + w;
+        if (!solidAt(b) && (liq[b] === 0 || typ[b] === typ[i])) {
+          const space = 8 - liq[b];
+          if (space > 0) {
+            const mv = Math.min(a, space);
+            liq[b] += mv;
+            typ[b] = typ[i];
+            liq[i] -= mv;
+            this.liquidActive.add(b);
+            changed = true;
+          }
+        } else if (liq[b] > 0 && typ[b] !== typ[i]) {
+          /* water lands on lava -> obsidian below */
+          const lavaIdx = typ[b] === 1 ? b : i;
+          liq[lavaIdx] = 0;
+          liq[typ[b] === 1 ? i : b] = Math.max(0, liq[typ[b] === 1 ? i : b] - 2);
+          this.set(lavaIdx % w, (lavaIdx / w) | 0, T.OBSIDIAN);
+          changed = true;
+        }
+      }
+
+      /* spread sideways */
+      if (liq[i] > 1) {
+        const first = (x + this._liquidTick) & 1 ? 1 : -1;
+        for (const dx of [first, -first]) {
+          const s = i + dx;
+          const sx = x + dx;
+          if (sx < 0 || sx >= w) continue;
+          if (solidAt(s)) continue;
+          if (liq[s] > 0 && typ[s] !== typ[i]) {
+            /* sideways lava/water contact -> obsidian at the lava cell */
+            const lavaIdx = typ[s] === 1 ? s : i;
+            liq[lavaIdx] = 0;
+            this.set(lavaIdx % w, (lavaIdx / w) | 0, T.OBSIDIAN);
+            changed = true;
+            break;
+          }
+          if (liq[s] < liq[i] - 1 || (liq[s] < liq[i] && ((this._liquidTick + x) & 3) === 0)) {
+            liq[s]++;
+            typ[s] = typ[i];
+            liq[i]--;
+            this.liquidActive.add(s);
+            changed = true;
+          }
+          if (liq[i] <= 1) break;
+        }
+      }
+
+      if (changed) {
+        moved++;
+        this.liquidActive.add(i);
+        if (i - w >= 0 && liq[i - w] > 0) this.liquidActive.add(i - w);
+      } else {
+        this.liquidActive.delete(i);
+      }
+    }
+    return moved;
+  }
+
+  /* Falling sand: unsupported sand drops one cell per pass. */
+  simSand() {
+    if (this.sandActive.size === 0) return;
+    const w = this.w;
+    for (const i of Array.from(this.sandActive)) {
+      if (this.tiles[i] !== T.SAND) { this.sandActive.delete(i); continue; }
+      const x = i % w, y = (i / w) | 0;
+      if (y + 1 >= this.h) { this.sandActive.delete(i); continue; }
+      const b = i + w;
+      const belowDef = TILES[this.tiles[b]];
+      const canFall = this.tiles[b] === T.AIR || this.tiles[b] === T.PLANT ||
+        (belowDef && !belowDef.solid && !belowDef.oneWay && !belowDef.station &&
+         this.tiles[b] !== T.TORCH && this.tiles[b] !== T.CHEST &&
+         this.tiles[b] !== T.DOOR_C && this.tiles[b] !== T.DOOR_O);
+      if (!canFall) { this.sandActive.delete(i); continue; }
+      /* swap any liquid upward as the sand sinks */
+      const liqAmt = this.liquid[b], liqTyp = this.liquidType[b];
+      this.set(x, y + 1, T.SAND);
+      this.set(x, y, T.AIR);
+      this.liquid[i] = liqAmt;
+      this.liquidType[i] = liqTyp;
+      this.liquid[b] = 0;
+      if (liqAmt > 0) this.liquidActive.add(i);
+      this.sandActive.add(b);
+    }
   }
 
   /* Nearby crafting stations within radius r tiles of tile coords (px, py). */
