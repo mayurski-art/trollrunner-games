@@ -24,7 +24,10 @@ Chop trees → workbench → wooden tools → dig for copper/iron/silver/gold �
 furnace + anvil → better gear + armor → mine troll hearts (+20 max HP, cap
 200) → collect eyeball lenses from troll eyes at night → craft a **Troll
 Totem** (6 lenses + 5 gold bars @ anvil) → use it at night → beat the
-**Troll King** → claim the Troll Blade.
+**Troll King** → claim the Troll Blade → **HARDMODE**: trollium erupts in
+the deep (golden pick required), elite enemies stalk the night → forge
+trollium gear → craft an **Emperor Sigil** (8 trollium bars + 10 bones +
+4 lenses) → face the flying **Troll Emperor** → the Emperor's Edge.
 
 ## Systems
 - **World**: 1600×800 tiles, seeded procedural gen — snow/forest/desert
@@ -45,6 +48,26 @@ Totem** (6 lenses + 5 gold bars @ anvil) → use it at night → beat the
   minimap + full map.
 - **Arcade wiring**: shared weekly leaderboard (`leaderboard.js` config —
   depth / blocks mined / boss kills), TrollNotis toasts for boss events.
+- **Touch**: coarse-pointer overlay (move/jump/drop buttons, canvas
+  hold-to-mine, interact/inventory/map), auto-shown on the first touch.
+- **Music**: original generative chiptune — five themes (day/night/cave/
+  boss/title) as chord progressions with seeded random-walk leads,
+  crossfading with context; separate music volume slider.
+- **Housing + NPCs**: flood-fill room validation (bounded, walled, torch +
+  bed/workbench + door). A valid house attracts the **Merchant Troll**
+  (barter shop, 7 offers, no currency). Troll cots set your spawn.
+- **Wiring**: wrench + wire layer, levers, pressure plates, dart traps;
+  pulses toggle torches/doors and fire traps. Wires visible while
+  holding the wrench.
+- **Hardmode**: post-King trollium tier, elite enemy variants (1.8× HP,
+  aura, double drops), and the Troll Emperor (hover/telegraph/dash AI,
+  radial tear rings, enrage).
+- **Co-op (v1)**: host/join with a 5-char room code from the title
+  screen. Supabase Realtime online (BroadcastChannel fallback between
+  tabs). Syncs: exact world snapshot on join (chunked), live tile/wall/
+  wire edits, chests, host clock + hardmode flag, player ghosts.
+  **Local per player**: enemies, bosses, drops, liquid settling — each
+  troll fights their own monsters. Guests never overwrite their own save.
 
 ## Art
 Player = Troll Kombat gladiator rig (`fighters/gladiator/anims/*.png`),
@@ -53,6 +76,7 @@ Troll King = `fighters/troll.png` + drawn crown. Everything else (tiles,
 items, enemies) is drawn procedurally at boot — no image assets.
 
 ## Deliberately out of scope (for now)
-Networked multiplayer, touch controls, wiring (logic circuits), NPC
-housing checks, events beyond the Troll Moon, music. The leaderboard uses
-the engine's mock rivals; only "you" is real (same as other games).
+Authoritative server netcode (co-op is trust-based shared-world sync),
+synced enemies/bosses in co-op, PvP, events beyond the Troll Moon, and
+biome spread. The leaderboard uses the engine's mock rivals; only "you"
+is real (same as other games).
