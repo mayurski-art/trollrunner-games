@@ -26,6 +26,7 @@ export function saveGame(game) {
       walls: packLayer(w.walls),
       liquid: packLayer(w.liquid),
       liquidType: packLayer(w.liquidType),
+      wires: packLayer(w.wires),
       explored: game.explored ? packLayer(game.explored) : null,
       chests: [...w.chests.entries()].map(([k, c]) => [k, c.items]),
       trees: w.trees,
@@ -67,6 +68,7 @@ export function applyWorldLayers(world, data) {
   unpackLayer(data.walls, n, world.walls);
   unpackLayer(data.liquid, n, world.liquid);
   unpackLayer(data.liquidType, n, world.liquidType);
+  if (data.wires) unpackLayer(data.wires, n, world.wires);
   world.chests = new Map((data.chests || []).map(([k, items]) => [k, { items }]));
   world.trees = data.trees || [];
   world.damage.clear();

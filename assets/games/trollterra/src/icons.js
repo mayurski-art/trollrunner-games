@@ -106,6 +106,17 @@ function drawFurniture(g, id) {
     g.fillStyle = "#8a5a2b"; g.fillRect(3, 19, 26, 4);
     g.fillStyle = "#c23a60"; g.fillRect(4, 13, 24, 7);
     g.fillStyle = "#f2f8fd"; g.fillRect(4, 11, 9, 6);
+  } else if (id === "lever") {
+    g.fillStyle = "#565a63"; g.fillRect(8, 18, 16, 10);
+    g.fillStyle = "#c9302c"; g.fillRect(14, 5, 4, 15);
+    g.fillStyle = "#ffd23c"; g.fillRect(12, 3, 8, 5);
+  } else if (id === "plate") {
+    g.fillStyle = "#8f8f96"; g.fillRect(4, 22, 24, 4);
+    g.fillStyle = "#c9c9cf"; g.fillRect(6, 20, 20, 3);
+  } else if (id === "dartTrap") {
+    g.fillStyle = "#4e525a"; g.fillRect(4, 4, 24, 24);
+    g.fillStyle = "#33363e"; g.fillRect(4, 13, 12, 7);
+    g.fillStyle = "#141414"; g.fillRect(2, 15, 5, 3);
   }
 }
 
@@ -121,6 +132,10 @@ function drawTool(g, kind, m) {
   } else if (kind === "axe") {
     g.beginPath(); g.moveTo(1, -10); g.quadraticCurveTo(12, -8, 9, 2);
     g.lineTo(1, -1); g.closePath(); g.fill();
+  } else if (kind === "wrench") {
+    g.fillStyle = "#c9302c";
+    g.fillRect(-2, -12, 4, 20);
+    g.beginPath(); g.arc(0, -12, 6, 0.6, Math.PI * 2 - 0.6); g.fill();
   } else {
     g.fillRect(-9, -10, 18, 8);
   }

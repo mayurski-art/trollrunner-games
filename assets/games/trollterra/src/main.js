@@ -280,6 +280,8 @@ class Game {
       this.revealAround(this.player.cx, this.player.cy);
     }
 
+    this.checkPlates();
+
     /* housing: every 8 s, see if a valid house near the player attracts
        the Merchant (and re-homes the Guide) */
     this._houseAcc = (this._houseAcc || 0) + dt;
@@ -556,7 +558,12 @@ class Game {
     }
 
     this.inventory.useSelected();
-    world.set(tx, ty, def.tile);
+    /* dart traps face away from the player */
+    let placeId = def.tile;
+    if (def.faces && this.player) {
+      placeId = (tx + 0.5) * TILE >= this.player.cx ? T.DART_R : T.DART_L;
+    }
+    world.set(tx, ty, placeId);
     if (tdef.solid) world.setLiquid(tx, ty, 0);
     if (def.tall === 2) world.set(tx, ty - 1, def.tile);
     if (def.tile === T.CHEST) world.addChest(tx, ty);
@@ -616,6 +623,10 @@ class Game {
       this.ui.openChest(m.tx, m.ty);
       return;
     }
+    if (id === T.LEVER) {
+      this.pulseWire(m.tx, m.ty);
+      return;
+    }
     if (id === T.BED) {
       this.spawn = { x: m.tx, y: m.ty - 1 };
       this.floatText(m.tx * TILE + 8, m.ty * TILE - 8, "Spawn set 🛏", "#57bd5c");
@@ -629,6 +640,101 @@ class Game {
         else if (this.ui.openDialog) this.ui.openDialog(n);
         return;
       }
+    }
+  }
+
+  /* ========================================================== wiring */
+  /* Wrench click: lay wire (consumes Wire) or cut existing wire (refund). */
+  wireTick(tx, ty) {
+    const world = this.world;
+    const i = world.idx(tx, ty);
+    if (this._lastWired === i && this.input.mouse.left && !this.input.clicked.left) return;
+    this._lastWired = i;
+    if (world.getWire(tx, ty)) {
+      world.setWire(tx, ty, 0);
+      this.inventory.add("wire", 1);
+      this.sfx && this.sfx.tink(false);
+      this.ui && this.ui.dirtyHud();
+    } else if (this.inventory.count("wire") > 0) {
+      this.inventory.consume("wire", 1);
+      world.setWire(tx, ty, 1);
+      this.sfx && this.sfx.click();
+      this.ui && this.ui.dirtyHud();
+    }
+  }
+
+  /* Pulse a signal from (tx,ty): flood along wires, toggle devices. */
+  pulseWire(tx, ty) {
+    const world = this.world;
+    if (!world.getWire(tx, ty)) {
+      /* a lever with no wire still clunks, so builders get feedback */
+      this.sfx && this.sfx.door();
+      return;
+    }
+    const seen = new Set();
+    const queue = [world.idx(tx, ty)];
+    seen.add(queue[0]);
+    let guard = 0;
+    while (queue.length && guard++ < 400) {
+      const i = queue.pop();
+      const x = i % world.w, y = (i / world.w) | 0;
+      this.activateDevice(x, y);
+      for (const [nx, ny] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]) {
+        if (!world.inBounds(nx, ny) || !world.getWire(nx, ny)) continue;
+        const k = world.idx(nx, ny);
+        if (!seen.has(k)) { seen.add(k); queue.push(k); }
+      }
+    }
+    this.sfx && this.sfx.click();
+  }
+
+  activateDevice(x, y) {
+    const world = this.world;
+    const id = world.get(x, y);
+    switch (id) {
+      case T.TORCH: world.set(x, y, T.TORCH_OFF); break;
+      case T.TORCH_OFF: world.set(x, y, T.TORCH); break;
+      case T.DOOR_C:
+      case T.DOOR_O: {
+        const other = world.get(x, y - 1) === id ? y - 1 : y + 1;
+        const to = id === T.DOOR_C ? T.DOOR_O : T.DOOR_C;
+        world.set(x, y, to);
+        if (world.get(x, other) === id) world.set(x, other, to);
+        break;
+      }
+      case T.DART_L:
+      case T.DART_R: {
+        this._trapCd = this._trapCd || new Map();
+        const i = world.idx(x, y);
+        const now = performance.now();
+        if ((this._trapCd.get(i) || 0) > now) break;
+        this._trapCd.set(i, now + 900);
+        const dir = id === T.DART_L ? -1 : 1;
+        this.entities.push(new Projectile(
+          x * TILE + 8 + dir * 10, y * TILE + 8, dir * 420, 0,
+          { dmg: 15, both: true, kind: "dart", gravity: 0.12, life: 2.5 }
+        ));
+        this.sfx && this.sfx.bow();
+        break;
+      }
+    }
+  }
+
+  /* Pressure plates: anything standing on one fires it (with a cooldown). */
+  checkPlates() {
+    const world = this.world;
+    this._plateCd = this._plateCd || new Map();
+    const now = performance.now();
+    const bodies = [this.player, ...this.enemies, ...this.npcs];
+    for (const b of bodies) {
+      if (!b || b.dead) continue;
+      const tx = Math.floor(b.cx / TILE);
+      const ty = Math.floor((b.y + b.h - 2) / TILE);
+      if (world.get(tx, ty) !== T.PLATE) continue;
+      const i = world.idx(tx, ty);
+      if ((this._plateCd.get(i) || 0) > now) continue;
+      this._plateCd.set(i, now + 800);
+      this.pulseWire(tx, ty);
     }
   }
 
@@ -864,6 +970,12 @@ class Game {
 
     this.renderer.drawCracks(ctx);
     this.renderer.drawLiquids(ctx, cam, this.viewW, this.viewH);
+
+    /* wires show while holding the wrench or wire */
+    const held = this.inventory && this.inventory.selected;
+    if (held && (held.id === "wrench" || held.id === "wire")) {
+      this.renderer.drawWires(ctx, cam, this.viewW, this.viewH);
+    }
 
     /* lighting */
     const st = skyState(this.time);

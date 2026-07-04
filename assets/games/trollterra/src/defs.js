@@ -27,7 +27,8 @@ export const T = {
   GOLD: 13, TORCH: 14, WORKBENCH: 15, FURNACE: 16, ANVIL: 17, CHEST: 18,
   DOOR_C: 19, DOOR_O: 20, PLATFORM: 21, HEART: 22, SHROOM: 23,
   BEDROCK: 24, OBSIDIAN: 25, PLANT: 26, BED: 27,
-  WIRE: 0, /* wires live on their own layer, not in T */
+  LEVER: 28, PLATE: 29, DART_L: 30, DART_R: 31, TORCH_OFF: 32,
+  /* wires live on their own layer, not in T */
 };
 
 /* pal: [dark, mid, light] used by the procedural texture atlas.
@@ -62,6 +63,11 @@ TILES[T.BEDROCK]  = { name: "Trollrock", solid: true, hp: Infinity, pow: 999, to
 TILES[T.OBSIDIAN] = { name: "Obsidian", solid: true, hp: 260, pow: 60, tool: "pick", drop: "obsidian", pal: ["#231d33", "#352c4d", "#4a3e6b"] };
 TILES[T.PLANT]    = { name: "Plant", solid: false, hp: 1, pow: 0, tool: "pick", drop: null, noVariant: true };
 TILES[T.BED]      = { name: "Troll cot", solid: false, hp: 70, pow: 0, tool: "pick", drop: "bed", noVariant: true };
+TILES[T.LEVER]    = { name: "Lever", solid: false, hp: 40, pow: 0, tool: "pick", drop: "lever", noVariant: true };
+TILES[T.PLATE]    = { name: "Pressure plate", solid: false, hp: 40, pow: 0, tool: "pick", drop: "plate", noVariant: true };
+TILES[T.DART_L]   = { name: "Dart trap", solid: true, hp: 160, pow: 0, tool: "pick", drop: "dartTrap", noVariant: true };
+TILES[T.DART_R]   = { name: "Dart trap", solid: true, hp: 160, pow: 0, tool: "pick", drop: "dartTrap", noVariant: true };
+TILES[T.TORCH_OFF] = { name: "Torch (out)", solid: false, hp: 5, pow: 0, tool: "pick", drop: "torch", noVariant: true };
 
 /* ------------------------------------------------------------------- walls */
 export const W = { NONE: 0, DIRT: 1, STONE: 2, WOOD: 3, STONE_BRICK: 4 };
@@ -95,6 +101,11 @@ export const ITEMS = {
   chest:       { name: "Chest", type: "block", tile: T.CHEST, max: 99, needsFloor: true },
   door:        { name: "Door", type: "block", tile: T.DOOR_C, max: 99, tall: 2, needsFloor: true },
   bed:         { name: "Troll cot", type: "block", tile: T.BED, max: 99, needsFloor: true, desc: "Right-click to set your spawn." },
+  lever:       { name: "Lever", type: "block", tile: T.LEVER, max: 99, needsSupport: true, desc: "Right-click to pulse connected wires." },
+  plate:       { name: "Pressure plate", type: "block", tile: T.PLATE, max: 99, needsFloor: true, desc: "Pulses wires when stepped on." },
+  dartTrap:    { name: "Dart trap", type: "block", tile: T.DART_L, max: 99, faces: true, desc: "Fires darts when pulsed. Darts hurt everyone." },
+  wrench:      { name: "Wrench", type: "tool", tool: "wrench", power: 0, speed: 6, dmg: 3, desc: "Lays wire (LMB) — needs Wire in your bag. Click a wired tile to cut." },
+  wire:        { name: "Wire", type: "material", max: 999 },
   platform:    { name: "Platform", type: "block", tile: T.PLATFORM, max: 999 },
   /* walls */
   woodWall:       { name: "Wood wall", type: "wall", wall: W.WOOD, max: 999 },
@@ -201,6 +212,11 @@ export const RECIPES = [
   { out: "goldChest", n: 1, ing: [["goldBar", 15]], station: "anvil" },
   { out: "goldLegs", n: 1, ing: [["goldBar", 12]], station: "anvil" },
   { out: "trollTotem", n: 1, ing: [["lens", 6], ["goldBar", 5]], station: "anvil" },
+  { out: "wrench", n: 1, ing: [["ironBar", 6]], station: "anvil" },
+  { out: "wire", n: 4, ing: [["copperBar", 1]], station: "anvil" },
+  { out: "lever", n: 1, ing: [["stone", 3], ["ironBar", 1]], station: "workbench" },
+  { out: "plate", n: 1, ing: [["stone", 2], ["copperBar", 1]], station: "workbench" },
+  { out: "dartTrap", n: 1, ing: [["stone", 10], ["copperBar", 3]], station: "workbench" },
 ];
 
 /* ----------------------------------------------------------------- enemies */

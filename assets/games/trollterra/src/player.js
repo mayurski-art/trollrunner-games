@@ -204,8 +204,13 @@ export class Player extends Entity {
     const def = ITEMS[sel.id];
     switch (def.type) {
       case "tool":
-        if (inReach) game.mineTick(m.tx, m.ty, def, this);
-        else this.startSwing(0.3);
+        if (def.tool === "wrench") {
+          if (inReach) game.wireTick(m.tx, m.ty);
+        } else if (inReach) {
+          game.mineTick(m.tx, m.ty, def, this);
+        } else {
+          this.startSwing(0.3);
+        }
         break;
       case "weapon":
         if (this.useTimer <= 0) {

@@ -397,6 +397,7 @@ export class Projectile extends Entity {
     this.vx = vx; this.vy = vy;
     this.dmg = opts.dmg || 8;
     this.hostile = !!opts.hostile;   // hurts the player instead of enemies
+    this.both = !!opts.both;         // trap darts hurt everyone
     this.flame = !!opts.flame;
     this.kind = opts.kind || "arrow";
     this.light = this.flame ? 150 : (opts.light || 0);
@@ -425,13 +426,14 @@ export class Projectile extends Entity {
       game.entities.push(new Particle(this.cx, this.cy, "#ffb300", { spread: 30, up: 20, life: 0.25, gravity: 0 }));
     }
 
-    if (this.hostile) {
+    if (this.hostile || this.both) {
       const p = game.player;
       if (p && !p.dead && aabb(this.box, p.box)) {
-        p.hurt(game, this.dmg, "troll tears", this.cx);
+        p.hurt(game, this.dmg, this.kind === "dart" ? "a dart trap" : "troll tears", this.cx);
         this.dead = true;
       }
-    } else {
+    }
+    if (!this.hostile || this.both) {
       for (const e of game.enemies) {
         if (!e.dead && aabb(this.box, e.box)) {
           e.hurt(game, this.dmg, this.cx, 0.6);
@@ -451,6 +453,10 @@ export class Projectile extends Entity {
       ctx.fillStyle = "#7fd4e8";
       ctx.beginPath(); ctx.arc(0, 0, 5, 0, 7); ctx.fill();
       ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.fillRect(-2, -3, 2, 2);
+    } else if (this.kind === "dart") {
+      ctx.fillStyle = "#9aa2ad"; ctx.fillRect(-5, -1, 10, 2);
+      ctx.fillStyle = "#141414";
+      ctx.beginPath(); ctx.moveTo(5, -2.5); ctx.lineTo(8, 0); ctx.lineTo(5, 2.5); ctx.fill();
     } else {
       ctx.fillStyle = "#8a5a2b"; ctx.fillRect(-7, -1, 12, 2);
       ctx.fillStyle = this.flame ? "#ff7a1a" : "#cfc9bd";

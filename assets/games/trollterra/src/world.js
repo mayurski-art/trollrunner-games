@@ -11,6 +11,7 @@ export class World {
     this.walls = new Uint8Array(w * h);
     this.liquid = new Uint8Array(w * h);      // 0..8 volume
     this.liquidType = new Uint8Array(w * h);  // 0 water, 1 lava
+    this.wires = new Uint8Array(w * h);       // 1 = wire on this tile
     this.topSolid = new Int16Array(w);        // y of first light-blocking tile per column
     this.chests = new Map();                  // "x,y" -> { items: Array(24) of {id,n}|null }
     this.trees = [];                          // { x, yBase, h, seed } — canopy render + felling
@@ -35,6 +36,16 @@ export class World {
   getWall(x, y) {
     if (!this.inBounds(x, y)) return 0;
     return this.walls[y * this.w + x];
+  }
+
+  getWire(x, y) {
+    if (!this.inBounds(x, y)) return 0;
+    return this.wires[y * this.w + x];
+  }
+
+  setWire(x, y, on) {
+    if (!this.inBounds(x, y)) return;
+    this.wires[y * this.w + x] = on ? 1 : 0;
   }
 
   isSolid(x, y) {
