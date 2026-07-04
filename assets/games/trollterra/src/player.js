@@ -126,8 +126,8 @@ export class Player extends Entity {
         this.coyote = 0; this.jumpBuf = 0;
         game.sfx && game.sfx.jump();
       }
-      /* variable jump height */
-      if (this.vy < -140 && !jumpKey) this.vy = -140;
+      /* variable jump height (floor keeps tap-jumps useful on touch) */
+      if (this.vy < -240 && !jumpKey) this.vy = -240;
       this.vy = Math.min(this.vy + GRAVITY * dt, MAX_FALL);
     }
 

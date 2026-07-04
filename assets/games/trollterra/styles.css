@@ -256,3 +256,24 @@ kbd {
   #inv-grid { grid-template-columns: repeat(5, var(--slot)); }
   #minimap { display: none; }
 }
+
+/* ---------------------------------------------------------- touch UI */
+#touch-ui { position: absolute; inset: 0; pointer-events: none; z-index: 25; }
+#touch-ui[hidden] { display: none; }
+.tc-cluster {
+  position: absolute; bottom: 86px; display: flex; gap: 12px;
+  align-items: flex-end; pointer-events: auto;
+}
+.tc-left { left: 14px; }
+.tc-right { right: 14px; flex-direction: row-reverse; }
+.tc-btn {
+  width: 58px; height: 58px; border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(16, 10, 34, 0.55); color: var(--tt-text);
+  font-size: 22px; touch-action: none; user-select: none;
+  backdrop-filter: blur(3px);
+}
+.tc-btn.on { background: rgba(255, 179, 0, 0.4); border-color: var(--tt-gold); }
+.tc-jump { width: 66px; height: 66px; }
+.tc-small { width: 44px; height: 44px; font-size: 17px; }
+@media (pointer: fine) and (min-width: 900px) { /* keyboard users keep a clean HUD */ }

@@ -24,6 +24,7 @@ import {
   saveGame, loadSaveData, applyWorldLayers, clearSave,
   loadSettings, saveSettings,
 } from "./save.js";
+import { TouchControls } from "./touch.js";
 import { rleDecode, b64ToU16 } from "./util.js";
 
 const FIXED_DT = 1 / 60;
@@ -75,6 +76,7 @@ class Game {
     this.ui = new UI(this);
     this.ui.dirtyInv();
     this.ui.showTitle(!!this.saveData);
+    this.touch = new TouchControls(this);
     this.resize();
     window.addEventListener("resize", () => this.resize());
     window.addEventListener("beforeunload", () => {
