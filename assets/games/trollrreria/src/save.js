@@ -1,4 +1,4 @@
-/* TrollTerra — world persistence: RLE + base64 into localStorage.
+/* Trollrreria — world persistence: RLE + base64 into localStorage.
    A full 1600x800 world compresses to a few hundred KB, well under quota. */
 
 import { SAVE_KEY, SETTINGS_KEY } from "./defs.js";
@@ -26,6 +26,7 @@ export function saveGame(game) {
       walls: packLayer(w.walls),
       liquid: packLayer(w.liquid),
       liquidType: packLayer(w.liquidType),
+      wires: packLayer(w.wires),
       explored: game.explored ? packLayer(game.explored) : null,
       chests: [...w.chests.entries()].map(([k, c]) => [k, c.items]),
       trees: w.trees,
@@ -42,7 +43,7 @@ export function saveGame(game) {
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     return true;
   } catch (e) {
-    console.warn("[trollterra] save failed:", e);
+    console.warn("[trollrreria] save failed:", e);
     return false;
   }
 }
@@ -55,7 +56,7 @@ export function loadSaveData() {
     if (!data || data.v !== 1 || !data.tiles) return null;
     return data;
   } catch (e) {
-    console.warn("[trollterra] corrupt save discarded:", e);
+    console.warn("[trollrreria] corrupt save discarded:", e);
     return null;
   }
 }
@@ -67,6 +68,7 @@ export function applyWorldLayers(world, data) {
   unpackLayer(data.walls, n, world.walls);
   unpackLayer(data.liquid, n, world.liquid);
   unpackLayer(data.liquidType, n, world.liquidType);
+  if (data.wires) unpackLayer(data.wires, n, world.wires);
   world.chests = new Map((data.chests || []).map(([k, items]) => [k, { items }]));
   world.trees = data.trees || [];
   world.damage.clear();

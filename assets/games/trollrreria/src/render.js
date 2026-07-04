@@ -1,4 +1,4 @@
-/* TrollTerra — renderer: procedural tile atlas, cached chunk canvases,
+/* Trollrreria — renderer: procedural tile atlas, cached chunk canvases,
    sky/sun/moon/stars, parallax hills, tree canopies, liquid + light overlays.
    World-space methods assume the caller has already applied the camera
    transform (ZOOM scale + translate); screen-space methods reset it.     */
@@ -272,6 +272,40 @@ export class Renderer {
         g.fillStyle = "#c7f08a"; g.fillRect(px + 6, py + 7, 2, 2);
         break;
       }
+      case T.TORCH_OFF: {
+        g.fillStyle = "#8a5a2b"; g.fillRect(px + 7, py + 6, 2, 9);
+        g.fillStyle = "#3a3a3e"; g.fillRect(px + 6, py + 3, 4, 4);
+        break;
+      }
+      case T.LEVER: {
+        g.fillStyle = "#565a63"; g.fillRect(px + 4, py + 9, 8, 6);
+        g.fillStyle = "#c9302c"; g.fillRect(px + 7, py + 2, 2, 8);
+        g.fillStyle = "#ffd23c"; g.fillRect(px + 6, py + 1, 4, 3);
+        break;
+      }
+      case T.PLATE: {
+        g.fillStyle = "#8f8f96"; g.fillRect(px + 2, py + 13, 12, 2);
+        g.fillStyle = "#c9c9cf"; g.fillRect(px + 3, py + 12, 10, 1);
+        break;
+      }
+      case T.DART_L:
+      case T.DART_R: {
+        g.fillStyle = "#4e525a"; g.fillRect(px, py, TILE, TILE);
+        g.fillStyle = "#33363e";
+        const mx = id === T.DART_L ? px + 1 : px + 9;
+        g.fillRect(mx, py + 6, 6, 4);
+        g.fillStyle = "#141414";
+        g.fillRect(id === T.DART_L ? px : px + 13, py + 7, 3, 2);
+        break;
+      }
+      case T.BED: {
+        g.fillStyle = "#5d4326";
+        g.fillRect(px, py + 12, 2, 4); g.fillRect(px + 14, py + 12, 2, 4);
+        g.fillStyle = "#8a5a2b"; g.fillRect(px, py + 10, TILE, 3);
+        g.fillStyle = "#c23a60"; g.fillRect(px + 1, py + 7, 14, 4);
+        g.fillStyle = "#f2f8fd"; g.fillRect(px + 1, py + 6, 5, 3);
+        break;
+      }
       case T.PLANT: {
         g.fillStyle = "#4faf54";
         const h1 = 4 + Math.floor(hash2(wx, wy, 3) * 6);
@@ -343,6 +377,31 @@ export class Renderer {
           ctx.fillStyle = lava ? "rgba(255,214,90,0.8)" : "rgba(160,208,255,0.5)";
           ctx.fillRect(tx * TILE, y, TILE, 1.5);
         }
+      }
+    }
+  }
+
+  /* Wire overlay — drawn only while the player holds the wrench or wire. */
+  drawWires(ctx, cam, vw, vh) {
+    const world = this.world;
+    const tx0 = Math.max(0, Math.floor(cam.x / TILE));
+    const ty0 = Math.max(0, Math.floor(cam.y / TILE));
+    const tx1 = Math.min(world.w - 1, Math.ceil((cam.x + vw) / TILE));
+    const ty1 = Math.min(world.h - 1, Math.ceil((cam.y + vh) / TILE));
+    ctx.strokeStyle = "rgba(255,60,60,0.9)";
+    ctx.lineWidth = 1.6;
+    for (let ty = ty0; ty <= ty1; ty++) {
+      for (let tx = tx0; tx <= tx1; tx++) {
+        if (!world.wires[ty * world.w + tx]) continue;
+        const cx = tx * TILE + TILE / 2, cy = ty * TILE + TILE / 2;
+        let linked = false;
+        ctx.beginPath();
+        if (world.getWire(tx - 1, ty)) { ctx.moveTo(cx, cy); ctx.lineTo(cx - TILE / 2, cy); linked = true; }
+        if (world.getWire(tx + 1, ty)) { ctx.moveTo(cx, cy); ctx.lineTo(cx + TILE / 2, cy); linked = true; }
+        if (world.getWire(tx, ty - 1)) { ctx.moveTo(cx, cy); ctx.lineTo(cx, cy - TILE / 2); linked = true; }
+        if (world.getWire(tx, ty + 1)) { ctx.moveTo(cx, cy); ctx.lineTo(cx, cy + TILE / 2); linked = true; }
+        ctx.stroke();
+        if (!linked) { ctx.fillStyle = "rgba(255,60,60,0.9)"; ctx.fillRect(cx - 2, cy - 2, 4, 4); }
       }
     }
   }

@@ -1,4 +1,4 @@
-/* TrollTerra — the player: physics, mining/placing/using, health, breath,
+/* Trollrreria — the player: physics, mining/placing/using, health, breath,
    fall damage. Sprite = the Troll Kombat gladiator rig (trollface approved),
    feet-anchored, with a drawn fallback while sheets load. */
 
@@ -126,8 +126,8 @@ export class Player extends Entity {
         this.coyote = 0; this.jumpBuf = 0;
         game.sfx && game.sfx.jump();
       }
-      /* variable jump height */
-      if (this.vy < -140 && !jumpKey) this.vy = -140;
+      /* variable jump height (floor keeps tap-jumps useful on touch) */
+      if (this.vy < -240 && !jumpKey) this.vy = -240;
       this.vy = Math.min(this.vy + GRAVITY * dt, MAX_FALL);
     }
 
@@ -204,8 +204,13 @@ export class Player extends Entity {
     const def = ITEMS[sel.id];
     switch (def.type) {
       case "tool":
-        if (inReach) game.mineTick(m.tx, m.ty, def, this);
-        else this.startSwing(0.3);
+        if (def.tool === "wrench") {
+          if (inReach) game.wireTick(m.tx, m.ty);
+        } else if (inReach) {
+          game.mineTick(m.tx, m.ty, def, this);
+        } else {
+          this.startSwing(0.3);
+        }
         break;
       case "weapon":
         if (this.useTimer <= 0) {
@@ -241,7 +246,7 @@ export class Player extends Entity {
         }
         break;
       case "summon":
-        if (fresh && game.trySummonBoss) game.trySummonBoss();
+        if (fresh && game.trySummonBoss) game.trySummonBoss(sel.id);
         break;
     }
   }

@@ -1,7 +1,10 @@
-/* TrollTerra — DOM UI layer: HUD (hearts, breath, hotbar, clock/depth),
+/* Trollrreria — DOM UI layer: HUD (hearts, breath, hotbar, clock/depth),
    inventory + crafting panel, chest panel, tooltips, drag & drop. */
 
-import { ITEMS, TILES, T, DAY_LEN, CYCLE, TILE, STATION_SCAN, WORLD_W, WORLD_H } from "./defs.js";
+import {
+  ITEMS, TILES, T, DAY_LEN, CYCLE, TILE, STATION_SCAN, WORLD_W, WORLD_H,
+  MERCHANT_OFFERS,
+} from "./defs.js";
 import { getIcon } from "./icons.js";
 import { fmtClock } from "./util.js";
 import { SURFACE_BASE } from "./worldgen.js";
@@ -56,7 +59,8 @@ export class UI {
     this.buildInventory();
     this.el.hud.hidden = false;
 
-    for (const zone of [this.el.hotbar, this.el.invPanel, this.el.chestPanel, this.el.dialog]) {
+    for (const zone of [this.el.hotbar, this.el.invPanel, this.el.chestPanel, this.el.dialog,
+                        document.getElementById("shop-panel")]) {
       zone.addEventListener("mouseenter", () => { this.pointerOver = true; });
       zone.addEventListener("mouseleave", () => { this.pointerOver = false; });
     }
@@ -68,6 +72,8 @@ export class UI {
 
     /* NPC dialog buttons */
     this.dialogNpc = null;
+    this.shopNpc = null;
+    document.getElementById("shop-close").addEventListener("click", () => this.closeShop());
     document.getElementById("dialog-next").addEventListener("click", () => {
       if (this.dialogNpc) this.el.dialogText.textContent = this.dialogNpc.nextTip();
     });
@@ -91,12 +97,23 @@ export class UI {
       setTimeout(() => { e.target.textContent = "💾 Save world"; }, 1500);
     });
     document.getElementById("btn-quit").addEventListener("click", () => game.quitToTitle());
+    document.getElementById("btn-coop-host").addEventListener("click", () => game.hostCoop());
+    document.getElementById("btn-coop-join").addEventListener("click", () =>
+      game.joinCoop(document.getElementById("coop-code").value));
     const vol = document.getElementById("vol-slider");
     vol.value = Math.round((game.settings.volume !== undefined ? game.settings.volume : 0.6) * 100);
     vol.addEventListener("input", () => {
       const v = vol.value / 100;
       game.sfx.setVolume(v);
       game.settings.volume = v;
+      saveSettings(game.settings);
+    });
+    const mus = document.getElementById("music-slider");
+    mus.value = Math.round((game.settings.music !== undefined ? game.settings.music : 0.5) * 100);
+    mus.addEventListener("input", () => {
+      const v = mus.value / 100;
+      game.music && game.music.setVolume(v);
+      game.settings.music = v;
       saveSettings(game.settings);
     });
   }
@@ -240,6 +257,63 @@ export class UI {
     this.dialogNpc = null;
     this.el.dialog.hidden = true;
     this.pointerOver = false;
+  }
+
+  /* -------------------------------------------------------------- co-op */
+  setCoopCode(code) {
+    const box = document.getElementById("coop-code");
+    if (box) box.value = code;
+  }
+
+  /* -------------------------------------------------------------- shop */
+  openShop(npc) {
+    this.shopNpc = npc;
+    document.getElementById("shop-panel").hidden = false;
+    this.paintShop();
+  }
+
+  closeShop() {
+    this.shopNpc = null;
+    document.getElementById("shop-panel").hidden = true;
+    this.pointerOver = false;
+  }
+
+  paintShop() {
+    const inv = this.game.inventory;
+    const list = document.getElementById("shop-list");
+    list.innerHTML = "";
+    for (const offer of MERCHANT_OFFERS) {
+      const can = offer.give.every(([id, n]) => inv.count(id) >= n);
+      const row = document.createElement("div");
+      row.className = "craft-row shop-row" + (can ? "" : " cant");
+      const txt = document.createElement("div");
+      const giveStr = offer.give.map(([id, n]) => `${n} ${ITEMS[id].name}`).join(" + ");
+      txt.innerHTML =
+        `<div class="cr-name">${offer.get[1]} ${ITEMS[offer.get[0]].name}</div>` +
+        `<div class="cr-ing">for ${giveStr}</div>`;
+      const get = document.createElement("div");
+      get.className = "cr-get";
+      const cv = document.createElement("canvas");
+      cv.width = 32; cv.height = 32;
+      cv.getContext("2d").drawImage(getIcon(offer.get[0]), 0, 0);
+      get.appendChild(cv);
+      row.appendChild(txt);
+      row.appendChild(get);
+      row.addEventListener("mousedown", e => {
+        e.stopPropagation();
+        if (!offer.give.every(([id, n]) => inv.count(id) >= n)) return;
+        for (const [id, n] of offer.give) inv.consume(id, n);
+        const left = inv.add(offer.get[0], offer.get[1]);
+        if (left > 0 && this.game.player) {
+          this.game.spawnDrop(this.game.player.cx, this.game.player.cy - 8, offer.get[0], left);
+        }
+        const s = this.game.sfx;
+        if (s) s.craft();
+        this.dirtyInv();
+        this.paintShop();
+      });
+      list.appendChild(row);
+    }
   }
 
   /* ---------------------------------------------------------- boss bar */
@@ -533,6 +607,13 @@ export class UI {
   }
 
   closeChest() {
+    /* co-op: share final chest contents when we're done rummaging */
+    if (this.chest && this.game.net && this.game.net.active) {
+      this.game.net.send({
+        t: "chest", id: this.game.net.id,
+        key: this.chest.key, items: this.chest.items,
+      });
+    }
     this.chest = null;
     this.el.chestPanel.hidden = true;
   }
@@ -619,10 +700,16 @@ export class UI {
     if (input.hit("KeyM")) this.toggleBigMap();
     if (input.hit("Escape")) {
       if (this.bigMapOpen) this.toggleBigMap(false);
+      else if (this.shopNpc) this.closeShop();
       else if (this.dialogNpc) this.closeDialog();
       else if (this.invOpen) this.toggleInventory(false);
     }
     this.updateBossBar();
+
+    /* close the shop when wandering off */
+    if (this.shopNpc && g.player) {
+      if (Math.abs(this.shopNpc.cx - g.player.cx) > TILE * 10) this.closeShop();
+    }
 
     /* minimap refresh */
     this._mapAcc += dt;
@@ -649,6 +736,11 @@ export class UI {
     if (this._statusAcc > 0.25) {
       this._statusAcc = 0;
       this.el.clock.textContent = `Day ${g.dayCount} · ${fmtClock(g.time, DAY_LEN, CYCLE - DAY_LEN)}`;
+      const coop = document.getElementById("hud-coop");
+      if (g.net && g.net.active) {
+        coop.hidden = false;
+        coop.textContent = `🌐 ${g.net.room} · ${g.net.peerCount + 1} troll${g.net.peerCount ? "s" : ""}`;
+      } else if (!coop.hidden) coop.hidden = true;
       if (g.player) {
         const depthTiles = Math.floor(g.player.y / TILE) - SURFACE_BASE;
         this.el.depth.textContent = depthTiles > 4 ? `${depthTiles * 2} ft deep` : "Surface";

@@ -1,4 +1,4 @@
-/* TrollTerra — bootstrap + game loop + world-interaction rules.
+/* Trollrreria — bootstrap + game loop + world-interaction rules.
    Draw order per frame:
      sky -> parallax -> [world transform: tiles -> canopies -> entities ->
      player -> particles -> cracks -> liquids] -> light overlay -> HUD (DOM)
@@ -18,13 +18,17 @@ import { Inventory } from "./inventory.js";
 import { ItemDrop, DamageText, burst, Enemy, Projectile } from "./entities.js";
 import { UI } from "./ui.js";
 import { SFX } from "./audio.js";
-import { TrollKing } from "./boss.js";
-import { GuideTroll } from "./npc.js";
+import { TrollKing, TrollEmperor } from "./boss.js";
+import { GuideTroll, MerchantTroll } from "./npc.js";
+import { findHouseNear } from "./housing.js";
 import {
   saveGame, loadSaveData, applyWorldLayers, clearSave,
   loadSettings, saveSettings,
 } from "./save.js";
-import { rleDecode, b64ToU16 } from "./util.js";
+import { TouchControls } from "./touch.js";
+import { Music } from "./music.js";
+import { rleDecode, b64ToU16, rleEncode, u16ToB64 } from "./util.js";
+import { Net } from "./net.js";
 
 const FIXED_DT = 1 / 60;
 
@@ -54,6 +58,7 @@ class Game {
     this.cam = { x: 0, y: 0 };
     this.lighting = new Lighting();
     this.sfx = new SFX();
+    this.net = new Net(this);
     this._fluidAcc = 0;
     this.fps = 0;
     this._fpsAcc = 0; this._fpsN = 0;
@@ -64,6 +69,7 @@ class Game {
     this._recorded = { blocksMined: 0, bossKills: 0 };
     this.settings = loadSettings();
     this.sfx.setVolume(this.settings.volume !== undefined ? this.settings.volume : 0.6);
+    this.music = new Music(this.sfx, this.settings.music !== undefined ? this.settings.music : 0.5);
 
     /* boot into the last save if there is one, else a fresh world */
     this.saveData = loadSaveData();
@@ -75,15 +81,30 @@ class Game {
     this.ui = new UI(this);
     this.ui.dirtyInv();
     this.ui.showTitle(!!this.saveData);
+    this.touch = new TouchControls(this);
     this.resize();
     window.addEventListener("resize", () => this.resize());
     window.addEventListener("beforeunload", () => {
-      if (this.state === "play" || this.state === "pause") saveGame(this);
+      /* guests never overwrite their own world with the host's */
+      if ((this.state === "play" || this.state === "pause") &&
+          (!this.net.active || this.net.isHost)) saveGame(this);
+      this.net.stop();
     });
 
     this._last = performance.now();
     this._acc = 0;
     requestAnimationFrame(t => this.frame(t));
+
+    /* background tabs freeze rAF; this keeps the clock + co-op alive
+       (intervals still tick ~1/s in background, which is plenty) */
+    setInterval(() => {
+      const now = performance.now();
+      if (now - this._last > 700 && this.state === "play") {
+        this._last = now;
+        this.update(FIXED_DT);
+        this.input.flush();
+      }
+    }, 500);
   }
 
   newWorld(seedStr) {
@@ -160,6 +181,7 @@ class Game {
     saveGame(this);
     this.recordProgress("quit");
     this.state = "title";
+    if (this.music) this.music.setContext("title");
     if (this.ui) {
       this.ui.toggleInventory(false);
       this.ui.showTitle(true);
@@ -181,6 +203,69 @@ class Game {
     }
   }
 
+  /* ============================================================ co-op */
+  packLayersForNet() {
+    const w = this.world;
+    const pack = a => u16ToB64(rleEncode(a));
+    return {
+      tiles: pack(w.tiles), walls: pack(w.walls),
+      liquid: pack(w.liquid), liquidType: pack(w.liquidType),
+      wires: pack(w.wires),
+      trees: w.trees,
+    };
+  }
+
+  /* Guest side: replace the local world with the host's snapshot. */
+  adoptRemoteWorld(m) {
+    this.newWorld(m.seedStr);
+    const w = this.world, n = w.w * w.h;
+    const L = m.layers;
+    w.tiles.set(rleDecode(b64ToU16(L.tiles), n));
+    w.walls.set(rleDecode(b64ToU16(L.walls), n));
+    w.liquid.set(rleDecode(b64ToU16(L.liquid), n));
+    w.liquidType.set(rleDecode(b64ToU16(L.liquidType), n));
+    w.wires.set(rleDecode(b64ToU16(L.wires), n));
+    w.trees = L.trees || [];
+    w.chests = new Map((m.chests || []).map(([k, items]) => [k, { items }]));
+    w.damage.clear();
+    w.dirtyChunks.clear();
+    w.liquidActive.clear();
+    w.sandActive.clear();
+    w.rebuildTopSolid();
+    this.renderer.chunks.clear();
+    this.time = m.time;
+    this.dayCount = m.day;
+    this.trollMoon = !!m.moon;
+    this.flags = Object.assign(this.flags, m.flags);
+    this.spawn = m.spawn || this.spawn;
+    this.player.x = this.spawn.x * TILE + 5;
+    this.player.y = this.spawn.y * TILE - this.player.h;
+    this.cam.x = this.player.cx - this.viewW / 2;
+    this.cam.y = this.player.cy - this.viewH / 2;
+    this.clampCam();
+    this.net.hookWorld();          // re-attach to the fresh world instance
+    if (this.ui) this.ui.dirtyInv();
+    this.enterPlay();
+    this.announce("🌐 Synced with the host — dig together!");
+  }
+
+  async hostCoop() {
+    const code = this.net.makeCode();
+    const ok = await this.net.start(code, true);
+    if (!ok) { this.announce("Co-op unavailable (no transport)"); return; }
+    this.enterPlay();
+    if (this.ui) this.ui.setCoopCode(code);
+  }
+
+  async joinCoop(code) {
+    code = (code || "").trim().toUpperCase();
+    if (code.length < 3) { this.announce("Enter the host's room code first."); return; }
+    const ok = await this.net.start(code, false);
+    if (!ok) { this.announce("Co-op unavailable (no transport)"); return; }
+    if (this.ui) this.ui.setCoopCode(code);
+    /* world arrives from the host via adoptRemoteWorld */
+  }
+
   /* Report session progress to the shared arcade leaderboard (deltas). */
   recordProgress(reason) {
     const lb = window.TrollLeaderboard;
@@ -191,7 +276,7 @@ class Game {
       blocks: Math.max(0, s.blocksMined - this._recorded.blocksMined),
       bossKills: Math.max(0, s.bossKills - this._recorded.bossKills),
     };
-    try { lb.record("trollterra", ev); } catch (e) { /* engine hiccups are non-fatal */ }
+    try { lb.record("trollrreria", ev); } catch (e) { /* engine hiccups are non-fatal */ }
     this._recorded = { blocksMined: s.blocksMined, bossKills: s.bossKills };
   }
 
@@ -261,17 +346,50 @@ class Game {
       this.world.simSand();
     }
 
-    /* autosave + map exploration */
+    /* autosave + map exploration (guests don't save the host's world) */
     this._autosaveAcc += dt;
     if (this._autosaveAcc >= 60) {
       this._autosaveAcc = 0;
-      saveGame(this);
+      if (!this.net.active || this.net.isHost) saveGame(this);
       this.recordProgress("autosave");
     }
+    this.net.update(dt);
     this._exploreAcc += dt;
     if (this._exploreAcc >= 0.4 && this.player && !this.player.dead) {
       this._exploreAcc = 0;
       this.revealAround(this.player.cx, this.player.cy);
+    }
+
+    this.checkPlates();
+
+    /* housing: every 8 s, see if a valid house near the player attracts
+       the Merchant (and re-homes the Guide) */
+    this._houseAcc = (this._houseAcc || 0) + dt;
+    if (this._houseAcc >= 8 && this.player && !this.player.dead) {
+      this._houseAcc = 0;
+      const ptx = Math.floor(this.player.cx / TILE), pty = Math.floor(this.player.cy / TILE);
+      const hasMerchant = this.npcs.some(n => n.shop);
+      if (!hasMerchant || this._guideHomeless !== false) {
+        const house = findHouseNear(this.world, ptx, pty, 50);
+        if (house) {
+          if (!hasMerchant) {
+            this.npcs.push(new MerchantTroll(house.cx, house.cy + 1));
+            this.announce("🧌 A Merchant Troll moved into your house!");
+          }
+          const guide = this.npcs.find(n => !n.shop);
+          if (guide) { guide.homeX = house.cx * TILE; this._guideHomeless = false; }
+        }
+      }
+    }
+
+    /* music follows the situation */
+    if (this.music) {
+      const st2 = skyState(this.time);
+      let ctxName = "day";
+      if (this.enemies.some(e => e.boss && !e.dead)) ctxName = "boss";
+      else if (this.player && this.player.y / TILE > 330) ctxName = "cave";
+      else if (st2.isNight) ctxName = "night";
+      this.music.setContext(ctxName);
     }
 
     if (this.input.hit("F3")) this.debug = !this.debug;
@@ -520,7 +638,12 @@ class Game {
     }
 
     this.inventory.useSelected();
-    world.set(tx, ty, def.tile);
+    /* dart traps face away from the player */
+    let placeId = def.tile;
+    if (def.faces && this.player) {
+      placeId = (tx + 0.5) * TILE >= this.player.cx ? T.DART_R : T.DART_L;
+    }
+    world.set(tx, ty, placeId);
     if (tdef.solid) world.setLiquid(tx, ty, 0);
     if (def.tall === 2) world.set(tx, ty - 1, def.tile);
     if (def.tile === T.CHEST) world.addChest(tx, ty);
@@ -580,12 +703,118 @@ class Game {
       this.ui.openChest(m.tx, m.ty);
       return;
     }
-    /* NPC chat */
+    if (id === T.LEVER) {
+      this.pulseWire(m.tx, m.ty);
+      return;
+    }
+    if (id === T.BED) {
+      this.spawn = { x: m.tx, y: m.ty - 1 };
+      this.floatText(m.tx * TILE + 8, m.ty * TILE - 8, "Spawn set 🛏", "#57bd5c");
+      this.sfx && this.sfx.potion();
+      return;
+    }
+    /* NPC chat / shop */
     for (const n of this.npcs) {
-      if (Math.abs(n.cx - m.x) < 24 && Math.abs(n.cy - m.y) < 30 && this.ui && this.ui.openDialog) {
-        this.ui.openDialog(n);
+      if (Math.abs(n.cx - m.x) < 24 && Math.abs(n.cy - m.y) < 30 && this.ui) {
+        if (n.shop && this.ui.openShop) this.ui.openShop(n);
+        else if (this.ui.openDialog) this.ui.openDialog(n);
         return;
       }
+    }
+  }
+
+  /* ========================================================== wiring */
+  /* Wrench click: lay wire (consumes Wire) or cut existing wire (refund). */
+  wireTick(tx, ty) {
+    const world = this.world;
+    const i = world.idx(tx, ty);
+    if (this._lastWired === i && this.input.mouse.left && !this.input.clicked.left) return;
+    this._lastWired = i;
+    if (world.getWire(tx, ty)) {
+      world.setWire(tx, ty, 0);
+      this.inventory.add("wire", 1);
+      this.sfx && this.sfx.tink(false);
+      this.ui && this.ui.dirtyHud();
+    } else if (this.inventory.count("wire") > 0) {
+      this.inventory.consume("wire", 1);
+      world.setWire(tx, ty, 1);
+      this.sfx && this.sfx.click();
+      this.ui && this.ui.dirtyHud();
+    }
+  }
+
+  /* Pulse a signal from (tx,ty): flood along wires, toggle devices. */
+  pulseWire(tx, ty) {
+    const world = this.world;
+    if (!world.getWire(tx, ty)) {
+      /* a lever with no wire still clunks, so builders get feedback */
+      this.sfx && this.sfx.door();
+      return;
+    }
+    const seen = new Set();
+    const queue = [world.idx(tx, ty)];
+    seen.add(queue[0]);
+    let guard = 0;
+    while (queue.length && guard++ < 400) {
+      const i = queue.pop();
+      const x = i % world.w, y = (i / world.w) | 0;
+      this.activateDevice(x, y);
+      for (const [nx, ny] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]) {
+        if (!world.inBounds(nx, ny) || !world.getWire(nx, ny)) continue;
+        const k = world.idx(nx, ny);
+        if (!seen.has(k)) { seen.add(k); queue.push(k); }
+      }
+    }
+    this.sfx && this.sfx.click();
+  }
+
+  activateDevice(x, y) {
+    const world = this.world;
+    const id = world.get(x, y);
+    switch (id) {
+      case T.TORCH: world.set(x, y, T.TORCH_OFF); break;
+      case T.TORCH_OFF: world.set(x, y, T.TORCH); break;
+      case T.DOOR_C:
+      case T.DOOR_O: {
+        const other = world.get(x, y - 1) === id ? y - 1 : y + 1;
+        const to = id === T.DOOR_C ? T.DOOR_O : T.DOOR_C;
+        world.set(x, y, to);
+        if (world.get(x, other) === id) world.set(x, other, to);
+        break;
+      }
+      case T.DART_L:
+      case T.DART_R: {
+        this._trapCd = this._trapCd || new Map();
+        const i = world.idx(x, y);
+        const now = performance.now();
+        if ((this._trapCd.get(i) || 0) > now) break;
+        this._trapCd.set(i, now + 900);
+        const dir = id === T.DART_L ? -1 : 1;
+        this.entities.push(new Projectile(
+          x * TILE + 8 + dir * 10, y * TILE + 8, dir * 420, 0,
+          { dmg: 15, both: true, kind: "dart", gravity: 0.12, life: 2.5 }
+        ));
+        this.sfx && this.sfx.bow();
+        break;
+      }
+    }
+  }
+
+  /* Pressure plates: anything standing on one fires it (with a cooldown). */
+  checkPlates() {
+    const world = this.world;
+    this._plateCd = this._plateCd || new Map();
+    const now = performance.now();
+    const bodies = [this.player, ...this.enemies, ...this.npcs];
+    for (const b of bodies) {
+      if (!b || b.dead) continue;
+      const tx = Math.floor(b.cx / TILE);
+      const ty = Math.floor((b.y + b.h - 2) / TILE);
+      if (world.get(tx, ty) !== T.PLATE) continue;
+      const i = world.idx(tx, ty);
+      if ((this._plateCd.get(i) || 0) > now) continue;
+      this._plateCd.set(i, now + 800);
+      this.pulseWire(tx, ty);
     }
   }
 
@@ -664,7 +893,9 @@ class Game {
 
       if (flyer) {
         if (world.isSolid(tx, ty) || world.isSolid(tx, ty - 1) || world.isSolid(tx + 1, ty)) continue;
-        this.enemies.push(new Enemy(type, tx * TILE + 8, ty * TILE + d.h));
+        const e = new Enemy(type, tx * TILE + 8, ty * TILE + d.h);
+        if (this.flags.hardmode && Math.random() < 0.4) e.makeElite();
+        this.enemies.push(e);
         return;
       }
       /* grounded: walk down to a floor */
@@ -674,7 +905,9 @@ class Game {
         if (tallOk && world.isSolid(tx, y + 1)) {
           const i = y * world.w + tx;
           if (world.liquid[i] > 3) break;
-          this.enemies.push(new Enemy(type, tx * TILE + 8, (y + 1) * TILE));
+          const e = new Enemy(type, tx * TILE + 8, (y + 1) * TILE);
+          if (this.flags.hardmode && Math.random() < 0.4) e.makeElite();
+          this.enemies.push(e);
           return;
         }
       }
@@ -709,27 +942,60 @@ class Game {
     this.npcs.push(new GuideTroll(this.spawn.x, this.spawn.y + 1));
   }
 
-  /* Use a Troll Totem: wake the king (night only, one at a time). */
-  trySummonBoss() {
+  /* Use a summon item: wake a boss (night only, one at a time). */
+  trySummonBoss(itemId = "trollTotem") {
     const st = skyState(this.time);
     const p = this.player;
     if (!p) return;
     if (this.enemies.some(e => e.boss && !e.dead)) {
-      this.floatText(p.cx, p.y - 12, "He's already awake!", "#ff9500");
+      this.floatText(p.cx, p.y - 12, "One royal at a time!", "#ff9500");
       return;
     }
     if (!st.isNight) {
-      this.floatText(p.cx, p.y - 12, "The Troll King only wakes at night…", "#9a92b8");
+      this.floatText(p.cx, p.y - 12, "Royals only wake at night…", "#9a92b8");
+      return;
+    }
+    if (itemId === "emperorSigil" && !this.flags.hardmode) {
+      this.floatText(p.cx, p.y - 12, "The sigil is silent… defeat the King first.", "#9a92b8");
       return;
     }
     this.inventory.useSelected();
     this.ui && this.ui.dirtyHud();
     this.sfx && this.sfx.summon();
-    this.announce("👑 THE TROLL KING HAS AWOKEN!");
     const side = Math.random() < 0.5 ? -1 : 1;
     const tx = Math.floor(p.cx / TILE) + side * 24;
     const sy = this.world.topSolid[clamp(tx, 0, this.world.w - 1)];
-    this.enemies.push(new TrollKing(tx * TILE + 8, sy * TILE));
+    if (itemId === "emperorSigil") {
+      this.announce("👑👑 THE TROLL EMPEROR DESCENDS!");
+      this.enemies.push(new TrollEmperor(tx * TILE + 8, (sy - 12) * TILE));
+    } else {
+      this.announce("👑 THE TROLL KING HAS AWOKEN!");
+      this.enemies.push(new TrollKing(tx * TILE + 8, sy * TILE));
+    }
+  }
+
+  /* First King kill: the world hardens. Trollium erupts through deep stone. */
+  enterHardmode() {
+    if (this.flags.hardmode) return;
+    this.flags.hardmode = true;
+    const world = this.world;
+    let veins = 0, guard = 0;
+    while (veins < 240 && guard++ < 6000) {
+      let x = 20 + Math.floor(Math.random() * (world.w - 40));
+      let y = 480 + Math.floor(Math.random() * (world.h - 500));
+      let placed = 0;
+      const size = 3 + Math.floor(Math.random() * 5);
+      for (let s = 0; s < size; s++) {
+        if (world.inBounds(x, y) && world.get(x, y) === T.STONE) {
+          world.set(x, y, T.TROLLIUM);
+          placed++;
+        }
+        x += Math.floor(Math.random() * 3) - 1;
+        y += Math.floor(Math.random() * 3) - 1;
+      }
+      if (placed > 0) veins++;
+    }
+    this.announce("⛏ The world hums… TROLLIUM erupts in the deep!");
   }
 
   /* Console/testing helper: spawn an enemy near the player. */
@@ -752,7 +1018,7 @@ class Game {
   announce(text) {
     if (this.player) this.floatText(this.player.cx, this.player.y - 24, text, "#ffb300");
     if (window.TrollNotis && window.TrollNotis.show) {
-      try { window.TrollNotis.show({ platform: "x", summary: "TrollTerra — " + text }); }
+      try { window.TrollNotis.show({ platform: "x", summary: "Trollrreria — " + text }); }
       catch (e) { /* non-fatal */ }
     }
   }
@@ -816,11 +1082,18 @@ class Game {
 
     for (const e of this.npcs) if (e.draw) e.draw(ctx, this);
     for (const e of this.enemies) if (e.draw) e.draw(ctx, this);
+    if (this.net.active) this.net.drawPeers(ctx);
     if (this.player) this.player.draw(ctx, this);
     for (const e of this.entities) if (e.draw) e.draw(ctx, this);
 
     this.renderer.drawCracks(ctx);
     this.renderer.drawLiquids(ctx, cam, this.viewW, this.viewH);
+
+    /* wires show while holding the wrench or wire */
+    const held = this.inventory && this.inventory.selected;
+    if (held && (held.id === "wrench" || held.id === "wire")) {
+      this.renderer.drawWires(ctx, cam, this.viewW, this.viewH);
+    }
 
     /* lighting */
     const st = skyState(this.time);
@@ -877,7 +1150,7 @@ class Game {
 /* ------------------------------------------------------------------ boot */
 function boot() {
   const canvas = document.getElementById("tt-canvas");
-  if (!canvas) { console.error("[trollterra] canvas missing"); return; }
+  if (!canvas) { console.error("[trollrreria] canvas missing"); return; }
   window.TT = new Game(canvas);
 }
 

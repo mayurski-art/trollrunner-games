@@ -4,18 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#0a0616">
-  <meta name="description" content="TrollTerra — dig, build, craft and fight through a procedurally generated troll world. Mine ores, survive the night, wake the Troll King.">
-  <title>TrollTerra | Troll Runner Arcade</title>
+  <meta name="description" content="Trollrreria — dig, build, craft and fight through a procedurally generated troll world. Mine ores, survive the night, wake the Troll King.">
+  <title>Trollrreria | Troll Runner Arcade</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230a0616'/%3E%3Ctext x='6' y='44' font-size='30' font-family='monospace'%3E%F0%9F%A7%8C%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,500;0,700;0,900;1,900&family=DM+Mono:wght@500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/troll-leaderboard.css?v=lb-engine-v1">
-  <link rel="stylesheet" href="assets/games/trollterra/styles.css?v=tt1">
+  <link rel="stylesheet" href="assets/games/trollrreria/styles.css?v=tt1">
 </head>
 <body>
   <div id="tt-root">
-    <canvas id="tt-canvas" aria-label="TrollTerra sandbox world"></canvas>
+    <canvas id="tt-canvas" aria-label="Trollrreria sandbox world"></canvas>
 
     <!-- In-game HUD -->
     <div id="hud" hidden>
@@ -24,6 +24,7 @@
       <div id="hud-status">
         <span id="hud-clock">Day 1 · 08:00</span>
         <span id="hud-depth">Surface</span>
+        <span id="hud-coop" hidden></span>
       </div>
       <div id="hotbar" aria-label="Hotbar"></div>
       <canvas id="minimap" width="220" height="124" aria-label="Minimap"></canvas>
@@ -57,6 +58,13 @@
       <div id="chest-grid"></div>
     </div>
 
+    <!-- Merchant barter shop -->
+    <div id="shop-panel" class="tt-panel" hidden>
+      <h3>Merchant Troll · barter</h3>
+      <div id="shop-list"></div>
+      <button id="shop-close" class="btn-ghost" type="button">Close</button>
+    </div>
+
     <!-- Full map -->
     <canvas id="bigmap" hidden></canvas>
 
@@ -79,12 +87,18 @@
     <section id="screen-title" class="screen" hidden>
       <div class="menu-panel">
         <div class="logo">
-          <span class="logo-troll">🧌 TROLLTERRA</span>
+          <span class="logo-troll">🧌 TROLLRRERIA</span>
           <span class="logo-sub">dig · build · troll</span>
         </div>
         <div class="dialog-actions">
           <button id="btn-continue" class="btn-primary" type="button" hidden>▶ Continue</button>
           <button id="btn-new" class="btn-secondary" type="button">✚ New world</button>
+          <div class="coop-row">
+            <button id="btn-coop-host" class="btn-secondary" type="button">🌐 Host co-op</button>
+            <input id="coop-code" maxlength="5" placeholder="CODE" autocomplete="off"
+                   aria-label="Co-op room code">
+            <button id="btn-coop-join" class="btn-secondary" type="button">Join</button>
+          </div>
           <button id="btn-title-lb" class="btn-ghost" type="button">Leaderboard</button>
         </div>
         <div class="menu-controls">
@@ -103,7 +117,8 @@
         <div class="dialog-actions">
           <button id="btn-resume" class="btn-primary" type="button">▶ Resume</button>
           <button id="btn-save" class="btn-secondary" type="button">💾 Save world</button>
-          <label class="vol-row">Volume <input id="vol-slider" type="range" min="0" max="100" value="60"></label>
+          <label class="vol-row">SFX <input id="vol-slider" type="range" min="0" max="100" value="60"></label>
+          <label class="vol-row">Music <input id="music-slider" type="range" min="0" max="100" value="50"></label>
           <button id="btn-quit" class="btn-ghost" type="button">Save &amp; quit to title</button>
         </div>
       </div>
@@ -130,9 +145,10 @@
     </section>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
   <script src="assets/js/troll-leaderboard.js?v=lb-engine-v1" defer></script>
-  <script src="assets/games/trollterra/leaderboard.js?v=tt1" defer></script>
-  <script type="module" src="assets/games/trollterra/src/main.js?v=tt1"></script>
+  <script src="assets/games/trollrreria/leaderboard.js?v=tt1" defer></script>
+  <script type="module" src="assets/games/trollrreria/src/main.js?v=tt1"></script>
   <script src="https://mayurski-art.github.io/assets/js/troll-notis.js" defer></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-/* TrollTerra — keyboard + mouse state. */
+/* Trollrreria — keyboard + mouse state. */
 
 export class Input {
   constructor(canvas) {
@@ -11,6 +11,8 @@ export class Input {
 
     window.addEventListener("keydown", e => {
       if (!this.enabled) return;
+      /* don't steal keys from text fields (co-op room code, etc.) */
+      if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;
       if (!this.keys.has(e.code)) this.pressed.add(e.code);
       this.keys.add(e.code);
       /* keep the page from scrolling / triggering browser shortcuts */

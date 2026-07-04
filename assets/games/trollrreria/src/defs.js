@@ -1,4 +1,4 @@
-/* TrollTerra — game data: constants, tiles, walls, items, recipes, enemies.
+/* Trollrreria — game data: constants, tiles, walls, items, recipes, enemies.
    Everything here is plain data; systems live in the other modules. */
 
 /* ---------------------------------------------------------------- constants */
@@ -17,8 +17,8 @@ export const PLAYER_W = 22;           // hitbox world px
 export const PLAYER_H = 44;
 export const REACH = 6.5;             // tiles
 
-export const SAVE_KEY = "trollterra:world1";
-export const SETTINGS_KEY = "trollterra:settings";
+export const SAVE_KEY = "trollrreria:world1";
+export const SETTINGS_KEY = "trollrreria:settings";
 
 /* ------------------------------------------------------------------- tiles */
 export const T = {
@@ -26,7 +26,10 @@ export const T = {
   STONE_BRICK: 7, GLASS: 8, TREE: 9, COPPER: 10, IRON: 11, SILVER: 12,
   GOLD: 13, TORCH: 14, WORKBENCH: 15, FURNACE: 16, ANVIL: 17, CHEST: 18,
   DOOR_C: 19, DOOR_O: 20, PLATFORM: 21, HEART: 22, SHROOM: 23,
-  BEDROCK: 24, OBSIDIAN: 25, PLANT: 26,
+  BEDROCK: 24, OBSIDIAN: 25, PLANT: 26, BED: 27,
+  LEVER: 28, PLATE: 29, DART_L: 30, DART_R: 31, TORCH_OFF: 32,
+  TROLLIUM: 33,
+  /* wires live on their own layer, not in T */
 };
 
 /* pal: [dark, mid, light] used by the procedural texture atlas.
@@ -60,6 +63,14 @@ TILES[T.SHROOM]   = { name: "Glowshroom", solid: false, hp: 5, pow: 0, tool: "pi
 TILES[T.BEDROCK]  = { name: "Trollrock", solid: true, hp: Infinity, pow: 999, tool: "pick", drop: null, pal: ["#26282e", "#33363e", "#41454f"] };
 TILES[T.OBSIDIAN] = { name: "Obsidian", solid: true, hp: 260, pow: 60, tool: "pick", drop: "obsidian", pal: ["#231d33", "#352c4d", "#4a3e6b"] };
 TILES[T.PLANT]    = { name: "Plant", solid: false, hp: 1, pow: 0, tool: "pick", drop: null, noVariant: true };
+TILES[T.BED]      = { name: "Troll cot", solid: false, hp: 70, pow: 0, tool: "pick", drop: "bed", noVariant: true };
+TILES[T.LEVER]    = { name: "Lever", solid: false, hp: 40, pow: 0, tool: "pick", drop: "lever", noVariant: true };
+TILES[T.PLATE]    = { name: "Pressure plate", solid: false, hp: 40, pow: 0, tool: "pick", drop: "plate", noVariant: true };
+TILES[T.DART_L]   = { name: "Dart trap", solid: true, hp: 160, pow: 0, tool: "pick", drop: "dartTrap", noVariant: true };
+TILES[T.DART_R]   = { name: "Dart trap", solid: true, hp: 160, pow: 0, tool: "pick", drop: "dartTrap", noVariant: true };
+TILES[T.TORCH_OFF] = { name: "Torch (out)", solid: false, hp: 5, pow: 0, tool: "pick", drop: "torch", noVariant: true };
+TILES[T.TROLLIUM] = { name: "Trollium ore", solid: true, hp: 300, pow: 80, tool: "pick", drop: "trolliumOre", ore: "#57e87a", light: 30, pal: ["#565a63", "#6e737d", "#848a94"] };
+TILES[T.TROLLIUM] = { name: "Trollium ore", solid: true, hp: 300, pow: 80, tool: "pick", drop: "trolliumOre", ore: "#57e87a", light: 30, pal: ["#565a63", "#6e737d", "#848a94"] };
 
 /* ------------------------------------------------------------------- walls */
 export const W = { NONE: 0, DIRT: 1, STONE: 2, WOOD: 3, STONE_BRICK: 4 };
@@ -92,6 +103,12 @@ export const ITEMS = {
   anvil:       { name: "Anvil", type: "block", tile: T.ANVIL, max: 99, needsFloor: true },
   chest:       { name: "Chest", type: "block", tile: T.CHEST, max: 99, needsFloor: true },
   door:        { name: "Door", type: "block", tile: T.DOOR_C, max: 99, tall: 2, needsFloor: true },
+  bed:         { name: "Troll cot", type: "block", tile: T.BED, max: 99, needsFloor: true, desc: "Right-click to set your spawn." },
+  lever:       { name: "Lever", type: "block", tile: T.LEVER, max: 99, needsSupport: true, desc: "Right-click to pulse connected wires." },
+  plate:       { name: "Pressure plate", type: "block", tile: T.PLATE, max: 99, needsFloor: true, desc: "Pulses wires when stepped on." },
+  dartTrap:    { name: "Dart trap", type: "block", tile: T.DART_L, max: 99, faces: true, desc: "Fires darts when pulsed. Darts hurt everyone." },
+  wrench:      { name: "Wrench", type: "tool", tool: "wrench", power: 0, speed: 6, dmg: 3, desc: "Lays wire (LMB) — needs Wire in your bag. Click a wired tile to cut." },
+  wire:        { name: "Wire", type: "material", max: 999 },
   platform:    { name: "Platform", type: "block", tile: T.PLATFORM, max: 999 },
   /* walls */
   woodWall:       { name: "Wood wall", type: "wall", wall: W.WOOD, max: 999 },
@@ -105,6 +122,8 @@ export const ITEMS = {
   ironBar:    { name: "Iron bar", type: "material", max: 999 },
   silverBar:  { name: "Silver bar", type: "material", max: 999 },
   goldBar:    { name: "Gold bar", type: "material", max: 999 },
+  trolliumOre: { name: "Trollium ore", type: "material", max: 999 },
+  trolliumBar: { name: "Trollium bar", type: "material", max: 999 },
   gel:        { name: "Troll gel", type: "material", max: 999 },
   lens:       { name: "Eyeball lens", type: "material", max: 999 },
   bone:       { name: "Troll bone", type: "material", max: 999 },
@@ -115,6 +134,7 @@ export const ITEMS = {
   ironPick:   { name: "Iron pick", type: "tool", tool: "pick", power: 55, speed: 4.2, dmg: 7 },
   silverPick: { name: "Silver pick", type: "tool", tool: "pick", power: 65, speed: 4.6, dmg: 8 },
   goldPick:   { name: "Golden pick", type: "tool", tool: "pick", power: 80, speed: 5.2, dmg: 10 },
+  trolliumPick: { name: "Trollium pick", type: "tool", tool: "pick", power: 100, speed: 6, dmg: 14 },
   woodAxe:    { name: "Wooden axe", type: "tool", tool: "axe", power: 40, speed: 3.0, dmg: 6 },
   copperAxe:  { name: "Copper axe", type: "tool", tool: "axe", power: 55, speed: 3.4, dmg: 8 },
   ironAxe:    { name: "Iron axe", type: "tool", tool: "axe", power: 70, speed: 3.8, dmg: 10 },
@@ -128,6 +148,9 @@ export const ITEMS = {
   silverSword: { name: "Silver sword", type: "weapon", dmg: 23, knock: 250, speed: 4.2, arc: 1.1 },
   goldSword:   { name: "Golden sword", type: "weapon", dmg: 29, knock: 270, speed: 4.4, arc: 1.15 },
   trollBlade:  { name: "Troll Blade", type: "weapon", dmg: 39, knock: 340, speed: 4.2, arc: 1.5, rare: true },
+  trolliumSword: { name: "Trollium sword", type: "weapon", dmg: 48, knock: 300, speed: 4.4, arc: 1.3 },
+  emperorEdge: { name: "Emperor's Edge", type: "weapon", dmg: 62, knock: 380, speed: 4.4, arc: 1.7, rare: true },
+  trolliumBow: { name: "Trollium bow", type: "bow", dmg: 24, speed: 3.6 },
   woodBow:     { name: "Wooden bow", type: "bow", dmg: 9, speed: 2.6 },
   goldBow:     { name: "Golden bow", type: "bow", dmg: 17, speed: 3.2 },
   arrow:       { name: "Arrow", type: "ammo", dmg: 5, max: 999 },
@@ -142,9 +165,13 @@ export const ITEMS = {
   goldHelm:    { name: "Golden helmet", type: "armor", slot: "head", def: 3 },
   goldChest:   { name: "Golden chestplate", type: "armor", slot: "chest", def: 4 },
   goldLegs:    { name: "Golden greaves", type: "armor", slot: "legs", def: 3 },
+  trolliumHelm:  { name: "Trollium helmet", type: "armor", slot: "head", def: 4 },
+  trolliumChest: { name: "Trollium chestplate", type: "armor", slot: "chest", def: 6 },
+  trolliumLegs:  { name: "Trollium greaves", type: "armor", slot: "legs", def: 5 },
   /* consumables + special */
   trollBrew:   { name: "Troll brew", type: "potion", heal: 50, max: 30 },
   trollTotem:  { name: "Troll totem", type: "summon", max: 5, desc: "Wakes the Troll King. Use at night." },
+  emperorSigil: { name: "Emperor sigil", type: "summon", max: 5, desc: "Calls the Troll Emperor. Hardmode, night, regrets." },
 };
 for (const id in ITEMS) { ITEMS[id].id = id; if (!ITEMS[id].max) ITEMS[id].max = 1; }
 
@@ -162,6 +189,7 @@ export const RECIPES = [
   { out: "arrow", n: 5, ing: [["wood", 1], ["stone", 1]], station: "workbench" },
   { out: "flameArrow", n: 5, ing: [["arrow", 5], ["torch", 1]], station: "workbench" },
   { out: "door", n: 1, ing: [["wood", 6]], station: "workbench" },
+  { out: "bed", n: 1, ing: [["wood", 15], ["gel", 5]], station: "workbench" },
   { out: "chest", n: 1, ing: [["wood", 8], ["copperBar", 2]], station: "workbench" },
   { out: "woodWall", n: 4, ing: [["wood", 1]], station: "workbench" },
   { out: "stoneBrickWall", n: 4, ing: [["stoneBrick", 1]], station: "workbench" },
@@ -197,6 +225,19 @@ export const RECIPES = [
   { out: "goldChest", n: 1, ing: [["goldBar", 15]], station: "anvil" },
   { out: "goldLegs", n: 1, ing: [["goldBar", 12]], station: "anvil" },
   { out: "trollTotem", n: 1, ing: [["lens", 6], ["goldBar", 5]], station: "anvil" },
+  { out: "trolliumBar", n: 1, ing: [["trolliumOre", 4]], station: "furnace" },
+  { out: "trolliumPick", n: 1, ing: [["trolliumBar", 10], ["wood", 4]], station: "anvil" },
+  { out: "trolliumSword", n: 1, ing: [["trolliumBar", 8]], station: "anvil" },
+  { out: "trolliumBow", n: 1, ing: [["trolliumBar", 9]], station: "anvil" },
+  { out: "trolliumHelm", n: 1, ing: [["trolliumBar", 12]], station: "anvil" },
+  { out: "trolliumChest", n: 1, ing: [["trolliumBar", 18]], station: "anvil" },
+  { out: "trolliumLegs", n: 1, ing: [["trolliumBar", 14]], station: "anvil" },
+  { out: "emperorSigil", n: 1, ing: [["trolliumBar", 8], ["bone", 10], ["lens", 4]], station: "anvil" },
+  { out: "wrench", n: 1, ing: [["ironBar", 6]], station: "anvil" },
+  { out: "wire", n: 4, ing: [["copperBar", 1]], station: "anvil" },
+  { out: "lever", n: 1, ing: [["stone", 3], ["ironBar", 1]], station: "workbench" },
+  { out: "plate", n: 1, ing: [["stone", 2], ["copperBar", 1]], station: "workbench" },
+  { out: "dartTrap", n: 1, ing: [["stone", 10], ["copperBar", 3]], station: "workbench" },
 ];
 
 /* ----------------------------------------------------------------- enemies */
@@ -211,13 +252,28 @@ export const ENEMIES = {
   slimeKing:  { name: "Kingling slime", ai: "slime", hp: 30, dmg: 12, def: 3, w: 26, h: 18, color: "#e8b23c", drops: [["gel", 1, 2, 1]], kb: 0.9, noNatural: true },
 };
 
-/* Boss stats live in entities.js (TrollKing class); these are shared knobs. */
+/* Boss knobs (classes live in boss.js). */
 export const BOSS = {
   hp: 2600, contactDmg: 26, def: 10, tearDmg: 16,
   drops: [["trollBlade", 1, 1, 1], ["goldBar", 15, 25, 1]],
 };
+export const BOSS2 = {
+  hp: 5200, contactDmg: 38, def: 18, tearDmg: 24,
+  drops: [["emperorEdge", 1, 1, 1], ["trolliumBar", 10, 16, 1]],
+};
 
 export const STATION_SCAN = 8;  // tiles radius for crafting-station detection
+
+/* Merchant Troll barter offers: give -> get (no currency, pure hustle). */
+export const MERCHANT_OFFERS = [
+  { give: [["wood", 10]], get: ["arrow", 15] },
+  { give: [["gel", 3]], get: ["trollBrew", 1] },
+  { give: [["mushroom", 8]], get: ["trollBrew", 3] },
+  { give: [["sand", 20]], get: ["glass", 10] },
+  { give: [["bone", 5]], get: ["silverBar", 1] },
+  { give: [["lens", 3]], get: ["goldBar", 2] },
+  { give: [["ironBar", 1]], get: ["flameArrow", 20] },
+];
 
 /* Starter kit (fresh worlds). */
 export const STARTER_ITEMS = [
