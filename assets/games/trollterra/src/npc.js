@@ -28,6 +28,7 @@ export class GuideTroll extends Entity {
   constructor(tx, ty) {
     super(tx * TILE + 2, ty * TILE - 46, 22, 46);
     this.name = "Guide Troll";
+    this.tint = "hue-rotate(105deg) saturate(0.8) brightness(0.96)";
     this.homeX = this.x;
     this.dir = 1;
     this.walkT = 0;
@@ -98,8 +99,8 @@ export class GuideTroll extends Entity {
     const a = this.rig[anim];
     const feetX = this.cx, feetY = this.y + this.h;
     ctx.save();
-    /* hue-shift: our guide is a mossy sage, not a gladiator */
-    ctx.filter = "hue-rotate(105deg) saturate(0.8) brightness(0.96)";
+    /* hue-shift so each troll reads as his own troll */
+    ctx.filter = this.tint;
     if (a) {
       const fi = Math.floor(this.animTime * a.fps) % a.frames;
       const scale = BODY_H / 96;      // gladiator content is ~96px tall in a 136 cell
@@ -118,6 +119,24 @@ export class GuideTroll extends Entity {
     /* tiny "!" so players notice him */
     ctx.fillStyle = "#ffb300";
     ctx.font = "bold 10px 'DM Mono', monospace";
-    ctx.fillText("?", feetX - 2, this.y - 8 + Math.sin(this.animTime * 3) * 2);
+    ctx.fillText(this.shop ? "$" : "?", feetX - 2, this.y - 8 + Math.sin(this.animTime * 3) * 2);
+  }
+}
+
+/* The Merchant: moves into the first valid house and barters — no coins,
+   just an economy of vibes and troll gel. */
+export class MerchantTroll extends GuideTroll {
+  constructor(tx, ty) {
+    super(tx, ty);
+    this.name = "Merchant Troll";
+    this.shop = true;
+    this.tint = "hue-rotate(-40deg) saturate(1.35) brightness(1.05)";
+    this.tips = [
+      "Everything's for trade. Bring materials, leave happy. Probably.",
+      "Gel for brews, lenses for gold. The market has spoken.",
+      "I once sold a rock to a zombie. Great customer. No complaints.",
+      "Nice house. Would be a shame if someone... moved in. Oh wait, I did.",
+    ];
+    this.tipIdx = 0;
   }
 }

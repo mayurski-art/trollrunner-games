@@ -101,6 +101,11 @@ function drawFurniture(g, id) {
   } else if (id === "platform") {
     g.fillStyle = "#7a5a33"; g.fillRect(3, 13, 26, 6);
     g.fillStyle = "#5d4326"; g.fillRect(3, 17, 26, 2);
+  } else if (id === "bed") {
+    g.fillStyle = "#5d4326"; g.fillRect(4, 22, 3, 6); g.fillRect(25, 22, 3, 6);
+    g.fillStyle = "#8a5a2b"; g.fillRect(3, 19, 26, 4);
+    g.fillStyle = "#c23a60"; g.fillRect(4, 13, 24, 7);
+    g.fillStyle = "#f2f8fd"; g.fillRect(4, 11, 9, 6);
   }
 }
 

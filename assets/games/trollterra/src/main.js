@@ -19,7 +19,8 @@ import { ItemDrop, DamageText, burst, Enemy, Projectile } from "./entities.js";
 import { UI } from "./ui.js";
 import { SFX } from "./audio.js";
 import { TrollKing } from "./boss.js";
-import { GuideTroll } from "./npc.js";
+import { GuideTroll, MerchantTroll } from "./npc.js";
+import { findHouseNear } from "./housing.js";
 import {
   saveGame, loadSaveData, applyWorldLayers, clearSave,
   loadSettings, saveSettings,
@@ -277,6 +278,26 @@ class Game {
     if (this._exploreAcc >= 0.4 && this.player && !this.player.dead) {
       this._exploreAcc = 0;
       this.revealAround(this.player.cx, this.player.cy);
+    }
+
+    /* housing: every 8 s, see if a valid house near the player attracts
+       the Merchant (and re-homes the Guide) */
+    this._houseAcc = (this._houseAcc || 0) + dt;
+    if (this._houseAcc >= 8 && this.player && !this.player.dead) {
+      this._houseAcc = 0;
+      const ptx = Math.floor(this.player.cx / TILE), pty = Math.floor(this.player.cy / TILE);
+      const hasMerchant = this.npcs.some(n => n.shop);
+      if (!hasMerchant || this._guideHomeless !== false) {
+        const house = findHouseNear(this.world, ptx, pty, 50);
+        if (house) {
+          if (!hasMerchant) {
+            this.npcs.push(new MerchantTroll(house.cx, house.cy + 1));
+            this.announce("🧌 A Merchant Troll moved into your house!");
+          }
+          const guide = this.npcs.find(n => !n.shop);
+          if (guide) { guide.homeX = house.cx * TILE; this._guideHomeless = false; }
+        }
+      }
     }
 
     /* music follows the situation */
@@ -595,10 +616,17 @@ class Game {
       this.ui.openChest(m.tx, m.ty);
       return;
     }
-    /* NPC chat */
+    if (id === T.BED) {
+      this.spawn = { x: m.tx, y: m.ty - 1 };
+      this.floatText(m.tx * TILE + 8, m.ty * TILE - 8, "Spawn set 🛏", "#57bd5c");
+      this.sfx && this.sfx.potion();
+      return;
+    }
+    /* NPC chat / shop */
     for (const n of this.npcs) {
-      if (Math.abs(n.cx - m.x) < 24 && Math.abs(n.cy - m.y) < 30 && this.ui && this.ui.openDialog) {
-        this.ui.openDialog(n);
+      if (Math.abs(n.cx - m.x) < 24 && Math.abs(n.cy - m.y) < 30 && this.ui) {
+        if (n.shop && this.ui.openShop) this.ui.openShop(n);
+        else if (this.ui.openDialog) this.ui.openDialog(n);
         return;
       }
     }

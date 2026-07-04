@@ -272,6 +272,14 @@ export class Renderer {
         g.fillStyle = "#c7f08a"; g.fillRect(px + 6, py + 7, 2, 2);
         break;
       }
+      case T.BED: {
+        g.fillStyle = "#5d4326";
+        g.fillRect(px, py + 12, 2, 4); g.fillRect(px + 14, py + 12, 2, 4);
+        g.fillStyle = "#8a5a2b"; g.fillRect(px, py + 10, TILE, 3);
+        g.fillStyle = "#c23a60"; g.fillRect(px + 1, py + 7, 14, 4);
+        g.fillStyle = "#f2f8fd"; g.fillRect(px + 1, py + 6, 5, 3);
+        break;
+      }
       case T.PLANT: {
         g.fillStyle = "#4faf54";
         const h1 = 4 + Math.floor(hash2(wx, wy, 3) * 6);

@@ -1,7 +1,10 @@
 /* TrollTerra — DOM UI layer: HUD (hearts, breath, hotbar, clock/depth),
    inventory + crafting panel, chest panel, tooltips, drag & drop. */
 
-import { ITEMS, TILES, T, DAY_LEN, CYCLE, TILE, STATION_SCAN, WORLD_W, WORLD_H } from "./defs.js";
+import {
+  ITEMS, TILES, T, DAY_LEN, CYCLE, TILE, STATION_SCAN, WORLD_W, WORLD_H,
+  MERCHANT_OFFERS,
+} from "./defs.js";
 import { getIcon } from "./icons.js";
 import { fmtClock } from "./util.js";
 import { SURFACE_BASE } from "./worldgen.js";
@@ -56,7 +59,8 @@ export class UI {
     this.buildInventory();
     this.el.hud.hidden = false;
 
-    for (const zone of [this.el.hotbar, this.el.invPanel, this.el.chestPanel, this.el.dialog]) {
+    for (const zone of [this.el.hotbar, this.el.invPanel, this.el.chestPanel, this.el.dialog,
+                        document.getElementById("shop-panel")]) {
       zone.addEventListener("mouseenter", () => { this.pointerOver = true; });
       zone.addEventListener("mouseleave", () => { this.pointerOver = false; });
     }
@@ -68,6 +72,8 @@ export class UI {
 
     /* NPC dialog buttons */
     this.dialogNpc = null;
+    this.shopNpc = null;
+    document.getElementById("shop-close").addEventListener("click", () => this.closeShop());
     document.getElementById("dialog-next").addEventListener("click", () => {
       if (this.dialogNpc) this.el.dialogText.textContent = this.dialogNpc.nextTip();
     });
@@ -248,6 +254,57 @@ export class UI {
     this.dialogNpc = null;
     this.el.dialog.hidden = true;
     this.pointerOver = false;
+  }
+
+  /* -------------------------------------------------------------- shop */
+  openShop(npc) {
+    this.shopNpc = npc;
+    document.getElementById("shop-panel").hidden = false;
+    this.paintShop();
+  }
+
+  closeShop() {
+    this.shopNpc = null;
+    document.getElementById("shop-panel").hidden = true;
+    this.pointerOver = false;
+  }
+
+  paintShop() {
+    const inv = this.game.inventory;
+    const list = document.getElementById("shop-list");
+    list.innerHTML = "";
+    for (const offer of MERCHANT_OFFERS) {
+      const can = offer.give.every(([id, n]) => inv.count(id) >= n);
+      const row = document.createElement("div");
+      row.className = "craft-row shop-row" + (can ? "" : " cant");
+      const txt = document.createElement("div");
+      const giveStr = offer.give.map(([id, n]) => `${n} ${ITEMS[id].name}`).join(" + ");
+      txt.innerHTML =
+        `<div class="cr-name">${offer.get[1]} ${ITEMS[offer.get[0]].name}</div>` +
+        `<div class="cr-ing">for ${giveStr}</div>`;
+      const get = document.createElement("div");
+      get.className = "cr-get";
+      const cv = document.createElement("canvas");
+      cv.width = 32; cv.height = 32;
+      cv.getContext("2d").drawImage(getIcon(offer.get[0]), 0, 0);
+      get.appendChild(cv);
+      row.appendChild(txt);
+      row.appendChild(get);
+      row.addEventListener("mousedown", e => {
+        e.stopPropagation();
+        if (!offer.give.every(([id, n]) => inv.count(id) >= n)) return;
+        for (const [id, n] of offer.give) inv.consume(id, n);
+        const left = inv.add(offer.get[0], offer.get[1]);
+        if (left > 0 && this.game.player) {
+          this.game.spawnDrop(this.game.player.cx, this.game.player.cy - 8, offer.get[0], left);
+        }
+        const s = this.game.sfx;
+        if (s) s.craft();
+        this.dirtyInv();
+        this.paintShop();
+      });
+      list.appendChild(row);
+    }
   }
 
   /* ---------------------------------------------------------- boss bar */
@@ -627,10 +684,16 @@ export class UI {
     if (input.hit("KeyM")) this.toggleBigMap();
     if (input.hit("Escape")) {
       if (this.bigMapOpen) this.toggleBigMap(false);
+      else if (this.shopNpc) this.closeShop();
       else if (this.dialogNpc) this.closeDialog();
       else if (this.invOpen) this.toggleInventory(false);
     }
     this.updateBossBar();
+
+    /* close the shop when wandering off */
+    if (this.shopNpc && g.player) {
+      if (Math.abs(this.shopNpc.cx - g.player.cx) > TILE * 10) this.closeShop();
+    }
 
     /* minimap refresh */
     this._mapAcc += dt;

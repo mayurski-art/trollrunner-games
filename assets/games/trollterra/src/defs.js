@@ -26,7 +26,8 @@ export const T = {
   STONE_BRICK: 7, GLASS: 8, TREE: 9, COPPER: 10, IRON: 11, SILVER: 12,
   GOLD: 13, TORCH: 14, WORKBENCH: 15, FURNACE: 16, ANVIL: 17, CHEST: 18,
   DOOR_C: 19, DOOR_O: 20, PLATFORM: 21, HEART: 22, SHROOM: 23,
-  BEDROCK: 24, OBSIDIAN: 25, PLANT: 26,
+  BEDROCK: 24, OBSIDIAN: 25, PLANT: 26, BED: 27,
+  WIRE: 0, /* wires live on their own layer, not in T */
 };
 
 /* pal: [dark, mid, light] used by the procedural texture atlas.
@@ -60,6 +61,7 @@ TILES[T.SHROOM]   = { name: "Glowshroom", solid: false, hp: 5, pow: 0, tool: "pi
 TILES[T.BEDROCK]  = { name: "Trollrock", solid: true, hp: Infinity, pow: 999, tool: "pick", drop: null, pal: ["#26282e", "#33363e", "#41454f"] };
 TILES[T.OBSIDIAN] = { name: "Obsidian", solid: true, hp: 260, pow: 60, tool: "pick", drop: "obsidian", pal: ["#231d33", "#352c4d", "#4a3e6b"] };
 TILES[T.PLANT]    = { name: "Plant", solid: false, hp: 1, pow: 0, tool: "pick", drop: null, noVariant: true };
+TILES[T.BED]      = { name: "Troll cot", solid: false, hp: 70, pow: 0, tool: "pick", drop: "bed", noVariant: true };
 
 /* ------------------------------------------------------------------- walls */
 export const W = { NONE: 0, DIRT: 1, STONE: 2, WOOD: 3, STONE_BRICK: 4 };
@@ -92,6 +94,7 @@ export const ITEMS = {
   anvil:       { name: "Anvil", type: "block", tile: T.ANVIL, max: 99, needsFloor: true },
   chest:       { name: "Chest", type: "block", tile: T.CHEST, max: 99, needsFloor: true },
   door:        { name: "Door", type: "block", tile: T.DOOR_C, max: 99, tall: 2, needsFloor: true },
+  bed:         { name: "Troll cot", type: "block", tile: T.BED, max: 99, needsFloor: true, desc: "Right-click to set your spawn." },
   platform:    { name: "Platform", type: "block", tile: T.PLATFORM, max: 999 },
   /* walls */
   woodWall:       { name: "Wood wall", type: "wall", wall: W.WOOD, max: 999 },
@@ -162,6 +165,7 @@ export const RECIPES = [
   { out: "arrow", n: 5, ing: [["wood", 1], ["stone", 1]], station: "workbench" },
   { out: "flameArrow", n: 5, ing: [["arrow", 5], ["torch", 1]], station: "workbench" },
   { out: "door", n: 1, ing: [["wood", 6]], station: "workbench" },
+  { out: "bed", n: 1, ing: [["wood", 15], ["gel", 5]], station: "workbench" },
   { out: "chest", n: 1, ing: [["wood", 8], ["copperBar", 2]], station: "workbench" },
   { out: "woodWall", n: 4, ing: [["wood", 1]], station: "workbench" },
   { out: "stoneBrickWall", n: 4, ing: [["stoneBrick", 1]], station: "workbench" },
@@ -218,6 +222,17 @@ export const BOSS = {
 };
 
 export const STATION_SCAN = 8;  // tiles radius for crafting-station detection
+
+/* Merchant Troll barter offers: give -> get (no currency, pure hustle). */
+export const MERCHANT_OFFERS = [
+  { give: [["wood", 10]], get: ["arrow", 15] },
+  { give: [["gel", 3]], get: ["trollBrew", 1] },
+  { give: [["mushroom", 8]], get: ["trollBrew", 3] },
+  { give: [["sand", 20]], get: ["glass", 10] },
+  { give: [["bone", 5]], get: ["silverBar", 1] },
+  { give: [["lens", 3]], get: ["goldBar", 2] },
+  { give: [["ironBar", 1]], get: ["flameArrow", 20] },
+];
 
 /* Starter kit (fresh worlds). */
 export const STARTER_ITEMS = [
