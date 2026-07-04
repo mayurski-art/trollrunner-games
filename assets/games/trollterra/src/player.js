@@ -193,6 +193,8 @@ export class Player extends Entity {
     const sel = game.inventory.selected;
     const m = game.mouseWorld();
     const inReach = this.tileInReach(m.tx, m.ty);
+    /* face the cursor while using anything (so swings hit either side) */
+    this.dir = m.x >= this.cx ? 1 : -1;
 
     if (!sel) {
       /* bare fists: punch-mine soft tiles slowly */

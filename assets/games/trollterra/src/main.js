@@ -5,17 +5,17 @@
 */
 
 import {
-  T, TILES, W, ITEMS, TILE, ZOOM, CYCLE, DAY_LEN, WORLD_W, REACH,
+  T, TILES, W, ITEMS, ENEMIES, TILE, ZOOM, CYCLE, DAY_LEN, WORLD_W, REACH,
   STATION_SCAN, STARTER_ITEMS,
 } from "./defs.js";
-import { hashStr, clamp, lerp, fmtClock } from "./util.js";
+import { hashStr, clamp, lerp, fmtClock, aabb } from "./util.js";
 import { generateWorld, biomeAt } from "./worldgen.js";
 import { Renderer, skyState } from "./render.js";
 import { Lighting } from "./lighting.js";
 import { Input } from "./input.js";
 import { Player } from "./player.js";
 import { Inventory } from "./inventory.js";
-import { ItemDrop, DamageText, burst } from "./entities.js";
+import { ItemDrop, DamageText, burst, Enemy, Projectile } from "./entities.js";
 import { UI } from "./ui.js";
 
 const FIXED_DT = 1 / 60;
@@ -109,13 +109,21 @@ class Game {
     if (this.state !== "play") return;
 
     /* time of day */
+    const prevTime = this.time;
     this.time += dt;
     if (this.time >= CYCLE) {
       this.time -= CYCLE;
       this.dayCount++;
       this.trollMoon = false;
+    } else if (prevTime < DAY_LEN && this.time >= DAY_LEN) {
+      /* nightfall: occasionally the Troll Moon rises */
+      if (this.dayCount >= 2 && Math.random() < 0.15) {
+        this.trollMoon = true;
+        this.announce("🧌 The Troll Moon rises… problem?");
+      }
     }
     this.stats.playSec += dt;
+    this.updateSpawns(dt);
 
     if (this.input.hit("F3")) this.debug = !this.debug;
     if (this.input.hit("F4")) this.freeCam = !this.freeCam;
@@ -426,6 +434,138 @@ class Game {
         this.ui.openDialog(n);
         return;
       }
+    }
+  }
+
+  /* ========================================================== combat */
+  /* Melee swing: hitbox in front of the player. */
+  meleeSwing(def) {
+    const p = this.player;
+    if (!p) return;
+    const reach = 46 * (def.arc || 1);
+    const box = {
+      x: p.dir > 0 ? p.x + p.w - 8 : p.x - reach + 8,
+      y: p.y - 10, w: reach, h: p.h + 16,
+    };
+    for (const e of this.enemies) {
+      if (!e.dead && aabb(box, e.box)) {
+        e.hurt(this, def.dmg, p.cx, (def.knock || 200) / 200);
+      }
+    }
+    this.sfx && this.sfx.swing();
+  }
+
+  /* Bow: consumes one arrow, fires toward the mouse. Returns success. */
+  shootArrow(def) {
+    const inv = this.inventory;
+    const idx = inv.slots.findIndex(s => s && (s.id === "arrow" || s.id === "flameArrow"));
+    if (idx < 0) return false;
+    const s = inv.slots[idx];
+    const ammo = ITEMS[s.id];
+    s.n--;
+    if (s.n <= 0) inv.slots[idx] = null;
+    const p = this.player;
+    const m = this.mouseWorld();
+    const ang = Math.atan2(m.y - (p.cy - 4), m.x - p.cx);
+    p.dir = Math.cos(ang) >= 0 ? 1 : -1;
+    p.startSwing(0.22);
+    const spd = 540;
+    this.entities.push(new Projectile(
+      p.cx + Math.cos(ang) * 14, p.cy - 4 + Math.sin(ang) * 14,
+      Math.cos(ang) * spd, Math.sin(ang) * spd,
+      { dmg: def.dmg + ammo.dmg, flame: !!ammo.flame }
+    ));
+    this.sfx && this.sfx.bow();
+    this.ui && this.ui.dirtyInv();
+    return true;
+  }
+
+  /* Enemy spawner: off-screen, tables by depth + time of day. */
+  updateSpawns(dt) {
+    if (this.noSpawn) return;
+    this._spawnAcc = (this._spawnAcc || 0) + dt;
+    const interval = this.trollMoon ? 0.35 : 0.7;
+    if (this._spawnAcc < interval) return;
+    this._spawnAcc = 0;
+    const p = this.player;
+    if (!p || p.dead) return;
+    const st = skyState(this.time);
+    const cap = this.trollMoon && st.isNight ? 12 : 7;
+    if (this.enemies.filter(e => !e.boss).length >= cap) return;
+
+    const ptx = Math.floor(p.cx / TILE), pty = Math.floor(p.cy / TILE);
+    const world = this.world;
+    const vx0 = Math.floor(this.cam.x / TILE) - 3, vx1 = vx0 + Math.ceil(this.viewW / TILE) + 6;
+    const vy0 = Math.floor(this.cam.y / TILE) - 3, vy1 = vy0 + Math.ceil(this.viewH / TILE) + 6;
+
+    for (let attempt = 0; attempt < 14; attempt++) {
+      const tx = ptx + Math.round((28 + Math.random() * 26) * (Math.random() < 0.5 ? -1 : 1));
+      const ty = pty + Math.round((Math.random() - 0.5) * 36);
+      if (!world.inBounds(tx, ty)) continue;
+      /* must be off-screen */
+      if (tx >= vx0 && tx <= vx1 && ty >= vy0 && ty <= vy1) continue;
+
+      const type = this.pickSpawnType(ty, st.isNight);
+      if (!type) continue;
+      const d = ENEMIES[type];
+      const flyer = d.ai === "flyer";
+
+      if (flyer) {
+        if (world.isSolid(tx, ty) || world.isSolid(tx, ty - 1) || world.isSolid(tx + 1, ty)) continue;
+        this.enemies.push(new Enemy(type, tx * TILE + 8, ty * TILE + d.h));
+        return;
+      }
+      /* grounded: walk down to a floor */
+      for (let y = ty; y < Math.min(world.h - 2, ty + 14); y++) {
+        const tallOk = !world.isSolid(tx, y) && !world.isSolid(tx, y - 1) &&
+          (d.h <= 24 || !world.isSolid(tx, y - 2));
+        if (tallOk && world.isSolid(tx, y + 1)) {
+          const i = y * world.w + tx;
+          if (world.liquid[i] > 3) break;
+          this.enemies.push(new Enemy(type, tx * TILE + 8, (y + 1) * TILE));
+          return;
+        }
+      }
+    }
+  }
+
+  pickSpawnType(ty, isNight) {
+    const r = Math.random();
+    if (ty < 310) {
+      /* surface */
+      if (!isNight) return r < 0.8 ? "slimeGreen" : "slimeBlue";
+      if (this.trollMoon) return r < 0.6 ? "zombie" : "eye";
+      return r < 0.5 ? "zombie" : r < 0.85 ? "eye" : "slimeBlue";
+    }
+    if (ty < 650) return r < 0.5 ? "bat" : r < 0.8 ? "slimeBlue" : "skeleton";
+    return r < 0.45 ? "skeleton" : r < 0.8 ? "bat" : "slimeBlue";
+  }
+
+  onKill(enemy) {
+    /* hook for boss + future stats */
+  }
+
+  /* Console/testing helper: spawn an enemy near the player. */
+  debugSpawn(type, dxTiles = 6) {
+    if (!ENEMIES[type] || !this.player) return null;
+    const d = ENEMIES[type];
+    const tx = Math.floor(this.player.cx / TILE) + dxTiles;
+    for (let y = Math.floor(this.player.cy / TILE) - 8; y < Math.floor(this.player.cy / TILE) + 12; y++) {
+      if (!this.world.isSolid(tx, y) && !this.world.isSolid(tx, y - 1) && this.world.isSolid(tx, y + 1)) {
+        const e = new Enemy(type, tx * TILE + 8, (y + 1) * TILE);
+        this.enemies.push(e);
+        return e;
+      }
+    }
+    const e = new Enemy(type, tx * TILE + 8, this.player.y);
+    this.enemies.push(e);
+    return e;
+  }
+
+  announce(text) {
+    if (this.player) this.floatText(this.player.cx, this.player.y - 24, text, "#ffb300");
+    if (window.TrollNotis && window.TrollNotis.show) {
+      try { window.TrollNotis.show({ title: "TrollTerra", text }); } catch (e) { /* non-fatal */ }
     }
   }
 
