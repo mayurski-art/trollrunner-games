@@ -1,0 +1,226 @@
+/* TrollTerra — game data: constants, tiles, walls, items, recipes, enemies.
+   Everything here is plain data; systems live in the other modules. */
+
+/* ---------------------------------------------------------------- constants */
+export const TILE = 16;               // world px per tile
+export const ZOOM = 2;                // screen px per world px
+export const WORLD_W = 1600;          // tiles
+export const WORLD_H = 800;
+export const CHUNK = 32;              // tiles per chunk side
+export const DAY_LEN = 600;           // seconds of daylight
+export const NIGHT_LEN = 360;         // seconds of night
+export const CYCLE = DAY_LEN + NIGHT_LEN;
+
+export const GRAVITY = 1700;          // px/s^2
+export const MAX_FALL = 620;          // terminal velocity px/s
+export const PLAYER_W = 22;           // hitbox world px
+export const PLAYER_H = 44;
+export const REACH = 6.5;             // tiles
+
+export const SAVE_KEY = "trollterra:world1";
+export const SETTINGS_KEY = "trollterra:settings";
+
+/* ------------------------------------------------------------------- tiles */
+export const T = {
+  AIR: 0, DIRT: 1, STONE: 2, SAND: 3, SNOW: 4, ICE: 5, WOOD: 6,
+  STONE_BRICK: 7, GLASS: 8, TREE: 9, COPPER: 10, IRON: 11, SILVER: 12,
+  GOLD: 13, TORCH: 14, WORKBENCH: 15, FURNACE: 16, ANVIL: 17, CHEST: 18,
+  DOOR_C: 19, DOOR_O: 20, PLATFORM: 21, HEART: 22, SHROOM: 23,
+  BEDROCK: 24, OBSIDIAN: 25, PLANT: 26,
+};
+
+/* pal: [dark, mid, light] used by the procedural texture atlas.
+   hp: mining damage to break. pow: minimum tool power. tool: pick|axe|hammer.
+   solid: blocks movement + light. drop: item id granted on break.        */
+export const TILES = [];
+TILES[T.AIR]      = { name: "Air", solid: false };
+TILES[T.DIRT]     = { name: "Dirt", solid: true, hp: 50, pow: 0, tool: "pick", drop: "dirt", pal: ["#5d4326", "#7a5a33", "#8f6c40"] };
+TILES[T.STONE]    = { name: "Stone", solid: true, hp: 100, pow: 0, tool: "pick", drop: "stone", pal: ["#565a63", "#6e737d", "#848a94"] };
+TILES[T.SAND]     = { name: "Sand", solid: true, hp: 40, pow: 0, tool: "pick", drop: "sand", falls: true, pal: ["#b99b57", "#d3b46b", "#e5c87e"] };
+TILES[T.SNOW]     = { name: "Snow", solid: true, hp: 40, pow: 0, tool: "pick", drop: "snow", pal: ["#b9c7d4", "#dbe6ef", "#f2f8fd"] };
+TILES[T.ICE]      = { name: "Ice", solid: true, hp: 70, pow: 0, tool: "pick", drop: "ice", slippery: true, pal: ["#6fa3c9", "#93c4e4", "#bde0f5"] };
+TILES[T.WOOD]     = { name: "Wood", solid: true, hp: 70, pow: 0, tool: "pick", drop: "wood", pal: ["#6b4a26", "#855e31", "#9a7040"] };
+TILES[T.STONE_BRICK] = { name: "Stone brick", solid: true, hp: 120, pow: 0, tool: "pick", drop: "stoneBrick", pal: ["#4e525a", "#686d77", "#7e848e"] };
+TILES[T.GLASS]    = { name: "Glass", solid: true, hp: 30, pow: 0, tool: "pick", drop: "glass", glass: true, pal: ["#7fb4c9", "#a8d4e4", "#d3edf7"] };
+TILES[T.TREE]     = { name: "Troll oak", solid: false, hp: 160, pow: 0, tool: "axe", drop: "wood", pal: ["#4e3418", "#66451f", "#7c5527"] };
+TILES[T.COPPER]   = { name: "Copper ore", solid: true, hp: 140, pow: 0, tool: "pick", drop: "copperOre", ore: "#e28448", pal: ["#565a63", "#6e737d", "#848a94"] };
+TILES[T.IRON]     = { name: "Iron ore", solid: true, hp: 170, pow: 40, tool: "pick", drop: "ironOre", ore: "#c9b7a6", pal: ["#565a63", "#6e737d", "#848a94"] };
+TILES[T.SILVER]   = { name: "Silver ore", solid: true, hp: 200, pow: 50, tool: "pick", drop: "silverOre", ore: "#d9e2ea", pal: ["#565a63", "#6e737d", "#848a94"] };
+TILES[T.GOLD]     = { name: "Gold ore", solid: true, hp: 230, pow: 60, tool: "pick", drop: "goldOre", ore: "#f4c64c", pal: ["#565a63", "#6e737d", "#848a94"] };
+TILES[T.TORCH]    = { name: "Torch", solid: false, hp: 5, pow: 0, tool: "pick", drop: "torch", light: 235, noVariant: true };
+TILES[T.WORKBENCH] = { name: "Workbench", solid: false, hp: 60, pow: 0, tool: "pick", drop: "workbench", station: "workbench", noVariant: true };
+TILES[T.FURNACE]  = { name: "Furnace", solid: false, hp: 90, pow: 0, tool: "pick", drop: "furnace", station: "furnace", light: 120, noVariant: true };
+TILES[T.ANVIL]    = { name: "Anvil", solid: false, hp: 90, pow: 0, tool: "pick", drop: "anvil", station: "anvil", noVariant: true };
+TILES[T.CHEST]    = { name: "Chest", solid: false, hp: 80, pow: 0, tool: "pick", drop: "chest", noVariant: true };
+TILES[T.DOOR_C]   = { name: "Door", solid: true, hp: 70, pow: 0, tool: "pick", drop: "door", noVariant: true };
+TILES[T.DOOR_O]   = { name: "Door (open)", solid: false, hp: 70, pow: 0, tool: "pick", drop: "door", noVariant: true };
+TILES[T.PLATFORM] = { name: "Platform", solid: false, oneWay: true, hp: 40, pow: 0, tool: "pick", drop: "platform", noVariant: true };
+TILES[T.HEART]    = { name: "Troll heart", solid: true, hp: 220, pow: 50, tool: "pick", drop: null, light: 70, heart: true, pal: ["#8c2440", "#c23a60", "#e85f86"] };
+TILES[T.SHROOM]   = { name: "Glowshroom", solid: false, hp: 5, pow: 0, tool: "pick", drop: "mushroom", light: 90, noVariant: true };
+TILES[T.BEDROCK]  = { name: "Trollrock", solid: true, hp: Infinity, pow: 999, tool: "pick", drop: null, pal: ["#26282e", "#33363e", "#41454f"] };
+TILES[T.OBSIDIAN] = { name: "Obsidian", solid: true, hp: 260, pow: 60, tool: "pick", drop: "obsidian", pal: ["#231d33", "#352c4d", "#4a3e6b"] };
+TILES[T.PLANT]    = { name: "Plant", solid: false, hp: 1, pow: 0, tool: "pick", drop: null, noVariant: true };
+
+/* ------------------------------------------------------------------- walls */
+export const W = { NONE: 0, DIRT: 1, STONE: 2, WOOD: 3, STONE_BRICK: 4 };
+export const WALLS = [];
+WALLS[W.NONE]  = { name: "" };
+WALLS[W.DIRT]  = { name: "Dirt wall", drop: null, pal: ["#3a2a17", "#463320"] };        // natural, no drop
+WALLS[W.STONE] = { name: "Stone wall", drop: null, pal: ["#33363d", "#3d4149"] };       // natural, no drop
+WALLS[W.WOOD]  = { name: "Wood wall", drop: "woodWall", pal: ["#42301a", "#4e3920"] };
+WALLS[W.STONE_BRICK] = { name: "Stone brick wall", drop: "stoneBrickWall", pal: ["#2f323a", "#3a3e47"] };
+
+/* ------------------------------------------------------------------- items */
+/* type: block | wall | tool | weapon | bow | ammo | armor | potion | material | summon
+   tools: power (mining strength), speed (uses/sec), dmg
+   weapons: dmg, knock, arc (swing size scalar)
+   armor: slot head|chest|legs, def                                          */
+export const ITEMS = {
+  /* placeable blocks */
+  dirt:        { name: "Dirt", type: "block", tile: T.DIRT, max: 999 },
+  stone:       { name: "Stone", type: "block", tile: T.STONE, max: 999 },
+  sand:        { name: "Sand", type: "block", tile: T.SAND, max: 999 },
+  snow:        { name: "Snow", type: "block", tile: T.SNOW, max: 999 },
+  ice:         { name: "Ice", type: "block", tile: T.ICE, max: 999 },
+  wood:        { name: "Wood", type: "block", tile: T.WOOD, max: 999 },
+  stoneBrick:  { name: "Stone brick", type: "block", tile: T.STONE_BRICK, max: 999 },
+  glass:       { name: "Glass", type: "block", tile: T.GLASS, max: 999 },
+  obsidian:    { name: "Obsidian", type: "block", tile: T.OBSIDIAN, max: 999 },
+  torch:       { name: "Torch", type: "block", tile: T.TORCH, max: 99, needsSupport: true },
+  workbench:   { name: "Workbench", type: "block", tile: T.WORKBENCH, max: 99, needsFloor: true },
+  furnace:     { name: "Furnace", type: "block", tile: T.FURNACE, max: 99, needsFloor: true },
+  anvil:       { name: "Anvil", type: "block", tile: T.ANVIL, max: 99, needsFloor: true },
+  chest:       { name: "Chest", type: "block", tile: T.CHEST, max: 99, needsFloor: true },
+  door:        { name: "Door", type: "block", tile: T.DOOR_C, max: 99, tall: 2, needsFloor: true },
+  platform:    { name: "Platform", type: "block", tile: T.PLATFORM, max: 999 },
+  /* walls */
+  woodWall:       { name: "Wood wall", type: "wall", wall: W.WOOD, max: 999 },
+  stoneBrickWall: { name: "Stone brick wall", type: "wall", wall: W.STONE_BRICK, max: 999 },
+  /* materials */
+  copperOre:  { name: "Copper ore", type: "material", max: 999 },
+  ironOre:    { name: "Iron ore", type: "material", max: 999 },
+  silverOre:  { name: "Silver ore", type: "material", max: 999 },
+  goldOre:    { name: "Gold ore", type: "material", max: 999 },
+  copperBar:  { name: "Copper bar", type: "material", max: 999 },
+  ironBar:    { name: "Iron bar", type: "material", max: 999 },
+  silverBar:  { name: "Silver bar", type: "material", max: 999 },
+  goldBar:    { name: "Gold bar", type: "material", max: 999 },
+  gel:        { name: "Troll gel", type: "material", max: 999 },
+  lens:       { name: "Eyeball lens", type: "material", max: 999 },
+  bone:       { name: "Troll bone", type: "material", max: 999 },
+  mushroom:   { name: "Glowshroom", type: "material", max: 999 },
+  /* tools */
+  woodPick:   { name: "Wooden pick", type: "tool", tool: "pick", power: 35, speed: 3.4, dmg: 5 },
+  copperPick: { name: "Copper pick", type: "tool", tool: "pick", power: 45, speed: 3.8, dmg: 6 },
+  ironPick:   { name: "Iron pick", type: "tool", tool: "pick", power: 55, speed: 4.2, dmg: 7 },
+  silverPick: { name: "Silver pick", type: "tool", tool: "pick", power: 65, speed: 4.6, dmg: 8 },
+  goldPick:   { name: "Golden pick", type: "tool", tool: "pick", power: 80, speed: 5.2, dmg: 10 },
+  woodAxe:    { name: "Wooden axe", type: "tool", tool: "axe", power: 40, speed: 3.0, dmg: 6 },
+  copperAxe:  { name: "Copper axe", type: "tool", tool: "axe", power: 55, speed: 3.4, dmg: 8 },
+  ironAxe:    { name: "Iron axe", type: "tool", tool: "axe", power: 70, speed: 3.8, dmg: 10 },
+  goldAxe:    { name: "Golden axe", type: "tool", tool: "axe", power: 95, speed: 4.4, dmg: 13 },
+  woodHammer: { name: "Wooden hammer", type: "tool", tool: "hammer", power: 40, speed: 3.0, dmg: 7 },
+  ironHammer: { name: "Iron hammer", type: "tool", tool: "hammer", power: 70, speed: 3.6, dmg: 12 },
+  /* weapons */
+  woodSword:   { name: "Wooden sword", type: "weapon", dmg: 9, knock: 190, speed: 3.6, arc: 1.0 },
+  copperSword: { name: "Copper sword", type: "weapon", dmg: 13, knock: 210, speed: 3.8, arc: 1.0 },
+  ironSword:   { name: "Iron sword", type: "weapon", dmg: 18, knock: 230, speed: 4.0, arc: 1.05 },
+  silverSword: { name: "Silver sword", type: "weapon", dmg: 23, knock: 250, speed: 4.2, arc: 1.1 },
+  goldSword:   { name: "Golden sword", type: "weapon", dmg: 29, knock: 270, speed: 4.4, arc: 1.15 },
+  trollBlade:  { name: "Troll Blade", type: "weapon", dmg: 39, knock: 340, speed: 4.2, arc: 1.5, rare: true },
+  woodBow:     { name: "Wooden bow", type: "bow", dmg: 9, speed: 2.6 },
+  goldBow:     { name: "Golden bow", type: "bow", dmg: 17, speed: 3.2 },
+  arrow:       { name: "Arrow", type: "ammo", dmg: 5, max: 999 },
+  flameArrow:  { name: "Flaming arrow", type: "ammo", dmg: 10, max: 999, flame: true },
+  /* armor */
+  copperHelm:  { name: "Copper helmet", type: "armor", slot: "head", def: 1 },
+  copperChest: { name: "Copper chestplate", type: "armor", slot: "chest", def: 2 },
+  copperLegs:  { name: "Copper greaves", type: "armor", slot: "legs", def: 1 },
+  ironHelm:    { name: "Iron helmet", type: "armor", slot: "head", def: 2 },
+  ironChest:   { name: "Iron chestplate", type: "armor", slot: "chest", def: 3 },
+  ironLegs:    { name: "Iron greaves", type: "armor", slot: "legs", def: 2 },
+  goldHelm:    { name: "Golden helmet", type: "armor", slot: "head", def: 3 },
+  goldChest:   { name: "Golden chestplate", type: "armor", slot: "chest", def: 4 },
+  goldLegs:    { name: "Golden greaves", type: "armor", slot: "legs", def: 3 },
+  /* consumables + special */
+  trollBrew:   { name: "Troll brew", type: "potion", heal: 50, max: 30 },
+  trollTotem:  { name: "Troll totem", type: "summon", max: 5, desc: "Wakes the Troll King. Use at night." },
+};
+for (const id in ITEMS) { ITEMS[id].id = id; if (!ITEMS[id].max) ITEMS[id].max = 1; }
+
+/* ----------------------------------------------------------------- recipes */
+/* { out, n, ing: [[itemId, count]...], station: null|workbench|furnace|anvil } */
+export const RECIPES = [
+  { out: "workbench", n: 1, ing: [["wood", 10]], station: null },
+  { out: "torch", n: 3, ing: [["wood", 1], ["gel", 1]], station: null },
+  { out: "platform", n: 2, ing: [["wood", 1]], station: null },
+  { out: "woodPick", n: 1, ing: [["wood", 12]], station: "workbench" },
+  { out: "woodAxe", n: 1, ing: [["wood", 9]], station: "workbench" },
+  { out: "woodHammer", n: 1, ing: [["wood", 8]], station: "workbench" },
+  { out: "woodSword", n: 1, ing: [["wood", 7]], station: "workbench" },
+  { out: "woodBow", n: 1, ing: [["wood", 10]], station: "workbench" },
+  { out: "arrow", n: 5, ing: [["wood", 1], ["stone", 1]], station: "workbench" },
+  { out: "flameArrow", n: 5, ing: [["arrow", 5], ["torch", 1]], station: "workbench" },
+  { out: "door", n: 1, ing: [["wood", 6]], station: "workbench" },
+  { out: "chest", n: 1, ing: [["wood", 8], ["copperBar", 2]], station: "workbench" },
+  { out: "woodWall", n: 4, ing: [["wood", 1]], station: "workbench" },
+  { out: "stoneBrickWall", n: 4, ing: [["stoneBrick", 1]], station: "workbench" },
+  { out: "stoneBrick", n: 2, ing: [["stone", 2]], station: "workbench" },
+  { out: "furnace", n: 1, ing: [["stone", 20], ["wood", 4], ["torch", 3]], station: "workbench" },
+  { out: "glass", n: 1, ing: [["sand", 2]], station: "furnace" },
+  { out: "copperBar", n: 1, ing: [["copperOre", 3]], station: "furnace" },
+  { out: "ironBar", n: 1, ing: [["ironOre", 3]], station: "furnace" },
+  { out: "silverBar", n: 1, ing: [["silverOre", 3]], station: "furnace" },
+  { out: "goldBar", n: 1, ing: [["goldOre", 3]], station: "furnace" },
+  { out: "trollBrew", n: 1, ing: [["mushroom", 1], ["gel", 1]], station: "furnace" },
+  { out: "anvil", n: 1, ing: [["ironBar", 5]], station: "workbench" },
+  { out: "copperPick", n: 1, ing: [["copperBar", 8], ["wood", 3]], station: "anvil" },
+  { out: "copperAxe", n: 1, ing: [["copperBar", 7], ["wood", 3]], station: "anvil" },
+  { out: "copperSword", n: 1, ing: [["copperBar", 6]], station: "anvil" },
+  { out: "ironPick", n: 1, ing: [["ironBar", 8], ["wood", 3]], station: "anvil" },
+  { out: "ironAxe", n: 1, ing: [["ironBar", 7], ["wood", 3]], station: "anvil" },
+  { out: "ironHammer", n: 1, ing: [["ironBar", 6], ["wood", 3]], station: "anvil" },
+  { out: "ironSword", n: 1, ing: [["ironBar", 6]], station: "anvil" },
+  { out: "silverPick", n: 1, ing: [["silverBar", 8], ["wood", 3]], station: "anvil" },
+  { out: "silverSword", n: 1, ing: [["silverBar", 6]], station: "anvil" },
+  { out: "goldPick", n: 1, ing: [["goldBar", 8], ["wood", 3]], station: "anvil" },
+  { out: "goldAxe", n: 1, ing: [["goldBar", 7], ["wood", 3]], station: "anvil" },
+  { out: "goldSword", n: 1, ing: [["goldBar", 6]], station: "anvil" },
+  { out: "goldBow", n: 1, ing: [["goldBar", 8]], station: "anvil" },
+  { out: "copperHelm", n: 1, ing: [["copperBar", 10]], station: "anvil" },
+  { out: "copperChest", n: 1, ing: [["copperBar", 15]], station: "anvil" },
+  { out: "copperLegs", n: 1, ing: [["copperBar", 12]], station: "anvil" },
+  { out: "ironHelm", n: 1, ing: [["ironBar", 10]], station: "anvil" },
+  { out: "ironChest", n: 1, ing: [["ironBar", 15]], station: "anvil" },
+  { out: "ironLegs", n: 1, ing: [["ironBar", 12]], station: "anvil" },
+  { out: "goldHelm", n: 1, ing: [["goldBar", 10]], station: "anvil" },
+  { out: "goldChest", n: 1, ing: [["goldBar", 15]], station: "anvil" },
+  { out: "goldLegs", n: 1, ing: [["goldBar", 12]], station: "anvil" },
+  { out: "trollTotem", n: 1, ing: [["lens", 6], ["goldBar", 5]], station: "anvil" },
+];
+
+/* ----------------------------------------------------------------- enemies */
+/* ai: slime | walker | flyer  ·  ctx: when/where it spawns */
+export const ENEMIES = {
+  slimeGreen: { name: "Green troll slime", ai: "slime", hp: 16, dmg: 8, def: 0, w: 26, h: 18, color: "#4fd35f", drops: [["gel", 1, 2, 1]], kb: 1.0 },
+  slimeBlue:  { name: "Blue troll slime", ai: "slime", hp: 26, dmg: 10, def: 2, w: 28, h: 20, color: "#4f9fd3", drops: [["gel", 1, 3, 1]], kb: 1.0 },
+  zombie:     { name: "Troll zombie", ai: "walker", hp: 46, dmg: 15, def: 4, w: 22, h: 42, color: "#7ba05b", drops: [["gel", 0, 1, 0.2]], kb: 0.8 },
+  eye:        { name: "Wandering troll eye", ai: "flyer", hp: 40, dmg: 13, def: 2, w: 26, h: 26, color: "#e8e4da", drops: [["lens", 1, 2, 0.6]], kb: 0.9 },
+  bat:        { name: "Cave troll bat", ai: "flyer", hp: 22, dmg: 11, def: 1, w: 22, h: 16, color: "#8a6fb0", drops: [], kb: 1.1, erratic: true },
+  skeleton:   { name: "Troll skeleton", ai: "walker", hp: 72, dmg: 19, def: 8, w: 22, h: 42, color: "#cfc9bd", drops: [["bone", 1, 3, 0.8]], kb: 0.6 },
+  slimeKing:  { name: "Kingling slime", ai: "slime", hp: 30, dmg: 12, def: 3, w: 26, h: 18, color: "#e8b23c", drops: [["gel", 1, 2, 1]], kb: 0.9, noNatural: true },
+};
+
+/* Boss stats live in entities.js (TrollKing class); these are shared knobs. */
+export const BOSS = {
+  hp: 2600, contactDmg: 26, def: 10, tearDmg: 16,
+  drops: [["trollBlade", 1, 1, 1], ["goldBar", 15, 25, 1]],
+};
+
+export const STATION_SCAN = 8;  // tiles radius for crafting-station detection
+
+/* Starter kit (fresh worlds). */
+export const STARTER_ITEMS = [
+  { id: "woodPick", n: 1 }, { id: "woodAxe", n: 1 }, { id: "woodSword", n: 1 },
+  { id: "torch", n: 10 },
+];
