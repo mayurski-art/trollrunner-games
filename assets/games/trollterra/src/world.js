@@ -21,6 +21,8 @@ export class World {
     this.sandActive = new Set();              // sand tiles that may fall
     this.growth = [];                         // future use (regrowth timers)
     this._liquidTick = 0;
+    this.onEdit = null;                       // co-op hook: (kind, x, y, v)
+    this._simming = false;                    // sim writes are not broadcast
     this.chunksX = Math.ceil(w / CHUNK);
     this.chunksY = Math.ceil(h / CHUNK);
   }
@@ -46,6 +48,7 @@ export class World {
   setWire(x, y, on) {
     if (!this.inBounds(x, y)) return;
     this.wires[y * this.w + x] = on ? 1 : 0;
+    if (this.onEdit && !this._simming) this.onEdit("wire", x, y, on ? 1 : 0);
   }
 
   isSolid(x, y) {
@@ -71,6 +74,7 @@ export class World {
     /* wake sand that may now be unsupported (this cell + the one above) */
     if (id === T.SAND) this.sandActive.add(i);
     if (y > 0 && this.tiles[i - this.w] === T.SAND) this.sandActive.add(i - this.w);
+    if (this.onEdit && !this._simming) this.onEdit("tile", x, y, id);
   }
 
   setWall(x, y, id) {
@@ -79,6 +83,7 @@ export class World {
     if (this.walls[i] === id) return;
     this.walls[i] = id;
     this.markDirty(x, y);
+    if (this.onEdit && !this._simming) this.onEdit("wall", x, y, id);
   }
 
   setLiquid(x, y, amount, type) {
@@ -176,6 +181,11 @@ export class World {
      Water flows every pass; lava every other pass (it's sluggish).
      Water touching lava quenches it into obsidian. Returns cells moved. */
   simLiquids(budget = 3000) {
+    this._simming = true;
+    try { return this._simLiquids(budget); } finally { this._simming = false; }
+  }
+
+  _simLiquids(budget = 3000) {
     this._liquidTick++;
     const w = this.w, tiles = this.tiles, liq = this.liquid, typ = this.liquidType;
     const active = Array.from(this.liquidActive);
@@ -279,6 +289,11 @@ export class World {
   /* Falling sand: unsupported sand drops one cell per pass. */
   simSand() {
     if (this.sandActive.size === 0) return;
+    this._simming = true;
+    try { this._simSand(); } finally { this._simming = false; }
+  }
+
+  _simSand() {
     const w = this.w;
     for (const i of Array.from(this.sandActive)) {
       if (this.tiles[i] !== T.SAND) { this.sandActive.delete(i); continue; }

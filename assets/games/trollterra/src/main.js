@@ -27,7 +27,8 @@ import {
 } from "./save.js";
 import { TouchControls } from "./touch.js";
 import { Music } from "./music.js";
-import { rleDecode, b64ToU16 } from "./util.js";
+import { rleDecode, b64ToU16, rleEncode, u16ToB64 } from "./util.js";
+import { Net } from "./net.js";
 
 const FIXED_DT = 1 / 60;
 
@@ -57,6 +58,7 @@ class Game {
     this.cam = { x: 0, y: 0 };
     this.lighting = new Lighting();
     this.sfx = new SFX();
+    this.net = new Net(this);
     this._fluidAcc = 0;
     this.fps = 0;
     this._fpsAcc = 0; this._fpsN = 0;
@@ -83,12 +85,26 @@ class Game {
     this.resize();
     window.addEventListener("resize", () => this.resize());
     window.addEventListener("beforeunload", () => {
-      if (this.state === "play" || this.state === "pause") saveGame(this);
+      /* guests never overwrite their own world with the host's */
+      if ((this.state === "play" || this.state === "pause") &&
+          (!this.net.active || this.net.isHost)) saveGame(this);
+      this.net.stop();
     });
 
     this._last = performance.now();
     this._acc = 0;
     requestAnimationFrame(t => this.frame(t));
+
+    /* background tabs freeze rAF; this keeps the clock + co-op alive
+       (intervals still tick ~1/s in background, which is plenty) */
+    setInterval(() => {
+      const now = performance.now();
+      if (now - this._last > 700 && this.state === "play") {
+        this._last = now;
+        this.update(FIXED_DT);
+        this.input.flush();
+      }
+    }, 500);
   }
 
   newWorld(seedStr) {
@@ -187,6 +203,69 @@ class Game {
     }
   }
 
+  /* ============================================================ co-op */
+  packLayersForNet() {
+    const w = this.world;
+    const pack = a => u16ToB64(rleEncode(a));
+    return {
+      tiles: pack(w.tiles), walls: pack(w.walls),
+      liquid: pack(w.liquid), liquidType: pack(w.liquidType),
+      wires: pack(w.wires),
+      trees: w.trees,
+    };
+  }
+
+  /* Guest side: replace the local world with the host's snapshot. */
+  adoptRemoteWorld(m) {
+    this.newWorld(m.seedStr);
+    const w = this.world, n = w.w * w.h;
+    const L = m.layers;
+    w.tiles.set(rleDecode(b64ToU16(L.tiles), n));
+    w.walls.set(rleDecode(b64ToU16(L.walls), n));
+    w.liquid.set(rleDecode(b64ToU16(L.liquid), n));
+    w.liquidType.set(rleDecode(b64ToU16(L.liquidType), n));
+    w.wires.set(rleDecode(b64ToU16(L.wires), n));
+    w.trees = L.trees || [];
+    w.chests = new Map((m.chests || []).map(([k, items]) => [k, { items }]));
+    w.damage.clear();
+    w.dirtyChunks.clear();
+    w.liquidActive.clear();
+    w.sandActive.clear();
+    w.rebuildTopSolid();
+    this.renderer.chunks.clear();
+    this.time = m.time;
+    this.dayCount = m.day;
+    this.trollMoon = !!m.moon;
+    this.flags = Object.assign(this.flags, m.flags);
+    this.spawn = m.spawn || this.spawn;
+    this.player.x = this.spawn.x * TILE + 5;
+    this.player.y = this.spawn.y * TILE - this.player.h;
+    this.cam.x = this.player.cx - this.viewW / 2;
+    this.cam.y = this.player.cy - this.viewH / 2;
+    this.clampCam();
+    this.net.hookWorld();          // re-attach to the fresh world instance
+    if (this.ui) this.ui.dirtyInv();
+    this.enterPlay();
+    this.announce("🌐 Synced with the host — dig together!");
+  }
+
+  async hostCoop() {
+    const code = this.net.makeCode();
+    const ok = await this.net.start(code, true);
+    if (!ok) { this.announce("Co-op unavailable (no transport)"); return; }
+    this.enterPlay();
+    if (this.ui) this.ui.setCoopCode(code);
+  }
+
+  async joinCoop(code) {
+    code = (code || "").trim().toUpperCase();
+    if (code.length < 3) { this.announce("Enter the host's room code first."); return; }
+    const ok = await this.net.start(code, false);
+    if (!ok) { this.announce("Co-op unavailable (no transport)"); return; }
+    if (this.ui) this.ui.setCoopCode(code);
+    /* world arrives from the host via adoptRemoteWorld */
+  }
+
   /* Report session progress to the shared arcade leaderboard (deltas). */
   recordProgress(reason) {
     const lb = window.TrollLeaderboard;
@@ -267,13 +346,14 @@ class Game {
       this.world.simSand();
     }
 
-    /* autosave + map exploration */
+    /* autosave + map exploration (guests don't save the host's world) */
     this._autosaveAcc += dt;
     if (this._autosaveAcc >= 60) {
       this._autosaveAcc = 0;
-      saveGame(this);
+      if (!this.net.active || this.net.isHost) saveGame(this);
       this.recordProgress("autosave");
     }
+    this.net.update(dt);
     this._exploreAcc += dt;
     if (this._exploreAcc >= 0.4 && this.player && !this.player.dead) {
       this._exploreAcc = 0;
@@ -1002,6 +1082,7 @@ class Game {
 
     for (const e of this.npcs) if (e.draw) e.draw(ctx, this);
     for (const e of this.enemies) if (e.draw) e.draw(ctx, this);
+    if (this.net.active) this.net.drawPeers(ctx);
     if (this.player) this.player.draw(ctx, this);
     for (const e of this.entities) if (e.draw) e.draw(ctx, this);
 

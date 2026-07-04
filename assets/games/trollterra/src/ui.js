@@ -97,6 +97,9 @@ export class UI {
       setTimeout(() => { e.target.textContent = "💾 Save world"; }, 1500);
     });
     document.getElementById("btn-quit").addEventListener("click", () => game.quitToTitle());
+    document.getElementById("btn-coop-host").addEventListener("click", () => game.hostCoop());
+    document.getElementById("btn-coop-join").addEventListener("click", () =>
+      game.joinCoop(document.getElementById("coop-code").value));
     const vol = document.getElementById("vol-slider");
     vol.value = Math.round((game.settings.volume !== undefined ? game.settings.volume : 0.6) * 100);
     vol.addEventListener("input", () => {
@@ -254,6 +257,12 @@ export class UI {
     this.dialogNpc = null;
     this.el.dialog.hidden = true;
     this.pointerOver = false;
+  }
+
+  /* -------------------------------------------------------------- co-op */
+  setCoopCode(code) {
+    const box = document.getElementById("coop-code");
+    if (box) box.value = code;
   }
 
   /* -------------------------------------------------------------- shop */
@@ -598,6 +607,13 @@ export class UI {
   }
 
   closeChest() {
+    /* co-op: share final chest contents when we're done rummaging */
+    if (this.chest && this.game.net && this.game.net.active) {
+      this.game.net.send({
+        t: "chest", id: this.game.net.id,
+        key: this.chest.key, items: this.chest.items,
+      });
+    }
     this.chest = null;
     this.el.chestPanel.hidden = true;
   }
@@ -720,6 +736,11 @@ export class UI {
     if (this._statusAcc > 0.25) {
       this._statusAcc = 0;
       this.el.clock.textContent = `Day ${g.dayCount} · ${fmtClock(g.time, DAY_LEN, CYCLE - DAY_LEN)}`;
+      const coop = document.getElementById("hud-coop");
+      if (g.net && g.net.active) {
+        coop.hidden = false;
+        coop.textContent = `🌐 ${g.net.room} · ${g.net.peerCount + 1} troll${g.net.peerCount ? "s" : ""}`;
+      } else if (!coop.hidden) coop.hidden = true;
       if (g.player) {
         const depthTiles = Math.floor(g.player.y / TILE) - SURFACE_BASE;
         this.el.depth.textContent = depthTiles > 4 ? `${depthTiles * 2} ft deep` : "Surface";

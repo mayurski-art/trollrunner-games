@@ -24,6 +24,7 @@
       <div id="hud-status">
         <span id="hud-clock">Day 1 · 08:00</span>
         <span id="hud-depth">Surface</span>
+        <span id="hud-coop" hidden></span>
       </div>
       <div id="hotbar" aria-label="Hotbar"></div>
       <canvas id="minimap" width="220" height="124" aria-label="Minimap"></canvas>
@@ -92,6 +93,12 @@
         <div class="dialog-actions">
           <button id="btn-continue" class="btn-primary" type="button" hidden>▶ Continue</button>
           <button id="btn-new" class="btn-secondary" type="button">✚ New world</button>
+          <div class="coop-row">
+            <button id="btn-coop-host" class="btn-secondary" type="button">🌐 Host co-op</button>
+            <input id="coop-code" maxlength="5" placeholder="CODE" autocomplete="off"
+                   aria-label="Co-op room code">
+            <button id="btn-coop-join" class="btn-secondary" type="button">Join</button>
+          </div>
           <button id="btn-title-lb" class="btn-ghost" type="button">Leaderboard</button>
         </div>
         <div class="menu-controls">
@@ -138,6 +145,7 @@
     </section>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
   <script src="assets/js/troll-leaderboard.js?v=lb-engine-v1" defer></script>
   <script src="assets/games/trollterra/leaderboard.js?v=tt1" defer></script>
   <script type="module" src="assets/games/trollterra/src/main.js?v=tt1"></script>

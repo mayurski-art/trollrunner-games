@@ -221,6 +221,17 @@ html, body {
 .btn-ghost:hover { color: var(--tt-text); }
 .is-danger-text { color: var(--tt-danger); }
 
+.coop-row { display: flex; gap: 7px; }
+.coop-row .btn-secondary { flex: 1; padding: 10px 8px; font-size: 13px; }
+#coop-code {
+  width: 74px; text-align: center; text-transform: uppercase;
+  font: 700 14px "DM Mono", monospace; letter-spacing: 0.12em;
+  background: rgba(10, 6, 26, 0.82); color: var(--tt-gold);
+  border: 1px solid var(--tt-line); border-radius: 11px;
+}
+#coop-code:focus { outline: none; border-color: var(--tt-gold); }
+#hud-coop { color: #7cc4ff; }
+
 .menu-controls {
   display: flex; flex-direction: column; gap: 5px; margin: 12px 0;
   font-size: 12px; color: var(--tt-muted);
