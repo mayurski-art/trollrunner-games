@@ -99,6 +99,14 @@ export class UI {
       game.settings.volume = v;
       saveSettings(game.settings);
     });
+    const mus = document.getElementById("music-slider");
+    mus.value = Math.round((game.settings.music !== undefined ? game.settings.music : 0.5) * 100);
+    mus.addEventListener("input", () => {
+      const v = mus.value / 100;
+      game.music && game.music.setVolume(v);
+      game.settings.music = v;
+      saveSettings(game.settings);
+    });
   }
 
   /* ------------------------------------------------------------ screens */

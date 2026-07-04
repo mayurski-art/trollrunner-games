@@ -25,6 +25,7 @@ import {
   loadSettings, saveSettings,
 } from "./save.js";
 import { TouchControls } from "./touch.js";
+import { Music } from "./music.js";
 import { rleDecode, b64ToU16 } from "./util.js";
 
 const FIXED_DT = 1 / 60;
@@ -65,6 +66,7 @@ class Game {
     this._recorded = { blocksMined: 0, bossKills: 0 };
     this.settings = loadSettings();
     this.sfx.setVolume(this.settings.volume !== undefined ? this.settings.volume : 0.6);
+    this.music = new Music(this.sfx, this.settings.music !== undefined ? this.settings.music : 0.5);
 
     /* boot into the last save if there is one, else a fresh world */
     this.saveData = loadSaveData();
@@ -162,6 +164,7 @@ class Game {
     saveGame(this);
     this.recordProgress("quit");
     this.state = "title";
+    if (this.music) this.music.setContext("title");
     if (this.ui) {
       this.ui.toggleInventory(false);
       this.ui.showTitle(true);
@@ -274,6 +277,16 @@ class Game {
     if (this._exploreAcc >= 0.4 && this.player && !this.player.dead) {
       this._exploreAcc = 0;
       this.revealAround(this.player.cx, this.player.cy);
+    }
+
+    /* music follows the situation */
+    if (this.music) {
+      const st2 = skyState(this.time);
+      let ctxName = "day";
+      if (this.enemies.some(e => e.boss && !e.dead)) ctxName = "boss";
+      else if (this.player && this.player.y / TILE > 330) ctxName = "cave";
+      else if (st2.isNight) ctxName = "night";
+      this.music.setContext(ctxName);
     }
 
     if (this.input.hit("F3")) this.debug = !this.debug;
