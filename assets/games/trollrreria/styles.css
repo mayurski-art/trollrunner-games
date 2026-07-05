@@ -56,6 +56,20 @@ html, body {
   background: rgba(0,0,0,0.5); image-rendering: pixelated;
 }
 
+.hud-hotkeys-btn {
+  position: absolute; top: 144px; right: 14px;
+  width: 30px; height: 30px; pointer-events: auto;
+  border: 0.5px solid var(--tt-line); border-radius: 50%;
+  background: rgba(0,0,0,0.5); color: var(--tt-text);
+  font: 800 14px "DM Sans", sans-serif; cursor: pointer;
+}
+.hud-hotkeys-btn:hover { border-color: var(--tt-gold); color: var(--tt-gold); }
+
+#hotkeys-panel { top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(420px, 92vw); }
+#hotkeys-panel[hidden] { display: none; }
+#hotkeys-panel .menu-controls { margin: 6px 0 12px; }
+#hotkeys-panel .btn-ghost { padding: 8px 14px; }
+
 #bigmap {
   position: absolute; inset: 0; margin: auto;
   border: 0.5px solid var(--tt-line); border-radius: 12px;

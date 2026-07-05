@@ -1,8 +1,24 @@
-/* Trollrreria — world persistence: RLE + base64 into localStorage.
-   A full 1600x800 world compresses to a few hundred KB, well under quota. */
+/* Trollrreria — world persistence: RLE + base64, then either a real
+   per-account cloud save (logged in) or a local-only guest save (logged
+   out). A full 1600x800 world compresses to a few hundred KB.
+
+   Account scoping (fixes worlds bleeding between accounts / guests):
+     - Logged in  -> cloud save in troll_game_saves (RLS: owner-only),
+                     mirrored into a local per-account cache key as a
+                     synchronous backup for beforeunload, where an async
+                     network write may not finish in time.
+     - Logged out -> a separate local-only "guest" key. Never reads or
+                     writes any account's data.
+     - The old pre-account global key (SAVE_KEY) is migrated into the
+       first real account that logs in and then deleted, so it can never
+       leak into guest mode again. */
 
 import { SAVE_KEY, SETTINGS_KEY } from "./defs.js";
 import { rleEncode, rleDecode, u16ToB64, b64ToU16 } from "./util.js";
+
+const GAME_ID = "trollrreria";
+const GUEST_KEY = `${SAVE_KEY}:guest`;
+const cloudCacheKey = userId => `${SAVE_KEY}:cloud-cache:${userId}`;
 
 function packLayer(arr) {
   return u16ToB64(rleEncode(arr));
@@ -13,10 +29,87 @@ function unpackLayer(b64, outLen, into) {
   into.set(decoded);
 }
 
-export function saveGame(game) {
-  const w = game.world;
+/* Cached synchronously so beforeunload can decide guest-vs-account without
+   an async round trip (TrollrunnerAccounts.getSession() also fetches the
+   profile over the network, which is too slow for a page-unload window --
+   the browser can kill the page before that promise ever resolves). Kept
+   in sync via the auth-changed event dispatched on login/logout. */
+let cachedUserId = null;
+window.addEventListener("trollrunner:auth-changed", e => {
+  cachedUserId = e.detail?.userId || null;
+});
+
+async function getSessionSafe() {
   try {
-    const data = {
+    const session = await window.TrollrunnerAccounts?.getSession?.();
+    cachedUserId = session?.userId || null;
+    return session;
+  } catch {
+    return null;
+  }
+}
+
+function readLocal(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data || data.v !== 1 || !data.tiles) return null;
+    return data;
+  } catch (e) {
+    console.warn("[trollrreria] corrupt save discarded:", key, e);
+    return null;
+  }
+}
+
+function writeLocal(key, data) {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+    return true;
+  } catch (e) {
+    console.warn("[trollrreria] local save failed:", key, e);
+    return false;
+  }
+}
+
+async function loadCloudSave(userId) {
+  const sb = window.TrollrunnerAccounts?.getClient?.();
+  if (!sb) return null;
+  try {
+    const { data, error } = await sb
+      .from("troll_game_saves")
+      .select("data, updated_at")
+      .eq("user_id", userId)
+      .eq("game_id", GAME_ID)
+      .maybeSingle();
+    if (error || !data) return null;
+    return { save: data.data, updatedAt: new Date(data.updated_at).getTime() };
+  } catch {
+    return null;
+  }
+}
+
+async function saveCloudSave(userId, data) {
+  const sb = window.TrollrunnerAccounts?.getClient?.();
+  if (!sb) return false;
+  try {
+    const { error } = await sb.from("troll_game_saves").upsert({
+      user_id: userId,
+      game_id: GAME_ID,
+      data,
+      updated_at: new Date().toISOString(),
+    });
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+export async function saveGame(game) {
+  const w = game.world;
+  let data;
+  try {
+    data = {
       v: 1,
       seedStr: game.seedStr,
       time: game.time,
@@ -40,25 +133,52 @@ export function saveGame(game) {
       inv: game.inventory ? game.inventory.serialize() : null,
       savedAt: Date.now(),
     };
-    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
-    return true;
   } catch (e) {
-    console.warn("[trollrreria] save failed:", e);
+    console.warn("[trollrreria] save serialize failed:", e);
     return false;
   }
+
+  // Uses the synchronously-cached user id (kept fresh via boot + the
+  // auth-changed event) rather than re-awaiting getSession() here -- an
+  // async round trip is too slow to trust during beforeunload.
+  if (cachedUserId) {
+    // synchronous local backup first -- covers beforeunload, where the
+    // async cloud write below may get killed mid-flight by the browser.
+    writeLocal(cloudCacheKey(cachedUserId), data);
+    return saveCloudSave(cachedUserId, data);
+  }
+  return writeLocal(GUEST_KEY, data);
 }
 
-export function loadSaveData() {
-  try {
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) return null;
-    const data = JSON.parse(raw);
-    if (!data || data.v !== 1 || !data.tiles) return null;
-    return data;
-  } catch (e) {
-    console.warn("[trollrreria] corrupt save discarded:", e);
-    return null;
+/* One-time migration of the pre-account global save into whichever real
+   account first logs in after this update, so nobody loses progress --
+   then the legacy key is deleted so it can never leak into guest mode. */
+async function migrateLegacySave(userId) {
+  const legacy = readLocal(SAVE_KEY);
+  if (!legacy) return null;
+  await saveCloudSave(userId, legacy);
+  writeLocal(cloudCacheKey(userId), legacy);
+  try { localStorage.removeItem(SAVE_KEY); } catch { /* ignore */ }
+  return legacy;
+}
+
+export async function loadSaveData() {
+  const session = await getSessionSafe();
+  if (!session) return readLocal(GUEST_KEY);
+
+  const migrated = await migrateLegacySave(session.userId);
+  if (migrated) return migrated;
+
+  const cloud = await loadCloudSave(session.userId);
+  const cached = readLocal(cloudCacheKey(session.userId));
+  // prefer whichever is newer -- covers a beforeunload cloud write that
+  // never finished, where the local cache is ahead of what's in Supabase.
+  if (cloud && (!cached || cloud.updatedAt >= (cached.savedAt || 0))) return cloud.save;
+  if (cached) {
+    if (!cloud || cached.savedAt > cloud.updatedAt) void saveCloudSave(session.userId, cached);
+    return cached;
   }
+  return null;
 }
 
 /* Restore layers into an existing world instance (same dimensions). */
@@ -78,8 +198,20 @@ export function applyWorldLayers(world, data) {
   world.rebuildTopSolid();
 }
 
-export function clearSave() {
-  try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* ignore */ }
+export async function clearSave() {
+  try { localStorage.removeItem(SAVE_KEY); } catch { /* ignore */ }
+  const session = await getSessionSafe();
+  if (session) {
+    try { localStorage.removeItem(cloudCacheKey(session.userId)); } catch { /* ignore */ }
+    const sb = window.TrollrunnerAccounts?.getClient?.();
+    if (sb) {
+      try {
+        await sb.from("troll_game_saves").delete().eq("user_id", session.userId).eq("game_id", GAME_ID);
+      } catch { /* ignore */ }
+    }
+    return;
+  }
+  try { localStorage.removeItem(GUEST_KEY); } catch { /* ignore */ }
 }
 
 /* -------------------------------------------------------------- settings */

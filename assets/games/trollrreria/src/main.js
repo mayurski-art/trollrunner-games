@@ -33,7 +33,7 @@ import { Net } from "./net.js";
 const FIXED_DT = 1 / 60;
 
 class Game {
-  constructor(canvas) {
+  constructor(canvas, initialSaveData) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
     this.ctx.imageSmoothingEnabled = false;
@@ -71,8 +71,10 @@ class Game {
     this.sfx.setVolume(this.settings.volume !== undefined ? this.settings.volume : 0.6);
     this.music = new Music(this.sfx, this.settings.music !== undefined ? this.settings.music : 0.5);
 
-    /* boot into the last save if there is one, else a fresh world */
-    this.saveData = loadSaveData();
+    /* boot into the last save if there is one, else a fresh world.
+       Resolved asynchronously (account-aware) before construction -- see
+       boot() at the bottom of this file. */
+    this.saveData = initialSaveData || null;
     if (this.saveData) {
       this.applySave(this.saveData);
     } else {
@@ -89,6 +91,15 @@ class Game {
       if ((this.state === "play" || this.state === "pause") &&
           (!this.net.active || this.net.isHost)) saveGame(this);
       this.net.stop();
+    });
+    /* the parent desktop shell (mayurski-art.github.io) asks for a save
+       right before it resets this iframe back to the arcade home screen
+       on window close -- see twClose() in that repo's index.html. */
+    window.addEventListener("message", e => {
+      const allowed = ["https://mayurski-art.github.io", "https://www.trollrunner.net", "https://trollrunner.net"];
+      if (!allowed.includes(e.origin) || e.data?.type !== "trollrunner:request-save") return;
+      if ((this.state === "play" || this.state === "pause") &&
+          (!this.net.active || this.net.isHost)) saveGame(this);
     });
 
     this._last = performance.now();
@@ -1148,10 +1159,14 @@ class Game {
 }
 
 /* ------------------------------------------------------------------ boot */
-function boot() {
+async function boot() {
   const canvas = document.getElementById("tt-canvas");
   if (!canvas) { console.error("[trollrreria] canvas missing"); return; }
-  window.TT = new Game(canvas);
+  // Resolve which save applies (account cloud save, guest-local, or none)
+  // BEFORE building the world, so guests never see another account's
+  // world and each account only ever sees its own.
+  const saveData = await loadSaveData();
+  window.TT = new Game(canvas, saveData);
 }
 
 if (document.readyState === "loading") {

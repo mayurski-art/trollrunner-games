@@ -28,6 +28,19 @@
       </div>
       <div id="hotbar" aria-label="Hotbar"></div>
       <canvas id="minimap" width="220" height="124" aria-label="Minimap"></canvas>
+      <button id="btn-hotkeys" class="hud-hotkeys-btn" type="button" aria-label="Show controls" title="Controls (F1)">?</button>
+    </div>
+
+    <!-- Controls reference (toggle with the ? button or F1) -->
+    <div id="hotkeys-panel" class="tt-panel" hidden>
+      <h3>Controls</h3>
+      <div class="menu-controls">
+        <span><kbd>A</kbd><kbd>D</kbd> move · <kbd>Space</kbd> jump</span>
+        <span><kbd>LMB</kbd> use / mine · <kbd>RMB</kbd> interact</span>
+        <span><kbd>E</kbd> inventory · <kbd>M</kbd> map · <kbd>1–0</kbd> hotbar</span>
+        <span><kbd>Esc</kbd> pause · <kbd>F1</kbd> toggle this panel</span>
+      </div>
+      <button id="btn-hotkeys-close" class="btn-ghost" type="button">Close</button>
     </div>
 
     <!-- Boss health -->
@@ -146,6 +159,7 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
+  <script src="https://mayurski-art.github.io/assets/js/troll-accounts.js" defer></script>
   <script src="assets/js/troll-leaderboard.js?v=lb-engine-v1" defer></script>
   <script src="assets/games/trollrreria/leaderboard.js?v=tt1" defer></script>
   <script type="module" src="assets/games/trollrreria/src/main.js?v=tt1"></script>
