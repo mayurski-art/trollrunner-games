@@ -44,7 +44,9 @@ export class UI {
       screenLb: document.getElementById("screen-lb"),
       deathCause: document.getElementById("death-cause"),
       btnContinue: document.getElementById("btn-continue"),
+      hotkeysPanel: document.getElementById("hotkeys-panel"),
     };
+    this.hotkeysOpen = false;
     this._hudDirty = true;
     this._invDirty = true;
     this._statusAcc = 0;
@@ -91,12 +93,15 @@ export class UI {
     });
     document.getElementById("btn-lb-back").addEventListener("click", () => this.showTitle(this._hadSave));
     document.getElementById("btn-resume").addEventListener("click", () => game.enterPlay());
-    document.getElementById("btn-save").addEventListener("click", e => {
-      const ok = saveGame(game);
+    document.getElementById("btn-save").addEventListener("click", async e => {
+      e.target.textContent = "💾 Saving…";
+      const ok = await saveGame(game);
       e.target.textContent = ok ? "💾 Saved ✓" : "💾 Save failed";
       setTimeout(() => { e.target.textContent = "💾 Save world"; }, 1500);
     });
     document.getElementById("btn-quit").addEventListener("click", () => game.quitToTitle());
+    document.getElementById("btn-hotkeys").addEventListener("click", () => this.toggleHotkeys());
+    document.getElementById("btn-hotkeys-close").addEventListener("click", () => this.toggleHotkeys(false));
     document.getElementById("btn-coop-host").addEventListener("click", () => game.hostCoop());
     document.getElementById("btn-coop-join").addEventListener("click", () =>
       game.joinCoop(document.getElementById("coop-code").value));
@@ -569,6 +574,11 @@ export class UI {
   }
 
   /* ------------------------------------------------------------ panels */
+  toggleHotkeys(force) {
+    this.hotkeysOpen = force !== undefined ? force : !this.hotkeysOpen;
+    this.el.hotkeysPanel.hidden = !this.hotkeysOpen;
+  }
+
   toggleInventory(force) {
     this.invOpen = force !== undefined ? force : !this.invOpen;
     this.el.invPanel.hidden = !this.invOpen;
@@ -698,6 +708,7 @@ export class UI {
 
     if (input.hit("KeyE")) this.toggleInventory();
     if (input.hit("KeyM")) this.toggleBigMap();
+    if (input.hit("F1")) this.toggleHotkeys();
     if (input.hit("Escape")) {
       if (this.bigMapOpen) this.toggleBigMap(false);
       else if (this.shopNpc) this.closeShop();
