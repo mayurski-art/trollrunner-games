@@ -1,6 +1,23 @@
-// localStorage persistence: high score, coin bank, unlocks, settings.
+// Persistence: high score, coin bank, unlocks, settings.
+//
+// Account scoping (fixes progress bleeding between accounts / guests):
+//   - Logged in  -> cloud save in troll_game_saves (RLS: owner-only),
+//                   mirrored into a local per-account cache key as a
+//                   synchronous backup for beforeunload.
+//   - Logged out -> a separate local-only "guest" key. Never reads or
+//                   writes any account's data.
+//   - The old pre-account global key (KEY) is migrated into the first
+//     real account that logs in and then deleted.
+//
+// The constructor loads synchronously from the guest key (or defaults) so
+// the game can boot immediately; call hydrate() right after construction
+// to resolve the real account/guest save once login state is known, then
+// refresh anything already rendered with the synchronous defaults.
 
 const KEY = 'trollDashMemeMetroSave_v1';
+const GAME_ID = 'meme-metro';
+const GUEST_KEY = `${KEY}:guest`;
+const cloudCacheKey = userId => `${KEY}:cloud-cache:${userId}`;
 
 const DEFAULTS = {
   highScore: 0,
@@ -18,13 +35,14 @@ const DEFAULTS = {
 
 export class StorageManager {
   constructor() {
-    this.data = this.load();
+    this.userId = null;
+    this.data = this.loadLocal(GUEST_KEY) || structuredClone(DEFAULTS);
   }
 
-  load() {
+  loadLocal(key) {
     try {
-      const raw = localStorage.getItem(KEY);
-      if (!raw) return structuredClone(DEFAULTS);
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
       const parsed = JSON.parse(raw);
       return {
         ...structuredClone(DEFAULTS),
@@ -32,15 +50,109 @@ export class StorageManager {
         settings: { ...DEFAULTS.settings, ...(parsed.settings || {}) },
       };
     } catch {
-      return structuredClone(DEFAULTS);
+      return null;
     }
   }
 
-  save() {
+  saveLocal(key, data) {
     try {
-      localStorage.setItem(KEY, JSON.stringify(this.data));
+      localStorage.setItem(key, JSON.stringify(data));
     } catch {
       // Private mode / quota — play on without persistence.
+    }
+  }
+
+  async getSessionSafe() {
+    try {
+      return await window.TrollrunnerAccounts?.getSession?.();
+    } catch {
+      return null;
+    }
+  }
+
+  async loadCloud(userId) {
+    const sb = window.TrollrunnerAccounts?.getClient?.();
+    if (!sb) return null;
+    try {
+      const { data, error } = await sb
+        .from('troll_game_saves')
+        .select('data, updated_at')
+        .eq('user_id', userId)
+        .eq('game_id', GAME_ID)
+        .maybeSingle();
+      if (error || !data) return null;
+      return { save: data.data, updatedAt: new Date(data.updated_at).getTime() };
+    } catch {
+      return null;
+    }
+  }
+
+  async saveCloud(userId, data) {
+    const sb = window.TrollrunnerAccounts?.getClient?.();
+    if (!sb) return false;
+    try {
+      const { error } = await sb.from('troll_game_saves').upsert({
+        user_id: userId,
+        game_id: GAME_ID,
+        data,
+        updated_at: new Date().toISOString(),
+      });
+      return !error;
+    } catch {
+      return false;
+    }
+  }
+
+  async migrateLegacy(userId) {
+    const legacy = this.loadLocal(KEY);
+    if (!legacy) return null;
+    await this.saveCloud(userId, legacy);
+    this.saveLocal(cloudCacheKey(userId), legacy);
+    try { localStorage.removeItem(KEY); } catch { /* ignore */ }
+    return legacy;
+  }
+
+  // Resolves the real account/guest save. Call once after construction;
+  // storage getters read live from this.data, so anything already
+  // rendered with the synchronous guest-key defaults should be
+  // re-rendered once this resolves.
+  async hydrate() {
+    const session = await this.getSessionSafe();
+    if (!session) {
+      this.userId = null;
+      this.data = this.loadLocal(GUEST_KEY) || structuredClone(DEFAULTS);
+      return this.data;
+    }
+    this.userId = session.userId;
+
+    const migrated = await this.migrateLegacy(session.userId);
+    if (migrated) {
+      this.data = migrated;
+      return this.data;
+    }
+
+    const cloud = await this.loadCloud(session.userId);
+    const cached = this.loadLocal(cloudCacheKey(session.userId));
+    if (cloud && (!cached || cloud.updatedAt >= (cached.savedAt || 0))) {
+      this.data = cloud.save;
+    } else if (cached) {
+      this.data = cached;
+      if (!cloud || cached.savedAt > cloud.updatedAt) void this.saveCloud(session.userId, cached);
+    } else {
+      this.data = structuredClone(DEFAULTS);
+    }
+    return this.data;
+  }
+
+  save() {
+    this.data.savedAt = Date.now();
+    if (this.userId) {
+      // synchronous local backup first -- covers beforeunload, where the
+      // async cloud write below may get killed mid-flight by the browser.
+      this.saveLocal(cloudCacheKey(this.userId), this.data);
+      void this.saveCloud(this.userId, this.data);
+    } else {
+      this.saveLocal(GUEST_KEY, this.data);
     }
   }
 
@@ -76,8 +188,18 @@ export class StorageManager {
     return newBest;
   }
 
-  resetAll() {
+  async resetAll() {
     this.data = structuredClone(DEFAULTS);
-    this.save();
+    if (this.userId) {
+      try { localStorage.removeItem(cloudCacheKey(this.userId)); } catch { /* ignore */ }
+      const sb = window.TrollrunnerAccounts?.getClient?.();
+      if (sb) {
+        try {
+          await sb.from('troll_game_saves').delete().eq('user_id', this.userId).eq('game_id', GAME_ID);
+        } catch { /* ignore */ }
+      }
+      return;
+    }
+    try { localStorage.removeItem(GUEST_KEY); } catch { /* ignore */ }
   }
 }

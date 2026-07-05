@@ -1756,6 +1756,7 @@
           mode: this.mode,
         });
       }
+      void window.TrollrunnerAccounts?.awardXp?.("versus_match", "troll-kombat");
       showResult(this.winnerIdx, this.byKO, this.fighters, this.mode);
     },
     draw(dt) {
@@ -1874,6 +1875,7 @@
   window.addEventListener("keydown", e => {
     const tag = e.target && e.target.tagName;
     if (tag === "SELECT" || tag === "INPUT" || tag === "TEXTAREA") return;
+    if (window.TrollrunnerSiteLock?.getComputedRecord?.()?.mode === "locked") return;
     if (pause.active) return;   // frozen: ignore fight input (keyup still clears held keys)
     for (let slot = 0; slot < keymaps.length; slot++) {
       const a = keymaps[slot][e.key]; if (!a) continue;
@@ -2120,6 +2122,7 @@
   window.addEventListener("keydown", e => {
     const tag = e.target && e.target.tagName;
     if (tag === "SELECT" || tag === "INPUT" || tag === "TEXTAREA") return;
+    if (window.TrollrunnerSiteLock?.getComputedRecord?.()?.mode === "locked") return;
     if (!pause.canControl()) return;
     const live = new Set(pause.humans());
     for (let slot = 0; slot < PAUSE_KEYS.length; slot++) {

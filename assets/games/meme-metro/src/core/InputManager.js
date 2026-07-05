@@ -10,6 +10,10 @@ export class InputManager {
 
     this.onKeyDown = (e) => {
       if (e.repeat) return;
+      // `inert` (see site-lock.js) blocks pointer/focus targeting but not
+      // this global window-level keydown listener, so an already-open run
+      // could otherwise keep steering through a site lock.
+      if (window.TrollrunnerSiteLock?.getComputedRecord?.()?.mode === 'locked') return;
       switch (e.code) {
         case 'ArrowLeft': case 'KeyA': e.preventDefault(); handlers.left(); break;
         case 'ArrowRight': case 'KeyD': e.preventDefault(); handlers.right(); break;

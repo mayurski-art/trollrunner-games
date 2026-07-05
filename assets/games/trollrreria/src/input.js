@@ -1,5 +1,14 @@
 /* Trollrreria — keyboard + mouse state. */
 
+// `inert` (see site-lock.js) blocks pointer/focus targeting but NOT global
+// window-level keydown listeners like the one below, so a site lock alone
+// wouldn't stop an already-open game from still reading movement keys.
+// Checked both on new keydowns and in down() so already-held keys stop
+// registering the instant the site locks, not just new presses.
+function isSiteLocked() {
+  return window.TrollrunnerSiteLock?.getComputedRecord?.()?.mode === "locked";
+}
+
 export class Input {
   constructor(canvas) {
     this.keys = new Set();          // currently held (KeyboardEvent.code)
@@ -10,7 +19,7 @@ export class Input {
     this.enabled = true;            // false while typing in DOM inputs
 
     window.addEventListener("keydown", e => {
-      if (!this.enabled) return;
+      if (!this.enabled || isSiteLocked()) return;
       /* don't steal keys from text fields (co-op room code, etc.) */
       if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;
       if (!this.keys.has(e.code)) this.pressed.add(e.code);
@@ -43,8 +52,8 @@ export class Input {
     }, { passive: false });
   }
 
-  down(code) { return this.keys.has(code); }
-  hit(code) { return this.pressed.has(code); }
+  down(code) { return !isSiteLocked() && this.keys.has(code); }
+  hit(code) { return !isSiteLocked() && this.pressed.has(code); }
 
   /* call at end of each frame */
   flush() {
