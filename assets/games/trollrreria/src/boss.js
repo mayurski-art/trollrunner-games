@@ -133,6 +133,7 @@ export class TrollKing extends Entity {
     game.announce(this.deathLine);
     this.onDefeat(game);
     game.recordProgress && game.recordProgress("boss");
+    void window.TrollrunnerAccounts?.awardXp?.("boss_kill", "trollrreria");
   }
 
   onDefeat(game) {

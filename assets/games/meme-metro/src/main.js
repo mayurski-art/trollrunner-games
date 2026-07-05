@@ -13,6 +13,13 @@ const ui = new UIManager();
 const game = new Game(canvas, { ui, storage, audio });
 const charSelect = new CharacterSelect(storage);
 
+// Resolves the real account/guest save (constructor loads guest-only
+// defaults synchronously so the game can boot immediately) -- refreshes
+// the menu's high score/coin display once the real numbers are known.
+void storage.hydrate().then(() => {
+  ui.showMenu({ highScore: storage.highScore, totalCoins: storage.totalCoins });
+});
+
 ui.bind({
   onStart: () => game.startRun(),
   onPauseToggle: () => game.togglePause(),
@@ -43,9 +50,9 @@ document.getElementById('btn-settings').addEventListener('click', () => {
   audio.play('click');
 });
 document.getElementById('btn-settings-back').addEventListener('click', () => game.exitToMenu());
-document.getElementById('btn-settings-reset').addEventListener('click', () => {
+document.getElementById('btn-settings-reset').addEventListener('click', async () => {
   if (window.confirm('Reset ALL save data? High score, coins and unlocks will be wiped.')) {
-    storage.resetAll();
+    await storage.resetAll();
     window.location.reload();
   }
 });
