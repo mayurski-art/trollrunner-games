@@ -18,6 +18,14 @@
    replaces the CSS-gradient fallback for that scene. Missing images are fine —
    the gradients keep the page presentable.
 
+   VIDEO LOOPS
+   A same-named .mp4 next to each PNG (scene-01-lobby.mp4, …) upgrades that
+   scene to a looping video layer on top of the still (which stays as the
+   poster / instant paint). Only the ACTIVE scene's video plays; the rest stay
+   paused. Videos start muted (autoplay policy); game.js routes its one sound
+   toggle here via setAudio(on) so the active cinematic scene carries the
+   clip's ambience when sound is on. Reduced-motion users get stills only.
+
    PUBLIC API
      init({ stage, viewport })         mount + preload; call once on page load
      fadeToScene(n) / zoomToScene(n) / slideToScene(n)   manual transitions
@@ -25,6 +33,7 @@
      enterGameplayMode()               scene 5 + "gameplay" event
      playWalkthrough()                 full 1→5 cinematic (skippable)
      replayIntro()                     leave gameplay, run the walkthrough again
+     setAudio(on)                      unmute/mute the active scene's video loop
      on(event, fn)                     "scene" | "gameplay" | "cinematic"
    ============================================================================ */
 (() => {
@@ -58,6 +67,9 @@
     playing: false,
     timer: 0,
     reducedMotion: false,
+    videos: new Map(),    // scene n -> <video> (only scenes whose .mp4 loaded)
+    audioOn: false,       // user intent from the shared sound toggle
+    gameplay: false,      // gameplay backdrop stays muted regardless
   };
   const listeners = { scene: new Set(), gameplay: new Set(), cinematic: new Set() };
   function emit(ev, data) { listeners[ev]?.forEach(fn => { try { fn(data); } catch (_) {} }); }
@@ -77,6 +89,12 @@
 
     preloadArt();
     bindParallax();
+
+    // Don't burn decode/battery in a background tab; resume where we were.
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) state.videos.forEach(v => { if (!v.paused) v.pause(); });
+      else if (!state.gameplay) playActiveVideo();
+    });
 
     // Advance early on click/tap anywhere during the cinematic (feels snappy).
     state.viewport.addEventListener("click", (e) => {
@@ -100,7 +118,64 @@
       };
       // onerror: keep the gradient fallback — intentional, not a bug.
       probe.src = url;
+
+      mountVideo(s, el);
     });
+  }
+
+  /* --------------------------------------------------------------------------
+     Video loops — a same-named .mp4 upgrades a scene to living footage. The
+     still underneath doubles as the poster, so nothing flashes while the
+     video buffers. Missing .mp4s are fine (the <video> errors out silently).
+     -------------------------------------------------------------------------- */
+  function mountVideo(s, el) {
+    if (state.reducedMotion) return;                 // stills only, by request
+    const v = document.createElement("video");
+    v.className = "scene-video";
+    v.muted = true;
+    v.loop = true;
+    v.playsInline = true;
+    v.setAttribute("playsinline", "");               // older iOS
+    v.preload = "auto";
+    v.src = ART_DIR + s.img.replace(/\.png$/i, ".mp4");
+    v.addEventListener("loadeddata", () => {
+      el.classList.add("has-video");
+      if (state.current === s.n) playActiveVideo();
+    }, { once: true });
+    v.addEventListener("error", () => { v.remove(); state.videos.delete(s.n); }, { once: true });
+    // Sits above .scene-bg, below haze/vignette so the grade still applies.
+    const haze = el.querySelector(".scene-haze");
+    haze.parentNode.insertBefore(v, haze);
+    state.videos.set(s.n, v);
+  }
+
+  // Play only the active scene's loop; everything else pauses (battery, decode).
+  // During gameplay the stage is hidden (#room-ambient took over), so nothing
+  // plays at all — an async play() must never outrace the gameplay pause.
+  function playActiveVideo() {
+    state.videos.forEach((v, n) => {
+      if (n === state.current && !state.gameplay) {
+        applyAudioTo(v);
+        if (v.paused) { try { v.currentTime = 0; } catch (_) {} }
+        v.play().catch(() => { v.muted = true; v.play().catch(() => {}); });
+      } else if (!v.paused) {
+        v.pause();
+      }
+    });
+  }
+
+  function applyAudioTo(v) {
+    v.muted = !(state.audioOn && !state.gameplay);
+  }
+
+  // game.js routes its one sound toggle here; gameplay always stays muted so
+  // scene ambience never fights the table SFX.
+  function setAudio(on) {
+    state.audioOn = !!on;
+    const v = state.videos.get(state.current);
+    if (!v) return;
+    applyAudioTo(v);
+    if (!v.muted && v.paused) v.play().catch(() => { v.muted = true; v.play().catch(() => {}); });
   }
 
   function sceneEl(n) { return state.stage.querySelector(`.scene[data-scene="${n}"]`); }
@@ -135,6 +210,7 @@
 
     renderCaption(SCENES[n - 1]);
     state.dots.forEach((d, i) => d.classList.toggle("is-on", i < n));
+    playActiveVideo();
     emit("scene", { n, transition: t });
   }
 
@@ -197,20 +273,25 @@
   function enterGameplayMode() {
     clearTimeout(state.timer);
     state.playing = false;
+    state.gameplay = true;
     show(5, "zoom");
     state.viewport.classList.remove("is-cinematic");
     state.viewport.classList.add("is-gameplay");
+    // The scene stage is hidden during gameplay (#room-ambient takes over),
+    // so stop every loop instead of decoding video nobody can see.
+    state.videos.forEach(v => { if (!v.paused) v.pause(); });
     emit("cinematic", { playing: false });
     emit("gameplay", {});
   }
 
   function replayIntro() {
+    state.gameplay = false;
     state.viewport.classList.remove("is-gameplay");
     playWalkthrough();
   }
 
   window.TrollCasinoScenes = {
-    init, on, show,
+    init, on, show, setAudio,
     fadeToScene, zoomToScene, slideToScene, focusCharacter,
     playWalkthrough, skip, enterGameplayMode, replayIntro,
     current: () => state.current,

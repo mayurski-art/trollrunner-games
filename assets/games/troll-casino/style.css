@@ -122,6 +122,25 @@ button:focus-visible, a:focus-visible {
   to   { transform: translate3d(calc(var(--par-x) * -1px), calc(var(--par-y) * -1px), 0) scale(1.08); }
 }
 
+/* Video loops — scenes.js mounts a .scene-video over the still when a
+   same-named .mp4 exists. The still stays underneath as the poster; the video
+   fades in once it's actually playing. Same bleed + parallax as .scene-bg so
+   pointer drift moves footage and poster together (no drift seam). */
+.scene-video {
+  position: absolute;
+  inset: -6%;
+  width: 112%;
+  height: 112%;
+  object-fit: cover;
+  transform: translate3d(calc(var(--par-x) * 1px), calc(var(--par-y) * 1px), 0);
+  opacity: 0;
+  transition: opacity 700ms ease;
+  pointer-events: none;
+}
+.scene.is-active .scene-video { opacity: 1; }
+/* Footage brings its own motion — stop the Ken Burns drift under a video. */
+.scene.has-video.is-active .scene-bg { animation: none; }
+
 /* Gradient fallbacks — one mood per scene, used until real art loads. */
 .scene[data-scene="1"] .scene-bg { background-image: radial-gradient(120% 90% at 50% 0%, #1b0b33 0%, #07001a 55%, #030006 100%); }
 .scene[data-scene="2"] .scene-bg { background-image: radial-gradient(90% 80% at 50% 55%, #101c33 0%, #0a0326 55%, #030006 100%); }
