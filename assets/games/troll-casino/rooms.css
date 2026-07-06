@@ -19,6 +19,11 @@
 
 .game-room { animation: tc-in-fade 450ms ease both; }
 
+/* The hidden attribute must always win — .floor-view's display:flex was
+   overriding it, leaving the floor stacked above an opened room so players
+   had to scroll down to find the game they just picked. */
+.game-view [hidden] { display: none !important; }
+
 /* Dedicated ambient backdrop — game.js swaps its image per floor/room. Sits
    behind .game-view, replacing the walkthrough's scene-stage once gameplay
    begins (that stage is hidden below) so there's exactly one system writing
@@ -32,6 +37,15 @@
   transition: opacity 320ms ease;
 }
 .room-ambient.is-shown { opacity: 1; }
+/* game.js drops a muted looping <video> in here for .mp4 ambients; it fills
+   the element and inherits its blur/dim filter, with the .png twin painting
+   underneath as the instant poster. */
+.room-ambient video {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
 .casino-viewport.is-gameplay .scene-stage { display: none; }
 
 .floor-view { display: flex; flex-direction: column; gap: 16px; }

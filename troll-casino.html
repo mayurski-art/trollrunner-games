@@ -12,8 +12,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Audiowide&family=DM+Sans:wght@500;700;900&family=DM+Mono:wght@500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/troll-leaderboard.css?v=lb-engine-v1">
   <link rel="stylesheet" href="assets/css/troll-wallet.css?v=lab-v1">
-  <link rel="stylesheet" href="assets/games/troll-casino/style.css?v=casino-v2">
-  <link rel="stylesheet" href="assets/games/troll-casino/rooms.css?v=casino-v2">
+  <link rel="stylesheet" href="assets/games/troll-casino/style.css?v=casino-v3">
+  <link rel="stylesheet" href="assets/games/troll-casino/rooms.css?v=casino-v3">
 </head>
 <body>
 
@@ -192,14 +192,14 @@
 
   <!-- Leaderboard engine + casino modules -->
   <script src="assets/js/troll-leaderboard.js?v=lb-engine-v1" defer></script>
-  <script src="assets/games/troll-casino/scenes.js?v=casino-v2" defer></script>
-  <script src="assets/games/troll-casino/casino-wallet.js?v=casino-v2" defer></script>
-  <script src="assets/games/troll-casino/leaderboard.js?v=casino-v2" defer></script>
-  <script src="assets/games/troll-casino/game.js?v=casino-v2" defer></script>
+  <script src="assets/games/troll-casino/scenes.js?v=casino-v3" defer></script>
+  <script src="assets/games/troll-casino/casino-wallet.js?v=casino-v3" defer></script>
+  <script src="assets/games/troll-casino/leaderboard.js?v=casino-v3" defer></script>
+  <script src="assets/games/troll-casino/game.js?v=casino-v3" defer></script>
   <!-- game rooms — must load AFTER game.js (they register with TrollCasino) -->
-  <script src="assets/games/troll-casino/blackjack.js?v=casino-v2" defer></script>
-  <script src="assets/games/troll-casino/slots.js?v=casino-v2" defer></script>
-  <script src="assets/games/troll-casino/crash.js?v=casino-v2" defer></script>
+  <script src="assets/games/troll-casino/blackjack.js?v=casino-v3" defer></script>
+  <script src="assets/games/troll-casino/slots.js?v=casino-v3" defer></script>
+  <script src="assets/games/troll-casino/crash.js?v=casino-v3" defer></script>
 
   <script defer>
     // Page glue: boot the scene engine and hand the walkthrough buttons to it.
@@ -208,11 +208,20 @@
       S.init({ stage: "#scene-stage", viewport: "#casino-viewport" });
 
       const cta = document.getElementById("landing-cta");
-      document.getElementById("enter-casino").addEventListener("click", () => {
-        cta.remove();
-        S.playWalkthrough();
-      });
+      const start = () => { cta?.remove(); S.playWalkthrough(); };
+      document.getElementById("enter-casino").addEventListener("click", start);
       document.getElementById("skip-intro").addEventListener("click", () => S.skip());
+
+      // Remember reaching the floor so repeat hub boots skip the film.
+      S.on("gameplay", () => { try { localStorage.setItem("tc-intro-seen", "1"); } catch (_) {} });
+
+      // Launched from the arcade hub (?boot=1): the hub click already said
+      // "play", so no second Enter click. First-ever visit still gets the
+      // walkthrough; repeat visits land straight on the casino floor.
+      if (new URLSearchParams(location.search).has("boot")) {
+        if (localStorage.getItem("tc-intro-seen")) { cta?.remove(); S.enterGameplayMode(); }
+        else start();
+      }
     });
   </script>
 

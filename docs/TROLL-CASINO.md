@@ -68,6 +68,19 @@ close-up → seated, skippable and tap-advancing; `replayIntro()` re-runs it
 from the table. Scenes are reusable for future intros/loading/mode
 transitions: call `show(n, "zoom")` etc. from any new mode.
 
+**Video loops.** A same-named `.mp4` beside each scene PNG upgrades it to
+looping footage (PNG stays as the poster; only the active scene decodes).
+Audio follows the page's single sound toggle via
+`TrollCasinoScenes.setAudio(on)` — game.js calls it; gameplay stays muted so
+ambience never fights table SFX. `#room-ambient` accepts `.mp4` URLs too
+(game.js mounts a muted looping `<video>` under its blur/dim filter): the
+floor loops scene 1, the wheel room loops scene 5.
+
+**Fewer clicks.** `?boot=1` (how the hub launches the page) skips the Enter
+button: first-ever visit auto-plays the walkthrough, repeats jump straight to
+the floor (`tc-intro-seen` in localStorage). `openRoom()` also auto-clicks the
+room hero's sit CTA, so one tap on a floor card lands in the game.
+
 ## The Troll Wheel
 
 24 segments, defined once in `SEGMENTS` (game.js). Zone counts, odds shown in

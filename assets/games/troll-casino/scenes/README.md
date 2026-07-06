@@ -4,6 +4,13 @@ Drop the five cinematic renders into THIS folder with EXACTLY these names
 (scenes.js preloads them; until a file exists, that scene shows a styled
 neon-gradient fallback, so partial drops are fine):
 
+**Video loops:** a same-named `.mp4` next to a PNG (e.g. `scene-01-lobby.mp4`)
+upgrades that scene to looping footage — the PNG stays underneath as the
+instant-paint poster. Only the active scene's video plays; audio follows the
+casino's one sound toggle (muted by default). `scene-01-lobby.mp4` also loops
+(blurred/dimmed) behind the casino floor, and `scene-05-first-person-wheel.mp4`
+behind the wheel room. Reduced-motion visitors get the stills.
+
 | File | Scene | Shot |
 |---|---|---|
 | `scene-01-lobby.png` | 1 · Arrival | Grand entrance: TROLL CASINO sign, glowing floor logo, characters at the far table |

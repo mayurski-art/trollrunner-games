@@ -309,7 +309,7 @@
      one static photo forever. Kept off scenes.js's own scene-5 node so there's
      no race between two separate image preloaders writing the same element.
      -------------------------------------------------------------------------- */
-  const LOBBY_AMBIENT = "assets/games/troll-casino/scenes/scene-01-lobby.png";
+  const LOBBY_AMBIENT = "assets/games/troll-casino/scenes/scene-01-lobby.mp4";
   let ambientTimer = 0;
   let ambientReady = false;    // has #room-ambient ever shown an image yet?
   function setAmbient(url) {
@@ -317,10 +317,32 @@
     if (!el || !url || el.dataset.ambient === url) return;
     el.dataset.ambient = url;
     clearTimeout(ambientTimer);   // cancel any in-flight swap so only the latest call ever lands
-    const swap = () => { el.style.backgroundImage = `url("${url}")`; el.classList.add("is-shown"); ambientReady = true; };
+    const swap = () => { paintAmbient(el, url); el.classList.add("is-shown"); ambientReady = true; };
     if (!ambientReady) { swap(); return; }   // first image ever: nothing to fade out
     el.classList.remove("is-shown");
     ambientTimer = setTimeout(swap, 320);
+  }
+
+  // An .mp4 ambient gets a muted looping <video> child (inheriting the
+  // element's blur/dim filter); its .png twin paints underneath as the
+  // instant poster. Static art keeps the plain background-image path.
+  function paintAmbient(el, url) {
+    const isVideo = /\.mp4$/i.test(url);
+    el.style.backgroundImage = `url("${isVideo ? url.replace(/\.mp4$/i, ".png") : url}")`;
+    let v = el.querySelector("video");
+    if (isVideo && !REDUCED) {
+      if (!v) {
+        v = document.createElement("video");
+        v.muted = true; v.loop = true; v.playsInline = true;
+        v.setAttribute("playsinline", ""); v.preload = "auto";
+        v.addEventListener("error", () => v.remove());
+        el.appendChild(v);
+      }
+      if (!v.src.endsWith(url)) v.src = url;
+      v.play().catch(() => {});
+    } else if (v) {
+      v.pause(); v.remove();
+    }
   }
 
   function init() {
@@ -637,11 +659,16 @@
         renderStakes();
       }));
 
+    // One sound state for the whole page: the synth SFX and the scene-video
+    // ambience both follow this toggle.
     const sound = $("#sound-toggle");
     sound.setAttribute("aria-pressed", String(!AudioFX.muted));
+    window.TrollCasinoScenes?.setAudio(!AudioFX.muted);
     sound.addEventListener("click", () => {
       AudioFX.ensure();
-      sound.setAttribute("aria-pressed", String(AudioFX.toggle()));
+      const on = AudioFX.toggle();
+      sound.setAttribute("aria-pressed", String(on));
+      window.TrollCasinoScenes?.setAudio(on);
     });
 
     $("#replay-intro").addEventListener("click", () => window.TrollCasinoScenes?.replayIntro());
@@ -732,6 +759,11 @@
     AudioFX.ensure(); AudioFX.chip();
     setAmbient(def.playArt || def.art);
     try { def.onEnter && def.onEnter(); } catch (_) {}
+    // One click on the floor card means "play" — auto-sit past the room's
+    // hero CTA so nobody has to scroll down and click a second button.
+    if (!el.classList.contains("is-playing")) {
+      el.querySelector('.room-hero [data-act="sit"]')?.click();
+    }
   }
 
   function backToFloor() {
@@ -781,7 +813,7 @@
     host: "Hosted by Trollface", tagline: "24 segments. One rug. The house always trolls.",
     cta: "Spin the wheel",
     art: "assets/games/troll-casino/scenes/scene-05-first-person-wheel.png",
-    playArt: "assets/games/troll-casino/scenes/scene-05-first-person-wheel.png",
+    playArt: "assets/games/troll-casino/scenes/scene-05-first-person-wheel.mp4",
     onEnter: () => requestAnimationFrame(() => { table.renderer.resize(); table.renderer.draw(table.rotation); }),
   });
 
