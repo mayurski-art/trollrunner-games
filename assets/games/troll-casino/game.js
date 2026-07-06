@@ -313,8 +313,10 @@
     buildBetBoard();
     buildChipRack();
     buildPaytable();
+    renderFloor();
     renderMoreTables();
     bindControls();
+    $("#back-to-floor")?.addEventListener("click", backToFloor);
 
     wallet().onChange(renderWallet);
     wallet().mountWalletChip("#wallet-mount");
@@ -323,8 +325,9 @@
     // Idle drift so the table feels alive between spins.
     if (!REDUCED) idleDrift();
 
-    // Scene engine handoff: size the canvas once the game view is visible.
+    // Scene engine handoff: the walkthrough always lands on the casino floor.
     window.TrollCasinoScenes?.on("gameplay", () => {
+      if (activeRoom) backToFloor();
       requestAnimationFrame(() => { table.renderer.resize(); table.renderer.draw(table.rotation); });
     });
   }
@@ -501,17 +504,8 @@
 
     pushOutcome(zone);
 
-    // Weekly ladder (mock rivals; currency-neutral stats so $TROLL and USDC
-    // sessions rank together fairly).
-    window.TrollLeaderboard?.record("troll-casino", {
-      won, mult: won ? zone.pays : 0, zone: zoneId,
-    });
-
-    // Real per-account stats/XP — no-ops for guests, same as the other games.
-    void window.TrollrunnerAccounts?.reportGameResult?.("troll-casino", won ? zone.pays * 100 : 0, {
-      zone: zoneId, won, currency: wallet().getCurrency(),
-      staked: totalStaked, payout,
-    });
+    // Shared ladder + XP, same call every casino game makes.
+    reportRound("wheel", { won, mult: zone.pays, zone: zoneId, meta: { staked: totalStaked, payout } });
   }
 
   function showBanner(result) {
@@ -644,31 +638,133 @@
     });
   }
 
-  /* --- future game modes ------------------------------------------------------- */
+  /* ==========================================================================
+     CASINO FLOOR + GAME ROOMS
+     Every game — this wheel included — registers itself here. The floor view
+     is the lobby the walkthrough lands on; openRoom()/backToFloor() swap
+     between it and a game's <section class="game-room">. Sibling modules
+     (blackjack.js / slots.js / crash.js) call TrollCasino.registerGame at
+     script-eval time (before DOMContentLoaded), so the floor renders complete.
+
+     def shape: { id, room, name, emoji, color, host, tagline, cta, art,
+                  onEnter?(), onLeave?() }
+     ========================================================================== */
   const gameRegistry = new Map();
+  let activeRoom = null;
+
   function registerGame(def) {
     if (!def?.id) return;
     gameRegistry.set(def.id, def);
-    renderMoreTables();
   }
+
+  function renderFloor() {
+    const floor = $("#floor-view");
+    if (!floor) return;
+    floor.innerHTML =
+      `<div class="floor-head">
+         <p class="floor-kicker">Casino floor</p>
+         <h2>Pick a table</h2>
+       </div>` +
+      `<div class="floor-grid">` +
+      [...gameRegistry.values()].map(g => `
+        <button type="button" class="floor-card" data-game="${g.id}" style="--fc:${g.color}">
+          <span class="fc-art" data-art aria-hidden="true"><span class="fc-emoji">${g.emoji}</span></span>
+          <span class="fc-body">
+            <span class="fc-host">${g.host}</span>
+            <strong class="fc-name">${g.name}</strong>
+            <span class="fc-tag">${g.tagline}</span>
+            <span class="fc-boot">▶ ${g.cta || "Play"}</span>
+          </span>
+        </button>`).join("") +
+      `</div>`;
+
+    // Hero-art probes — cards keep their gradient+emoji tile until art exists.
+    gameRegistry.forEach(g => {
+      if (!g.art) return;
+      const tile = floor.querySelector(`[data-game="${g.id}"] [data-art]`);
+      const probe = new Image();
+      probe.onload = () => { tile.style.backgroundImage = `url("${g.art}")`; tile.classList.add("has-art"); };
+      probe.src = g.art;
+    });
+
+    floor.addEventListener("click", (e) => {
+      const card = e.target.closest(".floor-card");
+      if (card) openRoom(card.dataset.game);
+    });
+  }
+
+  function roomEl(def) { return def && def.room ? document.getElementById(def.room) : null; }
+
+  function openRoom(id) {
+    const def = gameRegistry.get(id);
+    const el = roomEl(def);
+    if (!el) return;
+    if (activeRoom) backToFloor();
+    $("#floor-view").hidden = true;
+    el.hidden = false;
+    el.classList.add("is-active");
+    const back = $("#back-to-floor");
+    if (back) back.hidden = false;
+    activeRoom = id;
+    AudioFX.ensure(); AudioFX.chip();
+    try { def.onEnter && def.onEnter(); } catch (_) {}
+  }
+
+  function backToFloor() {
+    const def = gameRegistry.get(activeRoom);
+    const el = roomEl(def);
+    if (el) { el.hidden = true; el.classList.remove("is-active"); }
+    try { def && def.onLeave && def.onLeave(); } catch (_) {}
+    activeRoom = null;
+    $("#floor-view").hidden = false;
+    const back = $("#back-to-floor");
+    if (back) back.hidden = true;
+  }
+
+  // Side-rail quick links from the wheel room to the other tables.
   function renderMoreTables() {
     const el = $("#more-tables");
     if (!el) return;
     el.innerHTML = [...gameRegistry.values()]
-      .filter(g => !g.live)
-      .map(g => `<span>${g.name} · soon</span>`)
+      .filter(g => g.id !== "wheel")
+      .map(g => `<button type="button" class="mt-link" data-room="${g.id}">${g.emoji} ${g.name}</button>`)
       .join("") || `<span>More tables soon</span>`;
+    el.addEventListener("click", (e) => {
+      const btn = e.target.closest(".mt-link");
+      if (btn) openRoom(btn.dataset.room);
+    });
   }
-  registerGame({ id: "troll-wheel", name: "Troll Wheel", live: true });
-  registerGame({ id: "troll-slots", name: "Troll Slots", live: false });
-  registerGame({ id: "troll-blackjack", name: "Blackjack 🧌", live: false });
-  registerGame({ id: "rug-crash", name: "Rug Crash", live: false });
+
+  /* --------------------------------------------------------------------------
+     reportRound — the ONE integration call for every casino game's finished
+     round. Feeds the shared weekly ladder + real per-account XP identically
+     for wheel/blackjack/slots/crash. mult = payout multiple (0 on a loss).
+     -------------------------------------------------------------------------- */
+  function reportRound(game, { won, mult, zone, meta }) {
+    window.TrollLeaderboard?.record("troll-casino", {
+      won: !!won, mult: won ? mult : 0, zone: zone || game,
+    });
+    void window.TrollrunnerAccounts?.reportGameResult?.("troll-casino",
+      won ? Math.round(mult * 100) : 0,
+      Object.assign({ game, won, currency: wallet().getCurrency() }, meta || {}));
+  }
+
+  // The wheel is a room like any other game.
+  registerGame({
+    id: "wheel", room: "room-wheel",
+    name: "Troll Wheel", emoji: "🧌", color: "#3dff8a",
+    host: "Hosted by Trollface", tagline: "24 segments. One rug. The house always trolls.",
+    cta: "Spin the wheel",
+    art: "assets/games/troll-casino/scenes/scene-05-first-person-wheel.png",
+    onEnter: () => requestAnimationFrame(() => { table.renderer.resize(); table.renderer.draw(table.rotation); }),
+  });
 
   /* --- boot ---------------------------------------------------------------------- */
   document.addEventListener("DOMContentLoaded", init);
 
   window.TrollCasino = {
-    registerGame,
+    registerGame, openRoom, backToFloor, reportRound,
+    audio: AudioFX, makeFX,
     spin,
     model: { ZONES, SEGMENTS, zoneCounts, resolveSpin },
   };
