@@ -48,6 +48,12 @@
         <div class="scene" data-scene="5"><div class="scene-inner"><div class="scene-bg"></div><div class="scene-haze"></div><div class="scene-vignette"></div></div></div>
       </div>
 
+      <!-- Post-walkthrough ambient backdrop — game.js owns this exclusively and
+           swaps its image per floor/room (lobby art, each game's own gameplay
+           art). Kept separate from .scene-stage above so nothing else ever
+           writes to this element. -->
+      <div class="room-ambient" id="room-ambient" aria-hidden="true"></div>
+
       <!-- caption block — scenes.js rewrites this per scene -->
       <div class="scene-caption" aria-live="polite"></div>
 
