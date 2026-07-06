@@ -448,7 +448,7 @@ class Game {
         if (house) {
           if (!hasMerchant) {
             this.npcs.push(new MerchantTroll(house.cx, house.cy + 1));
-            this.announce("🧌 A Merchant Troll moved into your house!");
+            this.announce("🐕 Doge the Miner moved into your house!");
           }
           const guide = this.npcs.find(n => !n.shop);
           if (guide) { guide.homeX = house.cx * TILE; this._guideHomeless = false; }
@@ -530,6 +530,34 @@ class Game {
   }
 
   /* ==================================================== world editing */
+  /* Touch-assist: taps aren't tile-precise, so when the tapped tile is
+     empty, snap to the nearest breakable tile in the 8 neighbours (still
+     reach-checked by the caller). Returns {tx,ty} or null. */
+  snapMineTarget(m, tool) {
+    const world = this.world;
+    const breakable = (tx, ty) => {
+      const def = TILES[world.get(tx, ty)];
+      if (!def || def.hp === undefined || def.hp === Infinity) return false;
+      /* respect tool gating so the snap never "helpfully" bonks the wrong
+         material (axes snap to trees, picks skip them) */
+      if (def.tool === "axe" && tool && tool.tool !== "axe") return false;
+      if (def.tool === "pick" && tool && tool.tool === "axe") return false;
+      return true;
+    };
+    if (breakable(m.tx, m.ty)) return m;
+    let best = null, bestD = Infinity;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue;
+        const tx = m.tx + dx, ty = m.ty + dy;
+        if (!breakable(tx, ty)) continue;
+        const d = ((tx + 0.5) * TILE - m.x) ** 2 + ((ty + 0.5) * TILE - m.y) ** 2;
+        if (d < bestD) { bestD = d; best = { tx, ty }; }
+      }
+    }
+    return best;
+  }
+
   /* One tick of mining at (tx,ty) with a tool def. */
   mineTick(tx, ty, tool, player) {
     const world = this.world;
@@ -564,6 +592,14 @@ class Game {
       if (tool.power < (def.pow || 0)) {
         player.startSwing(1 / tool.speed);
         burst(this, tx * TILE + 8, ty * TILE + 8, "#c9c2b8", 1, { life: 0.25, spread: 60 });
+        /* say WHY nothing is happening — a plain particle puff reads as
+           "broken", not "underpowered" (throttled so it doesn't spam) */
+        const now = performance.now();
+        if (!this._weakToolAt || now - this._weakToolAt > 1500) {
+          this._weakToolAt = now;
+          this.floatText(tx * TILE + 8, ty * TILE - 6,
+            tool.tool === "axe" ? "Need a stronger axe" : "Need a stronger pick", "#9a92b8");
+        }
         return;
       }
     }
@@ -893,21 +929,24 @@ class Game {
   }
 
   /* ========================================================== combat */
-  /* Melee swing: hitbox in front of the player. */
-  meleeSwing(def) {
+  /* Melee sweep: called every frame while a swing is live (player.melee).
+     Each swing has an id; an enemy is only hurt once per swing, so holding
+     the blade through a crowd clips everyone exactly once per arc. */
+  meleeSweep(swing) {
     const p = this.player;
     if (!p) return;
+    const def = swing.def;
     const reach = 46 * (def.arc || 1);
     const box = {
       x: p.dir > 0 ? p.x + p.w - 8 : p.x - reach + 8,
       y: p.y - 10, w: reach, h: p.h + 16,
     };
     for (const e of this.enemies) {
-      if (!e.dead && aabb(box, e.box)) {
+      if (!e.dead && e._swingHit !== swing.id && aabb(box, e.box)) {
+        e._swingHit = swing.id;
         e.hurt(this, def.dmg, p.cx, (def.knock || 200) / 200);
       }
     }
-    this.sfx && this.sfx.swing();
   }
 
   /* Bow: consumes one arrow, fires toward the mouse. Returns success. */

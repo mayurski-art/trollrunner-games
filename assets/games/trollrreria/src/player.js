@@ -21,9 +21,12 @@ const CELL = 136;
 const BODY_H = 58;            // drawn height in world px
 
 export class Player extends Entity {
+  static _swingSeq = 0;          // unique id per melee swing (hit dedup)
+
   constructor(tx, ty) {
     super(tx * TILE + (TILE - PLAYER_W) / 2, ty * TILE - PLAYER_H, PLAYER_W, PLAYER_H);
     this.dir = 1;
+    this.melee = null;           // live swing: { def, t, id }
     this.hp = 100; this.maxHp = 100;
     this.breath = 8; this.maxBreath = 8;
     this.dead = false;
@@ -88,6 +91,13 @@ export class Player extends Entity {
     this.potionCd = Math.max(0, this.potionCd - dt);
     if (this.swing > 0) this.swing = Math.max(0, this.swing - dt / this.swingDur);
     this.animTime += dt;
+
+    /* live melee sweep: resolve hits across the swing's active window */
+    if (this.melee) {
+      game.meleeSweep && game.meleeSweep(this.melee);
+      this.melee.t -= dt;
+      if (this.melee.t <= 0) this.melee = null;
+    }
 
     /* -------- movement input */
     const left = input.down("KeyA") || input.down("ArrowLeft");
@@ -198,7 +208,9 @@ export class Player extends Entity {
 
     if (!sel) {
       /* bare fists: punch-mine soft tiles slowly */
-      if (inReach) game.mineTick(m.tx, m.ty, { tool: "pick", power: 20, speed: 2 }, this);
+      const fist = { tool: "pick", power: 20, speed: 2 };
+      const t = game.input.coarseAim ? game.snapMineTarget(m, fist) : m;
+      if (t && this.tileInReach(t.tx, t.ty)) game.mineTick(t.tx, t.ty, fist, this);
       return;
     }
     const def = ITEMS[sel.id];
@@ -206,17 +218,23 @@ export class Player extends Entity {
       case "tool":
         if (def.tool === "wrench") {
           if (inReach) game.wireTick(m.tx, m.ty);
-        } else if (inReach) {
-          game.mineTick(m.tx, m.ty, def, this);
         } else {
-          this.startSwing(0.3);
+          /* touch taps snap to the nearest breakable neighbour tile */
+          const t = game.input.coarseAim && def.tool !== "hammer"
+            ? game.snapMineTarget(m, def) : m;
+          if (t && this.tileInReach(t.tx, t.ty)) game.mineTick(t.tx, t.ty, def, this);
+          else this.startSwing(0.3);
         }
         break;
       case "weapon":
         if (this.useTimer <= 0) {
           this.useTimer = 1 / def.speed;
           this.startSwing(1 / def.speed * 0.8);
-          game.meleeSwing && game.meleeSwing(def);
+          /* the swing stays "live" for its visible arc — hits resolve over
+             the whole window (in update), not just this first frame, so an
+             enemy walking into the blade mid-swing still gets clipped */
+          this.melee = { def, t: this.swingDur * 0.9, id: ++Player._swingSeq };
+          game.sfx && game.sfx.swing();
         }
         break;
       case "bow":

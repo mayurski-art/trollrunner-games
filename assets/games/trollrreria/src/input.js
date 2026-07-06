@@ -38,6 +38,7 @@ export class Input {
       const r = canvas.getBoundingClientRect();
       this.mouse.x = e.clientX - r.left;
       this.mouse.y = e.clientY - r.top;
+      this.coarseAim = false;    // a real mouse aims precisely — no tap snap
       this.markActive();
     });
     canvas.addEventListener("mousedown", e => {

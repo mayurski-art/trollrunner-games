@@ -263,10 +263,18 @@ export class UI {
     this.dialogNpc = npc;
     this.el.dialogName.textContent = npc.name;
     this.el.dialogText.textContent = npc.tips[npc.tipIdx];
-    /* use the gladiator portrait, hue-shifted to match his in-world look */
-    this.el.dialogFace.innerHTML =
-      '<img src="assets/games/troll-kombat/fighters/gladiator/portrait.png" alt="" ' +
-      'style="filter:hue-rotate(105deg) saturate(0.8)">';
+    /* each NPC brings their own portrait (+ tint, if their in-world rig
+       is tinted) so the dialog face matches who you're talking to */
+    if (npc.portrait) {
+      const img = document.createElement("img");
+      img.src = npc.portrait;
+      img.alt = "";
+      if (npc.portraitFilter) img.style.filter = npc.portraitFilter;
+      this.el.dialogFace.innerHTML = "";
+      this.el.dialogFace.appendChild(img);
+    } else {
+      this.el.dialogFace.textContent = "🧌";
+    }
     this.el.dialog.hidden = false;
   }
 
@@ -402,6 +410,15 @@ export class UI {
       e.preventDefault();
       this.slotClick(kind, key, e.button === 2, e.shiftKey);
     });
+    /* touch: fire the click logic on touchstart — no 300ms synthesized-
+       mouse delay, and it works even where the browser suppresses the
+       synthesized events. This is the only way to switch hotbar items on
+       a phone (Digit keys and the wheel don't exist there). */
+    d.addEventListener("touchstart", e => {
+      e.stopPropagation();
+      e.preventDefault();
+      this.slotClick(kind, key, false, false);
+    }, { passive: false });
     d.addEventListener("contextmenu", e => e.preventDefault());
     d.addEventListener("mouseenter", () => this.showTip(kind, key, d));
     d.addEventListener("mouseleave", () => { this.el.tooltip.hidden = true; });

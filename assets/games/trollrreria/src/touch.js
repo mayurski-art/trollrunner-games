@@ -85,6 +85,9 @@ export class TouchControls {
       const r = canvas.getBoundingClientRect();
       input.mouse.x = t.clientX - r.left;
       input.mouse.y = t.clientY - r.top;
+      /* thumbs cover 3-4 tiles — let mining snap to the nearest breakable
+         tile around the tap instead of demanding pixel precision */
+      input.coarseAim = true;
     };
     canvas.addEventListener("touchstart", e => {
       e.preventDefault();
