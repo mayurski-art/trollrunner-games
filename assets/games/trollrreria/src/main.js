@@ -315,6 +315,12 @@ class Game {
     };
     try { lb.record("trollrreria", ev); } catch (e) { /* engine hiccups are non-fatal */ }
     this._recorded = { blocksMined: s.blocksMined, bossKills: s.bossKills };
+    // Real per-account stats + XP (game_run/high_score/game_first_daily) --
+    // separate from the mock weekly leaderboard above, which this doesn't
+    // touch. No-ops for guests.
+    void window.TrollrunnerAccounts?.reportGameResult?.("trollrreria", Math.round(s.deepest), {
+      blocksMined: s.blocksMined, bossKills: s.bossKills, reason,
+    });
   }
 
   resize() {

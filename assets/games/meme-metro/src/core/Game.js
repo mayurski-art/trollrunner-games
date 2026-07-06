@@ -170,6 +170,11 @@ export class Game {
     if (window.TrollLeaderboard) {
       window.TrollLeaderboard.record('meme-metro', { score, coins: this.runCoins });
     }
+    // Real per-account stats + XP (game_run/high_score/game_first_daily) --
+    // separate from the mock weekly leaderboard above. No-ops for guests.
+    void window.TrollrunnerAccounts?.reportGameResult?.('meme-metro', score, {
+      coins: this.runCoins, distance: this.difficulty.distance,
+    });
     this.ui.showGameOver({
       score,
       coins: this.runCoins,

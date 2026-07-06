@@ -1757,6 +1757,13 @@
         });
       }
       void window.TrollrunnerAccounts?.awardXp?.("versus_match", "troll-kombat");
+      // Real per-account stats + XP (game_run/high_score/game_first_daily) --
+      // separate from the mock weekly leaderboard above. No-ops for guests.
+      if (you) {
+        void window.TrollrunnerAccounts?.reportGameResult?.("troll-kombat", Math.round(you.dmgDealt), {
+          char: you.def.id, won: this.winnerIdx === 0, kos: you.kos, mode: this.mode,
+        });
+      }
       showResult(this.winnerIdx, this.byKO, this.fighters, this.mode);
     },
     draw(dt) {
