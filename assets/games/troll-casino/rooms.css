@@ -19,6 +19,21 @@
 
 .game-room { animation: tc-in-fade 450ms ease both; }
 
+/* Dedicated ambient backdrop — game.js swaps its image per floor/room. Sits
+   behind .game-view, replacing the walkthrough's scene-stage once gameplay
+   begins (that stage is hidden below) so there's exactly one system writing
+   to exactly one element — no race between two preloaders. */
+.room-ambient {
+  position: absolute; inset: -6%;
+  background-size: cover;
+  background-position: center;
+  filter: blur(7px) brightness(0.45) saturate(1.15);
+  opacity: 0;
+  transition: opacity 320ms ease;
+}
+.room-ambient.is-shown { opacity: 1; }
+.casino-viewport.is-gameplay .scene-stage { display: none; }
+
 .floor-view { display: flex; flex-direction: column; gap: 16px; }
 .floor-head .floor-kicker {
   font-family: var(--tc-font-mono);
@@ -524,4 +539,5 @@
 @media (prefers-reduced-motion: reduce) {
   .pcard, .game-room, .room-play { animation: none !important; }
   .sl-cell.is-win, .sl-jackpot strong { animation: none !important; }
+  .room-ambient { transition-duration: 1ms; }
 }
