@@ -86,11 +86,28 @@ class Game {
     this.touch = new TouchControls(this);
     this.resize();
     window.addEventListener("resize", () => this.resize());
-    window.addEventListener("beforeunload", () => {
+    window.addEventListener("beforeunload", e => {
+      const midRun = this.state === "play" || this.state === "pause";
       /* guests never overwrite their own world with the host's */
-      if ((this.state === "play" || this.state === "pause") &&
-          (!this.net.active || this.net.isHost)) saveGame(this);
+      if (midRun && (!this.net.active || this.net.isHost)) saveGame(this);
       this.net.stop();
+      /* This fires for ANY way of leaving the page -- closing the tab,
+         browser back, typing a new URL -- not just the in-game quit
+         button or the desktop-shell's postMessage handshake (which only
+         works when embedded in an iframe the parent controls). Direct
+         visits/popups of this origin never get that handshake, so this
+         native "leave site?" prompt is the one save-warning guaranteed to
+         show up regardless of how the game was opened. The saveGame()
+         call above is fire-and-forget (async cloud write); this native
+         dialog buys it time to finish, or lets the player cancel and use
+         Pause -> Save world instead. Browsers ignore custom messages here
+         and show their own fixed text, but showing *a* prompt at all is
+         the point. */
+      if (midRun && !this._gracefulClosePending) {
+        e.preventDefault();
+        e.returnValue = "";
+        return "";
+      }
     });
     /* the parent desktop shell (mayurski-art.github.io) asks permission
        before it actually closes this window and resets the iframe back to
@@ -102,6 +119,10 @@ class Game {
     window.addEventListener("message", e => {
       const allowed = ["https://mayurski-art.github.io", "https://www.trollrunner.net", "https://trollrunner.net"];
       if (!allowed.includes(e.origin) || e.data?.type !== "trollrunner:request-close") return;
+      // The desktop shell already runs its own graceful-close confirm/save
+      // handshake (below) -- skip the native beforeunload prompt too, or an
+      // embedded close would show two "are you sure" prompts back to back.
+      this._gracefulClosePending = true;
       const reply = type => { try { e.source?.postMessage({ type }, e.origin); } catch {} };
       const midRun = this.state === "play" || this.state === "pause";
       const canSave = !this.net.active || this.net.isHost;
@@ -395,6 +416,16 @@ class Game {
       this._autosaveAcc = 0;
       if (!this.net.active || this.net.isHost) saveGame(this);
       this.recordProgress("autosave");
+    }
+    /* idle autosave: catches players who wander off mid-session instead of
+       exiting outright -- saves once per idle stretch, not every frame. */
+    if (this.input.idleMs() >= 20000) {
+      if (!this._idleSaved) {
+        this._idleSaved = true;
+        if (!this.net.active || this.net.isHost) saveGame(this);
+      }
+    } else {
+      this._idleSaved = false;
     }
     this.net.update(dt);
     this._exploreAcc += dt;

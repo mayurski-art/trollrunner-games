@@ -50,6 +50,7 @@ export class TouchControls {
       const press = e => {
         e.preventDefault();
         btn.classList.add("on");
+        input.markActive();
         if (code) {
           if (!input.keys.has(code)) input.pressed.add(code);
           input.keys.add(code);
@@ -88,6 +89,7 @@ export class TouchControls {
     canvas.addEventListener("touchstart", e => {
       e.preventDefault();
       const t = e.changedTouches[0];
+      input.markActive();
       if (this._aimId === undefined) {
         this._aimId = t.identifier;
         setAim(t);
@@ -97,6 +99,7 @@ export class TouchControls {
     }, { passive: false });
     canvas.addEventListener("touchmove", e => {
       e.preventDefault();
+      input.markActive();
       for (const t of e.changedTouches) {
         if (t.identifier === this._aimId) setAim(t);
       }

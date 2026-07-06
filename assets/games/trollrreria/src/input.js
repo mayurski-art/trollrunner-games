@@ -17,6 +17,7 @@ export class Input {
     this.clicked = { left: false, right: false };
     this.wheel = 0;
     this.enabled = true;            // false while typing in DOM inputs
+    this.lastActivity = performance.now(); // last real player input, for idle-autosave
 
     window.addEventListener("keydown", e => {
       if (!this.enabled || isSiteLocked()) return;
@@ -24,6 +25,7 @@ export class Input {
       if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;
       if (!this.keys.has(e.code)) this.pressed.add(e.code);
       this.keys.add(e.code);
+      this.markActive();
       /* keep the page from scrolling / triggering browser shortcuts */
       if (["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Tab", "F1"].includes(e.code)) {
         e.preventDefault();
@@ -36,10 +38,12 @@ export class Input {
       const r = canvas.getBoundingClientRect();
       this.mouse.x = e.clientX - r.left;
       this.mouse.y = e.clientY - r.top;
+      this.markActive();
     });
     canvas.addEventListener("mousedown", e => {
       if (e.button === 0) { this.mouse.left = true; this.clicked.left = true; }
       if (e.button === 2) { this.mouse.right = true; this.clicked.right = true; }
+      this.markActive();
     });
     window.addEventListener("mouseup", e => {
       if (e.button === 0) this.mouse.left = false;
@@ -48,9 +52,13 @@ export class Input {
     canvas.addEventListener("contextmenu", e => e.preventDefault());
     canvas.addEventListener("wheel", e => {
       this.wheel += Math.sign(e.deltaY);
+      this.markActive();
       e.preventDefault();
     }, { passive: false });
   }
+
+  markActive() { this.lastActivity = performance.now(); }
+  idleMs() { return performance.now() - this.lastActivity; }
 
   down(code) { return !isSiteLocked() && this.keys.has(code); }
   hit(code) { return !isSiteLocked() && this.pressed.has(code); }
