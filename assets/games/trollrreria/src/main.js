@@ -23,7 +23,7 @@ import { GuideTroll, MerchantTroll } from "./npc.js";
 import { findHouseNear } from "./housing.js";
 import {
   saveGame, loadSaveData, applyWorldLayers, clearSave,
-  loadSettings, saveSettings,
+  loadSettings, saveSettings, isGuest,
 } from "./save.js";
 import { TouchControls } from "./touch.js";
 import { Music } from "./music.js";
@@ -92,14 +92,31 @@ class Game {
           (!this.net.active || this.net.isHost)) saveGame(this);
       this.net.stop();
     });
-    /* the parent desktop shell (mayurski-art.github.io) asks for a save
-       right before it resets this iframe back to the arcade home screen
-       on window close -- see twClose() in that repo's index.html. */
+    /* the parent desktop shell (mayurski-art.github.io) asks permission
+       before it actually closes this window and resets the iframe back to
+       the arcade home screen -- see twClose()/requestGameClose() in that
+       repo's index.html. A logged-in mid-run save is quick (ack right
+       away); a guest gets a real confirm-or-create-account gate first,
+       since guest progress is never persisted -- reply "pending" so the
+       parent knows to wait instead of assuming this page ignored it. */
     window.addEventListener("message", e => {
       const allowed = ["https://mayurski-art.github.io", "https://www.trollrunner.net", "https://trollrunner.net"];
-      if (!allowed.includes(e.origin) || e.data?.type !== "trollrunner:request-save") return;
-      if ((this.state === "play" || this.state === "pause") &&
-          (!this.net.active || this.net.isHost)) saveGame(this);
+      if (!allowed.includes(e.origin) || e.data?.type !== "trollrunner:request-close") return;
+      const reply = type => { try { e.source?.postMessage({ type }, e.origin); } catch {} };
+      const midRun = this.state === "play" || this.state === "pause";
+      const canSave = !this.net.active || this.net.isHost;
+      if (!midRun || !isGuest() || !canSave) {
+        if (midRun && canSave) saveGame(this);
+        reply("trollrunner:close-ack");
+        return;
+      }
+      reply("trollrunner:close-pending");
+      window.TrollrunnerAccounts?.confirmGuestExit?.({
+        message: "You're not logged in — this world will not be saved if you close this window.",
+        onAccountCreated: () => saveGame(this),
+      }).then(choice => {
+        reply(choice === "cancel" ? "trollrunner:close-cancel" : "trollrunner:close-ack");
+      });
     });
 
     this._last = performance.now();
@@ -188,7 +205,16 @@ class Game {
     if (this.ui) this.ui.showScreens({});
   }
 
-  quitToTitle() {
+  async quitToTitle() {
+    // Guests are never persisted -- confirm before actually discarding
+    // this run, with a one-click way to create an account and keep it.
+    if (isGuest()) {
+      const choice = await window.TrollrunnerAccounts?.confirmGuestExit?.({
+        message: "You're not logged in — this world will not be saved if you quit.",
+        onAccountCreated: () => saveGame(this),
+      });
+      if (choice === "cancel") return;
+    }
     saveGame(this);
     this.recordProgress("quit");
     this.state = "title";

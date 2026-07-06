@@ -13,9 +13,9 @@ const ui = new UIManager();
 const game = new Game(canvas, { ui, storage, audio });
 const charSelect = new CharacterSelect(storage);
 
-// Resolves the real account/guest save (constructor loads guest-only
-// defaults synchronously so the game can boot immediately) -- refreshes
-// the menu's high score/coin display once the real numbers are known.
+// Resolves the real account save (constructor starts from plain defaults
+// synchronously so the game can boot immediately) -- refreshes the menu's
+// high score/coin display once the real numbers are known.
 void storage.hydrate().then(() => {
   ui.showMenu({ highScore: storage.highScore, totalCoins: storage.totalCoins });
 });
@@ -55,6 +55,29 @@ document.getElementById('btn-settings-reset').addEventListener('click', async ()
     await storage.resetAll();
     window.location.reload();
   }
+});
+
+// The parent desktop shell (mayurski-art.github.io) asks permission
+// before it actually closes this window -- see twClose()/
+// requestGameClose() in that repo's index.html. Guests with real
+// progress get a confirm-or-create-account gate first, since guest
+// progress is never persisted; reply "pending" so the parent knows to
+// wait instead of assuming this page ignored it.
+window.addEventListener('message', e => {
+  const allowed = ['https://mayurski-art.github.io', 'https://www.trollrunner.net', 'https://trollrunner.net'];
+  if (!allowed.includes(e.origin) || e.data?.type !== 'trollrunner:request-close') return;
+  const reply = type => { try { e.source?.postMessage({ type }, e.origin); } catch {} };
+  if (!storage.isGuest || !storage.hasProgress) {
+    reply('trollrunner:close-ack');
+    return;
+  }
+  reply('trollrunner:close-pending');
+  window.TrollrunnerAccounts?.confirmGuestExit?.({
+    message: "You're not logged in — your high score, coins and unlocks will not be saved if you close this window.",
+    onAccountCreated: () => storage.save(),
+  }).then(choice => {
+    reply(choice === 'cancel' ? 'trollrunner:close-cancel' : 'trollrunner:close-ack');
+  });
 });
 
 // Revive — real on-chain payment via the shared TrollPay lib.

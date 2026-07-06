@@ -1,14 +1,17 @@
-/* Trollrreria — world persistence: RLE + base64, then either a real
-   per-account cloud save (logged in) or a local-only guest save (logged
-   out). A full 1600x800 world compresses to a few hundred KB.
+/* Trollrreria — world persistence: RLE + base64, saved to a real
+   per-account cloud save when logged in. A full 1600x800 world
+   compresses to a few hundred KB.
 
    Account scoping (fixes worlds bleeding between accounts / guests):
      - Logged in  -> cloud save in troll_game_saves (RLS: owner-only),
                      mirrored into a local per-account cache key as a
                      synchronous backup for beforeunload, where an async
                      network write may not finish in time.
-     - Logged out -> a separate local-only "guest" key. Never reads or
-                     writes any account's data.
+     - Logged out -> guest progress is intentionally NEVER persisted --
+                     every boot as a guest starts a fresh world. Games.js
+                     shows a confirm-or-create-account gate before a
+                     guest actually loses a run (closing the window,
+                     quitting to title) via TrollrunnerAccounts.confirmGuestExit.
      - The old pre-account global key (SAVE_KEY) is migrated into the
        first real account that logs in and then deleted, so it can never
        leak into guest mode again. */
@@ -17,7 +20,6 @@ import { SAVE_KEY, SETTINGS_KEY } from "./defs.js";
 import { rleEncode, rleDecode, u16ToB64, b64ToU16 } from "./util.js";
 
 const GAME_ID = "trollrreria";
-const GUEST_KEY = `${SAVE_KEY}:guest`;
 const cloudCacheKey = userId => `${SAVE_KEY}:cloud-cache:${userId}`;
 
 function packLayer(arr) {
@@ -47,6 +49,13 @@ async function getSessionSafe() {
   } catch {
     return null;
   }
+}
+
+// Synchronous -- reflects whichever session state was last resolved (at
+// boot, or via the auth-changed event). Used to decide whether to gate an
+// exit with "this won't be saved" without an async round trip.
+export function isGuest() {
+  return !cachedUserId;
 }
 
 function readLocal(key) {
@@ -147,7 +156,9 @@ export async function saveGame(game) {
     writeLocal(cloudCacheKey(cachedUserId), data);
     return saveCloudSave(cachedUserId, data);
   }
-  return writeLocal(GUEST_KEY, data);
+  // Guests are never persisted -- see confirmGuestExit in main.js, which
+  // gates any action that would actually discard this run.
+  return false;
 }
 
 /* One-time migration of the pre-account global save into whichever real
@@ -164,7 +175,7 @@ async function migrateLegacySave(userId) {
 
 export async function loadSaveData() {
   const session = await getSessionSafe();
-  if (!session) return readLocal(GUEST_KEY);
+  if (!session) return null; // guests always start fresh -- never persisted
 
   const migrated = await migrateLegacySave(session.userId);
   if (migrated) return migrated;
@@ -201,17 +212,14 @@ export function applyWorldLayers(world, data) {
 export async function clearSave() {
   try { localStorage.removeItem(SAVE_KEY); } catch { /* ignore */ }
   const session = await getSessionSafe();
-  if (session) {
-    try { localStorage.removeItem(cloudCacheKey(session.userId)); } catch { /* ignore */ }
-    const sb = window.TrollrunnerAccounts?.getClient?.();
-    if (sb) {
-      try {
-        await sb.from("troll_game_saves").delete().eq("user_id", session.userId).eq("game_id", GAME_ID);
-      } catch { /* ignore */ }
-    }
-    return;
+  if (!session) return; // nothing persisted for guests to clear
+  try { localStorage.removeItem(cloudCacheKey(session.userId)); } catch { /* ignore */ }
+  const sb = window.TrollrunnerAccounts?.getClient?.();
+  if (sb) {
+    try {
+      await sb.from("troll_game_saves").delete().eq("user_id", session.userId).eq("game_id", GAME_ID);
+    } catch { /* ignore */ }
   }
-  try { localStorage.removeItem(GUEST_KEY); } catch { /* ignore */ }
 }
 
 /* -------------------------------------------------------------- settings */
