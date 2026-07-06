@@ -65,6 +65,37 @@ html, body {
 }
 .hud-hotkeys-btn:hover { border-color: var(--tt-gold); color: var(--tt-gold); }
 
+/* ------------------------------------------------------------ quest tracker */
+#quest-tracker {
+  position: absolute; top: 66px; left: 14px; width: 240px;
+  background: rgba(10, 6, 26, 0.72); border: 0.5px solid var(--tt-line);
+  border-left: 3px solid #57e87a; border-radius: 10px;
+  padding: 9px 12px; pointer-events: none;
+  backdrop-filter: blur(4px);
+}
+#quest-tracker[hidden] { display: none; }
+#quest-title {
+  font: 800 12px "DM Sans", sans-serif; letter-spacing: 0.02em;
+  color: #57e87a; margin-bottom: 5px;
+}
+#quest-objectives { display: flex; flex-direction: column; gap: 3px; }
+.quest-obj {
+  font-family: "DM Mono", monospace; font-size: 11px; color: var(--tt-muted);
+  display: flex; justify-content: space-between; gap: 8px;
+}
+.quest-obj.done { color: var(--tt-text); text-decoration: line-through; opacity: 0.6; }
+
+/* ------------------------------------------------------------- area title */
+#area-title {
+  position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%);
+  text-align: center; pointer-events: none; z-index: 15;
+  font: 900 26px "DM Sans", sans-serif; letter-spacing: 0.1em;
+  color: var(--tt-gold); text-shadow: 0 3px 14px rgba(0,0,0,0.7), 0 1px 0 #7a4e00;
+  opacity: 0; transition: opacity 0.6s ease;
+}
+#area-title.show { opacity: 1; transition: opacity 0.25s ease; }
+#area-title[hidden] { display: none; }
+
 #hotkeys-panel { top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(420px, 92vw); }
 #hotkeys-panel[hidden] { display: none; }
 #hotkeys-panel .menu-controls { margin: 6px 0 12px; }

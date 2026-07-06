@@ -18,6 +18,7 @@
 
 import { SAVE_KEY, SETTINGS_KEY } from "./defs.js";
 import { rleEncode, rleDecode, u16ToB64, b64ToU16 } from "./util.js";
+import { serializeQuests } from "./quests.js";
 
 const GAME_ID = "trollrreria";
 const cloudCacheKey = userId => `${SAVE_KEY}:cloud-cache:${userId}`;
@@ -135,6 +136,7 @@ export async function saveGame(game) {
       spawn: game.spawn,
       stats: game.stats,
       flags: game.flags,
+      quests: serializeQuests(game.quests),
       player: game.player ? {
         x: game.player.x, y: game.player.y,
         hp: game.player.hp, maxHp: game.player.maxHp,

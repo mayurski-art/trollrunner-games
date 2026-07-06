@@ -9,6 +9,7 @@ import { getIcon } from "./icons.js";
 import { fmtClock } from "./util.js";
 import { SURFACE_BASE } from "./worldgen.js";
 import { saveGame, saveSettings, isGuest } from "./save.js";
+import { QUESTS, questFor, isDone } from "./quests.js";
 
 export class UI {
   constructor(game) {
@@ -45,7 +46,13 @@ export class UI {
       deathCause: document.getElementById("death-cause"),
       btnContinue: document.getElementById("btn-continue"),
       hotkeysPanel: document.getElementById("hotkeys-panel"),
+      questTracker: document.getElementById("quest-tracker"),
+      questTitle: document.getElementById("quest-title"),
+      questObjectives: document.getElementById("quest-objectives"),
+      areaTitle: document.getElementById("area-title"),
     };
+    this._questDirty = true;
+    this._areaTimer = null;
     this.hotkeysOpen = false;
     this._hudDirty = true;
     this._invDirty = true;
@@ -262,7 +269,16 @@ export class UI {
   openDialog(npc) {
     this.dialogNpc = npc;
     this.el.dialogName.textContent = npc.name;
-    this.el.dialogText.textContent = npc.tips[npc.tipIdx];
+    const qid = questFor(npc.name);
+    const g = this.game;
+    if (qid && !isDone(g.quests, qid)) {
+      /* first time talking to this NPC while their quest is live: kick it
+         off and lead with the quest pitch instead of a random tip */
+      if (!g.quests.progress[qid]) g.startQuest(qid);
+      this.el.dialogText.textContent = QUESTS[qid].intro;
+    } else {
+      this.el.dialogText.textContent = npc.tips[npc.tipIdx];
+    }
     /* each NPC brings their own portrait (+ tint, if their in-world rig
        is tinted) so the dialog face matches who you're talking to */
     if (npc.portrait) {
@@ -355,7 +371,40 @@ export class UI {
 
   dirtyHud() { this._hudDirty = true; }
   dirtyInv() { this._hudDirty = true; this._invDirty = true; }
+  dirtyQuest() { this._questDirty = true; }
   get blocking() { return false; }   // movement stays live with panels open
+
+  /* ------------------------------------------------------- quest tracker */
+  paintQuest() {
+    const g = this.game;
+    const qid = g.quests.active;
+    if (!qid) { this.el.questTracker.hidden = true; return; }
+    const q = QUESTS[qid];
+    const prog = g.quests.progress[qid] || q.objectives.map(() => 0);
+    this.el.questTracker.hidden = false;
+    this.el.questTitle.textContent = q.title;
+    this.el.questObjectives.innerHTML = "";
+    q.objectives.forEach((obj, i) => {
+      const row = document.createElement("div");
+      const done = prog[i] >= obj.n;
+      row.className = "quest-obj" + (done ? " done" : "");
+      row.innerHTML = `<span>${obj.label}</span><span>${Math.min(prog[i], obj.n)}/${obj.n}</span>`;
+      this.el.questObjectives.appendChild(row);
+    });
+  }
+
+  /* Flashes a biome name briefly on entering a new zone. */
+  showAreaTitle(text) {
+    const el = this.el.areaTitle;
+    el.textContent = text;
+    el.hidden = false;
+    el.classList.add("show");
+    clearTimeout(this._areaTimer);
+    this._areaTimer = setTimeout(() => {
+      el.classList.remove("show");
+      setTimeout(() => { el.hidden = true; }, 650);
+    }, 2200);
+  }
 
   /* ------------------------------------------------------------ build */
   buildHotbar() {
@@ -816,6 +865,10 @@ export class UI {
       this._hudDirty = false;
       this.paintHearts();
       this.paintHotbar();
+    }
+    if (this._questDirty) {
+      this._questDirty = false;
+      this.paintQuest();
     }
     if (this._invDirty) {
       this._invDirty = false;

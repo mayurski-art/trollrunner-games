@@ -28,7 +28,7 @@ export const T = {
   DOOR_C: 19, DOOR_O: 20, PLATFORM: 21, HEART: 22, SHROOM: 23,
   BEDROCK: 24, OBSIDIAN: 25, PLANT: 26, BED: 27,
   LEVER: 28, PLATE: 29, DART_L: 30, DART_R: 31, TORCH_OFF: 32,
-  TROLLIUM: 33,
+  TROLLIUM: 33, GRIN_FRAG: 34,
   /* wires live on their own layer, not in T */
 };
 
@@ -70,7 +70,7 @@ TILES[T.DART_L]   = { name: "Dart trap", solid: true, hp: 160, pow: 0, tool: "pi
 TILES[T.DART_R]   = { name: "Dart trap", solid: true, hp: 160, pow: 0, tool: "pick", drop: "dartTrap", noVariant: true };
 TILES[T.TORCH_OFF] = { name: "Torch (out)", solid: false, hp: 5, pow: 0, tool: "pick", drop: "torch", noVariant: true };
 TILES[T.TROLLIUM] = { name: "Trollium ore", solid: true, hp: 300, pow: 80, tool: "pick", drop: "trolliumOre", ore: "#57e87a", light: 30, pal: ["#565a63", "#6e737d", "#848a94"] };
-TILES[T.TROLLIUM] = { name: "Trollium ore", solid: true, hp: 300, pow: 80, tool: "pick", drop: "trolliumOre", ore: "#57e87a", light: 30, pal: ["#565a63", "#6e737d", "#848a94"] };
+TILES[T.GRIN_FRAG] = { name: "Grin fragment", solid: false, hp: 1, pow: 0, tool: "pick", drop: "grinFragment", light: 55, noVariant: true };
 
 /* ------------------------------------------------------------------- walls */
 export const W = { NONE: 0, DIRT: 1, STONE: 2, WOOD: 3, STONE_BRICK: 4 };
@@ -128,6 +128,7 @@ export const ITEMS = {
   lens:       { name: "Eyeball lens", type: "material", max: 999 },
   bone:       { name: "Troll bone", type: "material", max: 999 },
   mushroom:   { name: "Glowshroom", type: "material", max: 999 },
+  grinFragment: { name: "Grin fragment", type: "material", max: 99, desc: "A shard of the Grin Core. Someone's collecting these." },
   /* tools */
   woodPick:   { name: "Wooden pick", type: "tool", tool: "pick", power: 35, speed: 3.4, dmg: 5 },
   copperPick: { name: "Copper pick", type: "tool", tool: "pick", power: 45, speed: 3.8, dmg: 6 },
@@ -172,6 +173,8 @@ export const ITEMS = {
   trollBrew:   { name: "Troll brew", type: "potion", heal: 50, max: 30 },
   trollTotem:  { name: "Troll totem", type: "summon", max: 5, desc: "Wakes the Troll King. Use at night." },
   emperorSigil: { name: "Emperor sigil", type: "summon", max: 5, desc: "Calls the Troll Emperor. Hardmode, night, regrets." },
+  /* Grin Core relics — quest rewards, kept in the bag as trophies/keys */
+  lostGrin:    { name: "The Lost Grin", type: "relic", max: 1, desc: "First of six. The Grin Core is starting to remember its shape." },
 };
 for (const id in ITEMS) { ITEMS[id].id = id; if (!ITEMS[id].max) ITEMS[id].max = 1; }
 

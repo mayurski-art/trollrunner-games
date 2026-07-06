@@ -105,6 +105,7 @@ export class ItemDrop extends Entity {
           if (left < this.n) {
             game.sfx && game.sfx.pickup();
             game.ui && game.ui.dirtyInv();
+            game.progressQuest && game.progressQuest("collect", this.item, this.n - left);
           }
           if (left <= 0) { this.dead = true; return; }
           this.n = left;

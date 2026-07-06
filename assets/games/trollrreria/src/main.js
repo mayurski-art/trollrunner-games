@@ -9,7 +9,7 @@ import {
   REACH, STATION_SCAN, STARTER_ITEMS,
 } from "./defs.js";
 import { hashStr, clamp, lerp, fmtClock, aabb } from "./util.js";
-import { generateWorld, biomeAt } from "./worldgen.js";
+import { generateWorld, biomeAt, BIOME_NAMES } from "./worldgen.js";
 import { Renderer, skyState } from "./render.js";
 import { Lighting } from "./lighting.js";
 import { Input } from "./input.js";
@@ -25,6 +25,9 @@ import {
   saveGame, loadSaveData, applyWorldLayers, clearSave,
   loadSettings, saveSettings, isGuest,
 } from "./save.js";
+import {
+  createQuestState, startQuest, progressQuest, questFor, isDone, loadQuests, serializeQuests,
+} from "./quests.js";
 import { TouchControls } from "./touch.js";
 import { Music } from "./music.js";
 import { rleDecode, b64ToU16, rleEncode, u16ToB64 } from "./util.js";
@@ -172,6 +175,7 @@ class Game {
     this.trollMoon = false;
     this.stats = { blocksMined: 0, deepest: 0, bossKills: 0, playSec: 0 };
     this.flags = { bossDown: false };
+    this.quests = createQuestState();
     this._recorded = { blocksMined: 0, bossKills: 0 };
     this.explored = new Uint8Array((WORLD_W >> 2) * (WORLD_H >> 2));
     this.inventory = new Inventory();
@@ -196,6 +200,7 @@ class Game {
     this.spawn = data.spawn || this.spawn;
     this.stats = Object.assign(this.stats, data.stats);
     this.flags = Object.assign(this.flags, data.flags);
+    this.quests = loadQuests(data.quests);
     this._recorded = { blocksMined: this.stats.blocksMined, bossKills: this.stats.bossKills };
     if (data.explored) {
       try {
@@ -324,6 +329,12 @@ class Game {
     /* world arrives from the host via adoptRemoteWorld */
   }
 
+  /* ========================================================== quests */
+  startQuest(id) { return startQuest(this, id); }
+  progressQuest(type, id, amount) { progressQuest(this, type, id, amount); }
+  questForNpc(npc) { return questFor(npc.name); }
+  questIsDone(id) { return isDone(this.quests, id); }
+
   /* Report session progress to the shared arcade leaderboard (deltas). */
   recordProgress(reason) {
     const lb = window.TrollLeaderboard;
@@ -432,6 +443,13 @@ class Game {
     if (this._exploreAcc >= 0.4 && this.player && !this.player.dead) {
       this._exploreAcc = 0;
       this.revealAround(this.player.cx, this.player.cy);
+      /* area-title popup on crossing into a new surface zone */
+      const biome = biomeAt(Math.floor(this.player.cx / TILE), this.world.w);
+      if (biome !== this._lastBiome) {
+        this._lastBiome = biome;
+        if (this._announcedBiome) this.ui && this.ui.showAreaTitle(BIOME_NAMES[biome] || biome);
+        this._announcedBiome = true;
+      }
     }
 
     this.checkPlates();
@@ -491,7 +509,12 @@ class Game {
     /* entities */
     for (const e of this.entities) e.update(dt, this);
     for (const e of this.enemies) e.update(dt, this);
-    for (const e of this.npcs) e.update(dt, this);
+    for (const e of this.npcs) {
+      e.update(dt, this);
+      /* "!" marker: this NPC has a live, un-done quest to hand out */
+      const qid = questFor(e.name);
+      e.quest = !!(qid && !this.questIsDone(qid));
+    }
     if (this.entities.some(e => e.dead)) this.entities = this.entities.filter(e => !e.dead);
     if (this.enemies.some(e => e.dead)) this.enemies = this.enemies.filter(e => !e.dead);
 
@@ -585,7 +608,7 @@ class Game {
 
     if (id === T.AIR || !def || def.hp === Infinity) return;
     /* soft deco breaks with anything */
-    const soft = id === T.PLANT || id === T.SHROOM || id === T.TORCH;
+    const soft = id === T.PLANT || id === T.SHROOM || id === T.TORCH || id === T.GRIN_FRAG;
     if (!soft) {
       if (def.tool === "axe" && tool.tool !== "axe") return;
       if (def.tool === "pick" && tool.tool !== "pick") return;

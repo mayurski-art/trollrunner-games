@@ -306,6 +306,22 @@ export class Renderer {
         g.fillStyle = "#f2f8fd"; g.fillRect(px + 1, py + 6, 5, 3);
         break;
       }
+      case T.GRIN_FRAG: {
+        /* a small floating grin-shaped shard, always a little brighter
+           than its surroundings so it reads as "pick this up" */
+        const bob = Math.sin(wx * 0.7 + wy) * 1.2;
+        g.fillStyle = "#ffe08a";
+        g.beginPath();
+        g.arc(px + 8, py + 8 + bob, 5, 0, Math.PI * 2);
+        g.fill();
+        g.fillStyle = "#1c1424";
+        g.beginPath();
+        g.arc(px + 8, py + 9 + bob, 3, 0.15, Math.PI - 0.15);
+        g.fill();
+        g.fillStyle = "#fff7d6";
+        g.fillRect(px + 6, py + 5 + bob, 1, 1);
+        break;
+      }
       case T.PLANT: {
         g.fillStyle = "#4faf54";
         const h1 = 4 + Math.floor(hash2(wx, wy, 3) * 6);

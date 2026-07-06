@@ -22,6 +22,16 @@ export function biomeAt(x, w) {
   return "forest";
 }
 
+/* Player-facing zone names for the area-title popup. forest is the
+   confirmed starting zone from the expansion doc; snow/desert keep
+   generic placeholder names until their own biome passes (Phases 3-6)
+   give them real meme identities. */
+export const BIOME_NAMES = {
+  forest: "Meme Meadow",
+  snow: "Frostbite Reach",
+  desert: "Sunbaked Wastes",
+};
+
 export function generateWorld(seed) {
   const world = new World(WORLD_W, WORLD_H);
   const rng = mulberry32(seed);
@@ -146,6 +156,7 @@ export function generateWorld(seed) {
 
   /* ------------------------------------------------ 8. trees + surface plants */
   let lastTree = -10;
+  let lastGrin = -30;
   for (let x = 8; x < w - 8; x++) {
     if (biomeAt(x, w) !== "forest") continue;
     const sy = surface[x];
@@ -159,6 +170,12 @@ export function generateWorld(seed) {
       lastTree = x;
     } else if (hash2(x, 79, seed) < 0.3) {
       tiles[(sy - 1) * w + x] = T.PLANT;
+    } else if (x - lastGrin >= 26 && hash2(x, 81, seed) < 0.12) {
+      /* Grin Core relic fragments -- Meme Meadow starter quest bait,
+         scattered generously (well over the 5 needed) so nobody has to
+         comb the whole starting zone for the last one */
+      tiles[(sy - 1) * w + x] = T.GRIN_FRAG;
+      lastGrin = x;
     }
   }
 

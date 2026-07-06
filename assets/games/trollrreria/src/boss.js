@@ -25,6 +25,7 @@ export class TrollKing extends Entity {
     this.dir = 1;
     this.light = 60;             // menacing glow
     this.dropsTable = BOSS.drops;
+    this.questId = "trollKing";
     this.deathLine = "👑 The Troll King has been trolled!";
     this.baseFilter = null;
     this.enrageFilter = "sepia(0.4) hue-rotate(-28deg) saturate(2.2)";
@@ -131,6 +132,7 @@ export class TrollKing extends Entity {
     game.stats.bossKills++;
     game.sfx && game.sfx.fanfare();
     game.announce(this.deathLine);
+    if (this.questId) game.progressQuest && game.progressQuest("defeat", this.questId, 1);
     this.onDefeat(game);
     game.recordProgress && game.recordProgress("boss");
     void window.TrollrunnerAccounts?.awardXp?.("boss_kill", "trollrreria");
@@ -202,6 +204,7 @@ export class TrollEmperor extends TrollKing {
     this.hp = this.maxHp = BOSS2.hp;
     this.defense = BOSS2.def;
     this.dropsTable = BOSS2.drops;
+    this.questId = "trollEmperor";
     this.deathLine = "👑👑 The Troll Emperor has abdicated!";
     this.baseFilter = "hue-rotate(235deg) saturate(1.5) brightness(0.92)";
     this.enrageFilter = "hue-rotate(280deg) saturate(2.4) brightness(1.05)";
