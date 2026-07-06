@@ -1,65 +1,54 @@
 /* ============================================================================
    TROLL CASINO  —  wallet facade  →  window.TrollCasinoWallet
 
-   The ONE place gameplay touches balances. The wheel never mutates a number
+   The ONE place gameplay touches balances. No game ever mutates a number
    directly — it asks this module to debit/credit and re-renders from events.
 
-   TODAY (mock mode — the default, and the only mode until flags flip):
-   - $TROLL and USDC balances are LOCAL mock chips in localStorage.
-   - deposit() routes through the shared TrollPayments confirm screen (which is
-     itself mock unless ENABLE_REAL_PAYMENTS is on) and credits mock chips.
-   - withdraw() is mock-only and refuses to pretend in real mode (needs a
-     payout backend — see docs/PART2-SYSTEMS.md). Fails closed.
+   REAL MONEY. Two live balances per logged-in account (troll_balance,
+   usdc_balance), held server-side in Supabase (assets/supabase/troll_casino.sql):
+   - deposit() charges a real on-chain payment via TrollPay/Phantom, then
+     confirms it server-side (idempotent on the tx signature) to credit
+     the balance. This is the ONLY door money enters through.
+   - requestRedemption() debits the balance immediately and files a pending
+     payout request that a human (you) reviews and pays by hand — see
+     casino-admin.js. This is the ONLY door money leaves through.
+   - debit()/credit() (in-round bets/wins) stay synchronous for the game
+     code, backed by an optimistic local balance that is queued and synced
+     to the server in the background — same trust model every other game's
+     score submission already uses (see troll_casino.sql header comment).
 
-   LATER (real money — DO NOT wire casually):
-   - Replace load()/save() with balance reads from the accounts backend
-     (assets/js/backend-api.js) keyed to the signed-in TrollrunnerAccounts user.
-   - debit()/credit() become server calls; keep the same signatures and the
-     whole game keeps working.
-   - Wallet connect stays TrollWallet's job; on-chain moves stay TrollPayments'.
-
-   Every real path in the chain (flags → wallet → payments → backend) already
-   fails closed, so shipping this file moves no money anywhere.
+   Requires the player to be logged in (TrollrunnerAccounts). Troll Casino
+   is hard-gated behind login at the page level (see the inline gate script
+   in troll-casino.html) — this module simply refuses to move money for a
+   guest (isReady() stays false, debit/credit/deposit/requestRedemption all
+   fail closed) as a second line of defense.
    ============================================================================ */
 (() => {
   "use strict";
   if (window.TrollCasinoWallet) return;   // singleton
 
-  const LS_KEY = "troll-casino-wallet-v1";
   const HISTORY_CAP = 50;
+  const SYNC_KEY = "troll-casino-sync-queue-v1";
 
-  // Currency registry. To add a token later: add an entry here + a chip color
-  // in style.css (.balance-chip[data-cur=...]) — everything else is generic.
+  // Currency registry. To add a token later: add an entry here + a chip
+  // color in style.css (.balance-chip[data-cur=...]) — everything else is generic.
   const CURRENCIES = {
-    TROLL: { code: "TROLL", label: "$TROLL", decimals: 0, start: 250000,
+    TROLL: { code: "TROLL", label: "$TROLL", decimals: 0,
              chips: [500, 1000, 5000, 25000], color: "#3dff8a" },
-    USDC:  { code: "USDC",  label: "USDC",   decimals: 2, start: 500,
+    USDC:  { code: "USDC",  label: "USDC",   decimals: 2,
              chips: [1, 5, 25, 100], color: "#3ea8ff" },
   };
 
   const state = {
     currency: "TROLL",
-    balances: { TROLL: CURRENCIES.TROLL.start, USDC: CURRENCIES.USDC.start },
-    history: [],          // { ts, label, amount (signed), currency }
+    balances: { TROLL: 0, USDC: 0 },
+    history: [],
+    userId: null,
+    ready: false,      // true once a real balance has loaded for a logged-in user
   };
 
-  /* --- persistence (mock chips only) --------------------------------------- */
-  function load() {
-    try {
-      const raw = JSON.parse(localStorage.getItem(LS_KEY) || "null");
-      if (!raw) return;
-      if (raw.currency in CURRENCIES) state.currency = raw.currency;
-      for (const c in CURRENCIES) {
-        if (typeof raw.balances?.[c] === "number" && raw.balances[c] >= 0) {
-          state.balances[c] = raw.balances[c];
-        }
-      }
-      if (Array.isArray(raw.history)) state.history = raw.history.slice(0, HISTORY_CAP);
-    } catch (_) { /* corrupted store → fresh mock balances */ }
-  }
-  function save() {
-    try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (_) {}
-  }
+  const accounts = () => window.TrollrunnerAccounts;
+  const client = () => { const a = accounts(); return a && a.getClient(); };
 
   /* --- events ---------------------------------------------------------------- */
   const listeners = new Set();
@@ -70,6 +59,7 @@
       currency: state.currency,
       balances: { ...state.balances },
       history: state.history.slice(0, HISTORY_CAP),
+      ready: state.ready,
     };
   }
 
@@ -78,7 +68,8 @@
   const def = (cur) => CURRENCIES[cur || state.currency];
   const list = () => Object.values(CURRENCIES).map(c => ({ ...c }));
   const getBalance = (cur) => state.balances[cur || state.currency] || 0;
-  const canAfford = (amount, cur) => amount > 0 && getBalance(cur) >= amount;
+  const canAfford = (amount, cur) => amount > 0 && state.ready && getBalance(cur) >= amount;
+  const isReady = () => state.ready;
 
   function fmt(amount, cur) {
     const d = def(cur);
@@ -89,78 +80,196 @@
     return d.code === "TROLL" ? `${s} $TROLL` : `${s} ${d.label}`;
   }
 
-  /* --- writes ------------------------------------------------------------------
-     Amounts are always positive; direction comes from the method. Returns
-     false (and changes nothing) when the debit doesn't cover. */
+  /* --- local history + optimistic writes -------------------------------------- */
   function record(label, signedAmount, cur) {
     state.history.unshift({ ts: Date.now(), label, amount: signedAmount, currency: cur || state.currency });
     if (state.history.length > HISTORY_CAP) state.history.length = HISTORY_CAP;
   }
+
+  function setCurrency(cur) {
+    if (!(cur in CURRENCIES) || cur === state.currency) return state.currency;
+    state.currency = cur;
+    emit();
+    return cur;
+  }
+
+  /* --- background sync queue: gameplay deltas are applied locally first (so
+     the UI never blocks on a network round trip), then drained into the
+     server-side troll_casino_adjust_balance RPC. A refresh mid-flight just
+     resumes draining from localStorage — nothing is lost. -------------------- */
+  function loadQueue() { try { return JSON.parse(localStorage.getItem(SYNC_KEY) || "[]"); } catch (_) { return []; } }
+  function saveQueue(q) { try { localStorage.setItem(SYNC_KEY, JSON.stringify(q.slice(-200))); } catch (_) {} }
+
+  let syncing = false;
+  async function flushQueue() {
+    if (syncing || !state.userId) return;
+    const c = client();
+    if (!c) return;
+    syncing = true;
+    try {
+      let queue = loadQueue();
+      while (queue.length) {
+        const item = queue[0];
+        try {
+          const { error } = await c.rpc("troll_casino_adjust_balance", {
+            p_delta: item.delta, p_currency: item.currency, p_reason: item.reason || null,
+          });
+          if (error) break; // network/db hiccup — stop, retry on next flush
+          queue.shift();
+          saveQueue(queue);
+        } catch (_) { break; }
+      }
+    } finally { syncing = false; }
+  }
+  function queueDelta(delta, currency, reason) {
+    const q = loadQueue();
+    q.push({ delta, currency, reason: reason || null, ts: Date.now() });
+    saveQueue(q);
+    flushQueue();
+  }
+
+  /* --- writes ------------------------------------------------------------------
+     Amounts are always positive; direction comes from the method. Returns
+     false (and changes nothing) when not logged in or the debit doesn't cover. */
   function debit(amount, label, cur) {
     cur = cur || state.currency;
-    if (!(amount > 0) || state.balances[cur] < amount) return false;
+    if (!state.ready || !(amount > 0) || state.balances[cur] < amount) return false;
     state.balances[cur] -= amount;
     record(label || "Debit", -amount, cur);
-    save(); emit();
+    queueDelta(-amount, cur, label);
+    emit();
     return true;
   }
   function credit(amount, label, cur) {
     cur = cur || state.currency;
-    if (!(amount > 0)) return false;
+    if (!state.ready || !(amount > 0)) return false;
     state.balances[cur] += amount;
     record(label || "Credit", +amount, cur);
-    save(); emit();
+    queueDelta(amount, cur, label);
+    emit();
     return true;
   }
-  function setCurrency(cur) {
-    if (!(cur in CURRENCIES) || cur === state.currency) return state.currency;
-    state.currency = cur;
-    save(); emit();
-    return cur;
-  }
-  function resetMock() {
-    for (const c in CURRENCIES) state.balances[c] = CURRENCIES[c].start;
-    state.history = [];
-    record("Mock balances reset", 0, state.currency);
-    save(); emit();
+
+  function mode() { return "real"; }
+
+  /* --- session lifecycle -------------------------------------------------------- */
+  async function trollUsdPrice() {
+    try {
+      if (window.TrollPayments && window.TrollPayments.trollUsdPrice) {
+        const p = await window.TrollPayments.trollUsdPrice();
+        if (p > 0) return p;
+      }
+    } catch (_) {}
+    return null;
   }
 
-  /* --- mode + money-movement stubs --------------------------------------------
-     mode() reports what the flag stack would allow; the casino UI shows it so
-     nobody mistakes mock chips for chain balances. */
-  function mode() {
-    const f = window.TROLL_FLAGS;
-    return f && f.realPaymentsLive && f.realPaymentsLive() ? "real" : "mock";
-  }
-
-  // Deposit: hand the request to TrollPayments (it owns confirm screens and the
-  // mock/real decision), then credit table chips on success. In mock mode this
-  // is a safe, clearly-labelled simulation end to end.
-  async function deposit(amount, cur) {
-    cur = cur || state.currency;
-    if (!(amount > 0)) return { ok: false, reason: "invalid" };
-    const pay = window.TrollPayments;
-    if (!pay) return { ok: false, reason: "unavailable", message: "Payments module not loaded." };
-    const res = await pay.requestPayment({
-      action: "Deposit to Troll Casino",
-      token: cur, amount,
-      dedupeKey: `casino-deposit-${cur}-${Date.now()}`,
-    });
-    if (res && res.ok) credit(amount, res.mock ? "Deposit (mock)" : "Deposit", cur);
-    return res;
-  }
-
-  // Withdraw: mock refund only. Real withdrawals need the Part 2 claims/payout
-  // backend, which is deliberately not built — so real mode refuses (closed).
-  async function withdraw(amount, cur) {
-    cur = cur || state.currency;
-    if (!(amount > 0) || !canAfford(amount, cur)) return { ok: false, reason: "insufficient" };
-    if (mode() === "real") {
-      return { ok: false, reason: "unavailable",
-               message: "Real withdrawals need the payout backend (docs/PART2-SYSTEMS.md)." };
+  async function init() {
+    const a = accounts();
+    if (!a) return;
+    const session = a.getCachedProfile() || await a.getSession();
+    if (!session) {
+      state.ready = false; state.userId = null;
+      state.balances = { TROLL: 0, USDC: 0 };
+      emit();
+      return;
     }
-    debit(amount, "Withdraw (mock)", cur);
-    return { ok: true, mock: true };
+    state.userId = session.userId;
+    const c = client();
+    if (!c) return;
+    try {
+      const { data, error } = await c.rpc("troll_casino_ensure_wallet");
+      if (!error && data) {
+        state.balances.TROLL = Number(data.troll_balance) || 0;
+        state.balances.USDC = Number(data.usdc_balance) || 0;
+      }
+    } catch (_) {}
+    state.ready = true;
+    emit();
+    flushQueue();
+  }
+
+  window.addEventListener("trollrunner:auth-changed", (e) => { init(); });
+
+  /* --- deposit: real payment in, via TrollPay + Phantom ------------------------- */
+  async function deposit(usdAmount, cur, onProgress) {
+    cur = cur || state.currency;
+    usdAmount = Number(usdAmount);
+    if (!state.userId) return { ok: false, reason: "login-required", message: "Log in to deposit." };
+    if (!(usdAmount > 0)) return { ok: false, reason: "invalid" };
+    const TP = window.TrollPay;
+    if (!TP) return { ok: false, reason: "unavailable", message: "Payment library not loaded." };
+    const TW = window.TrollWallet;
+    if (TW && !TW.isConnected()) {
+      const conn = await TW.connect();
+      if (!conn || !conn.connected) return { ok: false, reason: "wallet", message: "Connect Phantom to deposit." };
+    }
+
+    let tokenAmount = usdAmount;
+    if (cur === "TROLL") {
+      const price = await trollUsdPrice();
+      if (!price) return { ok: false, reason: "price", message: "$TROLL price unavailable — try again shortly." };
+      tokenAmount = usdAmount / price;
+    }
+
+    const res = await TP.pay({ amountUsd: usdAmount, taxRate: 0, token: cur, memo: "TR|casino|Deposit", onProgress });
+    if (!res || !res.ok) return res || { ok: false, reason: "failed" };
+
+    const c = client();
+    if (!c) return { ok: false, reason: "unavailable" };
+    try {
+      const wallet = TW && TW.getAddress ? TW.getAddress() : null;
+      const { data, error } = await c.rpc("troll_casino_confirm_deposit", {
+        p_token: cur, p_amount_usd: usdAmount, p_token_amount: tokenAmount,
+        p_tx_sig: res.txSig, p_wallet: wallet,
+      });
+      if (error) return { ok: false, reason: "db", message: error.message, txSig: res.txSig };
+      state.balances[cur] = Number(data);
+      record("Deposit", tokenAmount, cur);
+      emit();
+      try {
+        a_logSpend(cur, tokenAmount, wallet, res.txSig);
+      } catch (_) {}
+      return { ok: true, txSig: res.txSig, credited: tokenAmount };
+    } catch (e) {
+      return { ok: false, reason: "db", message: String((e && e.message) || e), txSig: res.txSig };
+    }
+  }
+  function a_logSpend(token, amount, wallet, signature) {
+    const a = accounts();
+    if (a && a.logPendingSpend) {
+      a.logPendingSpend({ token, amount, wallet, signature, purpose: "casino_deposit", feature: "troll-casino" }).catch(() => {});
+    }
+  }
+
+  /* --- redemption: real payout out, manual admin review ------------------------- */
+  async function requestRedemption({ amount, token, wallet }) {
+    token = token || state.currency;
+    amount = Number(amount);
+    if (!state.userId) return { ok: false, reason: "login-required" };
+    if (!(amount > 0) || !canAfford(amount, token)) return { ok: false, reason: "insufficient" };
+    if (!wallet || String(wallet).trim().length < 20) return { ok: false, reason: "bad-wallet", message: "Enter a valid payout wallet address." };
+    const c = client();
+    if (!c) return { ok: false, reason: "unavailable" };
+    try {
+      const { data, error } = await c.rpc("troll_casino_request_redemption", {
+        p_wallet: String(wallet).trim(), p_token: token, p_token_amount: amount,
+      });
+      if (error) return { ok: false, reason: "db", message: error.message };
+      state.balances[token] -= amount;
+      record("Redeem requested", -amount, token);
+      emit();
+      return { ok: true, id: data };
+    } catch (e) { return { ok: false, reason: "db", message: String((e && e.message) || e) }; }
+  }
+
+  async function listMyRedemptions() {
+    const c = client();
+    if (!c || !state.userId) return [];
+    try {
+      const { data } = await c.from("troll_casino_redemptions").select("*")
+        .eq("user_id", state.userId).order("created_at", { ascending: false });
+      return data || [];
+    } catch (_) { return []; }
   }
 
   // Wallet connect chip — delegated wholesale to the shared Phase 10 module.
@@ -169,11 +278,12 @@
     return () => {};
   }
 
-  load();
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
 
   window.TrollCasinoWallet = {
     list, getCurrency, setCurrency, getBalance, canAfford, fmt,
     debit, credit, onChange, getHistory: () => snapshot().history,
-    deposit, withdraw, resetMock, mode, mountWalletChip,
+    deposit, requestRedemption, listMyRedemptions, mode, mountWalletChip, isReady,
   };
 })();

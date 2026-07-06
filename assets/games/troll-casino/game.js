@@ -446,7 +446,7 @@
     const add = table.chipValue;
     if (!wallet().canAfford(stakedTotal() + add)) {
       const label = wallet().list().find(c => c.code === wallet().getCurrency()).label;
-      flashStatus(`Not enough ${label} — lower the stake or reset mock chips`);
+      flashStatus(`Not enough ${label} — lower the stake or add funds`);
       AudioFX.rug();
       return;
     }
@@ -673,19 +673,8 @@
 
     $("#replay-intro").addEventListener("click", () => window.TrollCasinoScenes?.replayIntro());
 
-    $("#deposit-btn")?.addEventListener("click", async () => {
-      const cur = wallet().getCurrency();
-      const amount = cur === "TROLL" ? 50000 : 100;
-      const res = await wallet().deposit(amount, cur);
-      flashStatus(res.ok ? `Deposited ${wallet().fmt(amount)}${res.mock ? " (mock)" : ""}`
-                         : res.message || "Deposit cancelled");
-    });
-    $("#reset-mock")?.addEventListener("click", () => {
-      if (table.spinning) return;
-      clearBets(true);
-      wallet().resetMock();
-      flashStatus("Mock balances reset");
-    });
+    $("#deposit-btn")?.addEventListener("click", () => window.TrollCasinoMoneyUI?.openDeposit());
+    $("#redeem-btn")?.addEventListener("click", () => window.TrollCasinoMoneyUI?.openRedeem());
   }
 
   /* ==========================================================================

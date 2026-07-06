@@ -16,7 +16,9 @@ Live page: `troll-casino.html` · Hub card: `index.html` (004).
 | `assets/games/troll-casino/style.css` | — | Design tokens, scene stage + transitions, wheel UI, shared chrome |
 | `assets/games/troll-casino/rooms.css` | — | Casino floor, room hero pattern, blackjack/slots/crash UI |
 | `assets/games/troll-casino/scenes.js` | `TrollCasinoScenes` | The 5-scene cinematic walkthrough, transitions, parallax, gameplay handoff |
-| `assets/games/troll-casino/casino-wallet.js` | `TrollCasinoWallet` | $TROLL/USDC balances (mock, localStorage), history, deposit/withdraw stubs |
+| `assets/games/troll-casino/casino-wallet.js` | `TrollCasinoWallet` | REAL $TROLL/USDC balances (Supabase, per account), history, deposit()/requestRedemption() |
+| `assets/games/troll-casino/casino-money-ui.js` | `TrollCasinoGate`, `TrollCasinoMoneyUI` | Hard login gate (guests blocked) + deposit/redeem modals |
+| `assets/games/troll-casino/casino-admin.js` | — | `?admin=1` manual redemption review panel (password UI gate + server-side `is_admin` RLS) |
 | `assets/games/troll-casino/game.js` | `TrollCasino` | Casino core: floor + room registry, shared audio/FX/reportRound — plus the Troll Wheel |
 | `assets/games/troll-casino/blackjack.js` | `TrollCasinoBlackjack` | Pepe's Diamond Hands Blackjack (room module) |
 | `assets/games/troll-casino/slots.js` | `TrollCasinoSlots` | Doge Jackpot Reels (room module) |
@@ -44,8 +46,8 @@ single leaderboard + XP integration point).
   3:2, double any first two, one split (aces get one card), insurance 2:1.
 - **Slots** — 5×3, 10 fixed paylines, weighted symbols, 😎 wild, 🚀 scatter
   (pays on total bet), 🐕 gold-doge jackpot: 3/4/5 anywhere = 25%/60%/100% of
-  a LOCAL mock progressive meter (localStorage per currency, fed 1.5% of each
-  bet). A real progressive needs a server-held pool.
+  a REAL shared progressive pool (`troll_casino_jackpot` in Supabase, per
+  currency, fed 1.5% of each bet — every player feeds the same pot).
 - **Crash** — P(crash ≥ m) = 0.96/m (4% edge, ~4% instant rugs, median ≈1.9×);
   crash point sampled by crypto RNG before ignition. Auto-exit beats frame
   quantization by design. Provably-fair seam: swap `sampleCrash`'s RNG for a
@@ -54,9 +56,16 @@ single leaderboard + XP integration point).
 Separation rules the code follows (keep them):
 - Scene logic never touches gameplay; it emits `"gameplay"` and game.js reacts.
 - Gameplay never mutates balances; it calls `TrollCasinoWallet.debit/credit`.
-- Money movement (real or mock) only ever routes through the shared Phase 10
-  stack (`TrollWallet` → `TrollPayments`), which fails closed behind
-  `TROLL_FLAGS`. This page ships with everything real OFF.
+- Deposits (money IN) go through TrollPay/Phantom directly, confirmed
+  server-side and idempotent on the tx signature — see
+  `troll_casino_confirm_deposit` in `assets/supabase/troll_casino.sql`
+  (in the main site repo). Redemptions (money OUT) debit immediately and
+  file a request a human reviews and pays by hand — there is no automatic
+  payout. In-round bet/win deltas stay client-trusted, like every other
+  game's score submission in this schema; the money rails (deposit/redeem)
+  are the parts that are actually guarded server-side.
+- This page is hard-gated behind login (`TrollCasinoGate` in
+  casino-money-ui.js) — guests never reach the game engine at all.
 
 ## The scene system
 
@@ -122,12 +131,18 @@ wheel moves, never by where pixels stop.
    `TrollCasino.reportRound(gameId, { won, mult, meta })`.
 5. Hero art goes in `art/` per its README (no baked-in UI text).
 
-## Going real later (deliberately not done)
+## Real money (live)
 
-Mock chips live in localStorage (`troll-casino-wallet-v1`). To make balances
-real: swap `load/save/debit/credit` in casino-wallet.js for backend calls
-(`assets/js/backend-api.js`) keyed to the signed-in account, and move spin
-settlement server-side (stake escrow → verified result → payout). Wallet
-connect stays `TrollWallet`; on-chain movement stays `TrollPayments`;
-withdrawals need the Part 2 payout backend (`docs/PART2-SYSTEMS.md`). All of
-it stays behind `TROLL_FLAGS` — which ship OFF.
+Balances are real, per-account, and live in Supabase
+(`assets/supabase/troll_casino.sql`, main site repo) — `troll_casino_wallet`,
+`troll_casino_deposits`, `troll_casino_redemptions`, `troll_casino_jackpot`.
+Run that SQL once (and flip your own `troll_profiles.is_admin` to `true` by
+hand) before this page can work.
+
+**Deliberately still manual:** redemptions are NOT auto-paid. A request
+debits the player's balance and sits `pending`; you review it at
+`troll-casino.html?admin=1`, send the payout yourself, then mark it paid
+(or reject it, which auto-refunds). Automating that leg would need a
+server-held treasury signer — a real infra/security project of its own,
+not something bolted on here. See `docs/PHASE10-WALLET-UTILITY.md` for why
+that's intentionally out of scope.

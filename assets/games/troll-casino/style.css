@@ -655,3 +655,91 @@ button:focus-visible, a:focus-visible {
   .enter-btn { animation: none; }
   .scene, .scene-inner { transition-duration: 1ms !important; animation-duration: 1ms !important; }
 }
+
+/* ---------- 9 · Shared modal + hard-gate overlay (login, deposit, redeem, admin) */
+.tc-modal-backdrop {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(3, 1, 8, 0.82);
+  backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.tc-modal {
+  width: min(420px, 100%);
+  max-height: 88vh;
+  overflow-y: auto;
+  background: var(--tc-panel-solid);
+  border: 0.5px solid var(--tc-line);
+  border-radius: var(--tc-radius);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+  padding: 28px 26px;
+  position: relative;
+}
+.tc-modal h2 {
+  font-family: var(--tc-font-display);
+  font-size: 22px;
+  margin-bottom: 6px;
+}
+.tc-modal p.tc-sub { color: var(--tc-dim); font-size: 13px; margin-bottom: 18px; line-height: 1.5; }
+.tc-modal-close {
+  position: absolute; top: 14px; right: 14px;
+  background: none; border: none; color: var(--tc-dim);
+  font-size: 18px; line-height: 1;
+}
+.tc-field { margin-bottom: 14px; }
+.tc-field label { display: block; font-size: 12px; color: var(--tc-dim); margin-bottom: 6px; font-family: var(--tc-font-mono); }
+.tc-field input, .tc-field select {
+  width: 100%; padding: 11px 12px;
+  background: rgba(255,255,255,0.04);
+  border: 0.5px solid var(--tc-line);
+  border-radius: 10px;
+  color: var(--tc-text);
+  font-family: var(--tc-font-mono);
+  font-size: 15px;
+}
+.tc-token-toggle { display: flex; gap: 8px; margin-bottom: 14px; }
+.tc-token-toggle button {
+  flex: 1; padding: 10px; border-radius: 10px;
+  border: 0.5px solid var(--tc-line);
+  background: rgba(255,255,255,0.03);
+  color: var(--tc-dim); font-weight: 700;
+}
+.tc-token-toggle button.is-active { color: var(--tc-bg); background: var(--tc-green); border-color: var(--tc-green); }
+.tc-btn {
+  width: 100%; padding: 13px; border-radius: 12px; border: none;
+  background: var(--tc-green); color: #04150a; font-weight: 900;
+  font-family: var(--tc-font-display); font-size: 14px; letter-spacing: 0.02em;
+  margin-top: 4px;
+}
+.tc-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.tc-btn--ghost { background: none; border: 0.5px solid var(--tc-line); color: var(--tc-text); }
+.tc-status { font-size: 13px; margin-top: 12px; min-height: 18px; }
+.tc-status.is-bad { color: var(--tc-red); }
+.tc-status.is-ok { color: var(--tc-green); }
+.tc-tab-row { display: flex; gap: 6px; margin-bottom: 18px; }
+.tc-tab-row button {
+  flex: 1; padding: 9px; border-radius: 10px; border: 0.5px solid var(--tc-line);
+  background: none; color: var(--tc-dim); font-size: 13px; font-weight: 700;
+}
+.tc-tab-row button.is-active { color: var(--tc-text); border-color: var(--tc-green); background: rgba(61,255,138,0.08); }
+.tc-req-list { list-style: none; margin-top: 16px; display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; }
+.tc-req-list li {
+  border: 0.5px solid var(--tc-line); border-radius: 10px; padding: 10px 12px;
+  font-size: 12px; font-family: var(--tc-font-mono); display: flex; justify-content: space-between; gap: 10px;
+}
+.tc-req-status { font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 0.04em; }
+.tc-req-status.pending { color: var(--tc-gold); }
+.tc-req-status.paid { color: var(--tc-green); }
+.tc-req-status.rejected { color: var(--tc-red); }
+
+/* Hard login gate — covers the whole casino viewport for guests. */
+.tc-gate {
+  position: absolute; inset: 0; z-index: 900;
+  background: linear-gradient(180deg, rgba(5,0,8,0.96), rgba(5,0,8,0.99));
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px; text-align: center;
+}
+.tc-gate-card { max-width: 420px; }
+.tc-gate-card h2 { font-family: var(--tc-font-display); font-size: 26px; margin-bottom: 10px; }
+.tc-gate-card p { color: var(--tc-dim); font-size: 14px; line-height: 1.6; margin-bottom: 22px; }
+.tc-gate-card .tc-btn { margin-bottom: 10px; }

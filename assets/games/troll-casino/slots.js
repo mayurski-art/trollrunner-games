@@ -8,9 +8,10 @@
        4 × 🐕 anywhere → MAJOR  (60% of the meter)
        5 × 🐕 anywhere → GRAND  (the whole meter, meter reseeds)
 
-   The meter is a LOCAL mock progressive (localStorage, per currency) — the
-   real-money version needs a server-held pool; see docs/TROLL-CASINO.md.
-   Money moves only via TrollCasinoWallet; results go through reportRound.
+   The meter is a REAL shared progressive (troll_casino_jackpot in Supabase,
+   per currency) — every player's spin feeds the same pool, and a win pays
+   real balance. Money moves only via TrollCasinoWallet; results go through
+   reportRound.
 
    The math sits between the MODEL markers (pure, node-testable). Line pays
    are multiples of the LINE bet (total bet / 10); scatter pays multiply the
@@ -135,7 +136,6 @@
     lose: "much rug. very house.",
   };
 
-  const JACKPOT_LS = "tc-slots-jackpot-v1";
   const JACKPOT_SEED = { TROLL: 500000, USDC: 2000 };
 
   const S = {
@@ -148,24 +148,45 @@
     recent: [],
   };
 
-  /* --- progressive meter (mock, local) ----------------------------------------- */
-  function meterLoad() {
-    try { return Object.assign({ ...JACKPOT_SEED }, JSON.parse(localStorage.getItem(JACKPOT_LS) || "{}")); }
-    catch (_) { return { ...JACKPOT_SEED }; }
+  /* --- progressive meter — a REAL shared jackpot in troll_casino_jackpot.
+     jackpotCache is a display-only local mirror; the pot itself only ever
+     changes via the troll_casino_jackpot_* RPCs (see troll_casino.sql), so
+     every player's bet feeds the same real pot and a win pays real balance. */
+  const jackpotCache = { ...JACKPOT_SEED };
+  function dbClient() { return window.TrollrunnerAccounts && window.TrollrunnerAccounts.getClient(); }
+  async function refreshJackpot() {
+    const c = dbClient();
+    if (!c) return;
+    try {
+      const { data } = await c.from("troll_casino_jackpot").select("troll_amount,usdc_amount").eq("id", 1).maybeSingle();
+      if (data) {
+        jackpotCache.TROLL = Number(data.troll_amount) || jackpotCache.TROLL;
+        jackpotCache.USDC = Number(data.usdc_amount) || jackpotCache.USDC;
+        renderMeter();
+      }
+    } catch (_) {}
   }
-  function meterSave(m) { try { localStorage.setItem(JACKPOT_LS, JSON.stringify(m)); } catch (_) {} }
-  function meterAdd(amount, cur) {
-    const m = meterLoad();
-    m[cur] = Math.round((m[cur] + amount) * 100) / 100;
-    meterSave(m); renderMeter();
+  function meterLoad() { return { ...jackpotCache }; }
+  async function meterAdd(amount, cur) {
+    jackpotCache[cur] = Math.round((jackpotCache[cur] + amount) * 100) / 100; // optimistic
+    renderMeter();
+    const c = dbClient();
+    if (!c) return;
+    try {
+      const { data, error } = await c.rpc("troll_casino_jackpot_contribute", { p_currency: cur, p_delta: amount });
+      if (!error && data != null) { jackpotCache[cur] = Number(data); renderMeter(); }
+    } catch (_) {}
   }
-  function meterTake(share, cur) {
-    const m = meterLoad();
-    const won = Math.round(m[cur] * share * 100) / 100;
-    m[cur] = Math.max(JACKPOT_SEED[cur], Math.round((m[cur] - won) * 100) / 100);
-    if (share >= 1) m[cur] = JACKPOT_SEED[cur];
-    meterSave(m); renderMeter();
-    return won;
+  async function meterTake(share, cur) {
+    const c = dbClient();
+    if (!c) return 0;
+    try {
+      const { data, error } = await c.rpc("troll_casino_jackpot_win", { p_currency: cur, p_share: share });
+      if (error) return 0;
+      const won = Number(data) || 0;
+      await refreshJackpot();
+      return won;
+    } catch (_) { return 0; }
   }
 
   /* --- room registration -------------------------------------------------------- */
@@ -176,7 +197,7 @@
     cta: "Pull the handle",
     art: "assets/games/troll-casino/art/doge-jackpot-hero.png",
     playArt: "assets/games/troll-casino/art/doge-jackpot-gameplay.png",
-    onEnter: () => { setLine(DOGE.idle); renderMeter(); },
+    onEnter: () => { setLine(DOGE.idle); renderMeter(); refreshJackpot(); },
     onLeave: () => stopAutoplay(),
   });
 
@@ -340,14 +361,14 @@
     const grid = spinGrid();
     const result = evalSpin(grid, S.bet);
     await animateReels(grid);
-    settle(grid, result, cur);
+    await settle(grid, result, cur);
 
     S.spinning = false;
     $("#sl-spin").disabled = false;
     if (S.autoplay) queueAuto();
   }
 
-  function settle(grid, result, cur) {
+  async function settle(grid, result, cur) {
     let credited = 0;
 
     if (result.total > 0) {
@@ -359,9 +380,9 @@
     let jackpotWon = 0, tierName = null;
     if (result.jackpotTier) {
       [tierName] = result.jackpotTier;
-      jackpotWon = meterTake(result.jackpotTier[1], cur);
+      jackpotWon = await meterTake(result.jackpotTier[1], cur);
       credited += jackpotWon;
-      wallet().credit(jackpotWon, `${tierName} jackpot 🐕`);
+      if (jackpotWon > 0) wallet().credit(jackpotWon, `${tierName} jackpot 🐕`);
     }
 
     const winCells = [

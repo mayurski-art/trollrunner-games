@@ -231,7 +231,7 @@
 
   function addChip(v) {
     if (T.phase !== "betting") return;
-    if (!wallet().canAfford(T.bet + v)) { setLine("Not enough chips for that. Pepe suggests the mock reset."); return; }
+    if (!wallet().canAfford(T.bet + v)) { setLine("Not enough chips for that. Pepe suggests adding funds."); return; }
     T.bet += v;
     audio().ensure(); audio().chip();
     renderBetUI();

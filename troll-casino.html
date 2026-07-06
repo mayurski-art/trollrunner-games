@@ -14,6 +14,13 @@
   <link rel="stylesheet" href="assets/css/troll-wallet.css?v=lab-v1">
   <link rel="stylesheet" href="assets/games/troll-casino/style.css?v=casino-v3">
   <link rel="stylesheet" href="assets/games/troll-casino/rooms.css?v=casino-v3">
+  <script>
+    // Real money page: allow real Phantom connect for the wallet status chip
+    // and the redeem-wallet prefill. Deposits/redemptions themselves go
+    // through TrollPay/Supabase RPCs directly (see casino-wallet.js) and are
+    // real regardless of this flag — this only affects the connect-status UI.
+    window.TROLL_FLAGS_OVERRIDE = { ENABLE_WALLET_CONNECT: true };
+  </script>
 </head>
 <body>
 
@@ -60,7 +67,7 @@
       <!-- landing CTA (scene 1 only; removed once the walkthrough starts) -->
       <div class="landing-cta" id="landing-cta">
         <button type="button" class="enter-btn" id="enter-casino">🧌 Enter Casino</button>
-        <p class="landing-note">Mock chips only — no real money moves. Problem?</p>
+        <p class="landing-note">Real $TROLL and USDC. Deposits and cash-outs are real money. Problem?</p>
       </div>
 
       <!-- walkthrough HUD -->
@@ -145,11 +152,11 @@
               <h3>Activity</h3>
               <ul class="activity-list" id="activity-list"></ul>
               <p class="rail-note">
-                <button type="button" class="ghost-btn" id="deposit-btn">＋ Add chips</button>
-                <button type="button" class="ghost-btn" id="reset-mock">↺ Reset mock</button>
+                <button type="button" class="ghost-btn" id="deposit-btn">＋ Add funds</button>
+                <button type="button" class="ghost-btn" id="redeem-btn">💸 Redeem</button>
               </p>
-              <p class="rail-note">Chips are mock balances stored on this device. Wallet connect and
-                 payments run through the shared flag-gated stack — everything real stays OFF.</p>
+              <p class="rail-note">Real $TROLL / USDC. Deposits pay a real on-chain transaction via Phantom.
+                 Redemptions are reviewed manually before payout.</p>
             </div>
             <div class="rail-card">
               <h3>More tables</h3>
@@ -183,27 +190,40 @@
     </section>
   </main>
 
-  <!-- Shared flag-gated utility stack (everything real defaults OFF) -->
+  <!-- Shared flag-gated utility stack (everything real defaults OFF except
+       ENABLE_WALLET_CONNECT, overridden above) -->
   <script src="assets/js/troll-arcade-flags.js?v=phase10-v1" defer></script>
   <script src="assets/js/troll-pay-config.js?v=1" defer></script>
+  <script src="https://trollrunner.net/assets/js/troll-pay.js?v=5" defer></script>
   <script src="assets/js/backend-api.js?v=phase10-v1" defer></script>
   <script src="assets/js/wallet.js?v=phase10-v1" defer></script>
   <script src="assets/js/payments.js?v=phase10-v2" defer></script>
 
+  <!-- Hard login gate + deposit/redeem modals — must load before the boot
+       glue script below, which awaits TrollCasinoGate.ready. Guests never
+       see the game engine; see assets/supabase/troll_casino.sql for the
+       real-money schema this and casino-wallet.js talk to. -->
+  <script src="assets/games/troll-casino/casino-money-ui.js?v=casino-v4" defer></script>
+  <script src="assets/games/troll-casino/casino-admin.js?v=casino-v4" defer></script>
+
   <!-- Leaderboard engine + casino modules -->
   <script src="assets/js/troll-leaderboard.js?v=lb-engine-v1" defer></script>
   <script src="assets/games/troll-casino/scenes.js?v=casino-v3" defer></script>
-  <script src="assets/games/troll-casino/casino-wallet.js?v=casino-v3" defer></script>
+  <script src="assets/games/troll-casino/casino-wallet.js?v=casino-v4" defer></script>
   <script src="assets/games/troll-casino/leaderboard.js?v=casino-v3" defer></script>
-  <script src="assets/games/troll-casino/game.js?v=casino-v3" defer></script>
+  <script src="assets/games/troll-casino/game.js?v=casino-v4" defer></script>
   <!-- game rooms — must load AFTER game.js (they register with TrollCasino) -->
   <script src="assets/games/troll-casino/blackjack.js?v=casino-v3" defer></script>
-  <script src="assets/games/troll-casino/slots.js?v=casino-v3" defer></script>
+  <script src="assets/games/troll-casino/slots.js?v=casino-v4" defer></script>
   <script src="assets/games/troll-casino/crash.js?v=casino-v3" defer></script>
 
   <script defer>
     // Page glue: boot the scene engine and hand the walkthrough buttons to it.
-    document.addEventListener("DOMContentLoaded", () => {
+    // Guests never get here for real — TrollCasinoGate.ready only resolves
+    // once a real session exists (see casino-money-ui.js).
+    document.addEventListener("DOMContentLoaded", async () => {
+      await window.TrollCasinoGate.ready;
+
       const S = window.TrollCasinoScenes;
       S.init({ stage: "#scene-stage", viewport: "#casino-viewport" });
 
