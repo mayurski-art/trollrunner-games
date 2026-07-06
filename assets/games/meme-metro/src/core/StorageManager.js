@@ -4,19 +4,21 @@
 //   - Logged in  -> cloud save in troll_game_saves (RLS: owner-only),
 //                   mirrored into a local per-account cache key as a
 //                   synchronous backup for beforeunload.
-//   - Logged out -> a separate local-only "guest" key. Never reads or
-//                   writes any account's data.
+//   - Logged out -> guest progress is intentionally NEVER persisted --
+//                   every boot as a guest starts from defaults. main.js
+//                   shows a confirm-or-create-account gate before a guest
+//                   actually loses a session (closing the window) via
+//                   TrollrunnerAccounts.confirmGuestExit.
 //   - The old pre-account global key (KEY) is migrated into the first
 //     real account that logs in and then deleted.
 //
-// The constructor loads synchronously from the guest key (or defaults) so
-// the game can boot immediately; call hydrate() right after construction
-// to resolve the real account/guest save once login state is known, then
-// refresh anything already rendered with the synchronous defaults.
+// The constructor loads synchronous defaults so the game can boot
+// immediately; call hydrate() right after construction to resolve the
+// real account save once login state is known, then refresh anything
+// already rendered with the synchronous defaults.
 
 const KEY = 'trollDashMemeMetroSave_v1';
 const GAME_ID = 'meme-metro';
-const GUEST_KEY = `${KEY}:guest`;
 const cloudCacheKey = userId => `${KEY}:cloud-cache:${userId}`;
 
 const DEFAULTS = {
@@ -36,8 +38,12 @@ const DEFAULTS = {
 export class StorageManager {
   constructor() {
     this.userId = null;
-    this.data = this.loadLocal(GUEST_KEY) || structuredClone(DEFAULTS);
+    this.data = structuredClone(DEFAULTS);
   }
+
+  get isGuest() { return !this.userId; }
+  // True once real progress exists worth confirming before it's discarded.
+  get hasProgress() { return this.data.totalCoins > 0 || this.data.unlocked.length > 1 || this.data.highScore > 0; }
 
   loadLocal(key) {
     try {
@@ -120,8 +126,7 @@ export class StorageManager {
     const session = await this.getSessionSafe();
     if (!session) {
       this.userId = null;
-      this.data = this.loadLocal(GUEST_KEY) || structuredClone(DEFAULTS);
-      return this.data;
+      return this.data; // guests keep whatever's in memory -- never persisted
     }
     this.userId = session.userId;
 
@@ -146,14 +151,11 @@ export class StorageManager {
 
   save() {
     this.data.savedAt = Date.now();
-    if (this.userId) {
-      // synchronous local backup first -- covers beforeunload, where the
-      // async cloud write below may get killed mid-flight by the browser.
-      this.saveLocal(cloudCacheKey(this.userId), this.data);
-      void this.saveCloud(this.userId, this.data);
-    } else {
-      this.saveLocal(GUEST_KEY, this.data);
-    }
+    if (!this.userId) return; // guests are never persisted
+    // synchronous local backup first -- covers beforeunload, where the
+    // async cloud write below may get killed mid-flight by the browser.
+    this.saveLocal(cloudCacheKey(this.userId), this.data);
+    void this.saveCloud(this.userId, this.data);
   }
 
   get highScore() { return this.data.highScore; }
@@ -190,16 +192,13 @@ export class StorageManager {
 
   async resetAll() {
     this.data = structuredClone(DEFAULTS);
-    if (this.userId) {
-      try { localStorage.removeItem(cloudCacheKey(this.userId)); } catch { /* ignore */ }
-      const sb = window.TrollrunnerAccounts?.getClient?.();
-      if (sb) {
-        try {
-          await sb.from('troll_game_saves').delete().eq('user_id', this.userId).eq('game_id', GAME_ID);
-        } catch { /* ignore */ }
-      }
-      return;
+    if (!this.userId) return;
+    try { localStorage.removeItem(cloudCacheKey(this.userId)); } catch { /* ignore */ }
+    const sb = window.TrollrunnerAccounts?.getClient?.();
+    if (sb) {
+      try {
+        await sb.from('troll_game_saves').delete().eq('user_id', this.userId).eq('game_id', GAME_ID);
+      } catch { /* ignore */ }
     }
-    try { localStorage.removeItem(GUEST_KEY); } catch { /* ignore */ }
   }
 }

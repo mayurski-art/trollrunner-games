@@ -8,7 +8,7 @@ import {
 import { getIcon } from "./icons.js";
 import { fmtClock } from "./util.js";
 import { SURFACE_BASE } from "./worldgen.js";
-import { saveGame, saveSettings } from "./save.js";
+import { saveGame, saveSettings, isGuest } from "./save.js";
 
 export class UI {
   constructor(game) {
@@ -94,6 +94,18 @@ export class UI {
     document.getElementById("btn-lb-back").addEventListener("click", () => this.showTitle(this._hadSave));
     document.getElementById("btn-resume").addEventListener("click", () => game.enterPlay());
     document.getElementById("btn-save").addEventListener("click", async e => {
+      if (isGuest()) {
+        // Guests are never persisted -- offer the one-click account path
+        // instead of silently no-oping (or a misleading "save failed").
+        await window.TrollrunnerAccounts?.confirmGuestExit?.({
+          title: "Create an account to save",
+          message: "You're not logged in — this world isn't being saved.",
+          declineLabel: "Keep playing without saving",
+          stayLabel: "Never mind",
+          onAccountCreated: () => saveGame(game),
+        });
+        return;
+      }
       e.target.textContent = "💾 Saving…";
       const ok = await saveGame(game);
       e.target.textContent = ok ? "💾 Saved ✓" : "💾 Save failed";
