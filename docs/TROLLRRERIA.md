@@ -11,7 +11,7 @@ Canvas 2D, ES modules, no frameworks, no build step. Launcher:
 | Space / W | Jump (hold for higher; swim up in water) |
 | S | Drop through platforms |
 | LMB | Use held item — mine / place / swing / shoot |
-| RMB | Interact — doors, chests, Guide Troll |
+| RMB | Interact — doors, chests, NPCs, the spawn sign |
 | E | Inventory + crafting |
 | M | Full map |
 | Q | Toss one of the held item |
@@ -55,7 +55,22 @@ trollium gear → craft an **Emperor Sigil** (8 trollium bars + 10 bones +
   crossfading with context; separate music volume slider.
 - **Housing + NPCs**: flood-fill room validation (bounded, walled, torch +
   bed/workbench + door). A valid house attracts the **Merchant Troll**
-  (barter shop, 7 offers, no currency). Troll cots set your spawn.
+  (barter shop, 7 offers, no currency). Troll cots set your spawn, and
+  sleeping in one at night (with no threats nearby) skips straight to
+  morning and tops up your HP.
+- **Survival**: a hunger bar drains over time (faster while sprinting) and
+  starves you once empty — passive regen needs a fed troll. Passive
+  animals (troll boars/hens) roam the surface by day, drop raw meat, and
+  never fight back. A **Campfire** (wood + stone, no gate) cooks raw meat
+  into a safer, bigger hunger refill; eating it raw risks a queasy HP hit.
+  **Farmland** (tilled from dirt) grows planted seeds — pulled from wild
+  surface grass — into troll berries over two timed stages.
+- **Trollrreria Town**: four specialist barter NPCs camped near spawn —
+  Blacksmith (ore → bars/gear), Alchemist (Troll Brew), Tavern Keeper
+  (cooked food), Butcher (meat, raw and cooked). Same no-currency barter
+  system as the Merchant Troll, each with its own offer table. A static
+  **weathered sign** (not a walking NPC) stands in for the old Guide
+  Troll — right-click it for onboarding tips and the Lost Grin questline.
 - **Wiring**: wrench + wire layer, levers, pressure plates, dart traps;
   pulses toggle torches/doors and fire traps. Wires visible while
   holding the wrench.
@@ -71,9 +86,12 @@ trollium gear → craft an **Emperor Sigil** (8 trollium bars + 10 bones +
 
 ## Art
 Player = Troll Kombat gladiator rig (`fighters/gladiator/anims/*.png`),
-feet-anchored strips, 136 px cells. Guide Troll = same rig hue-rotated.
-Troll King = `fighters/troll.png` + drawn crown. Everything else (tiles,
-items, enemies) is drawn procedurally at boot — no image assets.
+feet-anchored strips, 136 px cells. Every town/quest NPC has its own
+dedicated PixelLab rig at 132 px cells (Blacksmith, Alchemist, Tavern
+Keeper, Butcher, Whale Oracle, Rocket Tinkerer), plus Doge and Pepe —
+no two NPCs share a sprite. Troll King = `fighters/troll.png` + drawn
+crown. Everything else (tiles, items, enemies) is drawn procedurally at
+boot — no image assets.
 
 ## Deliberately out of scope (for now)
 Authoritative server netcode (co-op is trust-based shared-world sync),

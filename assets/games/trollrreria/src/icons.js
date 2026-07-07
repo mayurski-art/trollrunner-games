@@ -73,6 +73,7 @@ function drawIcon(g, id, def) {
     case "potion": drawPotion(g); break;
     case "summon": drawTotem(g); break;
     case "material": drawMaterial(g, id, m); break;
+    case "food": drawFood(g, id); break;
     default: { g.fillStyle = "#f0f"; g.fillRect(8, 8, 16, 16); }
   }
 }
@@ -119,6 +120,46 @@ function drawFurniture(g, id) {
     g.fillStyle = "#4e525a"; g.fillRect(4, 4, 24, 24);
     g.fillStyle = "#33363e"; g.fillRect(4, 13, 12, 7);
     g.fillStyle = "#141414"; g.fillRect(2, 15, 5, 3);
+  } else if (id === "seeds") {
+    g.fillStyle = "#6b8f3a";
+    for (const [x, y] of [[10, 20], [16, 15], [22, 20], [13, 24], [19, 24]]) {
+      g.beginPath(); g.arc(x, y, 3, 0, 7); g.fill();
+    }
+    g.fillStyle = "#8fb573"; g.fillRect(14, 6, 3, 10); g.fillRect(19, 8, 3, 8);
+  } else if (id === "campfire") {
+    g.fillStyle = "#5d4326"; g.fillRect(6, 24, 4, 4); g.fillRect(22, 24, 4, 4);
+    g.strokeStyle = "#3a2a17"; g.lineWidth = 3;
+    g.beginPath(); g.moveTo(7, 25); g.lineTo(25, 25); g.stroke();
+    g.fillStyle = "#ff7a1a";
+    g.beginPath(); g.moveTo(16, 6); g.quadraticCurveTo(23, 16, 16, 24); g.quadraticCurveTo(9, 16, 16, 6); g.fill();
+    g.fillStyle = "#ffd23c";
+    g.beginPath(); g.moveTo(16, 12); g.quadraticCurveTo(20, 18, 16, 24); g.quadraticCurveTo(12, 18, 16, 12); g.fill();
+  }
+}
+
+function drawFood(g, id) {
+  if (id === "rawMeat") {
+    g.fillStyle = "#c9645a";
+    g.beginPath(); g.arc(16, 16, 10, 0, 7); g.fill();
+    g.fillStyle = "#e8a0a0"; g.fillRect(11, 11, 5, 5);
+    g.strokeStyle = "#8a3a34"; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(9, 20); g.lineTo(23, 12); g.stroke();
+  } else if (id === "cookedMeat") {
+    /* cooked meat: browner, with grill marks */
+    g.fillStyle = "#8a5a2b";
+    g.beginPath(); g.arc(16, 16, 10, 0, 7); g.fill();
+    g.strokeStyle = "#4e3418"; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(9, 12); g.lineTo(23, 20); g.stroke();
+    g.beginPath(); g.moveTo(9, 20); g.lineTo(23, 12); g.stroke();
+    g.fillStyle = "#c9a35a"; g.fillRect(19, 8, 5, 5);
+  } else if (id === "berry") {
+    g.fillStyle = "#8c2440";
+    for (const [x, y] of [[12, 14], [20, 14], [16, 20]]) {
+      g.beginPath(); g.arc(x, y, 5, 0, 7); g.fill();
+    }
+    g.fillStyle = "rgba(255,255,255,0.35)";
+    g.fillRect(10, 12, 2, 2); g.fillRect(18, 12, 2, 2); g.fillRect(14, 18, 2, 2);
+    g.fillStyle = "#8fb573"; g.fillRect(15, 5, 3, 6);
   }
 }
 

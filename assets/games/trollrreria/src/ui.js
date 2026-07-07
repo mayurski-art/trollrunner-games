@@ -18,6 +18,7 @@ export class UI {
     this.el = {
       hud: document.getElementById("hud"),
       hearts: document.getElementById("hud-hearts"),
+      hunger: document.getElementById("hud-hunger"),
       breath: document.getElementById("hud-breath"),
       clock: document.getElementById("hud-clock"),
       depth: document.getElementById("hud-depth"),
@@ -373,7 +374,7 @@ export class UI {
       this.el.dialogFace.innerHTML = "";
       this.el.dialogFace.appendChild(img);
     } else {
-      this.el.dialogFace.textContent = "🧌";
+      this.el.dialogFace.textContent = npc.emoji || "🧌";
     }
     this.el.dialog.hidden = false;
   }
@@ -407,7 +408,8 @@ export class UI {
     const inv = this.game.inventory;
     const list = document.getElementById("shop-list");
     list.innerHTML = "";
-    for (const offer of MERCHANT_OFFERS) {
+    const offers = (this.shopNpc && this.shopNpc.offers) || MERCHANT_OFFERS;
+    for (const offer of offers) {
       const can = offer.give.every(([id, n]) => inv.count(id) >= n);
       const row = document.createElement("div");
       row.className = "craft-row shop-row" + (can ? "" : " cant");
@@ -917,6 +919,7 @@ export class UI {
       if (g.player) {
         const depthTiles = Math.floor(g.player.y / TILE) - SURFACE_BASE;
         this.el.depth.textContent = depthTiles > 4 ? `${depthTiles * 2} ft deep` : "Surface";
+        this.paintHunger();
         const showBreath = g.player.breath < g.player.maxBreath - 0.05;
         this.el.breath.hidden = !showBreath;
         if (showBreath) {
@@ -948,6 +951,7 @@ export class UI {
     if (this._hudDirty) {
       this._hudDirty = false;
       this.paintHearts();
+      this.paintHunger();
       this.paintHotbar();
     }
     if (this._questDirty) {
@@ -977,6 +981,24 @@ export class UI {
       const h = document.createElement("span");
       h.className = "heart" + (i + 0.5 > full ? " empty" : "");
       h.textContent = "🧡";
+      box.appendChild(h);
+    }
+  }
+
+  paintHunger() {
+    const p = this.game.player;
+    if (!p) return;
+    const total = Math.round(p.maxHunger / 20);
+    const full = p.hunger / 20;
+    const starving = p.hunger <= 0;
+    if (this._hungerN === full && this._hungerStarving === starving) return;
+    this._hungerN = full; this._hungerStarving = starving;
+    const box = this.el.hunger;
+    box.innerHTML = "";
+    for (let i = 0; i < total; i++) {
+      const h = document.createElement("span");
+      h.className = "hunger" + (i + 0.5 > full ? " empty" : "") + (starving ? " starving" : "");
+      h.textContent = "🍖";
       box.appendChild(h);
     }
   }

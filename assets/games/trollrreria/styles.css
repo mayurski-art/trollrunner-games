@@ -34,7 +34,16 @@ html, body {
 .heart { width: 20px; height: 20px; font-size: 17px; line-height: 20px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.6)); }
 .heart.empty { opacity: 0.25; filter: grayscale(1); }
 
-#hud-breath { position: absolute; top: 40px; left: 14px; display: flex; gap: 3px; }
+#hud-hunger {
+  position: absolute; top: 40px; left: 14px;
+  display: flex; gap: 4px; flex-wrap: wrap; max-width: 300px;
+}
+.hunger { width: 18px; height: 18px; font-size: 15px; line-height: 18px; filter: drop-shadow(0 1px 2px rgba(0,0,0,.6)); }
+.hunger.empty { opacity: 0.25; filter: grayscale(1); }
+.hunger.starving { animation: hunger-pulse 0.9s ease-in-out infinite; }
+@keyframes hunger-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+#hud-breath { position: absolute; top: 68px; left: 14px; display: flex; gap: 3px; }
 .bubble { width: 12px; height: 12px; border-radius: 50%; background: #7cc4ff; box-shadow: 0 0 4px #7cc4ff88; }
 
 #hud-status {

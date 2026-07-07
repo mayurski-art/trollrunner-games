@@ -31,6 +31,7 @@ export const T = {
   TROLLIUM: 33, GRIN_FRAG: 34, MUD: 35, PEPE_SCROLL: 36,
   MOONROCK: 37, MOON_DEBRIS: 38, ROCKET_PART: 39, ROCKET_PAD: 40,
   VAULT_DOOR: 41, GRIN_ALTAR: 42,
+  CAMPFIRE: 43, FARMLAND: 44, CROP1: 45, CROP2: 46, CROP3: 47, SIGN: 48,
   /* wires live on their own layer, not in T */
 };
 
@@ -64,7 +65,7 @@ TILES[T.HEART]    = { name: "Troll heart", solid: true, hp: 220, pow: 50, tool: 
 TILES[T.SHROOM]   = { name: "Glowshroom", solid: false, hp: 5, pow: 0, tool: "pick", drop: "mushroom", light: 90, noVariant: true };
 TILES[T.BEDROCK]  = { name: "Trollrock", solid: true, hp: Infinity, pow: 999, tool: "pick", drop: null, pal: ["#26282e", "#33363e", "#41454f"] };
 TILES[T.OBSIDIAN] = { name: "Obsidian", solid: true, hp: 260, pow: 60, tool: "pick", drop: "obsidian", pal: ["#231d33", "#352c4d", "#4a3e6b"] };
-TILES[T.PLANT]    = { name: "Plant", solid: false, hp: 1, pow: 0, tool: "pick", drop: null, noVariant: true };
+TILES[T.PLANT]    = { name: "Plant", solid: false, hp: 1, pow: 0, tool: "pick", drop: "seeds", noVariant: true };
 TILES[T.BED]      = { name: "Troll cot", solid: false, hp: 70, pow: 0, tool: "pick", drop: "bed", noVariant: true };
 TILES[T.LEVER]    = { name: "Lever", solid: false, hp: 40, pow: 0, tool: "pick", drop: "lever", noVariant: true };
 TILES[T.PLATE]    = { name: "Pressure plate", solid: false, hp: 40, pow: 0, tool: "pick", drop: "plate", noVariant: true };
@@ -81,6 +82,14 @@ TILES[T.ROCKET_PART] = { name: "Rocket part", solid: false, hp: 1, pow: 0, tool:
 TILES[T.ROCKET_PAD] = { name: "Rocket pad", solid: false, hp: Infinity, noVariant: true, light: 60 };
 TILES[T.VAULT_DOOR] = { name: "Vault door", solid: true, hp: Infinity, noVariant: true, light: 30 };
 TILES[T.GRIN_ALTAR] = { name: "Grin Core altar", solid: true, hp: Infinity, noVariant: true, light: 90 };
+TILES[T.CAMPFIRE] = { name: "Campfire", solid: false, hp: 50, pow: 0, tool: "pick", drop: "campfire", station: "campfire", light: 150, noVariant: true };
+TILES[T.FARMLAND] = { name: "Farmland", solid: true, hp: 45, pow: 0, tool: "pick", drop: "dirt", pal: ["#4a3820", "#5c4726", "#6d5730"] };
+TILES[T.CROP1]    = { name: "Seedling", solid: false, hp: 1, pow: 0, tool: "pick", drop: "seeds", noVariant: true };
+TILES[T.CROP2]    = { name: "Crop (growing)", solid: false, hp: 1, pow: 0, tool: "pick", drop: "seeds", noVariant: true };
+TILES[T.CROP3]    = { name: "Crop (ripe)", solid: false, hp: 1, pow: 0, tool: "pick", drop: "berry", noVariant: true };
+TILES[T.SIGN]     = { name: "Weathered sign", solid: false, hp: Infinity, noVariant: true };
+
+export const CROP_GROW_TIME = 45;   // seconds per growth stage
 
 /* ------------------------------------------------------------------- walls */
 export const W = { NONE: 0, DIRT: 1, STONE: 2, WOOD: 3, STONE_BRICK: 4 };
@@ -111,6 +120,9 @@ export const ITEMS = {
   workbench:   { name: "Workbench", type: "block", tile: T.WORKBENCH, max: 99, needsFloor: true },
   furnace:     { name: "Furnace", type: "block", tile: T.FURNACE, max: 99, needsFloor: true },
   anvil:       { name: "Anvil", type: "block", tile: T.ANVIL, max: 99, needsFloor: true },
+  campfire:    { name: "Campfire", type: "block", tile: T.CAMPFIRE, max: 99, needsFloor: true, desc: "Cook raw meat here." },
+  farmland:    { name: "Farmland", type: "block", tile: T.FARMLAND, max: 99, needsFloor: true, desc: "Tilled soil. Plant seeds on top." },
+  seeds:       { name: "Seeds", type: "block", tile: T.CROP1, max: 99, needsFarmland: true, desc: "Plant on farmland. Grows into troll berries." },
   chest:       { name: "Chest", type: "block", tile: T.CHEST, max: 99, needsFloor: true },
   door:        { name: "Door", type: "block", tile: T.DOOR_C, max: 99, tall: 2, needsFloor: true },
   bed:         { name: "Troll cot", type: "block", tile: T.BED, max: 99, needsFloor: true, desc: "Right-click to set your spawn." },
@@ -186,6 +198,9 @@ export const ITEMS = {
   trolliumLegs:  { name: "Trollium greaves", type: "armor", slot: "legs", def: 5 },
   /* consumables + special */
   trollBrew:   { name: "Troll brew", type: "potion", heal: 50, max: 30 },
+  rawMeat:     { name: "Raw meat", type: "food", hunger: 12, max: 99, raw: true, desc: "Edible. Risky. Cook it if you can." },
+  cookedMeat:  { name: "Cooked meat", type: "food", hunger: 32, hpBonus: 4, max: 99, desc: "Proper troll cooking. Restores hunger and a little grit." },
+  berry:       { name: "Troll berry", type: "food", hunger: 10, max: 99, desc: "Tart little thing, farmed on tilled soil." },
   trollTotem:  { name: "Troll totem", type: "summon", max: 5, desc: "Wakes the Troll King. Use at night." },
   emperorSigil: { name: "Emperor sigil", type: "summon", max: 5, desc: "Calls the Troll Emperor. Hardmode, night, regrets." },
   /* Grin Core relics — quest rewards, kept in the bag as trophies/keys */
@@ -221,6 +236,9 @@ export const RECIPES = [
   { out: "stoneBrickWall", n: 4, ing: [["stoneBrick", 1]], station: "workbench" },
   { out: "stoneBrick", n: 2, ing: [["stone", 2]], station: "workbench" },
   { out: "furnace", n: 1, ing: [["stone", 20], ["wood", 4], ["torch", 3]], station: "workbench" },
+  { out: "campfire", n: 1, ing: [["wood", 8], ["stone", 4]], station: null },
+  { out: "cookedMeat", n: 1, ing: [["rawMeat", 1]], station: "campfire" },
+  { out: "farmland", n: 2, ing: [["dirt", 4]], station: null },
   { out: "glass", n: 1, ing: [["sand", 2]], station: "furnace" },
   { out: "copperBar", n: 1, ing: [["copperOre", 3]], station: "furnace" },
   { out: "ironBar", n: 1, ing: [["ironOre", 3]], station: "furnace" },
@@ -269,6 +287,11 @@ export const RECIPES = [
 /* ----------------------------------------------------------------- enemies */
 /* ai: slime | walker | flyer  ·  ctx: when/where it spawns */
 export const ENEMIES = {
+  /* Passive animals: never attack, flee when the player closes in, die in
+     a couple hits, drop raw meat for the hunger/cooking loop. Spawned by
+     updateAnimalSpawns() (main.js), not the hostile spawn tables. */
+  trollBoar: { name: "Troll Boar", ai: "flee", hp: 24, dmg: 0, def: 0, w: 24, h: 18, color: "#c98a72", drops: [["rawMeat", 1, 2, 1]], kb: 1.0, passive: true },
+  trollHen:  { name: "Troll Hen", ai: "flee", hp: 14, dmg: 0, def: 0, w: 18, h: 16, color: "#d9c9a3", drops: [["rawMeat", 1, 1, 1]], kb: 1.1, passive: true },
   slimeGreen: { name: "Green troll slime", ai: "slime", hp: 16, dmg: 8, def: 0, w: 26, h: 18, color: "#4fd35f", drops: [["gel", 1, 2, 1]], kb: 1.0 },
   slimeBlue:  { name: "Blue troll slime", ai: "slime", hp: 26, dmg: 10, def: 2, w: 28, h: 20, color: "#4f9fd3", drops: [["gel", 1, 3, 1]], kb: 1.0 },
   zombie:     { name: "Troll zombie", ai: "walker", hp: 46, dmg: 15, def: 4, w: 22, h: 42, color: "#7ba05b", drops: [["gel", 0, 1, 0.2]], kb: 0.8 },
@@ -311,6 +334,40 @@ export const MERCHANT_OFFERS = [
   { give: [["bone", 5]], get: ["silverBar", 1] },
   { give: [["lens", 3]], get: ["goldBar", 2] },
   { give: [["ironBar", 1]], get: ["flameArrow", 20] },
+];
+
+/* Trollrreria Town: four specialist barter shops, same no-currency hustle
+   as the Merchant Troll -- each just deals in its own lane so a proper
+   town has a reason to have more than one stall. */
+export const BLACKSMITH_OFFERS = [
+  { give: [["copperOre", 6]], get: ["copperBar", 2] },
+  { give: [["ironOre", 6]], get: ["ironBar", 2] },
+  { give: [["wood", 6], ["copperBar", 4]], get: ["copperSword", 1] },
+  { give: [["wood", 6], ["ironBar", 5]], get: ["ironSword", 1] },
+  { give: [["ironBar", 8]], get: ["ironHelm", 1] },
+  { give: [["goldOre", 6]], get: ["goldBar", 2] },
+];
+
+export const ALCHEMIST_OFFERS = [
+  { give: [["mushroom", 4]], get: ["trollBrew", 2] },
+  { give: [["gel", 6]], get: ["trollBrew", 3] },
+  { give: [["mushroom", 10], ["gel", 5]], get: ["trollBrew", 8] },
+  { give: [["lens", 2]], get: ["gel", 6] },
+  { give: [["bone", 4]], get: ["mushroom", 6] },
+];
+
+export const TAVERN_OFFERS = [
+  { give: [["rawMeat", 3]], get: ["cookedMeat", 3] },
+  { give: [["berry", 4]], get: ["cookedMeat", 1] },
+  { give: [["wood", 12]], get: ["cookedMeat", 4] },
+  { give: [["gel", 4]], get: ["berry", 10] },
+];
+
+export const BUTCHER_OFFERS = [
+  { give: [["gel", 2]], get: ["rawMeat", 4] },
+  { give: [["bone", 3]], get: ["rawMeat", 6] },
+  { give: [["rawMeat", 1]], get: ["cookedMeat", 1] },
+  { give: [["silverBar", 1]], get: ["cookedMeat", 10] },
 ];
 
 /* Starter kit (fresh worlds). */

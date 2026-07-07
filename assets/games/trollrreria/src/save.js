@@ -140,6 +140,7 @@ export async function saveGame(game) {
       player: game.player ? {
         x: game.player.x, y: game.player.y,
         hp: game.player.hp, maxHp: game.player.maxHp,
+        hunger: game.player.hunger, maxHunger: game.player.maxHunger,
       } : null,
       inv: game.inventory ? game.inventory.serialize() : null,
       savedAt: Date.now(),

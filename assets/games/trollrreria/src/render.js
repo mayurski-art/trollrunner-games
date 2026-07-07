@@ -298,6 +298,46 @@ export class Renderer {
         g.fillRect(id === T.DART_L ? px : px + 13, py + 7, 3, 2);
         break;
       }
+      case T.SIGN: {
+        g.fillStyle = "#5d4326"; g.fillRect(px + 6, py + 5, 3, 11);
+        g.fillStyle = "#7a5a33"; g.fillRect(px + 1, py, 14, 8);
+        g.strokeStyle = "#4e3418"; g.lineWidth = 1; g.strokeRect(px + 1.5, py + 0.5, 13, 7);
+        g.fillStyle = "#ffb300"; g.fillRect(px + 7, py + 2, 2, 4);
+        break;
+      }
+      case T.CAMPFIRE: {
+        g.fillStyle = "#5d4326"; g.fillRect(px + 2, py + 13, 3, 3); g.fillRect(px + 11, py + 13, 3, 3);
+        const flick = Math.sin(wx * 1.3 + wy * 0.7 + performance.now() * 0.006) * 1.2;
+        g.fillStyle = "#ff7a1a";
+        g.beginPath();
+        g.moveTo(px + 8, py + 3 + flick); g.quadraticCurveTo(px + 13, py + 9, px + 8, py + 14);
+        g.quadraticCurveTo(px + 3, py + 9, px + 8, py + 3 + flick);
+        g.fill();
+        g.fillStyle = "#ffd23c";
+        g.beginPath();
+        g.moveTo(px + 8, py + 7 + flick * 0.6); g.quadraticCurveTo(px + 11, py + 10, px + 8, py + 14);
+        g.quadraticCurveTo(px + 5, py + 10, px + 8, py + 7 + flick * 0.6);
+        g.fill();
+        break;
+      }
+      case T.CROP1: {
+        g.fillStyle = "#6b8f3a"; g.fillRect(px + 6, py + 11, 2, 5); g.fillRect(px + 9, py + 12, 2, 4);
+        break;
+      }
+      case T.CROP2: {
+        g.fillStyle = "#5f8f3a"; g.fillRect(px + 4, py + 7, 2, 9); g.fillRect(px + 10, py + 8, 2, 8);
+        g.fillStyle = "#8fb573"; g.fillRect(px + 7, py + 9, 2, 7);
+        break;
+      }
+      case T.CROP3: {
+        g.fillStyle = "#5f8f3a"; g.fillRect(px + 4, py + 6, 2, 10); g.fillRect(px + 10, py + 7, 2, 9);
+        g.fillStyle = "#8fb573"; g.fillRect(px + 7, py + 8, 2, 8);
+        g.fillStyle = "#8c2440";
+        g.beginPath(); g.arc(px + 5, py + 6, 2, 0, 7); g.fill();
+        g.beginPath(); g.arc(px + 11, py + 7, 2, 0, 7); g.fill();
+        g.beginPath(); g.arc(px + 8, py + 8, 2, 0, 7); g.fill();
+        break;
+      }
       case T.BED: {
         g.fillStyle = "#5d4326";
         g.fillRect(px, py + 12, 2, 4); g.fillRect(px + 14, py + 12, 2, 4);

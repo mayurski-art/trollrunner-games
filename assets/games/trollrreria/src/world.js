@@ -1,7 +1,7 @@
 /* Trollrreria — World: tile/wall/liquid layers, chunk invalidation, chests,
    trees, tile damage, and the per-column "first solid" cache for sky light. */
 
-import { T, TILES, WORLD_W, WORLD_H, CHUNK } from "./defs.js";
+import { T, TILES, WORLD_W, WORLD_H, CHUNK, CROP_GROW_TIME } from "./defs.js";
 
 /* Any tile whose def opts into falling when unsupported (sand, moon
    debris, ...) -- generalized so new fallable materials don't need
@@ -27,7 +27,7 @@ export class World {
     this.dirtyChunks = new Set();             // chunk keys needing re-render
     this.liquidActive = new Set();            // tile indices with settling liquid
     this.sandActive = new Set();              // sand tiles that may fall
-    this.growth = [];                         // future use (regrowth timers)
+    this.growth = new Map();                  // tileIndex -> seconds left until next crop stage
     this._liquidTick = 0;
     this.onEdit = null;                       // co-op hook: (kind, x, y, v)
     this._simming = false;                    // sim writes are not broadcast
@@ -84,6 +84,27 @@ export class World {
     if (fallable(id)) this.sandActive.add(i);
     if (y > 0 && fallable(this.tiles[i - this.w])) this.sandActive.add(i - this.w);
     if (this.onEdit && !this._simming) this.onEdit("tile", x, y, id);
+  }
+
+  /* Crops: tile-id swap through CROP1 -> CROP2 -> CROP3 (ripe), timed via
+     this.growth (tileIndex -> seconds left). Registered when seeds are
+     planted (main.js tryPlace); self-prunes if the tile stops being a crop
+     (mined, buried, etc). */
+  plantCrop(x, y, seconds) {
+    this.growth.set(this.idx(x, y), seconds);
+  }
+
+  tickGrowth(dt) {
+    if (!this.growth.size) return;
+    for (const [i, t] of this.growth) {
+      const id = this.tiles[i];
+      if (id !== T.CROP1 && id !== T.CROP2) { this.growth.delete(i); continue; }
+      const left = t - dt;
+      if (left > 0) { this.growth.set(i, left); continue; }
+      const x = i % this.w, y = (i / this.w) | 0;
+      if (id === T.CROP1) { this.set(x, y, T.CROP2); this.growth.set(i, CROP_GROW_TIME); }
+      else { this.set(x, y, T.CROP3); this.growth.delete(i); }
+    }
   }
 
   setWall(x, y, id) {

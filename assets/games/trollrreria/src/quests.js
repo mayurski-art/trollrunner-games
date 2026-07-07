@@ -12,7 +12,7 @@ import { burst } from "./entities.js";
 export const QUESTS = {
   lostGrin: {
     title: "Find the Lost Grin",
-    npc: "Trollface Guide",
+    npc: "Weathered Sign",
     intro: "The grin is broken. Bring me 5 grin fragments, then go remind the Troll King who's funnier.",
     objectives: [
       { type: "collect", id: "grinFragment", n: 5, label: "Grin fragments" },

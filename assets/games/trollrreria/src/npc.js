@@ -1,12 +1,21 @@
-/* Trollrreria — town NPCs. Each one wears a REAL rig of their own (Doge and
-   Pepe reuse the Troll Kombat fighter sheets — zero new art generations)
-   instead of a hue-shifted copy of the player, which used to read as a
-   mysterious second player in solo games. */
+/* Trollrreria — town NPCs. Every NPC wears a REAL rig of its own -- Doge
+   and Pepe reuse the Troll Kombat fighter sheets (they're shared with that
+   game), and the six town/quest NPCs below (Blacksmith, Alchemist, Tavern
+   Keeper, Butcher, Whale Oracle, Rocket Tinkerer) each got a dedicated
+   PixelLab rig of their own, living under this game's own npcs/ folder
+   since they're Trollrreria-only (generate -> animate idle/walk -> stitch
+   into a strip, same pipeline as Gladiator/Doge/Pepe) instead of a
+   hue-shifted copy of the player, which used to read as a mysterious
+   second player in solo games. */
 
-import { TILE, GRAVITY, MAX_FALL } from "./defs.js";
+import {
+  TILE, GRAVITY, MAX_FALL,
+  BLACKSMITH_OFFERS, ALCHEMIST_OFFERS, TAVERN_OFFERS, BUTCHER_OFFERS,
+} from "./defs.js";
 import { Entity } from "./entities.js";
 
 const FIGHTERS = "assets/games/troll-kombat/fighters/";
+const NPCS = "assets/games/trollrreria/npcs/";
 
 /* rig: { dir, cell, idle:{frames,fps}, walk:{frames,fps}, portrait } */
 const RIGS = {
@@ -25,17 +34,42 @@ const RIGS = {
     idle: { frames: 8, fps: 9 }, walk: { frames: 6, fps: 14 },
     portrait: FIGHTERS + "pepe-rig/anims/portrait.png",
   },
-  /* No dedicated Rocket Tinkerer rig exists yet (budgeted for a future
-     PixelLab pass per the expansion doc) -- tints the gladiator sheet
-     cyan/silver so he doesn't read as the Guide's twin in the meantime. */
-  gladiatorTinkerer: {
-    dir: FIGHTERS + "gladiator/anims/", cell: 136,
+  blacksmith: {
+    dir: NPCS + "blacksmith-grump/anims/", cell: 132,
     idle: { frames: 8, fps: 8 }, walk: { frames: 6, fps: 11 },
-    portrait: FIGHTERS + "gladiator/portrait.png",
+    portrait: NPCS + "blacksmith-grump/portrait.png",
+  },
+  alchemist: {
+    dir: NPCS + "alchemist-fizzwick/anims/", cell: 132,
+    idle: { frames: 8, fps: 8 }, walk: { frames: 6, fps: 11 },
+    portrait: NPCS + "alchemist-fizzwick/portrait.png",
+  },
+  tavernKeeper: {
+    dir: NPCS + "tavern-keeper-bramble/anims/", cell: 132,
+    idle: { frames: 8, fps: 8 }, walk: { frames: 6, fps: 11 },
+    portrait: NPCS + "tavern-keeper-bramble/portrait.png",
+  },
+  butcher: {
+    dir: NPCS + "butcher-cleaverson/anims/", cell: 132,
+    idle: { frames: 8, fps: 8 }, walk: { frames: 6, fps: 11 },
+    portrait: NPCS + "butcher-cleaverson/portrait.png",
+  },
+  whaleOracle: {
+    dir: NPCS + "whale-oracle/anims/", cell: 132,
+    idle: { frames: 8, fps: 8 }, walk: { frames: 6, fps: 11 },
+    portrait: NPCS + "whale-oracle/portrait.png",
+  },
+  rocketTinkerer: {
+    dir: NPCS + "rocket-tinkerer/anims/", cell: 132,
+    idle: { frames: 8, fps: 8 }, walk: { frames: 6, fps: 11 },
+    portrait: NPCS + "rocket-tinkerer/portrait.png",
   },
 };
 
-export const GUIDE_TIPS = [
+/* Carved into the weathered sign near spawn (see main.js placeQuestSign) --
+   onboarding hints that used to be the Guide Troll's dialogue, kept here
+   now that a static signpost replaces the walking NPC. */
+export const SIGN_TIPS = [
   "Welcome to Trollrreria. The grin is broken. The bots are thriving. This is unacceptable.",
   "Chop trees, build a workbench, craft a wooden pick. The ancient troll way.",
   "Troll gel + wood = torches. Caves are 100% less deadly when lit.",
@@ -49,12 +83,13 @@ export const GUIDE_TIPS = [
   "The Troll Moon turns the night up to eleven. Hide or fight, your call.",
   "Armor is crafted at the anvil. Fashion AND function.",
   "Platforms! Great for bases, terrible for keeping slimes out.",
+  "Hungry? Hunt a boar or hen, then cook the meat at a campfire. Raw works too. Regret comes free.",
 ];
 
 export class TownNPC extends Entity {
   constructor(tx, ty, opts = {}) {
     super(tx * TILE + 2, ty * TILE - 46, 22, 46);
-    this.name = opts.name || "Guide Troll";
+    this.name = opts.name || "Troll";
     this.rigDef = RIGS[opts.rig || "gladiator"];
     this.tint = opts.tint || null;
     this.bodyH = opts.bodyH || 54;
@@ -63,7 +98,7 @@ export class TownNPC extends Entity {
     this.walkT = 0;
     this.idleT = 2;
     this.animTime = 0;
-    this.tips = opts.tips || GUIDE_TIPS;
+    this.tips = opts.tips || [];
     this.tipIdx = Math.floor(Math.random() * this.tips.length);
     this.dead = false;
     this.marker = opts.marker || "?";
@@ -180,19 +215,6 @@ export class TownNPC extends Entity {
   }
 }
 
-/* The Guide: loiters near spawn, dispenses questionable wisdom, and hands
-   out the first quest. Keeps the tinted gladiator until he gets his own
-   rig — the tint is fine for him; he IS a troll like the player. */
-export class GuideTroll extends TownNPC {
-  constructor(tx, ty) {
-    super(tx, ty, {
-      name: "Trollface Guide",
-      rig: "gladiator",
-      tint: "hue-rotate(105deg) saturate(0.8) brightness(0.96)",
-    });
-  }
-}
-
 /* Doge: moves into the first valid house and barters — no coins, just an
    economy of vibes. Wears the real Troll Kombat Doge rig. */
 export class MerchantTroll extends TownNPC {
@@ -242,8 +264,8 @@ export class WhaleOracle extends TownNPC {
   constructor(tx, ty) {
     super(tx, ty, {
       name: "Whale Oracle",
-      rig: "gladiatorTinkerer",
-      tint: "hue-rotate(230deg) saturate(1.3) brightness(0.95)",
+      rig: "whaleOracle",
+      bodyH: 52,
       tips: [
         "Only diamond hands may enter the vault.",
         "The Rickroller guards the key. It will not let you go easily.",
@@ -255,6 +277,87 @@ export class WhaleOracle extends TownNPC {
   }
 }
 
+/* --------------------------------------------------------- Town shops --
+   Four specialist stalls for the Trollrreria town hub. Same barter
+   pattern as the Doge Merchant, just with their own wares (per-NPC
+   offers, wired through TownNPC.shop + .offers -> ui.paintShop()). Each
+   has its own dedicated PixelLab rig. */
+export class Blacksmith extends TownNPC {
+  constructor(tx, ty) {
+    super(tx, ty, {
+      name: "Blacksmith Grump",
+      rig: "blacksmith",
+      bodyH: 54,
+      tips: [
+        "Ore in, bars and blades out. That's the whole pitch.",
+        "Bring copper, iron, gold. I don't ask where you dug it.",
+        "A sword's only as sharp as the troll swinging it. Still, take the sword.",
+        "Helmets don't stop bad decisions. They do stop rocks.",
+      ],
+    });
+    this.shop = true;
+    this.offers = BLACKSMITH_OFFERS;
+    this.tipIdx = 0;
+  }
+}
+
+export class Alchemist extends TownNPC {
+  constructor(tx, ty) {
+    super(tx, ty, {
+      name: "Alchemist Fizzwick",
+      rig: "alchemist",
+      bodyH: 54,
+      tips: [
+        "Mushroom, gel, a little patience -- Troll Brew practically makes itself.",
+        "Lenses make a fine reagent. Don't ask what they used to look at.",
+        "Bulk discount for bulk mushrooms. I'm not proud, I'm efficient.",
+        "Drink it fast. It gets weirder the longer it sits.",
+      ],
+    });
+    this.shop = true;
+    this.offers = ALCHEMIST_OFFERS;
+    this.tipIdx = 0;
+  }
+}
+
+export class TavernKeeper extends TownNPC {
+  constructor(tx, ty) {
+    super(tx, ty, {
+      name: "Tavern Keeper Bramble",
+      rig: "tavernKeeper",
+      bodyH: 54,
+      tips: [
+        "Cook it here or cook it yourself -- I'm not precious about it.",
+        "Berries in bulk, meals in bulk. That's the whole menu.",
+        "Nothing cures a bad dig like a hot meal and a worse joke.",
+        "Wood buys a hot plate. Don't ask why. House recipe.",
+      ],
+    });
+    this.shop = true;
+    this.offers = TAVERN_OFFERS;
+    this.tipIdx = 0;
+  }
+}
+
+export class Butcher extends TownNPC {
+  constructor(tx, ty) {
+    super(tx, ty, {
+      name: "Butcher Cleaverson",
+      rig: "butcher",
+      bodyH: 54,
+      tips: [
+        "Boar, hen, whatever wandered too close. I don't discriminate.",
+        "Bones and gel get you meat wholesale. Everyone wins but the boar.",
+        "Cooked costs more. Cooking is a service. Respect the craft.",
+        "Silver bar for ten cooked meals? Only for regulars. You're a regular now.",
+      ],
+    });
+    this.shop = true;
+    this.offers = BUTCHER_OFFERS;
+    this.tipIdx = 0;
+  }
+}
+
 /* The Rocket Tinkerer: eccentric engineer camped out in the Rocketyard.
    Gives the Fix the Rocket questline; completing it unlocks the pad
    pair (ground + sky island) for fast travel. */
@@ -262,8 +365,8 @@ export class RocketTinkerer extends TownNPC {
   constructor(tx, ty) {
     super(tx, ty, {
       name: "Rocket Tinkerer",
-      rig: "gladiatorTinkerer",
-      tint: "hue-rotate(190deg) saturate(1.4) brightness(1.02)",
+      rig: "rocketTinkerer",
+      bodyH: 52,
       tips: [
         "I built a rocket to restore the memes. It exploded. Twice. Good data.",
         "Bring me parts. I bring you the sky. Fair trade, honestly.",

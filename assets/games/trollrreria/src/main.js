@@ -5,22 +5,25 @@
 */
 
 import {
-  T, TILES, W, ITEMS, ENEMIES, TILE, ZOOM, CYCLE, DAY_LEN, WORLD_W, WORLD_H,
+  T, TILES, W, ITEMS, ENEMIES, TILE, ZOOM, CYCLE, DAY_LEN, WORLD_W, WORLD_H, CROP_GROW_TIME,
   REACH, STATION_SCAN, STARTER_ITEMS,
 } from "./defs.js";
-import { hashStr, clamp, lerp, fmtClock, aabb } from "./util.js";
+import { hashStr, clamp, lerp, fmtClock, aabb, dist2 } from "./util.js";
 import { generateWorld, biomeAt, zoneAt, BIOME_NAMES, STONE_START, DEEP_START } from "./worldgen.js";
 import { Renderer, skyState } from "./render.js";
 import { Lighting } from "./lighting.js";
 import { Input } from "./input.js";
 import { Player } from "./player.js";
 import { Inventory } from "./inventory.js";
-import { ItemDrop, DamageText, burst, Enemy, Projectile } from "./entities.js";
+import { ItemDrop, DamageText, burst, Enemy, Projectile, QuestMarker } from "./entities.js";
 import { UI } from "./ui.js";
 import { SFX } from "./audio.js";
 import { TrollKing, TrollEmperor, Rickroller } from "./boss.js";
 import { Archtroll, Rarepepe, ElderShibe, Anon } from "./worldbosses.js";
-import { GuideTroll, MerchantTroll, PepeHermit, RocketTinkerer, WhaleOracle } from "./npc.js";
+import {
+  MerchantTroll, PepeHermit, RocketTinkerer, WhaleOracle,
+  Blacksmith, Alchemist, TavernKeeper, Butcher, SIGN_TIPS,
+} from "./npc.js";
 import { findHouseNear } from "./housing.js";
 import {
   saveGame, loadSaveData, applyWorldLayers, clearSave,
@@ -189,7 +192,8 @@ class Game {
     this.player = new Player(spawn.x, spawn.y + 1);
     this.cam.x = this.player.cx - 400;
     this.cam.y = this.player.cy - 260;
-    this.spawnGuide();
+    this.placeQuestSign();
+    this.spawnTownShops();
     this.spawnPepe();
     this.spawnRocketTinkerer();
     this.spawnWhaleOracle();
@@ -222,6 +226,10 @@ class Game {
       this.player.y = data.player.y;
       this.player.hp = data.player.hp;
       this.player.maxHp = data.player.maxHp;
+      if (typeof data.player.hunger === "number") {
+        this.player.hunger = data.player.hunger;
+        this.player.maxHunger = data.player.maxHunger || 100;
+      }
     }
     this.cam.x = this.player.cx - this.viewW / 2;
     this.cam.y = this.player.cy - this.viewH / 2;
@@ -431,6 +439,8 @@ class Game {
     }
     this.stats.playSec += dt;
     this.updateSpawns(dt);
+    this.updateAnimalSpawns(dt);
+    this.world.tickGrowth(dt);
 
     /* liquids + falling sand tick at 12.5 Hz */
     this._fluidAcc += dt;
@@ -821,6 +831,7 @@ class Game {
 
     const belowSolid = world.isSolid(tx, ty + 1) || world.isOneWay(tx, ty + 1);
     if (def.needsFloor && !belowSolid) return false;
+    if (def.needsFarmland && world.get(tx, ty + 1) !== T.FARMLAND) return false;
     if (def.needsSupport && !this.torchSupported(tx, ty)) return false;
     if (def.tall === 2) {
       if (world.get(tx, ty - 1) !== T.AIR || !belowSolid) return false;
@@ -846,6 +857,7 @@ class Game {
     if (tdef.solid) world.setLiquid(tx, ty, 0);
     if (def.tall === 2) world.set(tx, ty - 1, def.tile);
     if (def.tile === T.CHEST) world.addChest(tx, ty);
+    if (def.tile === T.CROP1) world.plantCrop(tx, ty, CROP_GROW_TIME);
     this.sfx && this.sfx.place();
     this.ui && this.ui.dirtyHud();
     return true;
@@ -898,6 +910,10 @@ class Game {
       this.sfx && this.sfx.door();
       return;
     }
+    if (id === T.SIGN) {
+      this.readSign(m.tx, m.ty);
+      return;
+    }
     if (id === T.CHEST && this.ui && this.ui.openChest) {
       this.ui.openChest(m.tx, m.ty);
       return;
@@ -920,7 +936,21 @@ class Game {
     }
     if (id === T.BED) {
       this.spawn = { x: m.tx, y: m.ty - 1 };
-      this.floatText(m.tx * TILE + 8, m.ty * TILE - 8, "Spawn set 🛏", "#57bd5c");
+      const st = skyState(this.time);
+      const nearbyThreat = this.enemies.some(e =>
+        !e.dead && (!e.def || !e.def.passive) && dist2(e.cx, e.cy, this.player.cx, this.player.cy) < (TILE * 22) ** 2);
+      if (st.isNight && !nearbyThreat) {
+        this.time = DAY_LEN;
+        this.dayCount++;
+        this.trollMoon = false;
+        this.player.hp = Math.min(this.player.maxHp, this.player.hp + 20);
+        this.floatText(m.tx * TILE + 8, m.ty * TILE - 8, "Slept till morning 🛏", "#57bd5c");
+        this.ui && this.ui.dirtyHud();
+      } else if (st.isNight) {
+        this.floatText(m.tx * TILE + 8, m.ty * TILE - 8, "Too dangerous to sleep!", "#ff4d5e");
+      } else {
+        this.floatText(m.tx * TILE + 8, m.ty * TILE - 8, "Spawn set 🛏", "#57bd5c");
+      }
       this.sfx && this.sfx.potion();
       return;
     }
@@ -1093,7 +1123,7 @@ class Game {
     if (!p || p.dead) return;
     const st = skyState(this.time);
     const cap = this.trollMoon && st.isNight ? 12 : 7;
-    if (this.enemies.filter(e => !e.boss).length >= cap) return;
+    if (this.enemies.filter(e => !e.boss && !e.def.passive).length >= cap) return;
 
     const ptx = Math.floor(p.cx / TILE), pty = Math.floor(p.cy / TILE);
     const world = this.world;
@@ -1164,20 +1194,86 @@ class Game {
     return r < 0.45 ? "skeleton" : r < 0.8 ? "bat" : "slimeBlue";
   }
 
+  /* Animal spawner: passive food source, daylight + surface only, off-screen. */
+  updateAnimalSpawns(dt) {
+    if (this.noSpawn) return;
+    this._animalAcc = (this._animalAcc || 0) + dt;
+    if (this._animalAcc < 2.5) return;
+    this._animalAcc = 0;
+    const p = this.player;
+    if (!p || p.dead) return;
+    const st = skyState(this.time);
+    if (st.isNight) return;
+    if (this.enemies.filter(e => e.def && e.def.passive).length >= 4) return;
+
+    const world = this.world;
+    const ptx = Math.floor(p.cx / TILE), pty = Math.floor(p.cy / TILE);
+    const vx0 = Math.floor(this.cam.x / TILE) - 3, vx1 = vx0 + Math.ceil(this.viewW / TILE) + 6;
+    const vy0 = Math.floor(this.cam.y / TILE) - 3, vy1 = vy0 + Math.ceil(this.viewH / TILE) + 6;
+
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const tx = ptx + Math.round((22 + Math.random() * 24) * (Math.random() < 0.5 ? -1 : 1));
+      const ty = pty + Math.round((Math.random() - 0.5) * 20);
+      if (!world.inBounds(tx, ty) || ty >= 310) continue;   // surface only
+      if (tx >= vx0 && tx <= vx1 && ty >= vy0 && ty <= vy1) continue;   // off-screen
+
+      const type = Math.random() < 0.6 ? "trollBoar" : "trollHen";
+      const d = ENEMIES[type];
+      for (let y = ty; y < Math.min(world.h - 2, ty + 10); y++) {
+        if (!world.isSolid(tx, y) && !world.isSolid(tx, y - 1) && world.isSolid(tx, y + 1)) {
+          const i = y * world.w + tx;
+          if (world.liquid[i] > 3) break;
+          this.enemies.push(new Enemy(type, tx * TILE + 8, (y + 1) * TILE));
+          return;
+        }
+      }
+    }
+  }
+
   onKill(enemy) {
     /* hook for boss + future stats */
   }
 
-  /* Place the Guide Troll on solid ground near spawn. */
-  spawnGuide() {
+  /* A static signpost near spawn replaces the old walking Guide Troll --
+     no character sprite to confuse with the player, just a carved sign
+     that hands out the Lost Grin questline + onboarding tips (right-click,
+     see interact() below). Placed directly into the world, not the NPC
+     list, so it never wanders and never needs a rig. */
+  placeQuestSign() {
     const sx = this.spawn.x + 4;
     for (let y = this.spawn.y - 6; y < this.spawn.y + 10; y++) {
       if (!this.world.isSolid(sx, y) && !this.world.isSolid(sx, y - 1) && this.world.isSolid(sx, y + 1)) {
-        this.npcs.push(new GuideTroll(sx, y + 1));
+        this.world.set(sx, y, T.SIGN);
+        this.entities.push(new QuestMarker(sx * TILE + 8, y * TILE - 6, "lostGrin"));
         return;
       }
     }
-    this.npcs.push(new GuideTroll(this.spawn.x, this.spawn.y + 1));
+    this.world.set(this.spawn.x, this.spawn.y, T.SIGN);
+    this.entities.push(new QuestMarker(this.spawn.x * TILE + 8, this.spawn.y * TILE - 6, "lostGrin"));
+  }
+
+  /* Place the town's four specialist shops on solid ground, spread out
+     along the surface near spawn -- same floor-finding search placeQuestSign
+     uses, just one offset per stall so they don't stack on each other. */
+  spawnTownShops() {
+    const roles = [
+      { dx: -10, make: (tx, ty) => new Blacksmith(tx, ty) },
+      { dx: -16, make: (tx, ty) => new Alchemist(tx, ty) },
+      { dx: 12, make: (tx, ty) => new TavernKeeper(tx, ty) },
+      { dx: 18, make: (tx, ty) => new Butcher(tx, ty) },
+    ];
+    for (const role of roles) {
+      const sx = this.spawn.x + role.dx;
+      let placed = false;
+      for (let y = this.spawn.y - 6; y < this.spawn.y + 10; y++) {
+        if (!this.world.isSolid(sx, y) && !this.world.isSolid(sx, y - 1) && this.world.isSolid(sx, y + 1)) {
+          this.npcs.push(role.make(sx, y + 1));
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) this.npcs.push(role.make(this.spawn.x, this.spawn.y + 1));
+    }
   }
 
   /* Place the Pepe Hermit somewhere along the swamp's surface. */
@@ -1257,6 +1353,28 @@ class Game {
     burst(this, p.cx, p.y + p.h, "#5ec8d8", 16, { spread: 260, up: 160 });
     this.sfx && this.sfx.summon();
     this.announce(atGround ? "🚀 To the sky!" : "🚀 Touchdown!");
+  }
+
+  /* The weathered sign near spawn: a static stand-in for the old walking
+     Guide Troll. Hands out the Lost Grin questline (via ui.openDialog's
+     existing questFor() lookup, matched on this "name") and otherwise
+     cycles the same onboarding one-liners the Guide used to say. */
+  readSign(tx, ty) {
+    if (!this._signNpc) {
+      this._signNpc = {
+        name: "Weathered Sign",
+        emoji: "🪧",
+        tips: SIGN_TIPS,
+        tipIdx: Math.floor(Math.random() * SIGN_TIPS.length),
+        nextTip() {
+          this.tipIdx = (this.tipIdx + 1) % this.tips.length;
+          return this.tips[this.tipIdx];
+        },
+      };
+    }
+    this._signNpc.cx = tx * TILE + 8;
+    this._signNpc.cy = ty * TILE - 8;
+    this.ui && this.ui.openDialog && this.ui.openDialog(this._signNpc);
   }
 
   /* Whale Vault door: needs a Whale Key (Quest 5's reward from the

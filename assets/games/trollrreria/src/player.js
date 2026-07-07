@@ -29,6 +29,7 @@ export class Player extends Entity {
     this.dir = 1;
     this.melee = null;           // live swing: { def, t, id }
     this.hp = 100; this.maxHp = 100;
+    this.hunger = 100; this.maxHunger = 100;
     this.breath = 8; this.maxBreath = 8;
     this.dead = false;
     this.invuln = 0;
@@ -186,9 +187,28 @@ export class Player extends Entity {
     if (lava) this.hurt(game, 24, "lava", this.cx - this.dir * 10);
     if (sludge) this.hurt(game, 4, "the sludge", null);
 
+    /* -------- hunger: drains over time (faster while sprinting), starves
+       you once empty. Passive regen needs a well-fed troll (matches the
+       Minecraft "regen needs hunger" gate). */
+    const sprinting = this.onGround && Math.abs(this.vx) > maxSpd * 0.7;
+    this.hunger = Math.max(0, this.hunger - dt * (sprinting ? 0.155 : 0.11));
+    if (this.hunger <= 0) {
+      this._starveAcc = (this._starveAcc || 0) + dt;
+      if (this._starveAcc >= 2) {
+        this._starveAcc = 0;
+        this.hp = Math.max(0, this.hp - 2);
+        this.hitFlash = 0.22;
+        game.floatText(this.cx, this.y - 4, 2, "#ff4d5e");
+        game.ui && game.ui.dirtyHud();
+        if (this.hp <= 0 && !this.dead) { this.dead = true; game.onPlayerDeath("starvation"); }
+      }
+    } else {
+      this._starveAcc = 0;
+    }
+
     /* -------- regen */
     this.regenWait += dt;
-    if (this.regenWait > 6 && this.hp < this.maxHp) {
+    if (this.regenWait > 6 && this.hp < this.maxHp && this.hunger > 20) {
       this._regenAcc = (this._regenAcc || 0) + dt;
       if (this._regenAcc >= 1.6) { this._regenAcc = 0; this.hp = Math.min(this.maxHp, this.hp + 1); game.ui && game.ui.dirtyHud(); }
     }
@@ -283,6 +303,21 @@ export class Player extends Entity {
       case "summon":
         if (fresh && game.trySummonBoss) game.trySummonBoss(sel.id);
         break;
+      case "food":
+        if (fresh && this.hunger < this.maxHunger) {
+          game.inventory.useSelected();
+          this.hunger = Math.min(this.maxHunger, this.hunger + def.hunger);
+          if (def.hpBonus) this.hp = Math.min(this.maxHp, this.hp + def.hpBonus);
+          /* raw meat: small chance of a queasy gut-punch, cooked is always safe */
+          if (def.raw && Math.random() < 0.2) {
+            this.hp = Math.max(1, this.hp - 4);
+            game.floatText(this.cx, this.y - 14, "queasy...", "#8fb573");
+          }
+          game.sfx && game.sfx.potion();
+          game.ui && game.ui.dirtyHud();
+          game.floatText(this.cx, this.y - 6, "+" + def.hunger, "#e8b23c");
+        }
+        break;
     }
   }
 
@@ -333,6 +368,7 @@ export class Player extends Entity {
 
   respawn(game) {
     this.hp = this.maxHp;
+    this.hunger = this.maxHunger;
     this.breath = this.maxBreath;
     this.dead = false;
     this.invuln = 2;

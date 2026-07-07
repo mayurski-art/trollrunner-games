@@ -195,8 +195,8 @@ export class Enemy extends Entity {
     /* lava hurts everything */
     if (this.inLiquid(game.world, 1)) this.hurt(game, 12, null, 0);
 
-    /* contact damage */
-    if (p && !p.dead && aabb(this.box, p.box)) {
+    /* contact damage (passive animals never hurt the player) */
+    if (!this.def.passive && p && !p.dead && aabb(this.box, p.box)) {
       p.hurt(game, this.contactDmg, (this.elite ? "an elite " : "") + this.def.name, this.cx);
     }
 
@@ -249,6 +249,22 @@ export class Enemy extends Entity {
             game.floatText(p.cx, p.y - 10, "Rug pulled!", "#ff2d55");
             game.sfx && game.sfx.tink(false);
           }
+        }
+        break;
+      }
+      /* Passive animals: wander idly, bolt away once the player gets close. */
+      case "flee": {
+        const d2 = dist2(this.cx, this.cy, p.cx, p.cy);
+        if (d2 < (TILE * 5) ** 2) {
+          this.dir = -toward;
+          this.vx = clamp(this.vx - toward * 800 * dt, -70, 70);
+          if (this.onGround && this.aiTimer <= 0) { this.vy = -260; this.aiTimer = 0.5; }
+        } else if (this.aiTimer <= 0) {
+          this.aiTimer = 1.2 + Math.random() * 2;
+          this.vx = (Math.random() < 0.5 ? -1 : 1) * (18 + Math.random() * 18);
+          this.dir = Math.sign(this.vx) || this.dir;
+        } else {
+          this.vx *= 0.92;
         }
         break;
       }
@@ -329,6 +345,7 @@ export class Enemy extends Entity {
       case "walker": this.drawWalker(ctx, d); break;
       case "flyer": d.erratic ? this.drawBat(ctx, d) : this.drawEye(ctx, d); break;
       case "ratRunner": this.drawRat(ctx, d); break;
+      case "flee": this.drawCritter(ctx, d); break;
     }
     ctx.restore();
   }
@@ -445,6 +462,31 @@ export class Enemy extends Entity {
     ctx.stroke();
   }
 
+  /* Passive animals: stubby quadruped body, snout (boar) or beak+comb (hen). */
+  drawCritter(ctx, d) {
+    const step = Math.sin(this.wobble * 9) * (Math.abs(this.vx) > 6 ? 2.5 : 0);
+    const hen = this.type === "trollHen";
+    ctx.fillStyle = "#7a6248";
+    ctx.fillRect(this.x + 3, this.y + this.h - 6 + Math.max(0, step), 3, 6 - Math.max(0, step));
+    ctx.fillRect(this.x + this.w - 6, this.y + this.h - 6 + Math.max(0, -step), 3, 6 - Math.max(0, -step));
+    ctx.fillStyle = d.color;
+    ctx.fillRect(this.x, this.y + 4, this.w, this.h - 8);
+    if (hen) {
+      /* comb + beak */
+      ctx.fillStyle = "#d94f4f";
+      ctx.fillRect(this.cx - 2, this.y - 2, 4, 4);
+      ctx.fillStyle = "#e8a23c";
+      ctx.fillRect(this.cx + this.dir * (this.w / 2 - 1), this.y + 5, this.dir * 4, 3);
+    } else {
+      /* snout */
+      ctx.fillStyle = "#b06a5a";
+      ctx.fillRect(this.cx + this.dir * (this.w / 2 - 2), this.y + this.h / 2 - 3, this.dir * 5, 5);
+    }
+    /* small dark eye */
+    ctx.fillStyle = "#1c1424";
+    ctx.fillRect(this.cx + this.dir * 4 - 1, this.y + 6, 2, 2);
+  }
+
   drawBat(ctx, d) {
     const flap = Math.sin(this.wobble * 18) * 7;
     ctx.fillStyle = d.color;
@@ -544,6 +586,37 @@ export class Projectile extends Entity {
   }
 }
 
+
+/* ---------------------------------------------------------- quest marker */
+/* A floating "!" over static world fixtures (the spawn sign) that hand out
+   a quest -- same bounce + color NPCs already use for their own quest
+   marker, so the affordance reads the same whether you're looking at a
+   person or a signpost. Self-removes once its quest is done. */
+export class QuestMarker {
+  constructor(x, y, questId) {
+    this.x = x; this.y = y;
+    this.questId = questId;
+    this.animTime = Math.random() * 6;
+    this.dead = false;
+  }
+
+  update(dt, game) {
+    this.animTime += dt;
+    if (game.questIsDone(this.questId)) this.dead = true;
+  }
+
+  draw(ctx) {
+    ctx.fillStyle = "#57e87a";
+    ctx.font = "bold 12px 'DM Mono', monospace";
+    ctx.textAlign = "center";
+    ctx.strokeStyle = "rgba(0,0,0,0.8)";
+    ctx.lineWidth = 2.5;
+    const y = this.y + Math.sin(this.animTime * 3) * 3;
+    ctx.strokeText("!", this.x, y);
+    ctx.fillText("!", this.x, y);
+    ctx.textAlign = "left";
+  }
+}
 
 /* ------------------------------------------------------------ damage text */
 export class DamageText {
