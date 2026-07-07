@@ -6,6 +6,7 @@ import {
   T, TILES, ITEMS, TILE, GRAVITY, MAX_FALL, PLAYER_W, PLAYER_H, REACH,
 } from "./defs.js";
 import { Entity, burst } from "./entities.js";
+import { SKINS } from "./store.js";
 import { getIcon } from "./icons.js";
 import { clamp } from "./util.js";
 
@@ -360,7 +361,12 @@ export class Player extends Entity {
       ctx.save();
       ctx.translate(feetX, feetY);
       if (this.dir < 0) ctx.scale(-1, 1);
+      /* hit-flash always wins (brief + needs to read clearly); otherwise a
+         purchased cosmetic skin, same exclusive-priority pattern the boss
+         classes already use for their own tint/enrage filters */
+      const skinDef = game.flags.skin && SKINS[game.flags.skin];
       if (this.hitFlash > 0) ctx.filter = "brightness(1.9) saturate(0.4)";
+      else if (skinDef) ctx.filter = skinDef.tint;
       ctx.drawImage(a.img, fi * CELL + b.x, b.y, b.w, b.h, -dw / 2, -dh, dw, dh);
       ctx.restore();
     } else {

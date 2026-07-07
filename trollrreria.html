@@ -139,10 +139,22 @@
         <div class="dialog-actions">
           <button id="btn-resume" class="btn-primary" type="button">▶ Resume</button>
           <button id="btn-save" class="btn-secondary" type="button">💾 Save world</button>
+          <button id="btn-store" class="btn-secondary" type="button">🪙 $TROLL Store</button>
           <label class="vol-row">SFX <input id="vol-slider" type="range" min="0" max="100" value="60"></label>
           <label class="vol-row">Music <input id="music-slider" type="range" min="0" max="100" value="50"></label>
           <button id="btn-quit" class="btn-ghost" type="button">Save &amp; quit to title</button>
         </div>
+      </div>
+    </section>
+
+    <!-- $TROLL store: cosmetic skins (real payment via TrollPay) -->
+    <section id="screen-store" class="screen" hidden>
+      <div class="menu-panel">
+        <h2 class="dialog-title">$TROLL STORE</h2>
+        <p class="death-note" style="margin-bottom:12px">Cosmetic only. Nothing here is faster, stronger, or pay-to-win.</p>
+        <div id="store-list" class="dialog-actions"></div>
+        <p id="store-status" class="death-note" style="min-height:1.2em"></p>
+        <button id="btn-store-back" class="btn-ghost" type="button">← Back</button>
       </div>
     </section>
 
@@ -151,7 +163,11 @@
       <div class="menu-panel">
         <h2 class="dialog-title is-danger">YOU GOT TROLLED</h2>
         <p id="death-cause" class="death-cause">Slain by gravity.</p>
-        <p class="death-note">Respawning at spawn…</p>
+        <p class="death-note" id="death-note">Respawning at spawn…</p>
+        <div class="dialog-actions" style="margin-top:10px">
+          <button id="btn-revive" class="btn-secondary" type="button" hidden>🧌 Revive here — <span id="revive-cost">$0.69 in $TROLL</span></button>
+          <p id="revive-status" class="death-note" style="min-height:1.2em"></p>
+        </div>
       </div>
     </section>
 
@@ -167,6 +183,8 @@
     </section>
   </div>
 
+  <script src="assets/js/troll-pay-config.js?v=1" defer></script>
+  <script src="https://trollrunner.net/assets/js/troll-pay.js?v=5" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
   <script src="https://mayurski-art.github.io/assets/js/troll-accounts.js" defer></script>
   <script src="assets/js/site-lock.js" defer></script>

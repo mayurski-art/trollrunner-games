@@ -1343,6 +1343,24 @@ class Game {
     if (this.ui) this.ui.showDeath(cause);
   }
 
+  /* $TROLL store battle revive: gets back up exactly where they fell,
+     instead of the free respawn-at-spawn/bed. Cancels the pending
+     auto-respawn by clearing dead/deathTimer directly rather than racing
+     the timer in update(). */
+  reviveInPlace() {
+    const p = this.player;
+    if (!p || !p.dead) return;
+    p.dead = false;
+    p.hp = Math.max(1, Math.round(p.maxHp * 0.5));
+    p.invuln = 2.5;
+    p.vx = 0; p.vy = -220;
+    this.deathTimer = 0;
+    if (this.ui) this.ui.showScreens({});
+    burst(this, p.cx, p.cy, "#ffb300", 20, { spread: 300, up: 200, glow: true });
+    this.sfx && this.sfx.potion();
+    this.announce("🧌 Back up. Let's go.");
+  }
+
   /* Dynamic light sources: held torch, glowing entities. */
   lightSources() {
     const out = [];

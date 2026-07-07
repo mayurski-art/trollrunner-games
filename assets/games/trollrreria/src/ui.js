@@ -10,6 +10,7 @@ import { fmtClock } from "./util.js";
 import { SURFACE_BASE } from "./worldgen.js";
 import { saveGame, saveSettings, isGuest } from "./save.js";
 import { QUESTS, questFor, isDone } from "./quests.js";
+import { SKINS, isOwned, buySkin, equipSkin, buyRevive } from "./store.js";
 
 export class UI {
   constructor(game) {
@@ -50,6 +51,12 @@ export class UI {
       questTitle: document.getElementById("quest-title"),
       questObjectives: document.getElementById("quest-objectives"),
       areaTitle: document.getElementById("area-title"),
+      screenStore: document.getElementById("screen-store"),
+      storeList: document.getElementById("store-list"),
+      storeStatus: document.getElementById("store-status"),
+      btnRevive: document.getElementById("btn-revive"),
+      reviveCost: document.getElementById("revive-cost"),
+      reviveStatus: document.getElementById("revive-status"),
     };
     this._questDirty = true;
     this._areaTimer = null;
@@ -119,6 +126,24 @@ export class UI {
       setTimeout(() => { e.target.textContent = "💾 Save world"; }, 1500);
     });
     document.getElementById("btn-quit").addEventListener("click", () => game.quitToTitle());
+    document.getElementById("btn-store").addEventListener("click", () => {
+      this.paintStoreList();
+      this.showScreens({ store: true });
+    });
+    document.getElementById("btn-store-back").addEventListener("click", () => this.showScreens({ pause: true }));
+    this.el.btnRevive.addEventListener("click", async () => {
+      this.el.btnRevive.disabled = true;
+      this.el.btnRevive.textContent = "Connecting…";
+      this.el.reviveStatus.textContent = "";
+      const res = await buyRevive(game);
+      if (!res.ok) {
+        this.el.btnRevive.disabled = false;
+        this.el.btnRevive.textContent = "🧌 Revive here";
+        this.el.reviveStatus.textContent = "⚠ " + res.reason;
+      }
+      /* on success, game.reviveInPlace() already swapped the screen back
+         to the HUD -- nothing left to do here */
+    });
     document.getElementById("btn-hotkeys").addEventListener("click", () => this.toggleHotkeys());
     document.getElementById("btn-hotkeys-close").addEventListener("click", () => this.toggleHotkeys(false));
     document.getElementById("btn-coop-host").addEventListener("click", () => game.hostCoop());
@@ -143,11 +168,12 @@ export class UI {
   }
 
   /* ------------------------------------------------------------ screens */
-  showScreens({ title, pause, death, lb } = {}) {
+  showScreens({ title, pause, death, lb, store } = {}) {
     this.el.screenTitle.hidden = !title;
     this.el.screenPause.hidden = !pause;
     this.el.screenDeath.hidden = !death;
     this.el.screenLb.hidden = !lb;
+    this.el.screenStore.hidden = !store;
     this.el.hud.hidden = !!(title || lb);
   }
 
@@ -160,6 +186,19 @@ export class UI {
   showDeath(cause) {
     this.el.deathCause.textContent = "Slain by " + (cause || "the world") + ".";
     this.showScreens({ death: true });
+    /* offer the paid revive only when there's a real payment lib to use --
+       a guest/offline visitor just gets the free respawn-at-spawn as before,
+       which keeps happening on its own timer either way */
+    const canPay = !!window.TrollPay;
+    this.el.btnRevive.hidden = !canPay;
+    if (canPay) {
+      const cfg = window.TROLL_PAY_CONFIG || {};
+      const price = ((cfg.REVIVE_PRICE_USD || 0.69) * (1 + (cfg.TAX_RATE || 0))).toFixed(2);
+      this.el.reviveCost.textContent = "$" + price;
+      this.el.reviveStatus.textContent = "";
+      this.el.btnRevive.disabled = false;
+      this.el.btnRevive.textContent = "🧌 Revive here";
+    }
   }
 
   /* --------------------------------------------------------------- maps */
@@ -263,6 +302,44 @@ export class UI {
     const ctx = cv.getContext("2d");
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(off, 0, 0, cv.width, cv.height);
+  }
+
+  /* ---------------------------------------------------------- $TROLL store */
+  paintStoreList() {
+    const g = this.game;
+    const list = this.el.storeList;
+    list.innerHTML = "";
+    this.el.storeStatus.textContent = window.TrollPay ? "" : "Payments unavailable — reload the page.";
+    for (const id in SKINS) {
+      const skin = SKINS[id];
+      const owned = isOwned(g, id);
+      const equipped = g.flags.skin === id;
+      const btn = document.createElement("button");
+      btn.className = "btn-secondary";
+      btn.type = "button";
+      btn.style.textAlign = "left";
+      btn.textContent = equipped ? `✓ ${skin.name} (equipped)`
+        : owned ? `${skin.name} — equip`
+        : `${skin.name} — $${skin.priceUsd.toFixed(2)}`;
+      btn.disabled = equipped;
+      btn.addEventListener("click", async () => {
+        if (owned) { equipSkin(g, id); this.paintStoreList(); return; }
+        btn.disabled = true;
+        btn.textContent = "Connecting…";
+        const res = await buySkin(g, id);
+        if (!res.ok) this.el.storeStatus.textContent = "⚠ " + res.reason;
+        this.paintStoreList();
+      });
+      list.appendChild(btn);
+    }
+    if (g.flags.skin) {
+      const clear = document.createElement("button");
+      clear.className = "btn-ghost";
+      clear.type = "button";
+      clear.textContent = "Remove skin (back to default troll)";
+      clear.addEventListener("click", () => { equipSkin(g, null); this.paintStoreList(); });
+      list.appendChild(clear);
+    }
   }
 
   /* ------------------------------------------------------------ dialog */
