@@ -36,10 +36,19 @@ export const QUESTS = {
     ],
     reward: { flags: ["moonBoots"], announce: "🐕 Quest complete: Moon Boots equipped — jump higher, land softer." },
   },
+  fixRocket: {
+    title: "Fix the Rocket",
+    npc: "Rocket Tinkerer",
+    intro: "Bring me 6 rocket parts. I'll get the pad running -- ground to sky, no ladder required.",
+    objectives: [
+      { type: "collect", id: "rocketPart", n: 6, label: "Rocket parts" },
+    ],
+    reward: { flags: ["rocketPad"], announce: "🚀 Quest complete: the rocket pads are live — hop between ground and sky." },
+  },
 };
 
 /* Order matters for the UI's "up next" hint; not enforced mechanically. */
-export const QUEST_ORDER = ["lostGrin", "pepeRecovery", "dogeMoon"];
+export const QUEST_ORDER = ["lostGrin", "pepeRecovery", "dogeMoon", "fixRocket"];
 
 export function createQuestState() {
   return {

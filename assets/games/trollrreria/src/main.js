@@ -19,7 +19,7 @@ import { ItemDrop, DamageText, burst, Enemy, Projectile } from "./entities.js";
 import { UI } from "./ui.js";
 import { SFX } from "./audio.js";
 import { TrollKing, TrollEmperor } from "./boss.js";
-import { GuideTroll, MerchantTroll, PepeHermit } from "./npc.js";
+import { GuideTroll, MerchantTroll, PepeHermit, RocketTinkerer } from "./npc.js";
 import { findHouseNear } from "./housing.js";
 import {
   saveGame, loadSaveData, applyWorldLayers, clearSave,
@@ -162,9 +162,11 @@ class Game {
   newWorld(seedStr) {
     this.seedStr = seedStr;
     this.seed = hashStr(seedStr);
-    const { world, spawn, surface } = generateWorld(this.seed);
+    const { world, spawn, surface, skyPad, groundPad } = generateWorld(this.seed);
     this.world = world;
     this.spawn = spawn;
+    this.skyPad = skyPad;
+    this.groundPad = groundPad;
     this.surface = surface;
     this.renderer = new Renderer(world, this.seed);
     this.entities = [];
@@ -185,6 +187,7 @@ class Game {
     this.cam.y = this.player.cy - 260;
     this.spawnGuide();
     this.spawnPepe();
+    this.spawnRocketTinkerer();
     this.revealAround(this.player.cx, this.player.cy);
     if (this.ui) this.ui.dirtyInv();
   }
@@ -610,7 +613,7 @@ class Game {
 
     if (id === T.AIR || !def || def.hp === Infinity) return;
     /* soft deco breaks with anything */
-    const soft = id === T.PLANT || id === T.SHROOM || id === T.TORCH || id === T.GRIN_FRAG || id === T.PEPE_SCROLL;
+    const soft = id === T.PLANT || id === T.SHROOM || id === T.TORCH || id === T.GRIN_FRAG || id === T.PEPE_SCROLL || id === T.ROCKET_PART;
     if (!soft) {
       if (def.tool === "axe" && tool.tool !== "axe") return;
       if (def.tool === "pick" && tool.tool !== "pick") return;
@@ -840,6 +843,10 @@ class Game {
     }
     if (id === T.LEVER) {
       this.pulseWire(m.tx, m.ty);
+      return;
+    }
+    if (id === T.ROCKET_PAD) {
+      this.useRocketPad(m.tx, m.ty);
       return;
     }
     if (id === T.BED) {
@@ -1098,10 +1105,21 @@ class Game {
 
   /* Place the Pepe Hermit somewhere along the swamp's surface. */
   spawnPepe() {
+    this.spawnNpcInBiome("swamp", (tx, ty) => new PepeHermit(tx, ty));
+  }
+
+  /* Place the Rocket Tinkerer somewhere along the desert's surface. */
+  spawnRocketTinkerer() {
+    this.spawnNpcInBiome("desert", (tx, ty) => new RocketTinkerer(tx, ty));
+  }
+
+  /* Shared search: find a safe surface spot somewhere in the given biome
+     band and drop the NPC there. */
+  spawnNpcInBiome(biome, make) {
     const w = this.world;
     let x0 = -1, x1 = -1;
     for (let x = 0; x < w.w; x++) {
-      if (biomeAt(x, w.w) === "swamp") { if (x0 < 0) x0 = x; x1 = x; }
+      if (biomeAt(x, w.w) === biome) { if (x0 < 0) x0 = x; x1 = x; }
     }
     if (x0 < 0) return;
     const sx = x0 + Math.floor((x1 - x0) * (0.3 + Math.random() * 0.4));
@@ -1109,10 +1127,34 @@ class Game {
       const tx = sx + dx;
       const ty = w.topSolid[clamp(tx, 0, w.w - 1)];
       if (ty > 2 && ty < w.h - 2 && !w.isSolid(tx, ty - 1)) {
-        this.npcs.push(new PepeHermit(tx, ty));
+        this.npcs.push(make(tx, ty));
         return;
       }
     }
+  }
+
+  /* Rocket pad: hop between the ground pad near spawn and the sky-island
+     pad above it. Locked until Quest 4 (Fix the Rocket) is complete --
+     both pads physically exist from world-gen either way, so there's
+     nothing to place/unplace, just a flag check. */
+  useRocketPad(tx, ty) {
+    if (!this.flags.rocketPad) {
+      this.floatText(tx * TILE + 8, ty * TILE - 10, "Locked — finish 'Fix the Rocket'", "#9a92b8");
+      return;
+    }
+    const p = this.player;
+    if (!p) return;
+    const atGround = Math.abs(tx - this.groundPad.x) < 2 && Math.abs(ty - this.groundPad.y) < 2;
+    const target = atGround ? this.skyPad : this.groundPad;
+    p.x = target.x * TILE - p.w / 2;
+    p.y = target.y * TILE - p.h;
+    p.vx = 0; p.vy = 0;
+    this.cam.x = p.cx - this.viewW / 2;
+    this.cam.y = p.cy - this.viewH / 2;
+    this.clampCam();
+    burst(this, p.cx, p.y + p.h, "#5ec8d8", 16, { spread: 260, up: 160 });
+    this.sfx && this.sfx.summon();
+    this.announce(atGround ? "🚀 To the sky!" : "🚀 Touchdown!");
   }
 
   /* Use a summon item: wake a boss (night only, one at a time). */

@@ -25,6 +25,14 @@ const RIGS = {
     idle: { frames: 8, fps: 9 }, walk: { frames: 6, fps: 14 },
     portrait: FIGHTERS + "pepe-rig/anims/portrait.png",
   },
+  /* No dedicated Rocket Tinkerer rig exists yet (budgeted for a future
+     PixelLab pass per the expansion doc) -- tints the gladiator sheet
+     cyan/silver so he doesn't read as the Guide's twin in the meantime. */
+  gladiatorTinkerer: {
+    dir: FIGHTERS + "gladiator/anims/", cell: 136,
+    idle: { frames: 8, fps: 8 }, walk: { frames: 6, fps: 11 },
+    portrait: FIGHTERS + "gladiator/portrait.png",
+  },
 };
 
 export const GUIDE_TIPS = [
@@ -221,6 +229,26 @@ export class PepeHermit extends TownNPC {
         "Three scrolls survived the screenshots. Find them. Feel good again.",
         "The phantoms out here at night? Pure FUD. Ignore the discourse.",
         "This bog? Toxic. The vibes? Also toxic. I stay anyway.",
+      ],
+    });
+    this.tipIdx = 0;
+  }
+}
+
+/* The Rocket Tinkerer: eccentric engineer camped out in the Rocketyard.
+   Gives the Fix the Rocket questline; completing it unlocks the pad
+   pair (ground + sky island) for fast travel. */
+export class RocketTinkerer extends TownNPC {
+  constructor(tx, ty) {
+    super(tx, ty, {
+      name: "Rocket Tinkerer",
+      rig: "gladiatorTinkerer",
+      tint: "hue-rotate(190deg) saturate(1.4) brightness(1.02)",
+      tips: [
+        "I built a rocket to restore the memes. It exploded. Twice. Good data.",
+        "Bring me parts. I bring you the sky. Fair trade, honestly.",
+        "The pad works on vibes and moon shards. Mostly vibes.",
+        "Every crash is just a launch that hasn't finished yet.",
       ],
     });
     this.tipIdx = 0;

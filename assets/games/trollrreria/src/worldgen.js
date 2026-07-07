@@ -52,6 +52,7 @@ export function generateWorld(seed) {
   const w = world.w, h = world.h;
   const tiles = world.tiles;
   const walls = world.walls;
+  const spawnX = Math.floor(w / 2);
 
   /* ------------------------------------------------ 1. surface heightmap */
   const surface = new Int16Array(w);
@@ -234,6 +235,19 @@ export function generateWorld(seed) {
     }
   }
 
+  /* ------------------------------------------------ 8c. Rocketyard parts */
+  let lastPart = -30;
+  for (let x = 8; x < w - 8; x++) {
+    if (biomeAt(x, w) !== "desert") continue;
+    const sy = surface[x];
+    if (tiles[sy * w + x] !== T.SAND) continue;
+    if (tiles[(sy - 1) * w + x] !== T.AIR) continue;
+    if (x - lastPart >= 24 && hash2(x, 85, seed) < 0.15) {
+      tiles[(sy - 1) * w + x] = T.ROCKET_PART;
+      lastPart = x;
+    }
+  }
+
   /* ------------------------------------------------ 9. underground loot chests */
   let placedChests = 0, guard = 0;
   while (placedChests < 22 && guard++ < 4000) {
@@ -248,11 +262,16 @@ export function generateWorld(seed) {
     }
   }
 
+  /* ------------------------------------------------ 10. sky islands + pads
+     One guaranteed island above spawn (the rocket pad's arrival point --
+     built before rebuildTopSolid so its platform counts as solid ground)
+     plus a scatter of unguaranteed ones with loot, for verticality. */
+  const skyPad = buildSkyIslands(world, rng, w, surface, spawnX);
+
   world.rebuildTopSolid();
 
-  const spawnX = Math.floor(w / 2);
   const spawn = { x: spawnX, y: surface[spawnX] - 1 };
-  return { world, spawn, surface };
+  return { world, spawn, surface, skyPad, groundPad: { x: spawnX - 6, y: surface[spawnX - 6] - 1 } };
 }
 
 function carve(world, cx, cy, r) {
@@ -305,6 +324,47 @@ function ruinsLootChest(rng) {
     if (slot >= 0) items[slot] = { id: "pepeScroll", n: 1 };
   }
   return items;
+}
+
+/* Sky islands: small floating stone-brick platforms in the open air above
+   the surface. One is guaranteed directly above spawn and carries the
+   sky-side rocket pad (Quest 4's fast-travel reward); the ground-side pad
+   sits a few tiles from spawn. Everything else is unguaranteed loot bait.
+   Returns the sky pad's {x, y} (tile coords, y = the walkable surface). */
+function buildSkyIslands(world, rng, w, surface, spawnX) {
+  const islandY = 90;
+  placeIsland(world, rng, spawnX - 3, islandY, 7, false); // pad goes here instead of a chest
+  const skyPadY = islandY - 1;
+  world.tiles[skyPadY * w + spawnX] = T.ROCKET_PAD;
+
+  const gx = spawnX - 6;
+  const gy = surface[gx] - 1;
+  world.tiles[gy * w + gx] = T.ROCKET_PAD;
+
+  let placed = 0, guard = 0;
+  while (placed < 10 && guard++ < 400) {
+    const ix = 30 + Math.floor(rng() * (w - 60));
+    if (Math.abs(ix - spawnX) < 40) continue;
+    const iy = 50 + Math.floor(rng() * 110);
+    placeIsland(world, rng, ix, iy, 5 + Math.floor(rng() * 4), rng() < 0.6);
+    placed++;
+  }
+  return { x: spawnX, y: skyPadY };
+}
+
+function placeIsland(world, rng, x0, y0, iw, withChest) {
+  const w = world.w;
+  for (let x = x0; x < x0 + iw; x++) {
+    if (x < 1 || x >= w - 1) continue;
+    world.tiles[y0 * w + x] = T.STONE_BRICK;
+    world.walls[y0 * w + x] = W.STONE_BRICK;
+  }
+  if (withChest) {
+    const cx = x0 + Math.floor(iw / 2);
+    const i = (y0 - 1) * w + cx;
+    world.tiles[i] = T.CHEST;
+    world.addChest(cx, y0 - 1, lootChest(rng, true));
+  }
 }
 
 function scatterOre(world, rng, ore, veins, yMin, yMax, minSize, maxSize) {

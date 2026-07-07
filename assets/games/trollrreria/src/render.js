@@ -333,6 +333,26 @@ export class Renderer {
         g.fillRect(px + 6, py + 8, 4, 1);
         break;
       }
+      case T.ROCKET_PART: {
+        g.fillStyle = "#8a94a8";
+        g.fillRect(px + 5, py + 5, 6, 8);
+        g.fillStyle = "#5ec8d8";
+        g.fillRect(px + 6, py + 6, 4, 3);
+        g.fillStyle = "#e8b23c";
+        g.fillRect(px + 6, py + 11, 4, 2);
+        break;
+      }
+      case T.ROCKET_PAD: {
+        g.fillStyle = "#3a3f52";
+        g.fillRect(px, py + 12, TILE, 4);
+        g.fillStyle = "#5ec8d8";
+        g.fillRect(px + 2, py + 12, TILE - 4, 1);
+        for (let n = 0; n < 3; n++) {
+          g.fillStyle = n === (Math.floor(wx * 0.5 + wy) % 3) ? "#ffe08a" : "#5ec8d8";
+          g.fillRect(px + 3 + n * 4, py + 13, 2, 2);
+        }
+        break;
+      }
       case T.PLANT: {
         g.fillStyle = "#4faf54";
         const h1 = 4 + Math.floor(hash2(wx, wy, 3) * 6);
