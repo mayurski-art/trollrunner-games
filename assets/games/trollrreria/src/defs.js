@@ -274,6 +274,12 @@ export const ENEMIES = {
   rugPullRat: { name: "Rug Pull Rat", ai: "ratRunner", hp: 18, dmg: 7, def: 0, w: 20, h: 14, color: "#a8875f", drops: [["gel", 0, 1, 0.3]], kb: 1.2 },
   /* Rage Comic Ruins */
   paperHandSkeleton: { name: "Paper Hand Skeleton", ai: "walker", hp: 55, dmg: 16, def: 3, w: 22, h: 42, color: "#e8e0c8", drops: [["bone", 1, 3, 0.8]], kb: 1.4 },
+  /* Going Viral: the botnet counterattack, unlocked once the Grin Core is
+     restored. Creeps into spawn tables across every earlier biome rather
+     than owning a zone of its own -- the corruption is the point. */
+  botGoblin: { name: "Bot Goblin", ai: "walker", hp: 60, dmg: 17, def: 5, w: 22, h: 40, color: "#5a6b7a", drops: [["gel", 1, 2, 0.6]], kb: 0.9 },
+  engagementFarmer: { name: "Engagement Farmer", ai: "walker", hp: 50, dmg: 14, def: 2, w: 22, h: 40, color: "#7a5a8a", drops: [["lens", 0, 1, 0.4]], kb: 0.7 },
+  cloutLeech: { name: "Clout Leech", ai: "flyer", hp: 44, dmg: 16, def: 2, w: 24, h: 22, color: "#a83a5a", drops: [["gel", 0, 2, 0.5]], kb: 1.0, erratic: true },
 };
 
 /* Boss knobs (classes live in boss.js). */

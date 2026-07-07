@@ -1095,6 +1095,12 @@ class Game {
   }
 
   pickSpawnType(ty, isNight, biome) {
+    /* Going Viral: the botnet counterattack creeps into every biome's
+       spawn table instead of owning a zone of its own -- the corruption
+       IS the point, not a new place to visit. */
+    if (this.flags.viral && Math.random() < 0.25) {
+      return ["botGoblin", "engagementFarmer", "cloutLeech"][Math.floor(Math.random() * 3)];
+    }
     const r = Math.random();
     if (biome === "swamp" && ty < 310) {
       /* Pepe Swamp gets its own surface roster instead of the generic one */
@@ -1279,6 +1285,17 @@ class Game {
       if (placed > 0) veins++;
     }
     this.announce("⛏ The world hums… TROLLIUM erupts in the deep!");
+  }
+
+  /* Going Viral: the botnet's counterattack once the Grin Core is
+     restored (Quest 6). Layers onto hardmode rather than replacing its
+     trigger -- trollium progression still opens up on the first King
+     kill same as always, this just adds a second, later escalation so
+     the finale actually changes something instead of just narrating. */
+  goingViral() {
+    if (this.flags.viral) return;
+    this.flags.viral = true;
+    this.announce("🦠 GOING VIRAL: the botnet has noticed you.");
   }
 
   /* Console/testing helper: spawn an enemy near the player. */

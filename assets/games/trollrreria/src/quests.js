@@ -130,6 +130,9 @@ export function completeQuest(game, id) {
   }
   if (q.reward?.flags) {
     for (const flag of q.reward.flags) game.flags[flag] = true;
+    /* the Grin Core's restoration is the story trigger for the botnet's
+       counterattack -- give it its own moment rather than a silent flag */
+    if (q.reward.flags.includes("grinCoreRestored")) game.goingViral && game.goingViral();
   }
   game.sfx && game.sfx.fanfare();
   game.announce(q.reward?.announce || `📜 Quest complete: ${q.title}`);
