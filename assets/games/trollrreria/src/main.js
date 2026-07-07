@@ -9,7 +9,7 @@ import {
   REACH, STATION_SCAN, STARTER_ITEMS,
 } from "./defs.js";
 import { hashStr, clamp, lerp, fmtClock, aabb } from "./util.js";
-import { generateWorld, biomeAt, zoneAt, BIOME_NAMES } from "./worldgen.js";
+import { generateWorld, biomeAt, zoneAt, BIOME_NAMES, STONE_START, DEEP_START } from "./worldgen.js";
 import { Renderer, skyState } from "./render.js";
 import { Lighting } from "./lighting.js";
 import { Input } from "./input.js";
@@ -19,6 +19,7 @@ import { ItemDrop, DamageText, burst, Enemy, Projectile } from "./entities.js";
 import { UI } from "./ui.js";
 import { SFX } from "./audio.js";
 import { TrollKing, TrollEmperor, Rickroller } from "./boss.js";
+import { Archtroll, Rarepepe, ElderShibe, Anon } from "./worldbosses.js";
 import { GuideTroll, MerchantTroll, PepeHermit, RocketTinkerer, WhaleOracle } from "./npc.js";
 import { findHouseNear } from "./housing.js";
 import {
@@ -164,11 +165,12 @@ class Game {
   newWorld(seedStr) {
     this.seedStr = seedStr;
     this.seed = hashStr(seedStr);
-    const { world, spawn, surface, skyPad, groundPad } = generateWorld(this.seed);
+    const { world, spawn, surface, skyPad, groundPad, ruinsBounds } = generateWorld(this.seed);
     this.world = world;
     this.spawn = spawn;
     this.skyPad = skyPad;
     this.groundPad = groundPad;
+    this.ruinsBounds = ruinsBounds;
     this.surface = surface;
     this.renderer = new Renderer(world, this.seed);
     this.entities = [];
@@ -474,20 +476,45 @@ class Game {
          same idea as debugSpawn(). */
       if (zone === "deepweb" && !this.flags.rickrollerSpawned) {
         this.flags.rickrollerSpawned = true;
-        const ptx = Math.floor(this.player.cx / TILE), pty = Math.floor(this.player.cy / TILE);
-        outer: for (let dx = 6; dx <= 16; dx++) {
-          for (const dir of [1, -1]) {
-            const tx = ptx + dir * dx;
-            for (let y = pty - 6; y < pty + 10; y++) {
-              if (!this.world.isSolid(tx, y) && !this.world.isSolid(tx, y - 1) &&
-                  !this.world.isSolid(tx, y - 2) && this.world.isSolid(tx, y + 1)) {
-                this.enemies.push(new Rickroller(tx * TILE + 8, (y + 1) * TILE));
-                this.announce("📼 Something's buffering in the dark...");
-                break outer;
-              }
-            }
-          }
+        const spot = this.findGroundNear(Math.floor(this.player.cx / TILE), Math.floor(this.player.cy / TILE));
+        if (spot) {
+          this.enemies.push(new Rickroller(spot.tx * TILE + 8, (spot.ty + 1) * TILE));
+          this.announce("📼 Something's buffering in the dark...");
         }
+      }
+      /* The Archtroll wakes the first time anyone actually walks into the
+         Rage Comic Ruins room (not just nearby -- the carved room's own
+         bounds from worldgen). */
+      if (this.ruinsBounds && !this.flags.archtrollSpawned) {
+        const r = this.ruinsBounds;
+        const ptx = Math.floor(this.player.cx / TILE), pty = Math.floor(this.player.cy / TILE);
+        if (ptx >= r.x && ptx < r.x + r.w && pty >= r.y && pty < r.y + r.h) {
+          this.flags.archtrollSpawned = true;
+          this.enemies.push(new Archtroll(this.player.cx + (this.player.dir > 0 ? 90 : -90), this.player.cy));
+          this.announce("🏛 Something ancient stirs in the Ruins...");
+        }
+      }
+      /* Rarepepe sleeps at the bottom of Pepe Swamp -- wakes once the
+         player reaches real depth while still inside the swamp's x-band. */
+      if (zone === "moonMines" && biomeAt(Math.floor(this.player.cx / TILE), this.world.w) === "swamp" &&
+          !this.flags.rarepepeSpawned) {
+        this.flags.rarepepeSpawned = true;
+        const spot = this.findGroundNear(Math.floor(this.player.cx / TILE), Math.floor(this.player.cy / TILE));
+        if (spot) {
+          this.enemies.push(new Rarepepe(spot.tx * TILE + 8, (spot.ty + 1) * TILE));
+          this.announce("🐸 Something in the deep swamp is crying...");
+        }
+      }
+      /* The Elder Shibe wakes at the floor of the Doge Moon Mines proper --
+         guarded off from the swamp's x-band so he doesn't overlap with
+         Rarepepe's spot. */
+      if (zone === "moonMines" &&
+          biomeAt(Math.floor(this.player.cx / TILE), this.world.w) !== "swamp" &&
+          Math.floor(this.player.cy / TILE) > (STONE_START + DEEP_START) / 2 &&
+          !this.flags.shibeSpawned) {
+        this.flags.shibeSpawned = true;
+        this.enemies.push(new ElderShibe(this.player.cx, this.player.cy - 100));
+        this.announce("🐕 Something ancient opens one eye...");
       }
     }
 
@@ -1020,10 +1047,11 @@ class Game {
       x: p.dir > 0 ? p.x + p.w - 8 : p.x - reach + 8,
       y: p.y - 10, w: reach, h: p.h + 16,
     };
+    const dmg = def.dmg * (p.atkDebuff > 0 ? 0.6 : 1); // Rarepepe's sorrowful wail
     for (const e of this.enemies) {
       if (!e.dead && e._swingHit !== swing.id && aabb(box, e.box)) {
         e._swingHit = swing.id;
-        e.hurt(this, def.dmg, p.cx, (def.knock || 200) / 200);
+        e.hurt(this, dmg, p.cx, (def.knock || 200) / 200);
       }
     }
   }
@@ -1043,10 +1071,11 @@ class Game {
     p.dir = Math.cos(ang) >= 0 ? 1 : -1;
     p.startSwing(0.22);
     const spd = 540;
+    const arrowDmg = (def.dmg + ammo.dmg) * (p.atkDebuff > 0 ? 0.6 : 1);
     this.entities.push(new Projectile(
       p.cx + Math.cos(ang) * 14, p.cy - 4 + Math.sin(ang) * 14,
       Math.cos(ang) * spd, Math.sin(ang) * spd,
-      { dmg: def.dmg + ammo.dmg, flame: !!ammo.flame }
+      { dmg: arrowDmg, flame: !!ammo.flame }
     ));
     this.sfx && this.sfx.bow();
     this.ui && this.ui.dirtyInv();
@@ -1166,6 +1195,24 @@ class Game {
      quest-giver stays reachable up top like everyone else. */
   spawnWhaleOracle() {
     this.spawnNpcInBiome("desert", (tx, ty) => new WhaleOracle(tx, ty));
+  }
+
+  /* Shared search: find open footing near a tile position (walker-height
+     clearance, solid floor). Returns {tx,ty} or null. Used to place
+     boss spawns without embedding them in solid rock. */
+  findGroundNear(ptx, pty, maxDx = 16) {
+    for (let dx = 6; dx <= maxDx; dx++) {
+      for (const dir of [1, -1]) {
+        const tx = ptx + dir * dx;
+        for (let y = pty - 6; y < pty + 10; y++) {
+          if (!this.world.isSolid(tx, y) && !this.world.isSolid(tx, y - 1) &&
+              !this.world.isSolid(tx, y - 2) && this.world.isSolid(tx, y + 1)) {
+            return { tx, ty: y };
+          }
+        }
+      }
+    }
+    return null;
   }
 
   /* Shared search: find a safe surface spot somewhere in the given biome
@@ -1308,6 +1355,14 @@ class Game {
     if (this.flags.viral) return;
     this.flags.viral = true;
     this.announce("🦠 GOING VIRAL: the botnet has noticed you.");
+    /* Anon, the botnet's lone human defender, shows up right where the
+       Core was restored -- one permanent spawn, same as the other three
+       world bosses. */
+    if (this.player && !this.flags.anonSpawned) {
+      this.flags.anonSpawned = true;
+      const spot = this.findGroundNear(Math.floor(this.player.cx / TILE), Math.floor(this.player.cy / TILE));
+      if (spot) this.enemies.push(new Anon(spot.tx * TILE + 8, (spot.ty + 1) * TILE));
+    }
   }
 
   /* Console/testing helper: spawn an enemy near the player. */

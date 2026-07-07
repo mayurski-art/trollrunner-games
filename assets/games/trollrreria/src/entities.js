@@ -513,7 +513,7 @@ export class Projectile extends Entity {
     if (!this.hostile || this.both) {
       for (const e of game.enemies) {
         if (!e.dead && aabb(this.box, e.box)) {
-          e.hurt(game, this.dmg, this.cx, 0.6);
+          e.hurt(game, this.dmg, this.cx, 0.6, true); // 5th arg: this hit was ranged
           this.dead = true;
           break;
         }

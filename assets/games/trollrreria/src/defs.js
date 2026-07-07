@@ -190,6 +190,14 @@ export const ITEMS = {
   emperorSigil: { name: "Emperor sigil", type: "summon", max: 5, desc: "Calls the Troll Emperor. Hardmode, night, regrets." },
   /* Grin Core relics — quest rewards, kept in the bag as trophies/keys */
   lostGrin:    { name: "The Lost Grin", type: "relic", max: 1, desc: "First of six. The Grin Core is starting to remember its shape." },
+  /* world boss drops */
+  banhammer:      { name: "The Banhammer", type: "weapon", dmg: 70, knock: 420, speed: 3.0, arc: 1.6, rare: true, desc: "Forged from a thousand rejected replies." },
+  ancientGrinFragment: { name: "Ancient Grin Fragment", type: "material", max: 10, desc: "Older than the forums themselves." },
+  smugCloak:      { name: "Smug Cloak", type: "material", max: 1, desc: "Cosmetic trophy. Insufferably smug." },
+  dogeSweaterToken: { name: "Doge Sweater", type: "material", max: 1, desc: "Such warm. Very cozy. Cosmetic trophy." },
+  moonCoreShard:  { name: "Moon Core Shard", type: "material", max: 10, desc: "Hums faintly. Might be worth something later." },
+  rgbBlade:       { name: "RGB Keyboard Blade", type: "weapon", dmg: 66, knock: 380, speed: 3.4, arc: 1.5, rare: true, desc: "Mechanical. Loud. Devastating." },
+  corruptedCore:  { name: "Corrupted Core", type: "material", max: 10, desc: "Still warm from the botnet." },
 };
 for (const id in ITEMS) { ITEMS[id].id = id; if (!ITEMS[id].max) ITEMS[id].max = 1; }
 

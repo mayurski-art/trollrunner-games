@@ -35,6 +35,7 @@ export class Player extends Entity {
     this.regenWait = 0;
     this.coyote = 0; this.jumpBuf = 0;
     this.airJumps = 0;         // Frog Legs unlock (game.flags.doubleJump)
+    this.atkDebuff = 0;        // seconds remaining; Rarepepe's sorrowful wail
     this.fallDist = 0;
     this.useTimer = 0;         // seconds until next use allowed
     this.swing = 0;            // 0..1 swing progress (visual)
@@ -91,6 +92,7 @@ export class Player extends Entity {
     this.hitFlash = Math.max(0, this.hitFlash - dt);
     this.useTimer = Math.max(0, this.useTimer - dt);
     this.potionCd = Math.max(0, this.potionCd - dt);
+    this.atkDebuff = Math.max(0, this.atkDebuff - dt);
     if (this.swing > 0) this.swing = Math.max(0, this.swing - dt / this.swingDur);
     this.animTime += dt;
 

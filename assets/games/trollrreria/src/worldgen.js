@@ -143,7 +143,7 @@ export function generateWorld(seed) {
      reads as a built structure: stone-brick perimeter, background wall,
      a few loot chests. Carved AFTER the cave passes so tunnel noise can't
      eat into its walls. Anchored under the swamp/desert boundary. */
-  carveRuins(world, rng, w);
+  const ruinsBounds = carveRuins(world, rng, w);
 
   /* ------------------------------------------------ 3e. Whale Vault
      Sealed with a VAULT_DOOR that only opens for a Whale Key (Quest 5).
@@ -288,7 +288,10 @@ export function generateWorld(seed) {
   world.rebuildTopSolid();
 
   const spawn = { x: spawnX, y: surface[spawnX] - 1 };
-  return { world, spawn, surface, skyPad, groundPad: { x: spawnX - 6, y: surface[spawnX - 6] - 1 } };
+  return {
+    world, spawn, surface, skyPad, ruinsBounds,
+    groundPad: { x: spawnX - 6, y: surface[spawnX - 6] - 1 },
+  };
 }
 
 function carve(world, cx, cy, r) {
