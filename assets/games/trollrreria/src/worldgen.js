@@ -34,7 +34,17 @@ export const BIOME_NAMES = {
   swamp: "Pepe Swamp",
   snow: "Frostbite Reach",
   desert: "Sunbaked Wastes",
+  moonMines: "Doge Moon Mines",
 };
+
+/* Depth-layered zone at a tile position: the mid-depth stone band reads
+   as the Doge Moon Mines regardless of which surface biome is overhead,
+   same way real caves don't care what's growing up top. Falls back to
+   the surface biome above that band. */
+export function zoneAt(tx, ty, w) {
+  if (ty >= STONE_START) return "moonMines";
+  return biomeAt(tx, w);
+}
 
 export function generateWorld(seed) {
   const world = new World(WORLD_W, WORLD_H);
@@ -137,6 +147,27 @@ export function generateWorld(seed) {
   scatterOre(world, rng, T.IRON, 700, 380, DEEP_START, 4, 8);
   scatterOre(world, rng, T.SILVER, 460, 480, BEDROCK_START - 20, 3, 7);
   scatterOre(world, rng, T.GOLD, 320, DEEP_START - 60, BEDROCK_START - 10, 3, 6);
+  /* Doge Moon Mines -- the mid-depth stone band (STONE_START..DEEP_START),
+     reframed with its own glowing ore rather than a whole new x-restricted
+     zone, since the depth tier already has the right shape (dangerous,
+     cave-dwelling enemies, worth digging toward). */
+  scatterOre(world, rng, T.MOONROCK, 520, STONE_START + 10, DEEP_START, 3, 7);
+
+  /* unstable debris in the Moon Mines: sits flush in a cave wall (so it's
+     discoverable, like ore) but falls the moment whatever's under it gets
+     mined out -- world.set()'s wake-on-edit already handles that once
+     it's tagged fallable, nothing bespoke needed here. */
+  let debris = 0, dguard = 0;
+  while (debris < 140 && dguard++ < 6000) {
+    const x = 4 + Math.floor(rng() * (w - 8));
+    const y = STONE_START + 20 + Math.floor(rng() * (DEEP_START - STONE_START - 30));
+    const i = y * w + x;
+    const exposed = world.tiles[i - 1] === T.AIR || world.tiles[i + 1] === T.AIR || world.tiles[i - w] === T.AIR;
+    if (world.tiles[i] === T.STONE && exposed) {
+      world.tiles[i] = T.MOON_DEBRIS;
+      debris++;
+    }
+  }
 
   /* ------------------------------------------------ 5. lava + obsidian deep down */
   for (let n = 0; n < 60; n++) {

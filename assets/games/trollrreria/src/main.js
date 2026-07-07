@@ -9,7 +9,7 @@ import {
   REACH, STATION_SCAN, STARTER_ITEMS,
 } from "./defs.js";
 import { hashStr, clamp, lerp, fmtClock, aabb } from "./util.js";
-import { generateWorld, biomeAt, BIOME_NAMES } from "./worldgen.js";
+import { generateWorld, biomeAt, zoneAt, BIOME_NAMES } from "./worldgen.js";
 import { Renderer, skyState } from "./render.js";
 import { Lighting } from "./lighting.js";
 import { Input } from "./input.js";
@@ -444,11 +444,12 @@ class Game {
     if (this._exploreAcc >= 0.4 && this.player && !this.player.dead) {
       this._exploreAcc = 0;
       this.revealAround(this.player.cx, this.player.cy);
-      /* area-title popup on crossing into a new surface zone */
-      const biome = biomeAt(Math.floor(this.player.cx / TILE), this.world.w);
-      if (biome !== this._lastBiome) {
-        this._lastBiome = biome;
-        if (this._announcedBiome) this.ui && this.ui.showAreaTitle(BIOME_NAMES[biome] || biome);
+      /* area-title popup on crossing into a new zone (surface biome or
+         depth-layered band, e.g. surfacing out of the Moon Mines) */
+      const zone = zoneAt(Math.floor(this.player.cx / TILE), Math.floor(this.player.cy / TILE), this.world.w);
+      if (zone !== this._lastBiome) {
+        this._lastBiome = zone;
+        if (this._announcedBiome) this.ui && this.ui.showAreaTitle(BIOME_NAMES[zone] || zone);
         this._announcedBiome = true;
       }
     }
@@ -850,7 +851,12 @@ class Game {
     /* NPC chat / shop */
     for (const n of this.npcs) {
       if (Math.abs(n.cx - m.x) < 24 && Math.abs(n.cy - m.y) < 30 && this.ui) {
-        if (n.shop && this.ui.openShop) this.ui.openShop(n);
+        /* a shop NPC with a fresh quest to hand out leads with dialog --
+           otherwise Doge (a shop NPC) could never actually give his quest,
+           since the shop would swallow every interaction first */
+        const qid = this.questForNpc(n);
+        const questFresh = qid && !this.questIsDone(qid) && !this.quests.progress[qid];
+        if (n.shop && this.ui.openShop && !questFresh) this.ui.openShop(n);
         else if (this.ui.openDialog) this.ui.openDialog(n);
         return;
       }

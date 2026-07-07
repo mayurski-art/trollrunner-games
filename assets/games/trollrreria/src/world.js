@@ -3,6 +3,14 @@
 
 import { T, TILES, WORLD_W, WORLD_H, CHUNK } from "./defs.js";
 
+/* Any tile whose def opts into falling when unsupported (sand, moon
+   debris, ...) -- generalized so new fallable materials don't need
+   world.js changes, just `falls: true` on the tile def. */
+function fallable(id) {
+  const d = TILES[id];
+  return !!(d && d.falls);
+}
+
 export class World {
   constructor(w = WORLD_W, h = WORLD_H) {
     this.w = w;
@@ -71,9 +79,10 @@ export class World {
     this.markDirty(x, y);
     this.updateTopSolid(x);
     this.wakeLiquids(x, y);
-    /* wake sand that may now be unsupported (this cell + the one above) */
-    if (id === T.SAND) this.sandActive.add(i);
-    if (y > 0 && this.tiles[i - this.w] === T.SAND) this.sandActive.add(i - this.w);
+    /* wake fallable tiles (sand, moon debris, ...) that may now be
+       unsupported -- this cell and the one above it */
+    if (fallable(id)) this.sandActive.add(i);
+    if (y > 0 && fallable(this.tiles[i - this.w])) this.sandActive.add(i - this.w);
     if (this.onEdit && !this._simming) this.onEdit("tile", x, y, id);
   }
 
@@ -286,7 +295,8 @@ export class World {
     return moved;
   }
 
-  /* Falling sand: unsupported sand drops one cell per pass. */
+  /* Falling tiles (sand, moon debris, ...): unsupported ones drop one
+     cell per pass. */
   simSand() {
     if (this.sandActive.size === 0) return;
     this._simming = true;
@@ -296,7 +306,8 @@ export class World {
   _simSand() {
     const w = this.w;
     for (const i of Array.from(this.sandActive)) {
-      if (this.tiles[i] !== T.SAND) { this.sandActive.delete(i); continue; }
+      const id = this.tiles[i];
+      if (!fallable(id)) { this.sandActive.delete(i); continue; }
       const x = i % w, y = (i / w) | 0;
       if (y + 1 >= this.h) { this.sandActive.delete(i); continue; }
       const b = i + w;
@@ -306,9 +317,9 @@ export class World {
          this.tiles[b] !== T.TORCH && this.tiles[b] !== T.CHEST &&
          this.tiles[b] !== T.DOOR_C && this.tiles[b] !== T.DOOR_O);
       if (!canFall) { this.sandActive.delete(i); continue; }
-      /* swap any liquid upward as the sand sinks */
+      /* swap any liquid upward as the tile sinks */
       const liqAmt = this.liquid[b], liqTyp = this.liquidType[b];
-      this.set(x, y + 1, T.SAND);
+      this.set(x, y + 1, id);
       this.set(x, y, T.AIR);
       this.liquid[i] = liqAmt;
       this.liquidType[i] = liqTyp;

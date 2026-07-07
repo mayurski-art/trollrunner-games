@@ -136,7 +136,7 @@ export class Player extends Entity {
       this.vy = Math.min(this.vy + GRAVITY * 0.32 * dt, 120);
     } else {
       if (this.jumpBuf > 0 && this.coyote > 0) {
-        this.vy = -548;
+        this.vy = game.flags.moonBoots ? -600 : -548;
         this.coyote = 0; this.jumpBuf = 0;
         game.sfx && game.sfx.jump();
       } else if (this.jumpBuf > 0 && this.airJumps > 0 && this.coyote <= 0) {
@@ -158,8 +158,10 @@ export class Player extends Entity {
     if (wet || lava) this.fallDist = 0;
     this.moveCollide(world, dt, true, drop);
     if (this.onGround) {
-      if (this.fallDist > 9.5 * TILE && fallingBefore > 320) {
-        const dmg = Math.round((this.fallDist / TILE - 9.5) * 5.5);
+      /* Moon Boots: higher safe-fall threshold + softer landings */
+      const safeTiles = game.flags.moonBoots ? 13 : 9.5;
+      if (this.fallDist > safeTiles * TILE && fallingBefore > 320) {
+        const dmg = Math.round((this.fallDist / TILE - safeTiles) * (game.flags.moonBoots ? 3.5 : 5.5));
         if (dmg > 0) this.hurt(game, dmg, "gravity", null, true);
       }
       this.fallDist = 0;

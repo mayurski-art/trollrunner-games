@@ -27,10 +27,19 @@ export const QUESTS = {
     ],
     reward: { flags: ["doubleJump"], announce: "🐸 Quest complete: Frog Legs equipped — you can double jump now." },
   },
+  dogeMoon: {
+    title: "Doge to the Moon",
+    npc: "Doge Miner",
+    intro: "Many dig. Much moon rock. Bring 10 shards and I show you how to land soft. Very technique.",
+    objectives: [
+      { type: "collect", id: "moonShard", n: 10, label: "Doge Moon Shards" },
+    ],
+    reward: { flags: ["moonBoots"], announce: "🐕 Quest complete: Moon Boots equipped — jump higher, land softer." },
+  },
 };
 
 /* Order matters for the UI's "up next" hint; not enforced mechanically. */
-export const QUEST_ORDER = ["lostGrin", "pepeRecovery"];
+export const QUEST_ORDER = ["lostGrin", "pepeRecovery", "dogeMoon"];
 
 export function createQuestState() {
   return {

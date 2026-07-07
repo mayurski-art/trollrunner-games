@@ -29,6 +29,7 @@ export const T = {
   BEDROCK: 24, OBSIDIAN: 25, PLANT: 26, BED: 27,
   LEVER: 28, PLATE: 29, DART_L: 30, DART_R: 31, TORCH_OFF: 32,
   TROLLIUM: 33, GRIN_FRAG: 34, MUD: 35, PEPE_SCROLL: 36,
+  MOONROCK: 37, MOON_DEBRIS: 38,
   /* wires live on their own layer, not in T */
 };
 
@@ -73,6 +74,8 @@ TILES[T.TROLLIUM] = { name: "Trollium ore", solid: true, hp: 300, pow: 80, tool:
 TILES[T.GRIN_FRAG] = { name: "Grin fragment", solid: false, hp: 1, pow: 0, tool: "pick", drop: "grinFragment", light: 55, noVariant: true };
 TILES[T.MUD]      = { name: "Mud", solid: true, hp: 45, pow: 0, tool: "pick", drop: "dirt", pal: ["#3a3220", "#4a4028", "#5a4f30"] };
 TILES[T.PEPE_SCROLL] = { name: "Rare Pepe scroll", solid: false, hp: 1, pow: 0, tool: "pick", drop: "pepeScroll", light: 35, noVariant: true };
+TILES[T.MOONROCK] = { name: "Moon rock", solid: true, hp: 190, pow: 45, tool: "pick", drop: "moonShard", ore: "#cfe8ff", light: 40, pal: ["#3a3f52", "#4d5468", "#616a80"] };
+TILES[T.MOON_DEBRIS] = { name: "Moon debris", solid: true, hp: 35, pow: 0, tool: "pick", drop: "stone", falls: true, light: 20, pal: ["#4d5468", "#616a80", "#7a84a0"] };
 
 /* ------------------------------------------------------------------- walls */
 export const W = { NONE: 0, DIRT: 1, STONE: 2, WOOD: 3, STONE_BRICK: 4 };
@@ -132,6 +135,7 @@ export const ITEMS = {
   mushroom:   { name: "Glowshroom", type: "material", max: 999 },
   grinFragment: { name: "Grin fragment", type: "material", max: 99, desc: "A shard of the Grin Core. Someone's collecting these." },
   pepeScroll: { name: "Rare Pepe scroll", type: "material", max: 99, desc: "Rare. Once. Before the screenshots." },
+  moonShard: { name: "Doge Moon Shard", type: "material", max: 99, desc: "Glows faintly. Smells like the moon. Very ore." },
   /* tools */
   woodPick:   { name: "Wooden pick", type: "tool", tool: "pick", power: 35, speed: 3.4, dmg: 5 },
   copperPick: { name: "Copper pick", type: "tool", tool: "pick", power: 45, speed: 3.8, dmg: 6 },
