@@ -18,10 +18,19 @@ export const QUESTS = {
     ],
     reward: { items: [["lostGrin", 1]], announce: "🧌 Quest complete: the Lost Grin is yours." },
   },
+  pepeRecovery: {
+    title: "Rare Pepe Recovery",
+    npc: "Pepe Hermit",
+    intro: "The scrolls were rare once. Find 3 before they're screenshotted again.",
+    objectives: [
+      { type: "collect", id: "pepeScroll", n: 3, label: "Rare Pepe scrolls" },
+    ],
+    reward: { flags: ["doubleJump"], announce: "🐸 Quest complete: Frog Legs equipped — you can double jump now." },
+  },
 };
 
 /* Order matters for the UI's "up next" hint; not enforced mechanically. */
-export const QUEST_ORDER = ["lostGrin"];
+export const QUEST_ORDER = ["lostGrin", "pepeRecovery"];
 
 export function createQuestState() {
   return {
@@ -80,6 +89,9 @@ export function completeQuest(game, id) {
       const left = game.inventory.add(itemId, n);
       if (left > 0 && game.player) game.spawnDrop(game.player.cx, game.player.cy - 8, itemId, left);
     }
+  }
+  if (q.reward?.flags) {
+    for (const flag of q.reward.flags) game.flags[flag] = true;
   }
   game.sfx && game.sfx.fanfare();
   game.announce(q.reward?.announce || `📜 Quest complete: ${q.title}`);

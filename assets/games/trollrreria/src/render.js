@@ -322,6 +322,17 @@ export class Renderer {
         g.fillRect(px + 6, py + 5 + bob, 1, 1);
         break;
       }
+      case T.PEPE_SCROLL: {
+        /* a small rolled scroll, faint green glow so it reads in swamp fog */
+        g.fillStyle = "#d8c98a";
+        g.fillRect(px + 4, py + 6, 8, 5);
+        g.fillStyle = "#8a7a4a";
+        g.fillRect(px + 3, py + 6, 1, 5);
+        g.fillRect(px + 12, py + 6, 1, 5);
+        g.fillStyle = "#5f8f3a";
+        g.fillRect(px + 6, py + 8, 4, 1);
+        break;
+      }
       case T.PLANT: {
         g.fillStyle = "#4faf54";
         const h1 = 4 + Math.floor(hash2(wx, wy, 3) * 6);
@@ -383,14 +394,15 @@ export class Renderer {
         const i = ty * world.w + tx;
         const amt = world.liquid[i];
         if (!amt) continue;
-        const lava = world.liquidType[i] === 1;
+        const type = world.liquidType[i];
+        const lava = type === 1, sludge = type === 2;
         const hpx = (amt / 8) * TILE;
         const y = ty * TILE + (TILE - hpx);
-        ctx.fillStyle = lava ? "rgba(255,94,20,0.88)" : "rgba(38,108,220,0.55)";
+        ctx.fillStyle = lava ? "rgba(255,94,20,0.88)" : sludge ? "rgba(95,143,58,0.72)" : "rgba(38,108,220,0.55)";
         ctx.fillRect(tx * TILE, y, TILE, hpx);
         /* surface shimmer when the cell above is empty */
         if (amt >= 2 && (ty === 0 || world.liquid[i - world.w] === 0)) {
-          ctx.fillStyle = lava ? "rgba(255,214,90,0.8)" : "rgba(160,208,255,0.5)";
+          ctx.fillStyle = lava ? "rgba(255,214,90,0.8)" : sludge ? "rgba(180,214,120,0.6)" : "rgba(160,208,255,0.5)";
           ctx.fillRect(tx * TILE, y, TILE, 1.5);
         }
       }

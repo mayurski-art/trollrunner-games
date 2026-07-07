@@ -28,7 +28,7 @@ export const T = {
   DOOR_C: 19, DOOR_O: 20, PLATFORM: 21, HEART: 22, SHROOM: 23,
   BEDROCK: 24, OBSIDIAN: 25, PLANT: 26, BED: 27,
   LEVER: 28, PLATE: 29, DART_L: 30, DART_R: 31, TORCH_OFF: 32,
-  TROLLIUM: 33, GRIN_FRAG: 34,
+  TROLLIUM: 33, GRIN_FRAG: 34, MUD: 35, PEPE_SCROLL: 36,
   /* wires live on their own layer, not in T */
 };
 
@@ -71,6 +71,8 @@ TILES[T.DART_R]   = { name: "Dart trap", solid: true, hp: 160, pow: 0, tool: "pi
 TILES[T.TORCH_OFF] = { name: "Torch (out)", solid: false, hp: 5, pow: 0, tool: "pick", drop: "torch", noVariant: true };
 TILES[T.TROLLIUM] = { name: "Trollium ore", solid: true, hp: 300, pow: 80, tool: "pick", drop: "trolliumOre", ore: "#57e87a", light: 30, pal: ["#565a63", "#6e737d", "#848a94"] };
 TILES[T.GRIN_FRAG] = { name: "Grin fragment", solid: false, hp: 1, pow: 0, tool: "pick", drop: "grinFragment", light: 55, noVariant: true };
+TILES[T.MUD]      = { name: "Mud", solid: true, hp: 45, pow: 0, tool: "pick", drop: "dirt", pal: ["#3a3220", "#4a4028", "#5a4f30"] };
+TILES[T.PEPE_SCROLL] = { name: "Rare Pepe scroll", solid: false, hp: 1, pow: 0, tool: "pick", drop: "pepeScroll", light: 35, noVariant: true };
 
 /* ------------------------------------------------------------------- walls */
 export const W = { NONE: 0, DIRT: 1, STONE: 2, WOOD: 3, STONE_BRICK: 4 };
@@ -129,6 +131,7 @@ export const ITEMS = {
   bone:       { name: "Troll bone", type: "material", max: 999 },
   mushroom:   { name: "Glowshroom", type: "material", max: 999 },
   grinFragment: { name: "Grin fragment", type: "material", max: 99, desc: "A shard of the Grin Core. Someone's collecting these." },
+  pepeScroll: { name: "Rare Pepe scroll", type: "material", max: 99, desc: "Rare. Once. Before the screenshots." },
   /* tools */
   woodPick:   { name: "Wooden pick", type: "tool", tool: "pick", power: 35, speed: 3.4, dmg: 5 },
   copperPick: { name: "Copper pick", type: "tool", tool: "pick", power: 45, speed: 3.8, dmg: 6 },
@@ -253,6 +256,12 @@ export const ENEMIES = {
   bat:        { name: "Cave troll bat", ai: "flyer", hp: 22, dmg: 11, def: 1, w: 22, h: 16, color: "#8a6fb0", drops: [], kb: 1.1, erratic: true },
   skeleton:   { name: "Troll skeleton", ai: "walker", hp: 72, dmg: 19, def: 8, w: 22, h: 42, color: "#cfc9bd", drops: [["bone", 1, 3, 0.8]], kb: 0.6 },
   slimeKing:  { name: "Kingling slime", ai: "slime", hp: 30, dmg: 12, def: 3, w: 26, h: 18, color: "#e8b23c", drops: [["gel", 1, 2, 1]], kb: 0.9, noNatural: true },
+  /* Pepe Swamp */
+  copeSlime:  { name: "Cope Slime", ai: "slime", hp: 20, dmg: 9, def: 1, w: 26, h: 18, color: "#5f8f3a", drops: [["gel", 1, 2, 1]], kb: 1.0 },
+  fudPhantom: { name: "FUD Phantom", ai: "flyer", hp: 30, dmg: 13, def: 1, w: 24, h: 24, color: "#8a7fa8", drops: [["lens", 0, 1, 0.3]], kb: 0.9, erratic: true },
+  rugPullRat: { name: "Rug Pull Rat", ai: "ratRunner", hp: 18, dmg: 7, def: 0, w: 20, h: 14, color: "#a8875f", drops: [["gel", 0, 1, 0.3]], kb: 1.2 },
+  /* Rage Comic Ruins */
+  paperHandSkeleton: { name: "Paper Hand Skeleton", ai: "walker", hp: 55, dmg: 16, def: 3, w: 22, h: 42, color: "#e8e0c8", drops: [["bone", 1, 3, 0.8]], kb: 1.4 },
 };
 
 /* Boss knobs (classes live in boss.js). */

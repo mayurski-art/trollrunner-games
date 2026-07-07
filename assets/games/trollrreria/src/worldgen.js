@@ -16,18 +16,22 @@ export const DEEP_START = 650;
 export const BEDROCK_START = WORLD_H - 14;
 
 export function biomeAt(x, w) {
-  /* snow on the left quarter, desert on the right quarter, forest between */
-  if (x < w * 0.22) return "snow";
-  if (x > w * 0.78) return "desert";
-  return "forest";
+  /* snow on the far left, forest (Meme Meadow / spawn) centered, then
+     Pepe Swamp, then desert on the far right. Spawn sits at w/2, well
+     inside the forest band so a fresh world never starts in the swamp. */
+  const f = x / w;
+  if (f < 0.18) return "snow";
+  if (f < 0.62) return "forest";
+  if (f < 0.80) return "swamp";
+  return "desert";
 }
 
-/* Player-facing zone names for the area-title popup. forest is the
-   confirmed starting zone from the expansion doc; snow/desert keep
-   generic placeholder names until their own biome passes (Phases 3-6)
-   give them real meme identities. */
+/* Player-facing zone names for the area-title popup. forest + swamp are
+   confirmed per the expansion doc; snow/desert keep generic placeholder
+   names until their own biome passes give them real meme identities. */
 export const BIOME_NAMES = {
   forest: "Meme Meadow",
+  swamp: "Pepe Swamp",
   snow: "Frostbite Reach",
   desert: "Sunbaked Wastes",
 };
@@ -62,7 +66,7 @@ export function generateWorld(seed) {
       if (y >= BEDROCK_START) { tiles[i] = T.BEDROCK; continue; }
       let t;
       if (y < sy + dirtDepth && y < stoneY) {
-        t = biome === "desert" ? T.SAND : biome === "snow" ? T.SNOW : T.DIRT;
+        t = biome === "desert" ? T.SAND : biome === "snow" ? T.SNOW : biome === "swamp" ? T.MUD : T.DIRT;
         /* snow biome gets an ice shelf under the snow */
         if (biome === "snow" && y > sy + 8) t = T.ICE;
       } else {
@@ -120,6 +124,13 @@ export function generateWorld(seed) {
       carve(world, Math.round(cx), Math.round(cy), 2.2);
     }
   }
+
+  /* ------------------------------------------------ 3d. Rage Comic Ruins
+     A single hand-shaped room (not proc-noise like the caves above) so it
+     reads as a built structure: stone-brick perimeter, background wall,
+     a few loot chests. Carved AFTER the cave passes so tunnel noise can't
+     eat into its walls. Anchored under the swamp/desert boundary. */
+  carveRuins(world, rng, w);
 
   /* ------------------------------------------------ 4. ores */
   scatterOre(world, rng, T.COPPER, 950, STONE_START - 30, 560, 4, 9);
@@ -179,6 +190,19 @@ export function generateWorld(seed) {
     }
   }
 
+  /* ------------------------------------------------ 8b. swamp scrolls */
+  let lastScroll = -30;
+  for (let x = 8; x < w - 8; x++) {
+    if (biomeAt(x, w) !== "swamp") continue;
+    const sy = surface[x];
+    if (tiles[sy * w + x] !== T.MUD) continue;
+    if (tiles[(sy - 1) * w + x] !== T.AIR) continue;
+    if (x - lastScroll >= 22 && hash2(x, 83, seed) < 0.16) {
+      tiles[(sy - 1) * w + x] = T.PEPE_SCROLL;
+      lastScroll = x;
+    }
+  }
+
   /* ------------------------------------------------ 9. underground loot chests */
   let placedChests = 0, guard = 0;
   while (placedChests < 22 && guard++ < 4000) {
@@ -211,6 +235,45 @@ function carve(world, cx, cy, r) {
       world.tiles[y * w + x] = T.AIR;
     }
   }
+}
+
+/* A single hand-shaped underground room: stone-brick perimeter, wired
+   background walls, three loot chests. Anchored just under the swamp,
+   spanning into the desert-side stone so it never needs the swamp's own
+   surface tiles to exist. */
+function carveRuins(world, rng, w) {
+  const bandX0 = Math.floor(w * 0.60), bandX1 = Math.floor(w * 0.80);
+  const rw = 26, rh = 13;
+  const x0 = bandX0 + Math.floor(rng() * Math.max(1, bandX1 - bandX0 - rw));
+  const y0 = STONE_START + 50 + Math.floor(rng() * 50);
+  for (let y = y0; y < y0 + rh; y++) {
+    for (let x = x0; x < x0 + rw; x++) {
+      const edge = x === x0 || x === x0 + rw - 1 || y === y0 || y === y0 + rh - 1;
+      world.tiles[y * w + x] = edge ? T.STONE_BRICK : T.AIR;
+    }
+  }
+  for (let y = y0 + 1; y < y0 + rh - 1; y++) {
+    for (let x = x0 + 1; x < x0 + rw - 1; x++) world.walls[y * w + x] = W.STONE_BRICK;
+  }
+  for (let k = 0; k < 3; k++) {
+    const cx = x0 + 3 + Math.floor(rng() * (rw - 6));
+    const cy = y0 + rh - 2;
+    const i = cy * w + cx;
+    if (world.tiles[i] === T.AIR) {
+      world.tiles[i] = T.CHEST;
+      world.addChest(cx, cy, ruinsLootChest(rng));
+    }
+  }
+  return { x: x0, y: y0, w: rw, h: rh };
+}
+
+function ruinsLootChest(rng) {
+  const items = lootChest(rng, true);
+  if (rng() < 0.5) {
+    const slot = items.findIndex(s => !s);
+    if (slot >= 0) items[slot] = { id: "pepeScroll", n: 1 };
+  }
+  return items;
 }
 
 function scatterOre(world, rng, ore, veins, yMin, yMax, minSize, maxSize) {
@@ -251,7 +314,10 @@ function poolLiquid(world, cx, cy, r, type) {
   }
 }
 
-/* Fill surface depressions with water: scan local minima, flood sideways. */
+/* Fill surface depressions with water: scan local minima, flood sideways.
+   Puddles in the swamp are toxic sludge (liquidType 2) instead of water --
+   same flow sim (only lava, type 1, gets special-cased), just a different
+   color and a poison tick on the player instead of buoyancy-only. */
 function fillSurfaceWater(world, surface) {
   const w = world.w;
   for (let x = 2; x < w - 2; x++) {
@@ -259,12 +325,13 @@ function fillSurfaceWater(world, surface) {
     /* a dip: both sides higher ground (smaller y = higher) */
     if (surface[x - 1] < sy - 2 && findRightWall(surface, x, w)) {
       const level = Math.min(surface[x - 1], findRightWall(surface, x, w)) + 1;
+      const liquidType = biomeAt(x, w) === "swamp" ? 2 : 0;
       for (let y = level; y <= sy; y++) {
         for (let fx = x; fx < w - 2 && surface[fx] >= y; fx++) {
           const i = y * w + fx;
           if (world.tiles[i] === T.AIR && y >= level) {
             world.liquid[i] = 8;
-            world.liquidType[i] = 0;
+            world.liquidType[i] = liquidType;
             world.liquidActive.add(i);
           }
         }

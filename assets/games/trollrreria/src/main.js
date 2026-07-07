@@ -19,7 +19,7 @@ import { ItemDrop, DamageText, burst, Enemy, Projectile } from "./entities.js";
 import { UI } from "./ui.js";
 import { SFX } from "./audio.js";
 import { TrollKing, TrollEmperor } from "./boss.js";
-import { GuideTroll, MerchantTroll } from "./npc.js";
+import { GuideTroll, MerchantTroll, PepeHermit } from "./npc.js";
 import { findHouseNear } from "./housing.js";
 import {
   saveGame, loadSaveData, applyWorldLayers, clearSave,
@@ -184,6 +184,7 @@ class Game {
     this.cam.x = this.player.cx - 400;
     this.cam.y = this.player.cy - 260;
     this.spawnGuide();
+    this.spawnPepe();
     this.revealAround(this.player.cx, this.player.cy);
     if (this.ui) this.ui.dirtyInv();
   }
@@ -608,7 +609,7 @@ class Game {
 
     if (id === T.AIR || !def || def.hp === Infinity) return;
     /* soft deco breaks with anything */
-    const soft = id === T.PLANT || id === T.SHROOM || id === T.TORCH || id === T.GRIN_FRAG;
+    const soft = id === T.PLANT || id === T.SHROOM || id === T.TORCH || id === T.GRIN_FRAG || id === T.PEPE_SCROLL;
     if (!soft) {
       if (def.tool === "axe" && tool.tool !== "axe") return;
       if (def.tool === "pick" && tool.tool !== "pick") return;
@@ -1022,7 +1023,7 @@ class Game {
       /* must be off-screen */
       if (tx >= vx0 && tx <= vx1 && ty >= vy0 && ty <= vy1) continue;
 
-      const type = this.pickSpawnType(ty, st.isNight);
+      const type = this.pickSpawnType(ty, st.isNight, biomeAt(clamp(tx, 0, world.w - 1), world.w));
       if (!type) continue;
       const d = ENEMIES[type];
       const flyer = d.ai === "flyer";
@@ -1050,15 +1051,26 @@ class Game {
     }
   }
 
-  pickSpawnType(ty, isNight) {
+  pickSpawnType(ty, isNight, biome) {
     const r = Math.random();
+    if (biome === "swamp" && ty < 310) {
+      /* Pepe Swamp gets its own surface roster instead of the generic one */
+      if (!isNight) return r < 0.75 ? "copeSlime" : r < 0.95 ? "rugPullRat" : "slimeGreen";
+      return r < 0.5 ? "fudPhantom" : r < 0.8 ? "copeSlime" : "rugPullRat";
+    }
     if (ty < 310) {
       /* surface */
       if (!isNight) return r < 0.8 ? "slimeGreen" : "slimeBlue";
       if (this.trollMoon) return r < 0.6 ? "zombie" : "eye";
       return r < 0.5 ? "zombie" : r < 0.85 ? "eye" : "slimeBlue";
     }
-    if (ty < 650) return r < 0.5 ? "bat" : r < 0.8 ? "slimeBlue" : "skeleton";
+    /* Rage Comic Ruins live in the stone under the swamp/desert boundary --
+       reskin the mid-depth skeleton roll to match whoever's down there */
+    if (ty < 650) {
+      if (r < 0.5) return "bat";
+      if (r < 0.8) return "slimeBlue";
+      return biome === "swamp" || biome === "desert" ? "paperHandSkeleton" : "skeleton";
+    }
     return r < 0.45 ? "skeleton" : r < 0.8 ? "bat" : "slimeBlue";
   }
 
@@ -1076,6 +1088,25 @@ class Game {
       }
     }
     this.npcs.push(new GuideTroll(this.spawn.x, this.spawn.y + 1));
+  }
+
+  /* Place the Pepe Hermit somewhere along the swamp's surface. */
+  spawnPepe() {
+    const w = this.world;
+    let x0 = -1, x1 = -1;
+    for (let x = 0; x < w.w; x++) {
+      if (biomeAt(x, w.w) === "swamp") { if (x0 < 0) x0 = x; x1 = x; }
+    }
+    if (x0 < 0) return;
+    const sx = x0 + Math.floor((x1 - x0) * (0.3 + Math.random() * 0.4));
+    for (let dx = 0; dx < 40; dx++) {
+      const tx = sx + dx;
+      const ty = w.topSolid[clamp(tx, 0, w.w - 1)];
+      if (ty > 2 && ty < w.h - 2 && !w.isSolid(tx, ty - 1)) {
+        this.npcs.push(new PepeHermit(tx, ty));
+        return;
+      }
+    }
   }
 
   /* Use a summon item: wake a boss (night only, one at a time). */

@@ -5,7 +5,7 @@
 import {
   T, TILES, ITEMS, TILE, GRAVITY, MAX_FALL, PLAYER_W, PLAYER_H, REACH,
 } from "./defs.js";
-import { Entity } from "./entities.js";
+import { Entity, burst } from "./entities.js";
 import { getIcon } from "./icons.js";
 import { clamp } from "./util.js";
 
@@ -33,6 +33,7 @@ export class Player extends Entity {
     this.invuln = 0;
     this.regenWait = 0;
     this.coyote = 0; this.jumpBuf = 0;
+    this.airJumps = 0;         // Frog Legs unlock (game.flags.doubleJump)
     this.fallDist = 0;
     this.useTimer = 0;         // seconds until next use allowed
     this.swing = 0;            // 0..1 swing progress (visual)
@@ -108,13 +109,15 @@ export class Player extends Entity {
 
     const water = this.inLiquid(world, 0);
     const lava = this.inLiquid(world, 1);
+    const sludge = this.inLiquid(world, 2);
+    const wet = water || sludge;     // swamp sludge swims like water, just toxic
     const belowTy = Math.floor((this.y + this.h + 2) / TILE);
     const tileBelow = TILES[world.get(Math.floor(this.cx / TILE), belowTy)];
     const icy = this.onGround && tileBelow && tileBelow.slippery;
 
-    const accel = water ? 700 : 1250;
-    const fric = water ? 320 : icy ? 190 : this.onGround ? 1350 : 260;
-    const maxSpd = water ? 88 : 152;
+    const accel = wet ? 700 : 1250;
+    const fric = wet ? 320 : icy ? 190 : this.onGround ? 1350 : 260;
+    const maxSpd = wet ? 88 : 152;
 
     if (left && !right) { this.vx = Math.max(this.vx - accel * dt, -maxSpd); this.dir = -1; }
     else if (right && !left) { this.vx = Math.min(this.vx + accel * dt, maxSpd); this.dir = 1; }
@@ -127,7 +130,8 @@ export class Player extends Entity {
     /* -------- jumping / swimming */
     this.coyote = this.onGround ? 0.09 : Math.max(0, this.coyote - dt);
     this.jumpBuf = jumpHit ? 0.09 : Math.max(0, this.jumpBuf - dt);
-    if (water) {
+    if (this.onGround) this.airJumps = game.flags.doubleJump ? 1 : 0;
+    if (wet) {
       if (jumpKey) this.vy = Math.max(this.vy - 900 * dt, -130);
       this.vy = Math.min(this.vy + GRAVITY * 0.32 * dt, 120);
     } else {
@@ -135,6 +139,13 @@ export class Player extends Entity {
         this.vy = -548;
         this.coyote = 0; this.jumpBuf = 0;
         game.sfx && game.sfx.jump();
+      } else if (this.jumpBuf > 0 && this.airJumps > 0 && this.coyote <= 0) {
+        /* Frog Legs: one extra jump once coyote time is spent */
+        this.airJumps--;
+        this.vy = -500;
+        this.jumpBuf = 0;
+        game.sfx && game.sfx.jump();
+        burst(game, this.cx, this.y + this.h, "#5f8f3a", 8, { spread: 120, life: 0.3, gravity: 0.3 });
       }
       /* variable jump height (floor keeps tap-jumps useful on touch) */
       if (this.vy < -240 && !jumpKey) this.vy = -240;
@@ -143,8 +154,8 @@ export class Player extends Entity {
 
     /* -------- fall tracking + move */
     const fallingBefore = this.vy > 0 ? this.vy : 0;
-    if (this.vy > 0 && !water) this.fallDist += this.vy * dt;
-    if (water || lava) this.fallDist = 0;
+    if (this.vy > 0 && !wet) this.fallDist += this.vy * dt;
+    if (wet || lava) this.fallDist = 0;
     this.moveCollide(world, dt, true, drop);
     if (this.onGround) {
       if (this.fallDist > 9.5 * TILE && fallingBefore > 320) {
@@ -168,6 +179,7 @@ export class Player extends Entity {
       this._drown = 0;
     }
     if (lava) this.hurt(game, 24, "lava", this.cx - this.dir * 10);
+    if (sludge) this.hurt(game, 4, "the sludge", null);
 
     /* -------- regen */
     this.regenWait += dt;

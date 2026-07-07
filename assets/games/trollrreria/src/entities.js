@@ -1,7 +1,7 @@
 /* Trollrreria — world entities: item drops, particles, damage text,
    enemies, projectiles. (The Troll King boss lives in boss.js.) */
 
-import { TILE, ITEMS, ENEMIES, GRAVITY, MAX_FALL } from "./defs.js";
+import { T, TILE, ITEMS, ENEMIES, GRAVITY, MAX_FALL } from "./defs.js";
 import { getIcon } from "./icons.js";
 import { clamp, aabb, dist2 } from "./util.js";
 
@@ -224,6 +224,33 @@ export class Enemy extends Entity {
         this.vx = clamp(this.vx + toward * 900 * dt, -spd, spd);
         break;
       }
+      /* Rug Pull Rat: scurries in, yanks the ground tile out from under
+         the player, then flees for a couple seconds before it'll try
+         again. Never touches stone/bedrock -- only soft surface ground. */
+      case "ratRunner": {
+        if (this._fleeT > 0) {
+          this._fleeT -= dt;
+          this.dir = -toward;
+          this.vx = clamp(this.vx - toward * 1100 * dt, -95, 95);
+          if (this._fleeT <= 0) this._pulled = false;
+          break;
+        }
+        this.dir = toward;
+        this.vx = clamp(this.vx + toward * 700 * dt, -55, 55);
+        if (this.onGround && !this._pulled &&
+            Math.abs(p.cx - this.cx) < 18 && Math.abs(p.cy - this.cy) < 26) {
+          this._pulled = true;
+          this._fleeT = 2.2;
+          const tx = Math.floor(p.cx / TILE), ty = Math.floor((p.y + p.h + 2) / TILE);
+          const id = game.world.get(tx, ty);
+          if (id === T.MUD || id === T.DIRT) {
+            game.world.set(tx, ty, T.AIR);
+            game.floatText(p.cx, p.y - 10, "Rug pulled!", "#ff2d55");
+            game.sfx && game.sfx.tink(false);
+          }
+        }
+        break;
+      }
       case "flyer": {
         if (d.erratic && this.aiTimer <= 0) {
           this.aiTimer = 0.5 + Math.random() * 0.7;
@@ -299,6 +326,7 @@ export class Enemy extends Entity {
       case "slime": this.drawSlime(ctx, d); break;
       case "walker": this.drawWalker(ctx, d); break;
       case "flyer": d.erratic ? this.drawBat(ctx, d) : this.drawEye(ctx, d); break;
+      case "ratRunner": this.drawRat(ctx, d); break;
     }
     ctx.restore();
   }
@@ -386,6 +414,33 @@ export class Enemy extends Entity {
     ctx.beginPath(); ctx.arc(this.cx + this.dir * 4, this.cy, 5.5, 0, 7); ctx.fill();
     ctx.fillStyle = "#141414";
     ctx.beginPath(); ctx.arc(this.cx + this.dir * 5, this.cy, 2.6, 0, 7); ctx.fill();
+  }
+
+  drawRat(ctx, d) {
+    const scurry = Math.sin(this.wobble * 16) * 1.2;
+    /* low quadruped body + tail, always scuttling */
+    ctx.fillStyle = d.color;
+    ctx.fillRect(this.x + 2, this.y + 4 + scurry * 0.3, this.w - 4, this.h - 6);
+    ctx.fillStyle = "#8a6f4a";
+    const tailX = this.dir > 0 ? this.x : this.x + this.w;
+    ctx.beginPath();
+    ctx.moveTo(tailX, this.y + this.h - 5);
+    ctx.lineTo(tailX - this.dir * 10, this.y + this.h - 9 + scurry);
+    ctx.lineTo(tailX - this.dir * 10, this.y + this.h - 7 + scurry);
+    ctx.closePath();
+    ctx.fill();
+    /* legs */
+    ctx.fillStyle = "#6b5636";
+    ctx.fillRect(this.x + 3, this.y + this.h - 4, 3, 4 + Math.abs(scurry));
+    ctx.fillRect(this.x + this.w - 6, this.y + this.h - 4, 3, 4 - Math.abs(scurry));
+    /* troll grin, tiny */
+    const ex = this.cx + this.dir * 6;
+    ctx.fillStyle = "#1c1424";
+    ctx.fillRect(ex - 2, this.y + 3, 2, 2);
+    ctx.strokeStyle = "#1c1424"; ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(ex, this.y + 7, 3, 0.2, Math.PI - 0.2);
+    ctx.stroke();
   }
 
   drawBat(ctx, d) {
