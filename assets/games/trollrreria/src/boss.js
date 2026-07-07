@@ -316,3 +316,105 @@ export class TrollEmperor extends TrollKing {
     game.flags.emperorDown = true;
   }
 }
+
+/* ============================================================ THE RICKROLLER
+   Deep Web miniboss. A permanent, one-per-world guardian (not a night-only
+   summon) -- spawns once when the player first crosses into the Deep Web,
+   then sticks around until killed. Its gimmick: try to leave its arena
+   and it teleports YOU back, not the other way around. Never gonna let
+   you go. Drops the Whale Key (Quest 5) and an Anti-Bot Flame. */
+export class Rickroller extends Entity {
+  constructor(x, y) {
+    super(x - 26, y - 46, 52, 46);
+    this.boss = true;
+    this.name = "THE RICKROLLER";
+    this.questId = "whaleKey";
+    this.hp = this.maxHp = 900;
+    this.defense = 12;
+    this.hitFlash = 0;
+    this.dir = 1;
+    this.wobble = 0;
+    this.arena = { x, y };
+    this.arenaR = TILE * 22;
+    this.light = 70;
+  }
+
+  update(dt, game) {
+    const p = game.player;
+    this.hitFlash = Math.max(0, this.hitFlash - dt);
+    this.wobble += dt;
+    this.vy = Math.min(this.vy + GRAVITY * dt, MAX_FALL);
+
+    if (p && !p.dead) {
+      /* never gonna let you go: wandering too far from the arena warps
+         the PLAYER back to its edge instead of the boss giving chase */
+      const d = Math.hypot(p.cx - this.arena.x, p.cy - this.arena.y);
+      if (d > this.arenaR) {
+        const ang = Math.atan2(p.cy - this.arena.y, p.cx - this.arena.x);
+        p.x = this.arena.x + Math.cos(ang) * this.arenaR * 0.7 - p.w / 2;
+        p.y = this.arena.y + Math.sin(ang) * this.arenaR * 0.7 - p.h / 2;
+        p.vx = p.vy = 0;
+        game.floatText(p.cx, p.y - 10, "never gonna let you go", "#ff2d78");
+        game.sfx && game.sfx.summon();
+      }
+      this.dir = Math.sign(p.cx - this.cx) || 1;
+      const toward = Math.sign(p.cx - this.cx) || 1;
+      this.vx = clamp(this.vx + toward * 700 * dt, -80, 80);
+      if (this.onGround && Math.random() < 0.01) this.vy = -420;
+    }
+
+    const hit = this.moveCollide(game.world, dt);
+    if (hit.hitX && this.onGround) this.vy = -380;
+
+    if (p && !p.dead && aabb(this.box, p.box)) {
+      p.hurt(game, 22, "the Rickroller", this.cx);
+    }
+  }
+
+  hurt(game, dmg, fromX, knock = 0) {
+    const final = Math.max(1, Math.round(dmg - this.defense / 2 + (Math.random() * 2 - 1)));
+    this.hp -= final;
+    this.hitFlash = 0.12;
+    game.floatText(this.cx, this.y - 6, final, "#ff2d78");
+    game.sfx && game.sfx.squish();
+    if (this.hp <= 0) this.die(game);
+  }
+
+  die(game) {
+    if (this.dead) return;
+    this.dead = true;
+    burst(game, this.cx, this.cy, "#ff2d78", 30, { spread: 340 });
+    game.spawnDrop(this.cx, this.cy - 10, "whaleKey", 1);
+    game.spawnDrop(this.cx, this.cy - 10, "antiBotFlame", 1);
+    game.spawnDrop(this.cx, this.cy - 10, "trolliumBar", 4 + Math.floor(Math.random() * 6));
+    game.stats.bossKills++;
+    game.sfx && game.sfx.fanfare();
+    game.announce("📼 The Rickroller buffers... and dissolves. Never gonna give you up, though.");
+    if (this.questId) game.progressQuest && game.progressQuest("defeat", this.questId, 1);
+    game.recordProgress && game.recordProgress("boss");
+    void window.TrollrunnerAccounts?.awardXp?.("boss_kill", "trollrreria");
+  }
+
+  draw(ctx) {
+    ctx.save();
+    if (this.hitFlash > 0) ctx.filter = "brightness(2)";
+    const x = this.x, y = this.y, w = this.w, h = this.h;
+    /* a corrupted "video window" body -- glitchy screen with a play triangle */
+    ctx.fillStyle = "#1c1424";
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = "#ff2d78"; ctx.lineWidth = 2;
+    ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+    /* scanline glitch offset */
+    const glitch = Math.sin(this.wobble * 11) * 3;
+    ctx.fillStyle = "rgba(255,45,120,0.25)";
+    ctx.fillRect(x + glitch, y + h * 0.4, w, 3);
+    ctx.fillStyle = "#5ec8d8";
+    ctx.beginPath();
+    ctx.moveTo(this.cx - 8, this.cy - 10);
+    ctx.lineTo(this.cx - 8, this.cy + 10);
+    ctx.lineTo(this.cx + 10, this.cy);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+}

@@ -235,6 +235,26 @@ export class PepeHermit extends TownNPC {
   }
 }
 
+/* The Whale Oracle: Saylor-coded vault guardian. Camped near the desert's
+   far edge, close to (but safely above) the Whale Vault below. Gives the
+   Whale Key questline. */
+export class WhaleOracle extends TownNPC {
+  constructor(tx, ty) {
+    super(tx, ty, {
+      name: "Whale Oracle",
+      rig: "gladiatorTinkerer",
+      tint: "hue-rotate(230deg) saturate(1.3) brightness(0.95)",
+      tips: [
+        "Only diamond hands may enter the vault.",
+        "The Rickroller guards the key. It will not let you go easily.",
+        "I've held for cycles longer than you've been digging.",
+        "The vault doesn't care about your feelings. Neither do I.",
+      ],
+    });
+    this.tipIdx = 0;
+  }
+}
+
 /* The Rocket Tinkerer: eccentric engineer camped out in the Rocketyard.
    Gives the Fix the Rocket questline; completing it unlocks the pad
    pair (ground + sky island) for fast travel. */

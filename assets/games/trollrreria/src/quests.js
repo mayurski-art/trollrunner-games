@@ -45,10 +45,30 @@ export const QUESTS = {
     ],
     reward: { flags: ["rocketPad"], announce: "🚀 Quest complete: the rocket pads are live — hop between ground and sky." },
   },
+  whaleKey: {
+    title: "The Whale Key",
+    npc: "Whale Oracle",
+    intro: "Only diamond hands may enter the vault. Defeat the Rickroller in the Deep Web and the key is yours.",
+    objectives: [
+      { type: "defeat", id: "whaleKey", n: 1, label: "Defeat the Rickroller" },
+    ],
+    reward: { announce: "🐋 Quest complete: the Whale Key is yours. The vault awaits." },
+  },
+  /* No npc -- given by the Grin Core altar itself once the other five are
+     done, not by talking to anyone. See Game.useGrinAltar in main.js. */
+  grinCore: {
+    title: "Restore the Grin Core",
+    npc: null,
+    intro: "All five relics gathered. The altar hums.",
+    objectives: [
+      { type: "altar", id: "grinCore", n: 1, label: "Restore the Grin Core" },
+    ],
+    reward: { flags: ["grinCoreRestored"], announce: "🧌 THE GRIN IS RESTORED. ...the botnet just noticed." },
+  },
 };
 
 /* Order matters for the UI's "up next" hint; not enforced mechanically. */
-export const QUEST_ORDER = ["lostGrin", "pepeRecovery", "dogeMoon", "fixRocket"];
+export const QUEST_ORDER = ["lostGrin", "pepeRecovery", "dogeMoon", "fixRocket", "whaleKey", "grinCore"];
 
 export function createQuestState() {
   return {

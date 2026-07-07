@@ -353,6 +353,30 @@ export class Renderer {
         }
         break;
       }
+      case T.VAULT_DOOR: {
+        g.fillStyle = "#2a2f42";
+        g.fillRect(px, py, TILE, TILE);
+        g.strokeStyle = "#7a8cff"; g.lineWidth = 1;
+        g.strokeRect(px + 2, py + 2, TILE - 4, TILE - 4);
+        g.fillStyle = "#7a8cff";
+        g.fillRect(px + 7, py + 6, 2, 2);
+        g.fillRect(px + 7, py + 9, 2, 5);
+        break;
+      }
+      case T.GRIN_ALTAR: {
+        g.fillStyle = "#4a3f6b";
+        g.fillRect(px + 1, py + 8, TILE - 2, 8);
+        g.fillStyle = "#6b5a8f";
+        g.fillRect(px + 2, py + 8, TILE - 4, 2);
+        g.fillStyle = "#ffe08a";
+        g.fillRect(px + 5, py + 2, 6, 5);
+        g.fillStyle = "#1c1424";
+        g.fillRect(px + 6, py + 3, 1, 1);
+        g.fillRect(px + 9, py + 3, 1, 1);
+        g.strokeStyle = "#1c1424"; g.lineWidth = 1;
+        g.beginPath(); g.arc(px + 8, py + 5, 2, 0.2, Math.PI - 0.2); g.stroke();
+        break;
+      }
       case T.PLANT: {
         g.fillStyle = "#4faf54";
         const h1 = 4 + Math.floor(hash2(wx, wy, 3) * 6);

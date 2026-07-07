@@ -30,6 +30,7 @@ export const T = {
   LEVER: 28, PLATE: 29, DART_L: 30, DART_R: 31, TORCH_OFF: 32,
   TROLLIUM: 33, GRIN_FRAG: 34, MUD: 35, PEPE_SCROLL: 36,
   MOONROCK: 37, MOON_DEBRIS: 38, ROCKET_PART: 39, ROCKET_PAD: 40,
+  VAULT_DOOR: 41, GRIN_ALTAR: 42,
   /* wires live on their own layer, not in T */
 };
 
@@ -78,6 +79,8 @@ TILES[T.MOONROCK] = { name: "Moon rock", solid: true, hp: 190, pow: 45, tool: "p
 TILES[T.MOON_DEBRIS] = { name: "Moon debris", solid: true, hp: 35, pow: 0, tool: "pick", drop: "stone", falls: true, light: 20, pal: ["#4d5468", "#616a80", "#7a84a0"] };
 TILES[T.ROCKET_PART] = { name: "Rocket part", solid: false, hp: 1, pow: 0, tool: "pick", drop: "rocketPart", light: 25, noVariant: true };
 TILES[T.ROCKET_PAD] = { name: "Rocket pad", solid: false, hp: Infinity, noVariant: true, light: 60 };
+TILES[T.VAULT_DOOR] = { name: "Vault door", solid: true, hp: Infinity, noVariant: true, light: 30 };
+TILES[T.GRIN_ALTAR] = { name: "Grin Core altar", solid: true, hp: Infinity, noVariant: true, light: 90 };
 
 /* ------------------------------------------------------------------- walls */
 export const W = { NONE: 0, DIRT: 1, STONE: 2, WOOD: 3, STONE_BRICK: 4 };
@@ -139,6 +142,8 @@ export const ITEMS = {
   pepeScroll: { name: "Rare Pepe scroll", type: "material", max: 99, desc: "Rare. Once. Before the screenshots." },
   moonShard: { name: "Doge Moon Shard", type: "material", max: 99, desc: "Glows faintly. Smells like the moon. Very ore." },
   rocketPart: { name: "Rocket part", type: "material", max: 99, desc: "Salvaged from a prototype. Probably fine." },
+  whaleKey: { name: "Whale Key", type: "material", max: 5, desc: "Only diamond hands may enter the vault. Opens the Whale Vault door." },
+  antiBotFlame: { name: "Anti-Bot Flame", type: "material", max: 5, desc: "Burns cleaner than any real fire. Doesn't like bots." },
   /* tools */
   woodPick:   { name: "Wooden pick", type: "tool", tool: "pick", power: 35, speed: 3.4, dmg: 5 },
   copperPick: { name: "Copper pick", type: "tool", tool: "pick", power: 45, speed: 3.8, dmg: 6 },

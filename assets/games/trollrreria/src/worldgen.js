@@ -35,13 +35,15 @@ export const BIOME_NAMES = {
   snow: "Frostbite Reach",
   desert: "Sunbaked Wastes",
   moonMines: "Doge Moon Mines",
+  deepweb: "The Deep Web",
 };
 
 /* Depth-layered zone at a tile position: the mid-depth stone band reads
-   as the Doge Moon Mines regardless of which surface biome is overhead,
-   same way real caves don't care what's growing up top. Falls back to
-   the surface biome above that band. */
+   as the Doge Moon Mines, the deepest band as The Deep Web, regardless of
+   which surface biome is overhead -- same way real caves don't care what's
+   growing up top. Falls back to the surface biome above both bands. */
 export function zoneAt(tx, ty, w) {
+  if (ty >= DEEP_START) return "deepweb";
   if (ty >= STONE_START) return "moonMines";
   return biomeAt(tx, w);
 }
@@ -143,6 +145,11 @@ export function generateWorld(seed) {
      eat into its walls. Anchored under the swamp/desert boundary. */
   carveRuins(world, rng, w);
 
+  /* ------------------------------------------------ 3e. Whale Vault
+     Sealed with a VAULT_DOOR that only opens for a Whale Key (Quest 5).
+     Deep, near the world's edge -- the game's actual late-game corner. */
+  carveVault(world, rng, w);
+
   /* ------------------------------------------------ 4. ores */
   scatterOre(world, rng, T.COPPER, 950, STONE_START - 30, 560, 4, 9);
   scatterOre(world, rng, T.IRON, 700, 380, DEEP_START, 4, 8);
@@ -235,6 +242,16 @@ export function generateWorld(seed) {
     }
   }
 
+  /* ------------------------------------------------ 8b2. the Grin Core altar
+     A few tiles from spawn (opposite the rocket ground pad) -- the finale
+     turn-in point for Quest 6, always reachable from the very first
+     minute of a new world. */
+  {
+    const ax = spawnX + 6;
+    const ay = surface[ax] - 1;
+    tiles[ay * w + ax] = T.GRIN_ALTAR;
+  }
+
   /* ------------------------------------------------ 8c. Rocketyard parts */
   let lastPart = -30;
   for (let x = 8; x < w - 8; x++) {
@@ -315,6 +332,49 @@ function carveRuins(world, rng, w) {
     }
   }
   return { x: x0, y: y0, w: rw, h: rh };
+}
+
+/* The Whale Vault: same hand-shaped-room trick as the Ruins, but sealed --
+   one wall tile is a VAULT_DOOR instead of stone brick, and it only opens
+   for someone holding a Whale Key (see Game.useVaultDoor). Anchored deep
+   and far out near the map edge, past the desert, so reaching it is its
+   own late-game trek. */
+function carveVault(world, rng, w) {
+  const rw = 22, rh = 12;
+  const x0 = w - 60 - Math.floor(rng() * 20);
+  const y0 = BEDROCK_START - 40 - rh;
+  for (let y = y0; y < y0 + rh; y++) {
+    for (let x = x0; x < x0 + rw; x++) {
+      const edge = x === x0 || x === x0 + rw - 1 || y === y0 || y === y0 + rh - 1;
+      world.tiles[y * w + x] = edge ? T.STONE_BRICK : T.AIR;
+    }
+  }
+  for (let y = y0 + 1; y < y0 + rh - 1; y++) {
+    for (let x = x0 + 1; x < x0 + rw - 1; x++) world.walls[y * w + x] = W.STONE_BRICK;
+  }
+  /* the door sits in the left wall, mid-height */
+  world.tiles[(y0 + Math.floor(rh / 2)) * w + x0] = T.VAULT_DOOR;
+  for (let k = 0; k < 4; k++) {
+    const cx = x0 + 3 + Math.floor(rng() * (rw - 6));
+    const cy = y0 + rh - 2;
+    const i = cy * w + cx;
+    if (world.tiles[i] === T.AIR) {
+      world.tiles[i] = T.CHEST;
+      world.addChest(cx, cy, vaultLootChest(rng));
+    }
+  }
+}
+
+function vaultLootChest(rng) {
+  const items = new Array(24).fill(null);
+  let slot = 0;
+  const add = (id, n) => { if (slot < 24) items[slot++] = { id, n }; };
+  add("trolliumBar", 6 + Math.floor(rng() * 8));
+  add("goldBar", 8 + Math.floor(rng() * 10));
+  if (rng() < 0.6) add("trolliumSword", 1);
+  if (rng() < 0.5) add("trolliumChest", 1);
+  add("trollBrew", 2 + Math.floor(rng() * 3));
+  return items;
 }
 
 function ruinsLootChest(rng) {

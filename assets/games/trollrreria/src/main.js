@@ -18,8 +18,8 @@ import { Inventory } from "./inventory.js";
 import { ItemDrop, DamageText, burst, Enemy, Projectile } from "./entities.js";
 import { UI } from "./ui.js";
 import { SFX } from "./audio.js";
-import { TrollKing, TrollEmperor } from "./boss.js";
-import { GuideTroll, MerchantTroll, PepeHermit, RocketTinkerer } from "./npc.js";
+import { TrollKing, TrollEmperor, Rickroller } from "./boss.js";
+import { GuideTroll, MerchantTroll, PepeHermit, RocketTinkerer, WhaleOracle } from "./npc.js";
 import { findHouseNear } from "./housing.js";
 import {
   saveGame, loadSaveData, applyWorldLayers, clearSave,
@@ -188,6 +188,7 @@ class Game {
     this.spawnGuide();
     this.spawnPepe();
     this.spawnRocketTinkerer();
+    this.spawnWhaleOracle();
     this.revealAround(this.player.cx, this.player.cy);
     if (this.ui) this.ui.dirtyInv();
   }
@@ -454,6 +455,27 @@ class Game {
         this._lastBiome = zone;
         if (this._announcedBiome) this.ui && this.ui.showAreaTitle(BIOME_NAMES[zone] || zone);
         this._announcedBiome = true;
+      }
+      /* the Rickroller guards the Deep Web -- one permanent spawn per
+         world, the first time anyone actually reaches that depth. Searches
+         for solid footing near the player rather than dropping it blind,
+         same idea as debugSpawn(). */
+      if (zone === "deepweb" && !this.flags.rickrollerSpawned) {
+        this.flags.rickrollerSpawned = true;
+        const ptx = Math.floor(this.player.cx / TILE), pty = Math.floor(this.player.cy / TILE);
+        outer: for (let dx = 6; dx <= 16; dx++) {
+          for (const dir of [1, -1]) {
+            const tx = ptx + dir * dx;
+            for (let y = pty - 6; y < pty + 10; y++) {
+              if (!this.world.isSolid(tx, y) && !this.world.isSolid(tx, y - 1) &&
+                  !this.world.isSolid(tx, y - 2) && this.world.isSolid(tx, y + 1)) {
+                this.enemies.push(new Rickroller(tx * TILE + 8, (y + 1) * TILE));
+                this.announce("📼 Something's buffering in the dark...");
+                break outer;
+              }
+            }
+          }
+        }
       }
     }
 
@@ -849,6 +871,14 @@ class Game {
       this.useRocketPad(m.tx, m.ty);
       return;
     }
+    if (id === T.VAULT_DOOR) {
+      this.useVaultDoor(m.tx, m.ty);
+      return;
+    }
+    if (id === T.GRIN_ALTAR) {
+      this.useGrinAltar(m.tx, m.ty);
+      return;
+    }
     if (id === T.BED) {
       this.spawn = { x: m.tx, y: m.ty - 1 };
       this.floatText(m.tx * TILE + 8, m.ty * TILE - 8, "Spawn set 🛏", "#57bd5c");
@@ -1113,6 +1143,13 @@ class Game {
     this.spawnNpcInBiome("desert", (tx, ty) => new RocketTinkerer(tx, ty));
   }
 
+  /* Place the Whale Oracle somewhere along the desert's surface too --
+     the Vault itself is deep underground near the map edge, but its
+     quest-giver stays reachable up top like everyone else. */
+  spawnWhaleOracle() {
+    this.spawnNpcInBiome("desert", (tx, ty) => new WhaleOracle(tx, ty));
+  }
+
   /* Shared search: find a safe surface spot somewhere in the given biome
      band and drop the NPC there. */
   spawnNpcInBiome(biome, make) {
@@ -1155,6 +1192,37 @@ class Game {
     burst(this, p.cx, p.y + p.h, "#5ec8d8", 16, { spread: 260, up: 160 });
     this.sfx && this.sfx.summon();
     this.announce(atGround ? "🚀 To the sky!" : "🚀 Touchdown!");
+  }
+
+  /* Whale Vault door: needs a Whale Key (Quest 5's reward from the
+     Rickroller). Opens once, permanently -- no reason to re-lock it. */
+  useVaultDoor(tx, ty) {
+    if (this.inventory.count("whaleKey") < 1) {
+      this.floatText(tx * TILE + 8, ty * TILE - 10, "Needs a Whale Key", "#9a92b8");
+      return;
+    }
+    this.inventory.consume("whaleKey", 1);
+    this.world.set(tx, ty, T.AIR);
+    this.floatText(tx * TILE + 8, ty * TILE - 10, "Vault opened", "#7a8cff");
+    this.sfx && this.sfx.door();
+    this.ui && this.ui.dirtyInv();
+  }
+
+  /* Grin Core altar: the finale turn-in. Needs quests 1-5 done first;
+     completing it here (not via an NPC) is what starts + finishes
+     Quest 6 in one interaction. */
+  useGrinAltar(tx, ty) {
+    const prereqs = ["lostGrin", "pepeRecovery", "dogeMoon", "fixRocket", "whaleKey"];
+    if (this.questIsDone("grinCore")) {
+      this.floatText(tx * TILE + 8, ty * TILE - 10, "The grin is already restored", "#57bd5c");
+      return;
+    }
+    if (!prereqs.every(id => this.questIsDone(id))) {
+      this.floatText(tx * TILE + 8, ty * TILE - 10, "The altar needs the other relics first", "#9a92b8");
+      return;
+    }
+    if (!this.quests.progress.grinCore) this.startQuest("grinCore");
+    this.progressQuest("altar", "grinCore", 1);
   }
 
   /* Use a summon item: wake a boss (night only, one at a time). */
