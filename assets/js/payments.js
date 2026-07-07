@@ -110,6 +110,14 @@
     const real = realPaymentsLive();
     if (!real && !mockEnabled()) return { ok: false, reason: "unavailable", message: "Payments are disabled." };
 
+    // The Troll Runner's own account never pays for in-game purchases (see
+    // troll-pay.js's matching admin bypass, which this mirrors for the Phase 10
+    // facade). Skips the confirm screen and wallet entirely.
+    if (window.TrollPay && window.TrollPay.isAdminBypass && window.TrollPay.isAdminBypass()) {
+      if (window.TrollBackend) window.TrollBackend.record("payment_admin_bypass", { action, token, amount, amountUsd });
+      return { ok: true, free: true, txSig: "ADMIN_BYPASS", intentId: null, action, token, amount, amountUsd };
+    }
+
     const amountLabel = amount != null ? fmtAmount(amount, token)
                         : amountUsd != null ? `$${Number(amountUsd).toFixed(2)} in ${token}` : `— ${token}`;
     const networkLabel = real ? `Solana ${config.network}` : "Mock (no network)";

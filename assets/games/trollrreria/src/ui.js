@@ -132,8 +132,9 @@ export class UI {
     });
     document.getElementById("btn-store-back").addEventListener("click", () => this.showScreens({ pause: true }));
     this.el.btnRevive.addEventListener("click", async () => {
+      const admin = window.TrollPay && window.TrollPay.isAdminBypass && window.TrollPay.isAdminBypass();
       this.el.btnRevive.disabled = true;
-      this.el.btnRevive.textContent = "Connecting…";
+      this.el.btnRevive.textContent = admin ? "Reviving…" : "Connecting…";
       this.el.reviveStatus.textContent = "";
       const res = await buyRevive(game);
       if (!res.ok) {
@@ -190,11 +191,17 @@ export class UI {
        a guest/offline visitor just gets the free respawn-at-spawn as before,
        which keeps happening on its own timer either way */
     const canPay = !!window.TrollPay;
+    const admin = canPay && window.TrollPay.isAdminBypass && window.TrollPay.isAdminBypass();
     this.el.btnRevive.hidden = !canPay;
     if (canPay) {
-      const cfg = window.TROLL_PAY_CONFIG || {};
-      const price = ((cfg.REVIVE_PRICE_USD || 0.69) * (1 + (cfg.TAX_RATE || 0))).toFixed(2);
-      this.el.reviveCost.textContent = "$" + price;
+      // The owner's account never sees a price — just a free revive.
+      if (admin) {
+        this.el.reviveCost.textContent = "";
+      } else {
+        const cfg = window.TROLL_PAY_CONFIG || {};
+        const price = ((cfg.REVIVE_PRICE_USD || 0.69) * (1 + (cfg.TAX_RATE || 0))).toFixed(2);
+        this.el.reviveCost.textContent = "$" + price;
+      }
       this.el.reviveStatus.textContent = "";
       this.el.btnRevive.disabled = false;
       this.el.btnRevive.textContent = "🧌 Revive here";

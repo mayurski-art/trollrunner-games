@@ -52,12 +52,15 @@ export class ReviveController {
   }
 
   TP() { return window.TrollPay; }
+  isAdmin() { const TP = this.TP(); return !!(TP && TP.isAdminBypass && TP.isAdminBypass()); }
   mobilePay() { const TP = this.TP(); return !!(TP && TP.shouldUseSolanaPay && TP.shouldUseSolanaPay()); }
   token() { const TP = this.TP(); return (TP && TP.getToken()) || 'USDC'; }
   priceUsd() { return (window.TROLL_PAY_CONFIG && window.TROLL_PAY_CONFIG.REVIVE_PRICE_USD) || 0.69; }
   taxRate() { return (window.TROLL_PAY_CONFIG && window.TROLL_PAY_CONFIG.TAX_RATE) || 0.069; }
   totalUsd() { return this.priceUsd() * (1 + this.taxRate()); }
+  // The owner's account never sees a price or token choice — just a free revive.
   costText() {
+    if (this.isAdmin()) return '';
     const total = this.totalUsd();
     return this.token() === 'TROLL' ? `$${total.toFixed(2)} in $TROLL` : `${total.toFixed(2)} USDC`;
   }
@@ -73,6 +76,7 @@ export class ReviveController {
     if (this.dom.ready) this.dom.ready.hidden = true;
     this.setStatus('');
     this.refreshCost();
+    if (this.dom.payTokenPicker) this.dom.payTokenPicker.hidden = this.isAdmin();
     if (this.dom.button) {
       if (this.mobilePay()) { this.dom.button.disabled = false; this.dom.button.textContent = 'Preparing…'; }
       else { this.dom.button.disabled = false; this.dom.button.textContent = '🧌 Revive'; }
@@ -146,13 +150,14 @@ export class ReviveController {
       return;
     }
 
+    const admin = this.isAdmin();
     this.phase = 'paying';
     this.dom.button.disabled = true;
-    this.dom.button.textContent = 'Connect wallet…';
+    this.dom.button.textContent = admin ? 'Reviving…' : 'Connect wallet…';
     this.setStatus('');
     const res = await TP.pay({
       amountUsd: this.priceUsd(), taxRate: this.taxRate(), token, memo: REVIVE_MEMO,
-      onProgress: (ev) => {
+      onProgress: admin ? null : (ev) => {
         if (ev.stage === 'connecting') this.dom.button.textContent = 'Connect wallet…';
         else if (ev.stage === 'building') this.dom.button.textContent = 'Building tx…';
         else if (ev.stage === 'awaiting') this.dom.button.textContent = 'Confirm in Phantom…';
