@@ -315,6 +315,8 @@ export class Player extends Entity {
     this.regenWait = 0;
     game.floatText(this.cx, this.y - 4, final, "#ff4d5e");
     game.sfx && game.sfx.hurt();
+    game.triggerHitPause && game.triggerHitPause(0.04);
+    game.triggerShake && game.triggerShake(3 + Math.min(4, final / 6), 0.15);
     if (fromX !== null && fromX !== undefined) {
       this.vx = Math.sign(this.cx - fromX) * 210;
       this.vy = Math.min(this.vy, -170);

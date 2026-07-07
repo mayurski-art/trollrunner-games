@@ -7,6 +7,8 @@
    Quest state lives in game.quests and rides along in the normal save
    file (see save.js), same as inventory — progress survives exit. */
 
+import { burst } from "./entities.js";
+
 export const QUESTS = {
   lostGrin: {
     title: "Find the Lost Grin",
@@ -137,6 +139,11 @@ export function completeQuest(game, id) {
   game.sfx && game.sfx.fanfare();
   game.announce(q.reward?.announce || `📜 Quest complete: ${q.title}`);
   game.ui && game.ui.dirtyQuest && game.ui.dirtyQuest();
+  /* fanfare: reuse the same big-text flash the area-title popup uses,
+     plus a gold burst at the player -- a quest completing should feel
+     like a bigger deal than a floating damage number */
+  if (game.player) burst(game, game.player.cx, game.player.cy - 10, "#ffb300", 22, { spread: 260, up: 160, glow: true });
+  game.ui && game.ui.showAreaTitle && game.ui.showAreaTitle("QUEST COMPLETE");
   void window.TrollrunnerAccounts?.awardXp?.("quest_complete", "trollrreria");
 }
 

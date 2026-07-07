@@ -115,6 +115,8 @@ export class TrollKing extends Entity {
     this.hitFlash = 0.12;
     game.floatText(this.cx + (Math.random() - 0.5) * 30, this.y - 6, final, "#ff9500");
     game.sfx && game.sfx.squish();
+    game.triggerHitPause && game.triggerHitPause(0.035);
+    game.triggerShake && game.triggerShake(2.5, 0.1);
     if (this.hp <= 0) this.die(game);
   }
 
@@ -123,6 +125,8 @@ export class TrollKing extends Entity {
     this.dead = true;
     burst(game, this.cx, this.cy, "#e8e4da", 40, { spread: 420, up: 300 });
     burst(game, this.cx, this.cy, "#ffb300", 24, { spread: 340 });
+    game.triggerHitPause && game.triggerHitPause(0.09);
+    game.triggerShake && game.triggerShake(9, 0.35);
     for (const [id, min, max, chance] of this.dropsTable) {
       if (Math.random() < chance) {
         const n = min + Math.floor(Math.random() * (max - min + 1));
@@ -377,6 +381,8 @@ export class Rickroller extends Entity {
     this.hitFlash = 0.12;
     game.floatText(this.cx, this.y - 6, final, "#ff2d78");
     game.sfx && game.sfx.squish();
+    game.triggerHitPause && game.triggerHitPause(0.035);
+    game.triggerShake && game.triggerShake(2.5, 0.1);
     if (this.hp <= 0) this.die(game);
   }
 
@@ -384,6 +390,8 @@ export class Rickroller extends Entity {
     if (this.dead) return;
     this.dead = true;
     burst(game, this.cx, this.cy, "#ff2d78", 30, { spread: 340 });
+    game.triggerHitPause && game.triggerHitPause(0.09);
+    game.triggerShake && game.triggerShake(9, 0.35);
     game.spawnDrop(this.cx, this.cy - 10, "whaleKey", 1);
     game.spawnDrop(this.cx, this.cy - 10, "antiBotFlame", 1);
     game.spawnDrop(this.cx, this.cy - 10, "trolliumBar", 4 + Math.floor(Math.random() * 6));

@@ -66,6 +66,8 @@ class Game {
     this.fps = 0;
     this._fpsAcc = 0; this._fpsN = 0;
     this._wallProg = { idx: -1, t: 0 };
+    this.hitPause = 0;              // seconds of freeze-frame remaining
+    this.shake = { t: 0, mag: 0 };  // screen shake: remaining time + magnitude
 
     this._autosaveAcc = 0;
     this._exploreAcc = 0;
@@ -373,14 +375,24 @@ class Game {
   frame(now) {
     const raw = Math.min(0.1, (now - this._last) / 1000);
     this._last = now;
-    this._acc += raw;
-    while (this._acc >= FIXED_DT) {
-      this.update(FIXED_DT);
-      this._acc -= FIXED_DT;
-      /* one-shot input (pressed/clicked/wheel) must not repeat across
-         multiple fixed steps within a single frame */
-      this.input.flush();
+    /* hit-pause: a brief freeze-frame on impactful hits. Skips physics
+       for its duration but keeps rendering, so the game visibly holds on
+       the hit instead of just continuing -- kept short (tens of ms) and
+       gated to real impacts (see triggerHitPause callers) so it reads as
+       weight, not lag. */
+    if (this.hitPause > 0) {
+      this.hitPause = Math.max(0, this.hitPause - raw);
+    } else {
+      this._acc += raw;
+      while (this._acc >= FIXED_DT) {
+        this.update(FIXED_DT);
+        this._acc -= FIXED_DT;
+        /* one-shot input (pressed/clicked/wheel) must not repeat across
+           multiple fixed steps within a single frame */
+        this.input.flush();
+      }
     }
+    if (this.shake.t > 0) this.shake.t = Math.max(0, this.shake.t - raw);
     this.render();
 
     this._fpsAcc += raw; this._fpsN++;
@@ -1335,10 +1347,22 @@ class Game {
     this.entities.push(new DamageText(x, y, text, color));
   }
 
+  /* Game-feel: brief freeze-frame + camera shake for impactful hits.
+     Durations/magnitudes are deliberately small -- see the note in
+     frame() about this reading as weight, not lag. */
+  triggerHitPause(dur = 0.03) {
+    this.hitPause = Math.max(this.hitPause, dur);
+  }
+
+  triggerShake(mag = 3, dur = 0.12) {
+    if (mag >= this.shake.mag) this.shake = { t: dur, mag };
+  }
+
   onPlayerDeath(cause) {
     this.deathTimer = 4;
     burst(this, this.player.cx, this.player.cy, "#e8e4da", 18, { spread: 260 });
     this.sfx && this.sfx.death();
+    this.triggerShake(8, 0.3);
     this.recordProgress("death");
     if (this.ui) this.ui.showDeath(cause);
   }
@@ -1384,6 +1408,14 @@ class Game {
   render() {
     const ctx = this.ctx;
     const sw = this.canvas.width, sh = this.canvas.height;
+    /* screen shake: jitter the real camera for this frame only, restored
+       at the end -- update() (which runs separately, before render()) is
+       never aware of it, so it can't drift the actual game camera */
+    const trueCamX = this.cam.x, trueCamY = this.cam.y;
+    if (this.shake.t > 0) {
+      this.cam.x += (Math.random() - 0.5) * 2 * this.shake.mag;
+      this.cam.y += (Math.random() - 0.5) * 2 * this.shake.mag;
+    }
     const cam = this.cam;
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -1431,6 +1463,9 @@ class Game {
 
     this.drawHover(ctx);
     if (this.debug) this.drawDebug(ctx);
+
+    this.cam.x = trueCamX;
+    this.cam.y = trueCamY;
   }
 
   drawHover(ctx) {

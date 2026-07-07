@@ -106,6 +106,7 @@ export class ItemDrop extends Entity {
             game.sfx && game.sfx.pickup();
             game.ui && game.ui.dirtyInv();
             game.progressQuest && game.progressQuest("collect", this.item, this.n - left);
+            burst(game, this.cx, this.cy, "#ffe08a", 5, { life: 0.25, spread: 90, up: 40, glow: true });
           }
           if (left <= 0) { this.dead = true; return; }
           this.n = left;
@@ -287,6 +288,7 @@ export class Enemy extends Entity {
     this.hitFlash = 0.15;
     game.floatText(this.cx, this.y - 4, final, "#ffb300");
     game.sfx && game.sfx.squish();
+    game.triggerHitPause && game.triggerHitPause(0.025);
     if (fromX !== null && fromX !== undefined) {
       this.vx = Math.sign(this.cx - fromX) * 190 * this.def.kb * knock;
       this.vy = Math.min(this.vy, -150 * this.def.kb);
