@@ -814,10 +814,23 @@ export class UI {
     const rows = inv.visibleRecipes(this.stations);
     const list = this.el.craftList;
     list.innerHTML = "";
+    if (this.stations.has("furnace")) {
+      const fuel = this.game.flags.furnaceFuel;
+      const status = this.game.smeltCooldown > 0 ? "🔥 smelting…"
+        : fuel > 0 ? `🔥 lit — ${Math.ceil(fuel)}s fuel left`
+        : "🔥 unlit — smelting will use 1 wood";
+      const bar = document.createElement("div");
+      bar.className = "cr-ing";
+      bar.style.padding = "4px 6px";
+      bar.textContent = status;
+      list.appendChild(bar);
+    }
     for (const { recipe, can } of rows) {
       const def = ITEMS[recipe.out];
+      const isFurnace = recipe.station === "furnace";
+      const fuelOk = !isFurnace || this.game.flags.furnaceFuel > 0 || inv.count("wood") >= 1;
       const row = document.createElement("div");
-      row.className = "craft-row" + (can ? "" : " cant");
+      row.className = "craft-row" + (can && fuelOk ? "" : " cant");
       const cv = document.createElement("canvas");
       cv.width = 32; cv.height = 32;
       cv.getContext("2d").drawImage(getIcon(recipe.out), 0, 0);
@@ -832,6 +845,17 @@ export class UI {
       row.appendChild(txt);
       row.addEventListener("mousedown", e => {
         e.stopPropagation();
+        if (isFurnace) {
+          const result = this.game.tryFurnaceCraft(recipe, this.stations);
+          if (result.ok) {
+            const s = this.game.sfx;
+            if (s) s.craft();
+            this.dirtyInv();
+          } else if (result.reason) {
+            this.game.announce && this.game.announce(result.reason);
+          }
+          return;
+        }
         if (inv.craft(recipe, this.stations)) {
           const s = this.game.sfx;
           if (s) s.craft();

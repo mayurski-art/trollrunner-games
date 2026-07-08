@@ -6,7 +6,7 @@
 
 import {
   T, TILES, W, ITEMS, ENEMIES, TILE, ZOOM, CYCLE, DAY_LEN, WORLD_W, WORLD_H, CROP_GROW_TIME,
-  REACH, STATION_SCAN, STARTER_ITEMS,
+  REACH, STATION_SCAN, STARTER_ITEMS, FUEL, SMELT_TIME,
 } from "./defs.js";
 import { hashStr, clamp, lerp, fmtClock, aabb, dist2 } from "./util.js";
 import { generateWorld, biomeAt, zoneAt, BIOME_NAMES, STONE_START, DEEP_START } from "./worldgen.js";
@@ -183,7 +183,8 @@ class Game {
     this.dayCount = 1;
     this.trollMoon = false;
     this.stats = { blocksMined: 0, deepest: 0, bossKills: 0, playSec: 0 };
-    this.flags = { bossDown: false, character: character || "prospector" };
+    this.flags = { bossDown: false, character: character || "prospector", furnaceFuel: 0 };
+    this.smeltCooldown = 0;
     this.quests = createQuestState();
     this._recorded = { blocksMined: 0, bossKills: 0 };
     this.explored = new Uint8Array((WORLD_W >> 2) * (WORLD_H >> 2));
@@ -439,6 +440,10 @@ class Game {
       }
     }
     this.stats.playSec += dt;
+    /* a lit furnace keeps burning in real time, whether or not you're
+       actively smelting -- same as a real fire */
+    if (this.flags.furnaceFuel > 0) this.flags.furnaceFuel = Math.max(0, this.flags.furnaceFuel - dt);
+    if (this.smeltCooldown > 0) this.smeltCooldown = Math.max(0, this.smeltCooldown - dt);
     this.updateSpawns(dt);
     this.updateAnimalSpawns(dt);
     this.world.tickGrowth(dt);
@@ -808,6 +813,25 @@ class Game {
     const world = this.world;
     if (world.getWall(tx, ty) !== W.NONE) return true;
     return world.isSolid(tx - 1, ty) || world.isSolid(tx + 1, ty) || world.isSolid(tx, ty + 1);
+  }
+
+  /* Craft a furnace recipe with real fuel: burns wood over time instead of
+     smelting for free/instantly. Auto-refuels from wood in the bag when the
+     furnace runs cold; each individual craft still takes SMELT_TIME on top
+     of that, gated by smeltCooldown, so output isn't instant even lit.
+     Returns { ok, reason } -- reason is set on failure for UI feedback. */
+  tryFurnaceCraft(recipe, stations) {
+    const inv = this.inventory;
+    if (this.smeltCooldown > 0) return { ok: false, reason: "smelting…" };
+    if (!inv.canCraft(recipe, stations)) return { ok: false, reason: "missing ingredients" };
+    if (this.flags.furnaceFuel <= 0) {
+      if (inv.count("wood") < 1) return { ok: false, reason: "needs wood for fuel" };
+      inv.consume("wood", 1);
+      this.flags.furnaceFuel = FUEL.wood;
+    }
+    if (!inv.craft(recipe, stations)) return { ok: false, reason: "bag full" };
+    this.smeltCooldown = SMELT_TIME;
+    return { ok: true };
   }
 
   /* Place the selected block item at (tx,ty). Returns success. */

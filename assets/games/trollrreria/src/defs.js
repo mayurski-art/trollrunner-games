@@ -93,6 +93,14 @@ TILES[T.ROPE]     = { name: "Rope", solid: false, hp: 8, pow: 0, tool: "pick", d
 
 export const CROP_GROW_TIME = 45;   // seconds per growth stage
 
+/* Furnace fuel: real burn time instead of free/instant smelting. Wood is
+   the only fuel for now (nothing else combustible exists yet). Burns down
+   in real time whether or not you're actively smelting, same as a real
+   fire; each individual smelt also takes SMELT_TIME to finish so output
+   isn't instant even with fuel loaded. */
+export const FUEL = { wood: 8 };     // seconds of burn per unit consumed
+export const SMELT_TIME = 2;         // seconds per craft at a furnace
+
 /* ------------------------------------------------------------------- walls */
 export const W = { NONE: 0, DIRT: 1, STONE: 2, WOOD: 3, STONE_BRICK: 4 };
 export const WALLS = [];
