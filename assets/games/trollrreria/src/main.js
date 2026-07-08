@@ -165,7 +165,7 @@ class Game {
     }, 500);
   }
 
-  newWorld(seedStr) {
+  newWorld(seedStr, character) {
     this.seedStr = seedStr;
     this.seed = hashStr(seedStr);
     const { world, spawn, surface, skyPad, groundPad, ruinsBounds } = generateWorld(this.seed);
@@ -183,13 +183,13 @@ class Game {
     this.dayCount = 1;
     this.trollMoon = false;
     this.stats = { blocksMined: 0, deepest: 0, bossKills: 0, playSec: 0 };
-    this.flags = { bossDown: false };
+    this.flags = { bossDown: false, character: character || "prospector" };
     this.quests = createQuestState();
     this._recorded = { blocksMined: 0, bossKills: 0 };
     this.explored = new Uint8Array((WORLD_W >> 2) * (WORLD_H >> 2));
     this.inventory = new Inventory();
     for (const s of STARTER_ITEMS) this.inventory.add(s.id, s.n);
-    this.player = new Player(spawn.x, spawn.y + 1);
+    this.player = new Player(spawn.x, spawn.y + 1, this.flags.character);
     this.cam.x = this.player.cx - 400;
     this.cam.y = this.player.cy - 260;
     this.placeQuestSign();
@@ -213,6 +213,7 @@ class Game {
     this.spawn = data.spawn || this.spawn;
     this.stats = Object.assign(this.stats, data.stats);
     this.flags = Object.assign(this.flags, data.flags);
+    this.player.setCharacter(this.flags.character);
     this.quests = loadQuests(data.quests);
     this._recorded = { blocksMined: this.stats.blocksMined, bossKills: this.stats.bossKills };
     if (data.explored) {
@@ -236,9 +237,9 @@ class Game {
     if (this.ui) this.ui.dirtyInv();
   }
 
-  startNewWorld() {
+  startNewWorld(character) {
     clearSave();
-    this.newWorld("troll-runner-" + Math.floor(Math.random() * 1e9));
+    this.newWorld("troll-runner-" + Math.floor(Math.random() * 1e9), character);
     if (this.ui) this.ui.dirtyInv();
     this.enterPlay();
   }

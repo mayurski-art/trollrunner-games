@@ -10,7 +10,14 @@ import { SKINS } from "./store.js";
 import { getIcon } from "./icons.js";
 import { clamp } from "./util.js";
 
-const RIG_DIR = "assets/games/trollrreria/sprites/prospector/anims/";
+/* Every selectable character shares the same animation set + frame counts
+   (idle/walk/jump/hit/ko/mine/attack) so the rest of the class doesn't need
+   to know which one is active -- only the sprite folder changes. */
+export const CHARACTERS = {
+  prospector: { name: "Trollface Prospector", dir: "assets/games/trollrreria/sprites/prospector/anims/" },
+  gladiator:  { name: "Troll Gladiator", dir: "assets/games/troll-kombat/fighters/gladiator/anims/" },
+};
+const DEFAULT_CHARACTER = "prospector";
 const RIG = {
   idle:   { frames: 8, fps: 9 },
   walk:   { frames: 6, fps: 12 },
@@ -27,7 +34,7 @@ const BODY_H = 58;            // drawn height in world px
 export class Player extends Entity {
   static _swingSeq = 0;          // unique id per melee swing (hit dedup)
 
-  constructor(tx, ty) {
+  constructor(tx, ty, character = DEFAULT_CHARACTER) {
     super(tx * TILE + (TILE - PLAYER_W) / 2, ty * TILE - PLAYER_H, PLAYER_W, PLAYER_H);
     this.dir = 1;
     this.melee = null;           // live swing: { def, t, id }
@@ -48,10 +55,20 @@ export class Player extends Entity {
     this.animTime = 0;
     this.anim = "idle";
     this.hitFlash = 0;
+    this.character = CHARACTERS[character] ? character : DEFAULT_CHARACTER;
+    this.loadRig();
+  }
+
+  /* Swap character mid-game (e.g. loading a save whose choice differs from
+     the default one used while the world was still being constructed). */
+  setCharacter(character) {
+    if (!character || character === this.character || !CHARACTERS[character]) return;
+    this.character = character;
     this.loadRig();
   }
 
   loadRig() {
+    const dir = CHARACTERS[this.character].dir;
     this.rig = {};
     this.rigReady = false;
     let pending = 0;
@@ -64,7 +81,7 @@ export class Player extends Entity {
         if (--pending === 0) this.rigReady = true;
       };
       img.onerror = () => { if (--pending === 0) this.rigReady = Object.keys(this.rig).length > 0; };
-      img.src = RIG_DIR + key + ".png";
+      img.src = dir + key + ".png";
     }
   }
 
