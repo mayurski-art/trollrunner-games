@@ -427,6 +427,12 @@ export class Renderer {
         if (hash2(wx, wy, 9) > 0.72) { g.fillStyle = "#ffd23c"; g.fillRect(px + 7, py + TILE - h1 - 2, 3, 3); }
         break;
       }
+      case T.ROPE: {
+        g.fillStyle = "#8a6d3a"; g.fillRect(px + 7, py, 2, TILE);
+        g.fillStyle = "#6b5228";
+        for (let n = 0; n < 3; n++) g.fillRect(px + 5, py + 2 + n * 5, 6, 1);
+        break;
+      }
       default: {
         g.fillStyle = "#f0f"; g.fillRect(px, py, TILE, TILE);
       }

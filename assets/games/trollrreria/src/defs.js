@@ -32,6 +32,7 @@ export const T = {
   MOONROCK: 37, MOON_DEBRIS: 38, ROCKET_PART: 39, ROCKET_PAD: 40,
   VAULT_DOOR: 41, GRIN_ALTAR: 42,
   CAMPFIRE: 43, FARMLAND: 44, CROP1: 45, CROP2: 46, CROP3: 47, SIGN: 48,
+  ROPE: 49,
   /* wires live on their own layer, not in T */
 };
 
@@ -72,11 +73,11 @@ TILES[T.PLATE]    = { name: "Pressure plate", solid: false, hp: 40, pow: 0, tool
 TILES[T.DART_L]   = { name: "Dart trap", solid: true, hp: 160, pow: 0, tool: "pick", drop: "dartTrap", noVariant: true };
 TILES[T.DART_R]   = { name: "Dart trap", solid: true, hp: 160, pow: 0, tool: "pick", drop: "dartTrap", noVariant: true };
 TILES[T.TORCH_OFF] = { name: "Torch (out)", solid: false, hp: 5, pow: 0, tool: "pick", drop: "torch", noVariant: true };
-TILES[T.TROLLIUM] = { name: "Trollium ore", solid: true, hp: 300, pow: 80, tool: "pick", drop: "trolliumOre", ore: "#57e87a", light: 30, pal: ["#565a63", "#6e737d", "#848a94"] };
+TILES[T.TROLLIUM] = { name: "Trollium ore", solid: true, hp: 300, pow: 80, tool: "pick", drop: "trolliumOre", ore: "#57e87a", light: 95, pal: ["#565a63", "#6e737d", "#848a94"] };
 TILES[T.GRIN_FRAG] = { name: "Grin fragment", solid: false, hp: 1, pow: 0, tool: "pick", drop: "grinFragment", light: 55, noVariant: true };
 TILES[T.MUD]      = { name: "Mud", solid: true, hp: 45, pow: 0, tool: "pick", drop: "dirt", pal: ["#3a3220", "#4a4028", "#5a4f30"] };
 TILES[T.PEPE_SCROLL] = { name: "Rare Pepe scroll", solid: false, hp: 1, pow: 0, tool: "pick", drop: "pepeScroll", light: 35, noVariant: true };
-TILES[T.MOONROCK] = { name: "Moon rock", solid: true, hp: 190, pow: 45, tool: "pick", drop: "moonShard", ore: "#cfe8ff", light: 40, pal: ["#3a3f52", "#4d5468", "#616a80"] };
+TILES[T.MOONROCK] = { name: "Moon rock", solid: true, hp: 190, pow: 45, tool: "pick", drop: "moonShard", ore: "#cfe8ff", light: 85, pal: ["#3a3f52", "#4d5468", "#616a80"] };
 TILES[T.MOON_DEBRIS] = { name: "Moon debris", solid: true, hp: 35, pow: 0, tool: "pick", drop: "stone", falls: true, light: 20, pal: ["#4d5468", "#616a80", "#7a84a0"] };
 TILES[T.ROCKET_PART] = { name: "Rocket part", solid: false, hp: 1, pow: 0, tool: "pick", drop: "rocketPart", light: 25, noVariant: true };
 TILES[T.ROCKET_PAD] = { name: "Rocket pad", solid: false, hp: Infinity, noVariant: true, light: 60 };
@@ -88,6 +89,7 @@ TILES[T.CROP1]    = { name: "Seedling", solid: false, hp: 1, pow: 0, tool: "pick
 TILES[T.CROP2]    = { name: "Crop (growing)", solid: false, hp: 1, pow: 0, tool: "pick", drop: "seeds", noVariant: true };
 TILES[T.CROP3]    = { name: "Crop (ripe)", solid: false, hp: 1, pow: 0, tool: "pick", drop: "berry", noVariant: true };
 TILES[T.SIGN]     = { name: "Weathered sign", solid: false, hp: Infinity, noVariant: true };
+TILES[T.ROPE]     = { name: "Rope", solid: false, hp: 8, pow: 0, tool: "pick", drop: "rope", climbable: true, needsSupport: true, noVariant: true };
 
 export const CROP_GROW_TIME = 45;   // seconds per growth stage
 
@@ -132,6 +134,7 @@ export const ITEMS = {
   wrench:      { name: "Wrench", type: "tool", tool: "wrench", power: 0, speed: 6, dmg: 3, desc: "Lays wire (LMB) — needs Wire in your bag. Click a wired tile to cut." },
   wire:        { name: "Wire", type: "material", max: 999 },
   platform:    { name: "Platform", type: "block", tile: T.PLATFORM, max: 999 },
+  rope:        { name: "Rope", type: "block", tile: T.ROPE, max: 999, needsSupport: true, desc: "Climb it with W/S — or grab it mid-fall to stop taking fall damage." },
   /* walls */
   woodWall:       { name: "Wood wall", type: "wall", wall: W.WOOD, max: 999 },
   stoneBrickWall: { name: "Stone brick wall", type: "wall", wall: W.STONE_BRICK, max: 999 },
@@ -222,6 +225,7 @@ export const RECIPES = [
   { out: "workbench", n: 1, ing: [["wood", 10]], station: null },
   { out: "torch", n: 3, ing: [["wood", 1], ["gel", 1]], station: null },
   { out: "platform", n: 2, ing: [["wood", 1]], station: null },
+  { out: "rope", n: 8, ing: [["wood", 1]], station: null },
   { out: "woodPick", n: 1, ing: [["wood", 12]], station: "workbench" },
   { out: "woodAxe", n: 1, ing: [["wood", 9]], station: "workbench" },
   { out: "woodHammer", n: 1, ing: [["wood", 8]], station: "workbench" },
@@ -373,5 +377,5 @@ export const BUTCHER_OFFERS = [
 /* Starter kit (fresh worlds). */
 export const STARTER_ITEMS = [
   { id: "woodPick", n: 1 }, { id: "woodAxe", n: 1 }, { id: "woodSword", n: 1 },
-  { id: "torch", n: 10 },
+  { id: "torch", n: 10 }, { id: "rope", n: 8 },
 ];

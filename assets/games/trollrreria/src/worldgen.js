@@ -113,10 +113,12 @@ export function generateWorld(seed) {
       if (x < 2 || x > w - 3 || y > BEDROCK_START - 2 || y < 40) break;
     }
   }
-  /* 3b. blobby noise caves, denser with depth */
+  /* 3b. blobby noise caves, denser with depth -- tightened vs. the original
+     0.76-0.66 range so shallow caves read less like Swiss cheese for players
+     still learning the game; deep caves stay close to as dangerous. */
   for (let y = STONE_START; y < BEDROCK_START; y++) {
     const depthFrac = (y - STONE_START) / (BEDROCK_START - STONE_START);
-    const thr = 0.76 - depthFrac * 0.1;
+    const thr = 0.80 - depthFrac * 0.08;
     for (let x = 1; x < w - 1; x++) {
       if (octave2(x, y, seed + 23, 1 / 14, 3) > thr) {
         tiles[y * w + x] = T.AIR;
@@ -148,7 +150,7 @@ export function generateWorld(seed) {
   /* ------------------------------------------------ 3e. Whale Vault
      Sealed with a VAULT_DOOR that only opens for a Whale Key (Quest 5).
      Deep, near the world's edge -- the game's actual late-game corner. */
-  carveVault(world, rng, w);
+  const vaultBounds = carveVault(world, rng, w);
 
   /* ------------------------------------------------ 4. ores */
   scatterOre(world, rng, T.COPPER, 950, STONE_START - 30, 560, 4, 9);
@@ -183,6 +185,21 @@ export function generateWorld(seed) {
     const y = DEEP_START + Math.floor(rng() * (BEDROCK_START - DEEP_START - 20));
     poolLiquid(world, x, y, 3 + Math.floor(rng() * 6), 1);
   }
+  /* 5b. a scatter of smaller, shallower pockets starting partway into the
+     stone band (not just the deep zone) -- gives mid-depth mining some
+     natural light and hazard before the player has proper gear, matching
+     how Minecraft players run into lava well before full depth. */
+  for (let n = 0; n < 22; n++) {
+    const x = 20 + Math.floor(rng() * (w - 40));
+    const y = STONE_START + 100 + Math.floor(rng() * Math.max(1, DEEP_START - STONE_START - 110));
+    poolLiquid(world, x, y, 2 + Math.floor(rng() * 3), 1);
+  }
+
+  /* 5c. break up any tall open shaft left by the worm/blobby/lava passes
+     above -- run last (after every AIR-carving step) so it catches lava
+     pool cavities too, but skip the Ruins/Vault interiors since those are
+     built rooms, not organic hazards. */
+  plugLongDrops(world, [ruinsBounds, vaultBounds]);
 
   /* ------------------------------------------------ 6. surface water pools */
   fillSurfaceWater(world, surface);
@@ -195,12 +212,20 @@ export function generateWorld(seed) {
     const i = y * w + x;
     if (tiles[i] === T.STONE && tiles[i - w] === T.AIR) { tiles[i] = T.HEART; hearts++; }
   }
-  for (let n = 0; n < 500; n++) {
-    const x = 10 + Math.floor(rng() * (w - 20));
-    const y = STONE_START + Math.floor(rng() * (BEDROCK_START - STONE_START - 10));
-    const i = y * w + x;
-    if (tiles[i] === T.AIR && (tiles[i + w] === T.DIRT || tiles[i + w] === T.STONE) && rng() < 0.5) {
-      tiles[i] = T.SHROOM;
+  /* glowshrooms grow in small patches (like real mushroom clusters) rather
+     than uniform single-tile scatter, so the underground has real pockets
+     of natural light instead of one dim tile every so often. */
+  for (let n = 0; n < 130; n++) {
+    const cx = 10 + Math.floor(rng() * (w - 20));
+    const cy = STONE_START + Math.floor(rng() * (BEDROCK_START - STONE_START - 10));
+    const clusterSize = 3 + Math.floor(rng() * 5);
+    for (let k = 0; k < clusterSize; k++) {
+      const x = clamp(cx + Math.floor((rng() - 0.5) * 8), 10, w - 11);
+      const y = clamp(cy + Math.floor((rng() - 0.5) * 3), STONE_START, BEDROCK_START - 2);
+      const i = y * w + x;
+      if (tiles[i] === T.AIR && (tiles[i + w] === T.DIRT || tiles[i + w] === T.STONE)) {
+        tiles[i] = T.SHROOM;
+      }
     }
   }
 
@@ -307,6 +332,42 @@ function carve(world, cx, cy, r) {
   }
 }
 
+/* Interrupt any vertical air run longer than maxDrop tiles with a short
+   stone shelf every ~9 tiles, so mining/exploring straight down (or
+   stumbling into a lava pool's open cavity) can't open into a blind
+   multi-cavern freefall. Column-local (not a full connected-component
+   flood fill) because the thing we're actually fixing is fall distance,
+   which is a per-column measure -- a shelf a player can catch themselves
+   on. Widened a tile either side so it reads as a ledge rather than a
+   single floating block. `exclude` skips built rooms (Ruins/Vault) so
+   their intentional open interiors are never touched. */
+function plugLongDrops(world, exclude) {
+  const w = world.w, tiles = world.tiles;
+  const maxDrop = 9;
+  const regions = (exclude || []).filter(Boolean);
+  const inExcluded = (x, y) => regions.some(r =>
+    x >= r.x - 1 && x <= r.x + r.w + 1 && y >= r.y - 1 && y <= r.y + r.h + 1);
+  for (let x = 2; x < w - 2; x++) {
+    let runStart = -1;
+    for (let y = STONE_START; y < BEDROCK_START; y++) {
+      if (inExcluded(x, y)) { runStart = -1; continue; }
+      const i = y * w + x;
+      if (tiles[i] === T.AIR) {
+        if (runStart === -1) runStart = y;
+        if (y - runStart + 1 >= maxDrop) {
+          for (const dx of [-1, 0, 1]) {
+            const j = i + dx;
+            if (tiles[j] === T.AIR) { tiles[j] = T.STONE; world.setLiquid(x + dx, y, 0); }
+          }
+          runStart = -1;
+        }
+      } else {
+        runStart = -1;
+      }
+    }
+  }
+}
+
 /* A single hand-shaped underground room: stone-brick perimeter, wired
    background walls, three loot chests. Anchored just under the swamp,
    spanning into the desert-side stone so it never needs the swamp's own
@@ -366,6 +427,7 @@ function carveVault(world, rng, w) {
       world.addChest(cx, cy, vaultLootChest(rng));
     }
   }
+  return { x: x0, y: y0, w: rw, h: rh };
 }
 
 function vaultLootChest(rng) {

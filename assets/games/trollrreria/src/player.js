@@ -118,6 +118,7 @@ export class Player extends Entity {
     const lava = this.inLiquid(world, 1);
     const sludge = this.inLiquid(world, 2);
     const wet = water || sludge;     // swamp sludge swims like water, just toxic
+    const onRope = this.onRope(world);
     const belowTy = Math.floor((this.y + this.h + 2) / TILE);
     const tileBelow = TILES[world.get(Math.floor(this.cx / TILE), belowTy)];
     const icy = this.onGround && tileBelow && tileBelow.slippery;
@@ -141,6 +142,11 @@ export class Player extends Entity {
     if (wet) {
       if (jumpKey) this.vy = Math.max(this.vy - 900 * dt, -130);
       this.vy = Math.min(this.vy + GRAVITY * 0.32 * dt, 120);
+    } else if (onRope) {
+      /* climb, or just grab on to arrest a fall -- no input holds you in place */
+      if (jumpKey) this.vy = Math.max(this.vy - 1400 * dt, -110);
+      else if (drop) this.vy = Math.min(this.vy + 1400 * dt, 110);
+      else this.vy -= this.vy * Math.min(1, 10 * dt);
     } else {
       if (this.jumpBuf > 0 && this.coyote > 0) {
         this.vy = game.flags.moonBoots ? -600 : -548;
@@ -162,7 +168,7 @@ export class Player extends Entity {
     /* -------- fall tracking + move */
     const fallingBefore = this.vy > 0 ? this.vy : 0;
     if (this.vy > 0 && !wet) this.fallDist += this.vy * dt;
-    if (wet || lava) this.fallDist = 0;
+    if (wet || lava || onRope) this.fallDist = 0;
     this.moveCollide(world, dt, true, drop);
     if (this.onGround) {
       /* Moon Boots: higher safe-fall threshold + softer landings */
@@ -330,6 +336,19 @@ export class Player extends Entity {
 
   startSwing(dur) {
     if (this.swing <= 0) { this.swingDur = Math.max(0.16, dur); this.swing = 1; }
+  }
+
+  /* Rope check spans the player's hitbox (not just the center tile, like
+     inLiquid) so brushing a rope edge mid-fall is enough to grab it. */
+  onRope(world) {
+    const tx0 = Math.floor(this.x / TILE), tx1 = Math.floor((this.x + this.w) / TILE);
+    const ty0 = Math.floor(this.y / TILE), ty1 = Math.floor((this.y + this.h) / TILE);
+    for (let ty = ty0; ty <= ty1; ty++) {
+      for (let tx = tx0; tx <= tx1; tx++) {
+        if (world.inBounds(tx, ty) && world.get(tx, ty) === T.ROPE) return true;
+      }
+    }
+    return false;
   }
 
   tileInReach(tx, ty) {

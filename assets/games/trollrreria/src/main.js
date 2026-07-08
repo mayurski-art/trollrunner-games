@@ -1558,15 +1558,16 @@ class Game {
     this.announce("🧌 Back up. Let's go.");
   }
 
-  /* Dynamic light sources: held torch, glowing entities. */
+  /* Dynamic light sources: the player's own faint glow (so mining doesn't go
+     pitch black just because a pickaxe is selected instead of a torch),
+     boosted while actually holding a torch, plus glowing entities. */
   lightSources() {
     const out = [];
     const p = this.player;
     if (p && !p.dead) {
       const sel = this.inventory.selected;
-      if (sel && sel.id === "torch") {
-        out.push({ tx: Math.floor(p.cx / TILE), ty: Math.floor(p.cy / TILE), level: 200 });
-      }
+      const level = sel && sel.id === "torch" ? 200 : 60;
+      out.push({ tx: Math.floor(p.cx / TILE), ty: Math.floor(p.cy / TILE), level });
     }
     for (const e of this.entities) {
       if (e.light) out.push({ tx: Math.floor(e.cx / TILE), ty: Math.floor(e.cy / TILE), level: e.light });
