@@ -31,6 +31,20 @@ const RIG = {
 const CELL = 136;
 const BODY_H = 58;            // drawn height in world px
 
+/* Merge an item's static def with whatever enchantment its stack is
+   carrying (stack.ench, from the enchant table) -- tool power/speed and
+   weapon dmg/knock bonuses apply wherever the def is read (mining,
+   melee), armor's own def bonus is applied directly in totalDefense(). */
+function withEnchant(def, ench) {
+  if (!ench) return def;
+  const out = { ...def };
+  if (ench.power) out.power = (out.power || 0) + ench.power;
+  if (ench.speed) out.speed = (out.speed || 0) + ench.speed;
+  if (ench.dmg) out.dmg = (out.dmg || 0) + ench.dmg;
+  if (ench.knock) out.knock = (out.knock || 0) + ench.knock;
+  return out;
+}
+
 export class Player extends Entity {
   static _swingSeq = 0;          // unique id per melee swing (hit dedup)
 
@@ -156,7 +170,13 @@ export class Player extends Entity {
     this.coyote = this.onGround ? 0.09 : Math.max(0, this.coyote - dt);
     this.jumpBuf = jumpHit ? 0.09 : Math.max(0, this.jumpBuf - dt);
     if (this.onGround) this.airJumps = game.flags.doubleJump ? 1 : 0;
-    if (wet) {
+    if (game.creative) {
+      /* free flight: no gravity, jump/drop move straight up/down, hovers
+         in place with no input instead of falling */
+      if (jumpKey) this.vy = Math.max(this.vy - 900 * dt, -260);
+      else if (drop) this.vy = Math.min(this.vy + 900 * dt, 260);
+      else this.vy -= this.vy * Math.min(1, 8 * dt);
+    } else if (wet) {
       if (jumpKey) this.vy = Math.max(this.vy - 900 * dt, -130);
       this.vy = Math.min(this.vy + GRAVITY * 0.32 * dt, 120);
     } else if (onRope) {
@@ -185,7 +205,7 @@ export class Player extends Entity {
     /* -------- fall tracking + move */
     const fallingBefore = this.vy > 0 ? this.vy : 0;
     if (this.vy > 0 && !wet) this.fallDist += this.vy * dt;
-    if (wet || lava || onRope) this.fallDist = 0;
+    if (wet || lava || onRope || game.creative) this.fallDist = 0;
     this.moveCollide(world, dt, true, drop);
     if (this.onGround) {
       /* Moon Boots: higher safe-fall threshold + softer landings */
@@ -280,7 +300,7 @@ export class Player extends Entity {
       if (t && this.tileInReach(t.tx, t.ty)) game.mineTick(t.tx, t.ty, fist, this);
       return;
     }
-    const def = ITEMS[sel.id];
+    const def = withEnchant(ITEMS[sel.id], sel.ench);
     switch (def.type) {
       case "tool":
         if (def.tool === "wrench") {

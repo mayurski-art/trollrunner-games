@@ -71,7 +71,7 @@ export class Inventory {
     let d = 0;
     for (const k of ["head", "chest", "legs"]) {
       const s = this.armor[k];
-      if (s && ITEMS[s.id]) d += ITEMS[s.id].def || 0;
+      if (s && ITEMS[s.id]) d += (ITEMS[s.id].def || 0) + (s.ench && s.ench.def || 0);
     }
     return d;
   }

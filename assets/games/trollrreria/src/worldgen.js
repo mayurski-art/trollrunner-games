@@ -152,6 +152,13 @@ export function generateWorld(seed) {
      Deep, near the world's edge -- the game's actual late-game corner. */
   const vaultBounds = carveVault(world, rng, w);
 
+  /* ------------------------------------------------ 3f. Frostbite Bunker
+     A frozen hand-shaped room under the snow biome (the one starting zone
+     without its own underground structure) -- ice-walled, silver-heavy
+     loot, the first real reason to dig deep under the snow instead of
+     just passing through it on the surface. */
+  const bunkerBounds = carveBunker(world, rng, w);
+
   /* ------------------------------------------------ 4. ores */
   scatterOre(world, rng, T.COPPER, 950, STONE_START - 30, 560, 4, 9);
   scatterOre(world, rng, T.IRON, 700, 380, DEEP_START, 4, 8);
@@ -199,7 +206,7 @@ export function generateWorld(seed) {
      above -- run last (after every AIR-carving step) so it catches lava
      pool cavities too, but skip the Ruins/Vault interiors since those are
      built rooms, not organic hazards. */
-  plugLongDrops(world, [ruinsBounds, vaultBounds]);
+  plugLongDrops(world, [ruinsBounds, vaultBounds, bunkerBounds]);
 
   /* ------------------------------------------------ 6. surface water pools */
   fillSurfaceWater(world, surface);
@@ -428,6 +435,49 @@ function carveVault(world, rng, w) {
     }
   }
   return { x: x0, y: y0, w: rw, h: rh };
+}
+
+/* Frostbite Bunker: same hand-shaped-room trick again, but iced over and
+   anchored under the snow biome (x fraction < 0.18) -- the one starting
+   zone that had a surface identity (Frostbite Reach) but no underground
+   structure of its own. Silver-heavy loot gives the new silver armor
+   tier somewhere to actually drop from. */
+function carveBunker(world, rng, w) {
+  const bandX1 = Math.floor(w * 0.16);
+  const rw = 22, rh = 11;
+  const x0 = 20 + Math.floor(rng() * Math.max(1, bandX1 - rw - 20));
+  const y0 = STONE_START + 30 + Math.floor(rng() * 60);
+  for (let y = y0; y < y0 + rh; y++) {
+    for (let x = x0; x < x0 + rw; x++) {
+      const edge = x === x0 || x === x0 + rw - 1 || y === y0 || y === y0 + rh - 1;
+      world.tiles[y * w + x] = edge ? T.ICE : T.AIR;
+    }
+  }
+  for (let y = y0 + 1; y < y0 + rh - 1; y++) {
+    for (let x = x0 + 1; x < x0 + rw - 1; x++) world.walls[y * w + x] = W.STONE_BRICK;
+  }
+  for (let k = 0; k < 3; k++) {
+    const cx = x0 + 3 + Math.floor(rng() * (rw - 6));
+    const cy = y0 + rh - 2;
+    const i = cy * w + cx;
+    if (world.tiles[i] === T.AIR) {
+      world.tiles[i] = T.CHEST;
+      world.addChest(cx, cy, bunkerLootChest(rng));
+    }
+  }
+  return { x: x0, y: y0, w: rw, h: rh };
+}
+
+function bunkerLootChest(rng) {
+  const items = new Array(24).fill(null);
+  let slot = 0;
+  const add = (id, n) => { if (slot < 24) items[slot++] = { id, n }; };
+  add("silverBar", 8 + Math.floor(rng() * 10));
+  if (rng() < 0.6) add("silverSword", 1);
+  if (rng() < 0.5) add("silverChest", 1);
+  add("torch", 4 + Math.floor(rng() * 6));
+  if (rng() < 0.4) add("trollBrew", 1 + Math.floor(rng() * 2));
+  return items;
 }
 
 function vaultLootChest(rng) {

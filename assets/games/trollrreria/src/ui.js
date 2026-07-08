@@ -3,7 +3,7 @@
 
 import {
   ITEMS, TILES, T, DAY_LEN, CYCLE, TILE, STATION_SCAN, WORLD_W, WORLD_H,
-  MERCHANT_OFFERS, RECIPES, FUEL, SMELT_TIME,
+  MERCHANT_OFFERS, RECIPES, FUEL, SMELT_TIME, ENCHANTS, ENCHANT_COST,
 } from "./defs.js";
 import { getIcon } from "./icons.js";
 import { fmtClock } from "./util.js";
@@ -32,6 +32,10 @@ export class UI {
       craftOutputEl: document.getElementById("craft-output"),
       chestPanel: document.getElementById("chest-panel"),
       chestGrid: document.getElementById("chest-grid"),
+      enchantPanel: document.getElementById("enchant-panel"),
+      enchantSlotEl: document.getElementById("enchant-slot"),
+      enchantStatus: document.getElementById("enchant-status"),
+      btnEnchant: document.getElementById("btn-enchant"),
       cursor: document.getElementById("cursor-item"),
       tooltip: document.getElementById("tooltip"),
       dialog: document.getElementById("dialog"),
@@ -76,6 +80,7 @@ export class UI {
     this.stations = new Set();
     this.craftGrid = new Array(9).fill(null);   // real 3x3 crafting grid
     this._craftMatch = null;                    // recipe the grid currently satisfies
+    this.enchantSlot = null;                    // item currently in the enchant table
 
     this.buildHotbar();
     this.buildInventory();
@@ -140,6 +145,10 @@ export class UI {
       this.showScreens({ store: true });
     });
     document.getElementById("btn-store-back").addEventListener("click", () => this.showScreens({ pause: true }));
+    document.getElementById("btn-creative").addEventListener("click", e => {
+      game.toggleCreative();
+      e.target.textContent = `🛠️ Creative Mode: ${game.creative ? "On" : "Off"}`;
+    });
     this.el.btnRevive.addEventListener("click", async () => {
       const admin = window.TrollPay && window.TrollPay.isAdminBypass && window.TrollPay.isAdminBypass();
       this.el.btnRevive.disabled = true;
@@ -534,6 +543,12 @@ export class UI {
     });
     this.el.craftOutputEl.addEventListener("mouseleave", () => { this.el.tooltip.hidden = true; });
 
+    const enchantSlot = this.makeSlot(0, "enchant");
+    this.el.enchantSlotEl.replaceWith(enchantSlot);
+    this.el.enchantSlotEl = enchantSlot;
+    this.el.btnEnchant.addEventListener("click", () => this.clickEnchant());
+    document.getElementById("enchant-close").addEventListener("click", () => this.closeEnchant());
+
     this.el.invGrid.innerHTML = "";
     this.invSlots = [];
     for (let i = 10; i < 50; i++) {
@@ -593,6 +608,7 @@ export class UI {
     if (kind === "chest") return this.chest ? this.chest.items[key] : null;
     if (kind === "craft") return this.craftGrid[key];
     if (kind === "craft-output") return this._craftMatch ? { id: this._craftMatch.out, n: this._craftMatch.n } : null;
+    if (kind === "enchant") return this.enchantSlot;
     return null;
   }
 
@@ -601,6 +617,7 @@ export class UI {
     else if (kind === "armor") this.game.inventory.armor[key] = stack;
     else if (kind === "chest" && this.chest) this.chest.items[key] = stack;
     else if (kind === "craft") this.craftGrid[key] = stack;
+    else if (kind === "enchant") this.enchantSlot = stack;
   }
 
   slotClick(kind, key, isRight, isShift) {
@@ -676,7 +693,7 @@ export class UI {
       if (left === 0) this.setStack(kind, key, null);
       return;
     }
-    if (kind === "chest" || kind === "craft") {
+    if (kind === "chest" || kind === "craft" || kind === "enchant") {
       const left = inv.add(stack.id, stack.n);
       this.setStack(kind, key, left > 0 ? { id: stack.id, n: left } : null);
       return;
@@ -757,6 +774,7 @@ export class UI {
     if (def.type === "block") sub.push("placeable");
     if (def.type === "wall") sub.push("background wall");
     if (def.desc) sub.push(def.desc);
+    if (stack.ench) sub.push(`✨ ${stack.ench.name}`);
     if (sub.length) bits.push(`<div class="tip-sub">${sub.join("<br>")}</div>`);
     const tip = this.el.tooltip;
     tip.innerHTML = bits.join("");
@@ -777,6 +795,7 @@ export class UI {
     this.el.invPanel.hidden = !this.invOpen;
     if (!this.invOpen) {
       this.closeChest();
+      this.closeEnchant();
       this.dropCursor();
       this.returnCraftGrid();
       this.pointerOver = false;
@@ -824,6 +843,62 @@ export class UI {
 
   closeChestIf(key) {
     if (this.chest && this.chest.key === key) this.closeChest();
+  }
+
+  openEnchant() {
+    this.enchantOpen = true;
+    this.el.enchantPanel.hidden = false;
+    if (!this.invOpen) this.toggleInventory(true);
+    this.paintEnchant();
+    const s = this.game.sfx;
+    if (s) s.door();
+  }
+
+  closeEnchant() {
+    this.enchantOpen = false;
+    this.el.enchantPanel.hidden = true;
+    if (this.enchantSlot) {
+      const inv = this.game.inventory;
+      const left = inv.add(this.enchantSlot.id, this.enchantSlot.n);
+      if (left > 0 && this.game.player) {
+        this.game.spawnDrop(this.game.player.cx, this.game.player.cy - 8, this.enchantSlot.id, left,
+          (this.game.player.dir || 1) * 150);
+      }
+      this.enchantSlot = null;
+    }
+  }
+
+  /* Enchantable = tool, weapon, or armor -- the three types withEnchant()
+     (player.js) and totalDefense() (inventory.js) know how to apply a
+     bonus to. Everything else just can't go in the slot meaningfully. */
+  paintEnchant() {
+    this.paintSlot(this.el.enchantSlotEl, this.enchantSlot);
+    const inv = this.game.inventory;
+    const s = this.enchantSlot;
+    const def = s && ITEMS[s.id];
+    const enchantable = def && ENCHANTS[def.type];
+    const costText = ENCHANT_COST.map(([id, n]) => `${n} ${ITEMS[id].name}${inv.count(id) < n ? " ✗" : ""}`).join(", ");
+    const haveCost = ENCHANT_COST.every(([id, n]) => inv.count(id) >= n);
+    let status;
+    if (!s) status = "Place a tool, weapon, or armor piece";
+    else if (!enchantable) status = "That can't be enchanted";
+    else status = `Cost: ${costText}` + (s.ench ? ` — currently ${s.ench.name}` : "");
+    this.el.enchantStatus.textContent = status;
+    this.el.btnEnchant.disabled = !(enchantable && haveCost);
+  }
+
+  clickEnchant() {
+    const inv = this.game.inventory;
+    const s = this.enchantSlot;
+    const def = s && ITEMS[s.id];
+    const pool = def && ENCHANTS[def.type];
+    if (!pool || !ENCHANT_COST.every(([id, n]) => inv.count(id) >= n)) return;
+    for (const [id, n] of ENCHANT_COST) inv.consume(id, n);
+    s.ench = pool[Math.floor(Math.random() * pool.length)];
+    this.game.announce && this.game.announce(`✨ ${s.ench.name}!`);
+    const sfx = this.game.sfx;
+    if (sfx) sfx.craft();
+    this.paintEnchant();
   }
 
   refreshStations() {
@@ -1091,6 +1166,7 @@ export class UI {
         for (const k of ["head", "chest", "legs"]) this.paintSlot(this.armorSlots[k], g.inventory.armor[k]);
         this.paintCraftList();
         this.paintCraftGrid();
+        if (this.enchantOpen) this.paintEnchant();
       }
       this.paintChest();
       this.moveCursorEl();

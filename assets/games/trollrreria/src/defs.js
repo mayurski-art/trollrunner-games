@@ -32,7 +32,7 @@ export const T = {
   MOONROCK: 37, MOON_DEBRIS: 38, ROCKET_PART: 39, ROCKET_PAD: 40,
   VAULT_DOOR: 41, GRIN_ALTAR: 42,
   CAMPFIRE: 43, FARMLAND: 44, CROP1: 45, CROP2: 46, CROP3: 47, SIGN: 48,
-  ROPE: 49,
+  ROPE: 49, ENCHANT_TABLE: 50,
   /* wires live on their own layer, not in T */
 };
 
@@ -90,6 +90,7 @@ TILES[T.CROP2]    = { name: "Crop (growing)", solid: false, hp: 1, pow: 0, tool:
 TILES[T.CROP3]    = { name: "Crop (ripe)", solid: false, hp: 1, pow: 0, tool: "pick", drop: "berry", noVariant: true };
 TILES[T.SIGN]     = { name: "Weathered sign", solid: false, hp: Infinity, noVariant: true };
 TILES[T.ROPE]     = { name: "Rope", solid: false, hp: 8, pow: 0, tool: "pick", drop: "rope", climbable: true, needsSupport: true, noVariant: true };
+TILES[T.ENCHANT_TABLE] = { name: "Enchant table", solid: false, hp: 120, pow: 0, tool: "pick", drop: "enchantTable", station: "enchant", light: 70, needsFloor: true, noVariant: true };
 
 export const CROP_GROW_TIME = 45;   // seconds per growth stage
 
@@ -143,6 +144,7 @@ export const ITEMS = {
   wire:        { name: "Wire", type: "material", max: 999 },
   platform:    { name: "Platform", type: "block", tile: T.PLATFORM, max: 999 },
   rope:        { name: "Rope", type: "block", tile: T.ROPE, max: 999, needsSupport: true, desc: "Climb it with W/S — or grab it mid-fall to stop taking fall damage." },
+  enchantTable: { name: "Enchant table", type: "block", tile: T.ENCHANT_TABLE, max: 99, needsFloor: true, desc: "Right-click to enchant a tool, weapon, or armor piece." },
   /* walls */
   woodWall:       { name: "Wood wall", type: "wall", wall: W.WOOD, max: 999 },
   stoneBrickWall: { name: "Stone brick wall", type: "wall", wall: W.STONE_BRICK, max: 999 },
@@ -201,12 +203,15 @@ export const ITEMS = {
   ironHelm:    { name: "Iron helmet", type: "armor", slot: "head", def: 2 },
   ironChest:   { name: "Iron chestplate", type: "armor", slot: "chest", def: 3 },
   ironLegs:    { name: "Iron greaves", type: "armor", slot: "legs", def: 2 },
-  goldHelm:    { name: "Golden helmet", type: "armor", slot: "head", def: 3 },
-  goldChest:   { name: "Golden chestplate", type: "armor", slot: "chest", def: 4 },
-  goldLegs:    { name: "Golden greaves", type: "armor", slot: "legs", def: 3 },
-  trolliumHelm:  { name: "Trollium helmet", type: "armor", slot: "head", def: 4 },
-  trolliumChest: { name: "Trollium chestplate", type: "armor", slot: "chest", def: 6 },
-  trolliumLegs:  { name: "Trollium greaves", type: "armor", slot: "legs", def: 5 },
+  silverHelm:  { name: "Silver helmet", type: "armor", slot: "head", def: 3 },
+  silverChest: { name: "Silver chestplate", type: "armor", slot: "chest", def: 4 },
+  silverLegs:  { name: "Silver greaves", type: "armor", slot: "legs", def: 3 },
+  goldHelm:    { name: "Golden helmet", type: "armor", slot: "head", def: 4 },
+  goldChest:   { name: "Golden chestplate", type: "armor", slot: "chest", def: 5 },
+  goldLegs:    { name: "Golden greaves", type: "armor", slot: "legs", def: 4 },
+  trolliumHelm:  { name: "Trollium helmet", type: "armor", slot: "head", def: 6 },
+  trolliumChest: { name: "Trollium chestplate", type: "armor", slot: "chest", def: 8 },
+  trolliumLegs:  { name: "Trollium greaves", type: "armor", slot: "legs", def: 7 },
   /* consumables + special */
   trollBrew:   { name: "Troll brew", type: "potion", heal: 50, max: 30 },
   rawMeat:     { name: "Raw meat", type: "food", hunger: 12, max: 99, raw: true, desc: "Edible. Risky. Cook it if you can." },
@@ -277,6 +282,9 @@ export const RECIPES = [
   { out: "ironHelm", n: 1, ing: [["ironBar", 10]], station: "anvil" },
   { out: "ironChest", n: 1, ing: [["ironBar", 15]], station: "anvil" },
   { out: "ironLegs", n: 1, ing: [["ironBar", 12]], station: "anvil" },
+  { out: "silverHelm", n: 1, ing: [["silverBar", 10]], station: "anvil" },
+  { out: "silverChest", n: 1, ing: [["silverBar", 15]], station: "anvil" },
+  { out: "silverLegs", n: 1, ing: [["silverBar", 12]], station: "anvil" },
   { out: "goldHelm", n: 1, ing: [["goldBar", 10]], station: "anvil" },
   { out: "goldChest", n: 1, ing: [["goldBar", 15]], station: "anvil" },
   { out: "goldLegs", n: 1, ing: [["goldBar", 12]], station: "anvil" },
@@ -294,7 +302,27 @@ export const RECIPES = [
   { out: "lever", n: 1, ing: [["stone", 3], ["ironBar", 1]], station: "workbench" },
   { out: "plate", n: 1, ing: [["stone", 2], ["copperBar", 1]], station: "workbench" },
   { out: "dartTrap", n: 1, ing: [["stone", 10], ["copperBar", 3]], station: "workbench" },
+  { out: "enchantTable", n: 1, ing: [["trolliumBar", 4], ["lens", 4], ["goldBar", 3]], station: "anvil" },
 ];
+
+/* ----------------------------------------------------------------- enchanting */
+/* One enchant per item, re-rolling replaces whatever was there before --
+   no stacking multiple enchants for v1. Cost is a flat reagent price
+   regardless of item type or rarity, paid at the enchant table. */
+export const ENCHANT_COST = [["lens", 3], ["gel", 4]];
+export const ENCHANTS = {
+  tool: [
+    { key: "efficiency", name: "Efficiency", power: 15 },
+    { key: "haste", name: "Haste", speed: 0.6 },
+  ],
+  weapon: [
+    { key: "sharpness", name: "Sharpness", dmg: 6 },
+    { key: "brutality", name: "Brutality", knock: 60 },
+  ],
+  armor: [
+    { key: "protection", name: "Protection", def: 2 },
+  ],
+};
 
 /* ----------------------------------------------------------------- enemies */
 /* ai: slime | walker | flyer  ·  ctx: when/where it spawns */
@@ -311,6 +339,9 @@ export const ENEMIES = {
   bat:        { name: "Cave troll bat", ai: "flyer", hp: 22, dmg: 11, def: 1, w: 22, h: 16, color: "#8a6fb0", drops: [], kb: 1.1, erratic: true },
   skeleton:   { name: "Troll skeleton", ai: "walker", hp: 72, dmg: 19, def: 8, w: 22, h: 42, color: "#cfc9bd", drops: [["bone", 1, 3, 0.8]], kb: 0.6 },
   slimeKing:  { name: "Kingling slime", ai: "slime", hp: 30, dmg: 12, def: 3, w: 26, h: 18, color: "#e8b23c", drops: [["gel", 1, 2, 1]], kb: 0.9, noNatural: true },
+  grinCreeper: { name: "Grin Creeper", ai: "exploder", hp: 20, dmg: 30, def: 0, w: 24, h: 24, color: "#5fbf3a", drops: [["gel", 1, 3, 1]], kb: 0.5 },
+  boneArcher: { name: "Bone Archer", ai: "archer", hp: 50, dmg: 10, def: 4, w: 22, h: 42, color: "#cfc9bd", drops: [["bone", 1, 2, 0.7]], kb: 0.5 },
+  shadowStalker: { name: "Shadow Stalker", ai: "teleporter", hp: 60, dmg: 18, def: 5, w: 24, h: 30, color: "#3a2a4d", drops: [["lens", 1, 2, 0.5]], kb: 0.7, noNatural: true },
   /* Pepe Swamp */
   copeSlime:  { name: "Cope Slime", ai: "slime", hp: 20, dmg: 9, def: 1, w: 26, h: 18, color: "#5f8f3a", drops: [["gel", 1, 2, 1]], kb: 1.0 },
   fudPhantom: { name: "FUD Phantom", ai: "flyer", hp: 30, dmg: 13, def: 1, w: 24, h: 24, color: "#8a7fa8", drops: [["lens", 0, 1, 0.3]], kb: 0.9, erratic: true },

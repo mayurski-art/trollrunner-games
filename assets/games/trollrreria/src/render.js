@@ -433,6 +433,13 @@ export class Renderer {
         for (let n = 0; n < 3; n++) g.fillRect(px + 5, py + 2 + n * 5, 6, 1);
         break;
       }
+      case T.ENCHANT_TABLE: {
+        g.fillStyle = "#2f2347"; g.fillRect(px + 1, py + 9, TILE - 2, 6);
+        g.fillStyle = "#4a3a70"; g.fillRect(px + 2, py + 9, TILE - 4, 2);
+        g.fillStyle = "#8a6fd9"; g.fillRect(px + 5, py + 3, 6, 5);
+        g.fillStyle = "#d9c8ff"; g.fillRect(px + 7, py + 4, 2, 3);
+        break;
+      }
       default: {
         g.fillStyle = "#f0f"; g.fillRect(px, py, TILE, TILE);
       }

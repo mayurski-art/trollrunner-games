@@ -56,6 +56,7 @@ class Game {
     this.npcs = [];
     this.freeCam = false;          // F4 debug flight
     this.debug = false;
+    this.creative = false;         // build mode: infinite blocks, no fall dmg, fly -- never saved
     this.pointerOverUI = false;
     this.deathTimer = 0;
 
@@ -248,6 +249,14 @@ class Game {
   enterPlay() {
     this.state = "play";
     if (this.ui) this.ui.showScreens({});
+  }
+
+  /* Build mode: infinite blocks (see tryPlace/tryPlaceWall), instant
+     mining (mineTick), no fall damage + free flight (player.js) -- never
+     persisted, always starts off, fully separate from survival saves. */
+  toggleCreative() {
+    this.creative = !this.creative;
+    this.announce(this.creative ? "🛠️ Creative mode ON" : "🛠️ Creative mode OFF");
   }
 
   async quitToTitle() {
@@ -689,6 +698,12 @@ class Game {
     }
 
     if (id === T.AIR || !def || def.hp === Infinity) return;
+    /* creative: instant-break anything, any tool, no power gate */
+    if (this.creative) {
+      player.startSwing(0.1);
+      if (world.damageTile(tx, ty, def.hp)) this.breakTileAt(tx, ty);
+      return;
+    }
     /* soft deco breaks with anything */
     const soft = id === T.PLANT || id === T.SHROOM || id === T.TORCH || id === T.GRIN_FRAG || id === T.PEPE_SCROLL || id === T.ROCKET_PART;
     if (!soft) {
@@ -853,7 +868,7 @@ class Game {
       if (!support) return false;
     }
 
-    this.inventory.useSelected();
+    if (!this.creative) this.inventory.useSelected();
     /* dart traps face away from the player */
     let placeId = def.tile;
     if (def.faces && this.player) {
@@ -880,7 +895,7 @@ class Game {
       world.isSolid(tx - 1, ty) || world.isSolid(tx + 1, ty) ||
       world.isSolid(tx, ty - 1) || world.isSolid(tx, ty + 1);
     if (!support) return false;
-    this.inventory.useSelected();
+    if (!this.creative) this.inventory.useSelected();
     world.setWall(tx, ty, def.wall);
     this.sfx && this.sfx.place();
     this.ui && this.ui.dirtyHud();
@@ -922,6 +937,10 @@ class Game {
     }
     if (id === T.CHEST && this.ui && this.ui.openChest) {
       this.ui.openChest(m.tx, m.ty);
+      return;
+    }
+    if (id === T.ENCHANT_TABLE && this.ui && this.ui.openEnchant) {
+      this.ui.openEnchant(m.tx, m.ty);
       return;
     }
     if (id === T.LEVER) {
@@ -1178,6 +1197,11 @@ class Game {
     if (this.flags.viral && Math.random() < 0.25) {
       return ["botGoblin", "engagementFarmer", "cloutLeech"][Math.floor(Math.random() * 3)];
     }
+    /* Shadow Stalker: hardmode nights only, creeps into any underground
+       roll the same way -- never a natural surface spawn, never daytime. */
+    if (this.flags.hardmode && isNight && ty >= 310 && Math.random() < 0.12) {
+      return "shadowStalker";
+    }
     const r = Math.random();
     if (biome === "swamp" && ty < 310) {
       /* Pepe Swamp gets its own surface roster instead of the generic one */
@@ -1187,17 +1211,21 @@ class Game {
     if (ty < 310) {
       /* surface */
       if (!isNight) return r < 0.8 ? "slimeGreen" : "slimeBlue";
-      if (this.trollMoon) return r < 0.6 ? "zombie" : "eye";
-      return r < 0.5 ? "zombie" : r < 0.85 ? "eye" : "slimeBlue";
+      if (this.trollMoon) return r < 0.5 ? "zombie" : r < 0.85 ? "eye" : "grinCreeper";
+      return r < 0.42 ? "zombie" : r < 0.75 ? "eye" : r < 0.9 ? "slimeBlue" : "grinCreeper";
     }
     /* Rage Comic Ruins live in the stone under the swamp/desert boundary --
        reskin the mid-depth skeleton roll to match whoever's down there */
     if (ty < 650) {
-      if (r < 0.5) return "bat";
-      if (r < 0.8) return "slimeBlue";
-      return biome === "swamp" || biome === "desert" ? "paperHandSkeleton" : "skeleton";
+      if (r < 0.4) return "bat";
+      if (r < 0.65) return "slimeBlue";
+      if (r < 0.85) return biome === "swamp" || biome === "desert" ? "paperHandSkeleton" : "skeleton";
+      return "boneArcher";
     }
-    return r < 0.45 ? "skeleton" : r < 0.8 ? "bat" : "slimeBlue";
+    if (r < 0.35) return "skeleton";
+    if (r < 0.6) return "bat";
+    if (r < 0.8) return "slimeBlue";
+    return "boneArcher";
   }
 
   /* Animal spawner: passive food source, daylight + surface only, off-screen. */

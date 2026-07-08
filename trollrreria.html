@@ -86,6 +86,18 @@
       <div id="chest-grid"></div>
     </div>
 
+    <!-- Enchant table -->
+    <div id="enchant-panel" class="tt-panel" hidden>
+      <h3>Enchant</h3>
+      <div id="enchant-slot-wrap">
+        <div id="enchant-slot" class="slot" title="Item to enchant"></div>
+        <span class="craft-arrow">➜</span>
+        <button id="btn-enchant" class="btn-secondary" type="button">✨ Enchant</button>
+      </div>
+      <div id="enchant-status" class="cr-ing"></div>
+      <button id="enchant-close" class="btn-ghost" type="button">Close</button>
+    </div>
+
     <!-- Merchant barter shop -->
     <div id="shop-panel" class="tt-panel" hidden>
       <h3>Merchant Troll · barter</h3>
@@ -158,6 +170,7 @@
           <button id="btn-resume" class="btn-primary" type="button">▶ Resume</button>
           <button id="btn-save" class="btn-secondary" type="button">💾 Save world</button>
           <button id="btn-store" class="btn-secondary" type="button">🪙 $TROLL Store</button>
+          <button id="btn-creative" class="btn-secondary" type="button">🛠️ Creative Mode: Off</button>
           <label class="vol-row">SFX <input id="vol-slider" type="range" min="0" max="100" value="60"></label>
           <label class="vol-row">Music <input id="music-slider" type="range" min="0" max="100" value="50"></label>
           <button id="btn-quit" class="btn-ghost" type="button">Save &amp; quit to title</button>

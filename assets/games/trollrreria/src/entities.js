@@ -285,6 +285,76 @@ export class Enemy extends Entity {
         this.dir = Math.sign(this.vx) || this.dir;
         break;
       }
+      /* Grin Creeper: shuffles in close, then arms a short fuse and pops
+         in an AOE burst -- backing off doesn't disarm it once it's lit,
+         same tension as the thing it's riffing on. */
+      case "exploder": {
+        const armRange = TILE * 1.8;
+        if (this._fuse > 0) {
+          this.vx *= 0.7;
+          this._fuse -= dt;
+          if (this._fuse <= 0) {
+            const R = TILE * 2.6;
+            if (dist2(this.cx, this.cy, p.cx, p.cy) < R * R) {
+              p.hurt(game, this.elite ? 45 : 30, "a " + this.def.name, this.cx);
+            }
+            burst(game, this.cx, this.cy, "#8fd14f", 26, { spread: 260, up: 160, glow: true });
+            game.triggerShake && game.triggerShake(9, 0.25);
+            game.sfx && game.sfx.hurt && game.sfx.hurt();
+            this.die(game);
+          }
+        } else if (dist2(this.cx, this.cy, p.cx, p.cy) < armRange * armRange) {
+          this._fuse = 0.85;
+        } else {
+          this.dir = toward;
+          this.vx = clamp(this.vx + toward * 500 * dt, -46, 46);
+        }
+        break;
+      }
+      /* Bone Archer: holds a preferred range and lobs arrows instead of
+         closing to melee -- the walker's ranged counterpart. */
+      case "archer": {
+        const distX = Math.abs(p.cx - this.cx);
+        const preferred = TILE * 6;
+        this.dir = toward;
+        if (distX < preferred - 20) this.vx = clamp(this.vx - toward * 500 * dt, -50, 50);
+        else if (distX > preferred + 20) this.vx = clamp(this.vx + toward * 500 * dt, -50, 50);
+        else this.vx *= 0.85;
+        if (this.aiTimer <= 0 && distX < TILE * 10 && Math.abs(p.cy - this.cy) < TILE * 5) {
+          this.aiTimer = 1.6 + Math.random() * 0.7;
+          const dx = p.cx - this.cx, dy = (p.cy - 6) - this.cy;
+          const len = Math.hypot(dx, dy) || 1;
+          const spd = 280;
+          game.entities.push(new Projectile(
+            this.cx + this.dir * 10, this.cy - 6, (dx / len) * spd, (dy / len) * spd,
+            { dmg: this.elite ? 16 : 10, hostile: true, gravity: 0.2 }
+          ));
+          game.sfx && game.sfx.swing && game.sfx.swing();
+        }
+        break;
+      }
+      /* Shadow Stalker: hardmode-night only. Blinks near the player every
+         couple seconds instead of pathing over -- unsettling more than
+         hard, since it still just wants a normal melee hit once it's close. */
+      case "teleporter": {
+        if (this.aiTimer <= 0) {
+          this.aiTimer = 2.4 + Math.random() * 1.6;
+          const ang = Math.random() * Math.PI * 2;
+          const dist = TILE * (3 + Math.random() * 2);
+          const nx = p.cx + Math.cos(ang) * dist;
+          const ny = p.cy + Math.sin(ang) * dist - 20;
+          const tx = Math.floor(nx / TILE), ty = Math.floor(ny / TILE);
+          if (!game.world.isSolid(tx, ty) && !game.world.isSolid(tx, ty + 1)) {
+            burst(game, this.cx, this.cy, "#2a1f3d", 14, { spread: 160, glow: true });
+            this.x = nx - this.w / 2;
+            this.y = ny - this.h;
+            burst(game, this.cx, this.cy, "#8a6fb0", 14, { spread: 160, glow: true });
+          }
+        }
+        this.dir = toward;
+        this.vx = clamp(this.vx + toward * 700 * dt, -70, 70);
+        break;
+      }
     }
   }
 
@@ -346,6 +416,9 @@ export class Enemy extends Entity {
       case "flyer": d.erratic ? this.drawBat(ctx, d) : this.drawEye(ctx, d); break;
       case "ratRunner": this.drawRat(ctx, d); break;
       case "flee": this.drawCritter(ctx, d); break;
+      case "exploder": this.drawSlime(ctx, d); break;
+      case "archer": this.drawWalker(ctx, d); break;
+      case "teleporter": this.drawEye(ctx, d); break;
     }
     ctx.restore();
   }

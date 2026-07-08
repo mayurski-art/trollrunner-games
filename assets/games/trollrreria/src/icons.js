@@ -108,6 +108,11 @@ function drawFurniture(g, id) {
     g.fillStyle = "#8a6d3a"; g.fillRect(14, 2, 4, 28);
     g.fillStyle = "#6b5228";
     for (let n = 0; n < 5; n++) g.fillRect(10, 4 + n * 5, 12, 2);
+  } else if (id === "enchantTable") {
+    g.fillStyle = "#2f2347"; g.fillRect(3, 18, 26, 11);
+    g.fillStyle = "#4a3a70"; g.fillRect(4, 18, 24, 3);
+    g.fillStyle = "#8a6fd9"; g.fillRect(11, 6, 10, 10);
+    g.fillStyle = "#d9c8ff"; g.fillRect(14, 8, 4, 6);
   } else if (id === "bed") {
     g.fillStyle = "#5d4326"; g.fillRect(4, 22, 3, 6); g.fillRect(25, 22, 3, 6);
     g.fillStyle = "#8a5a2b"; g.fillRect(3, 19, 26, 4);
