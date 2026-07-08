@@ -1,5 +1,5 @@
 /* Trollrreria — the player: physics, mining/placing/using, health, breath,
-   fall damage. Sprite = the Troll Kombat gladiator rig (trollface approved),
+   fall damage. Sprite = the trollface prospector rig (trollface approved),
    feet-anchored, with a drawn fallback while sheets load. */
 
 import {
@@ -10,13 +10,16 @@ import { SKINS } from "./store.js";
 import { getIcon } from "./icons.js";
 import { clamp } from "./util.js";
 
-const RIG_DIR = "assets/games/troll-kombat/fighters/gladiator/anims/";
+const RIG_DIR = "assets/games/trollrreria/sprites/prospector/anims/";
 const RIG = {
-  idle: { frames: 8, fps: 9 },
-  walk: { frames: 6, fps: 12 },
-  jump: { frames: 9, fps: 14 },
-  hit:  { frames: 6, fps: 16 },
-  ko:   { frames: 7, fps: 10 },
+  idle:   { frames: 8, fps: 9 },
+  walk:   { frames: 6, fps: 12 },
+  jump:   { frames: 9, fps: 14 },
+  hit:    { frames: 6, fps: 16 },
+  ko:     { frames: 7, fps: 10 },
+  /* swing-progress-driven, not looped -- see draw() */
+  mine:   { frames: 9, fps: 24 },
+  attack: { frames: 9, fps: 24 },
 };
 const CELL = 136;
 const BODY_H = 58;            // drawn height in world px
@@ -231,7 +234,11 @@ export class Player extends Entity {
 
     /* -------- animation state */
     if (!this.onGround && !water) this.anim = "jump";
-    else if (Math.abs(this.vx) > 12) this.anim = "walk";
+    else if (this.swing > 0) {
+      const sel = game.inventory.selected;
+      const swingDef = sel && ITEMS[sel.id];
+      this.anim = swingDef && swingDef.type === "weapon" ? "attack" : "mine";
+    } else if (Math.abs(this.vx) > 12) this.anim = "walk";
     else this.anim = "idle";
   }
 
@@ -392,6 +399,10 @@ export class Player extends Entity {
         /* map vertical velocity onto the jump strip */
         const t = clamp((this.vy + 550) / 1100, 0, 0.999);
         fi = Math.floor(t * a.frames);
+      } else if (this.anim === "mine" || this.anim === "attack") {
+        /* play through the swing once, synced to swing progress (1..0) */
+        const prog = clamp(1 - this.swing, 0, 0.999);
+        fi = Math.floor(prog * a.frames);
       } else {
         fi = Math.floor(this.animTime * a.fps) % a.frames;
       }
@@ -422,9 +433,12 @@ export class Player extends Entity {
       ctx.strokeStyle = "#1c1424"; ctx.lineWidth = 1.6; ctx.stroke();
     }
 
-    /* held item swing */
+    /* held item swing — the mine/attack body animation already shows the
+       tool in hand, so only overlay the rotating icon when that rig is
+       unavailable (fallback silhouette) or the anim didn't get picked up. */
     const sel = game.inventory.selected;
-    if (sel && this.swing > 0) {
+    const bodyShowsSwing = a && this.rigBox && (this.anim === "mine" || this.anim === "attack");
+    if (sel && this.swing > 0 && !bodyShowsSwing) {
       const def = ITEMS[sel.id];
       if (def.type === "tool" || def.type === "weapon") {
         const prog = 1 - this.swing;
