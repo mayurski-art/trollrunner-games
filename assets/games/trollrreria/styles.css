@@ -169,6 +169,11 @@ html, body {
 .craft-row .cr-name { font-size: 13px; font-weight: 700; }
 .craft-row .cr-ing { font-size: 11px; color: var(--tt-muted); font-family: "DM Mono", monospace; }
 
+#craft-grid-wrap { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+#craft-grid { display: grid; grid-template-columns: repeat(3, var(--slot)); gap: 5px; }
+.craft-arrow { font-size: 18px; color: var(--tt-muted); flex: none; }
+#craft-output.has-result { border-color: var(--tt-gold); box-shadow: 0 0 8px rgba(255, 179, 0, 0.35); }
+
 #inv-grid { display: grid; grid-template-columns: repeat(10, var(--slot)); gap: 6px; }
 .inv-bottom { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
 #armor-col { display: flex; gap: 6px; }

@@ -6,7 +6,7 @@
 
 import {
   T, TILES, W, ITEMS, ENEMIES, TILE, ZOOM, CYCLE, DAY_LEN, WORLD_W, WORLD_H, CROP_GROW_TIME,
-  REACH, STATION_SCAN, STARTER_ITEMS, FUEL, SMELT_TIME,
+  REACH, STATION_SCAN, STARTER_ITEMS,
 } from "./defs.js";
 import { hashStr, clamp, lerp, fmtClock, aabb, dist2 } from "./util.js";
 import { generateWorld, biomeAt, zoneAt, BIOME_NAMES, STONE_START, DEEP_START } from "./worldgen.js";
@@ -813,25 +813,6 @@ class Game {
     const world = this.world;
     if (world.getWall(tx, ty) !== W.NONE) return true;
     return world.isSolid(tx - 1, ty) || world.isSolid(tx + 1, ty) || world.isSolid(tx, ty + 1);
-  }
-
-  /* Craft a furnace recipe with real fuel: burns wood over time instead of
-     smelting for free/instantly. Auto-refuels from wood in the bag when the
-     furnace runs cold; each individual craft still takes SMELT_TIME on top
-     of that, gated by smeltCooldown, so output isn't instant even lit.
-     Returns { ok, reason } -- reason is set on failure for UI feedback. */
-  tryFurnaceCraft(recipe, stations) {
-    const inv = this.inventory;
-    if (this.smeltCooldown > 0) return { ok: false, reason: "smelting…" };
-    if (!inv.canCraft(recipe, stations)) return { ok: false, reason: "missing ingredients" };
-    if (this.flags.furnaceFuel <= 0) {
-      if (inv.count("wood") < 1) return { ok: false, reason: "needs wood for fuel" };
-      inv.consume("wood", 1);
-      this.flags.furnaceFuel = FUEL.wood;
-    }
-    if (!inv.craft(recipe, stations)) return { ok: false, reason: "bag full" };
-    this.smeltCooldown = SMELT_TIME;
-    return { ok: true };
   }
 
   /* Place the selected block item at (tx,ty). Returns success. */

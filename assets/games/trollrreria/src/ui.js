@@ -3,7 +3,7 @@
 
 import {
   ITEMS, TILES, T, DAY_LEN, CYCLE, TILE, STATION_SCAN, WORLD_W, WORLD_H,
-  MERCHANT_OFFERS,
+  MERCHANT_OFFERS, RECIPES, FUEL, SMELT_TIME,
 } from "./defs.js";
 import { getIcon } from "./icons.js";
 import { fmtClock } from "./util.js";
@@ -28,6 +28,8 @@ export class UI {
       armorCol: document.getElementById("armor-col"),
       trash: document.getElementById("trash-slot"),
       craftList: document.getElementById("craft-list"),
+      craftGridEl: document.getElementById("craft-grid"),
+      craftOutputEl: document.getElementById("craft-output"),
       chestPanel: document.getElementById("chest-panel"),
       chestGrid: document.getElementById("chest-grid"),
       cursor: document.getElementById("cursor-item"),
@@ -72,6 +74,8 @@ export class UI {
     this.chest = null;           // { key, tx, ty, items }
     this.cursor = null;          // dragged stack { id, n }
     this.stations = new Set();
+    this.craftGrid = new Array(9).fill(null);   // real 3x3 crafting grid
+    this._craftMatch = null;                    // recipe the grid currently satisfies
 
     this.buildHotbar();
     this.buildInventory();
@@ -513,6 +517,23 @@ export class UI {
   }
 
   buildInventory() {
+    this.craftSlots = [];
+    this.el.craftGridEl.innerHTML = "";
+    for (let i = 0; i < 9; i++) {
+      const d = this.makeSlot(i, "craft");
+      this.el.craftGridEl.appendChild(d);
+      this.craftSlots.push(d);
+    }
+    this.el.craftOutputEl.addEventListener("mousedown", e => {
+      e.stopPropagation();
+      e.preventDefault();
+      this.clickCraftOutput();
+    });
+    this.el.craftOutputEl.addEventListener("mouseenter", () => {
+      if (this._craftMatch) this.showTip("craft-output", null, this.el.craftOutputEl);
+    });
+    this.el.craftOutputEl.addEventListener("mouseleave", () => { this.el.tooltip.hidden = true; });
+
     this.el.invGrid.innerHTML = "";
     this.invSlots = [];
     for (let i = 10; i < 50; i++) {
@@ -570,6 +591,8 @@ export class UI {
     if (kind === "inv") return this.game.inventory.slots[key];
     if (kind === "armor") return this.game.inventory.armor[key];
     if (kind === "chest") return this.chest ? this.chest.items[key] : null;
+    if (kind === "craft") return this.craftGrid[key];
+    if (kind === "craft-output") return this._craftMatch ? { id: this._craftMatch.out, n: this._craftMatch.n } : null;
     return null;
   }
 
@@ -577,6 +600,7 @@ export class UI {
     if (kind === "inv") this.game.inventory.slots[key] = stack;
     else if (kind === "armor") this.game.inventory.armor[key] = stack;
     else if (kind === "chest" && this.chest) this.chest.items[key] = stack;
+    else if (kind === "craft") this.craftGrid[key] = stack;
   }
 
   slotClick(kind, key, isRight, isShift) {
@@ -652,7 +676,7 @@ export class UI {
       if (left === 0) this.setStack(kind, key, null);
       return;
     }
-    if (kind === "chest") {
+    if (kind === "chest" || kind === "craft") {
       const left = inv.add(stack.id, stack.n);
       this.setStack(kind, key, left > 0 ? { id: stack.id, n: left } : null);
       return;
@@ -754,6 +778,7 @@ export class UI {
     if (!this.invOpen) {
       this.closeChest();
       this.dropCursor();
+      this.returnCraftGrid();
       this.pointerOver = false;
       this.el.tooltip.hidden = true;
     } else {
@@ -809,6 +834,10 @@ export class UI {
     );
   }
 
+  /* The list is now a recipe browser, not an instant-craft button: clicking
+     a row pulls that recipe's ingredients out of the bag and into the real
+     3x3 grid below, where the output slot does the actual crafting (so
+     manually dragging items into the grid works exactly the same way). */
   paintCraftList() {
     const inv = this.game.inventory;
     const rows = inv.visibleRecipes(this.stations);
@@ -827,10 +856,8 @@ export class UI {
     }
     for (const { recipe, can } of rows) {
       const def = ITEMS[recipe.out];
-      const isFurnace = recipe.station === "furnace";
-      const fuelOk = !isFurnace || this.game.flags.furnaceFuel > 0 || inv.count("wood") >= 1;
       const row = document.createElement("div");
-      row.className = "craft-row" + (can && fuelOk ? "" : " cant");
+      row.className = "craft-row" + (can ? "" : " cant");
       const cv = document.createElement("canvas");
       cv.width = 32; cv.height = 32;
       cv.getContext("2d").drawImage(getIcon(recipe.out), 0, 0);
@@ -845,28 +872,98 @@ export class UI {
       row.appendChild(txt);
       row.addEventListener("mousedown", e => {
         e.stopPropagation();
-        if (isFurnace) {
-          const result = this.game.tryFurnaceCraft(recipe, this.stations);
-          if (result.ok) {
-            const s = this.game.sfx;
-            if (s) s.craft();
-            this.dirtyInv();
-          } else if (result.reason) {
-            this.game.announce && this.game.announce(result.reason);
-          }
-          return;
-        }
-        if (inv.craft(recipe, this.stations)) {
-          const s = this.game.sfx;
-          if (s) s.craft();
-          this.dirtyInv();
-        }
+        if (can) this.fillCraftGrid(recipe);
       });
       list.appendChild(row);
     }
     if (!rows.length) {
       list.innerHTML = `<div class="cr-ing" style="padding:6px">Gather materials or stand near a station…</div>`;
     }
+  }
+
+  /* Find the recipe (if any) whose ingredients exactly match what's
+     currently sitting in the grid -- shapeless, aggregate match (position
+     within the 3x3 doesn't matter), same as tossing items in and seeing
+     what lines up. */
+  matchRecipe() {
+    const counts = new Map();
+    for (const s of this.craftGrid) if (s) counts.set(s.id, (counts.get(s.id) || 0) + s.n);
+    if (counts.size === 0) return null;
+    for (const r of RECIPES) {
+      if (r.station && !this.stations.has(r.station)) continue;
+      if (r.ing.length !== counts.size) continue;
+      if (r.ing.every(([id, n]) => counts.get(id) === n)) return r;
+    }
+    return null;
+  }
+
+  paintCraftGrid() {
+    for (let i = 0; i < 9; i++) this.paintSlot(this.craftSlots[i], this.craftGrid[i]);
+    const match = this.matchRecipe();
+    this._craftMatch = match;
+    this.paintSlot(this.el.craftOutputEl, match ? { id: match.out, n: match.n } : null);
+    this.el.craftOutputEl.classList.toggle("has-result", !!match);
+  }
+
+  /* Pull a recipe's ingredients out of the bag and into the grid so the
+     player doesn't have to hunt-and-drag every item by hand -- purely a
+     shortcut, identical result to placing them manually. */
+  fillCraftGrid(recipe) {
+    this.returnCraftGrid();
+    const inv = this.game.inventory;
+    if (!inv.canCraft(recipe, this.stations)) return;
+    let slot = 0;
+    for (const [id, n] of recipe.ing) {
+      inv.consume(id, n);
+      this.craftGrid[slot++] = { id, n };
+    }
+    this.dirtyInv();
+  }
+
+  /* Hand back whatever's sitting in the grid (e.g. closing the inventory
+     mid-craft, or loading up a different recipe) -- nothing is ever lost. */
+  returnCraftGrid() {
+    const inv = this.game.inventory;
+    for (let i = 0; i < 9; i++) {
+      const s = this.craftGrid[i];
+      if (s) {
+        const left = inv.add(s.id, s.n);
+        if (left > 0 && this.game.player) {
+          this.game.spawnDrop(this.game.player.cx, this.game.player.cy - 8, s.id, left,
+            (this.game.player.dir || 1) * 150);
+        }
+        this.craftGrid[i] = null;
+      }
+    }
+  }
+
+  /* The one real crafting action: consumes the exact grid contents (the
+     match guarantees there's nothing extra sitting in it) and grants the
+     output, routing furnace recipes through the same fuel/cooldown gate
+     as before. */
+  clickCraftOutput() {
+    const recipe = this._craftMatch;
+    if (!recipe || this.cursor) return;
+    const inv = this.game.inventory;
+    const game = this.game;
+    if (recipe.station === "furnace") {
+      if (game.smeltCooldown > 0) { game.announce && game.announce("smelting…"); return; }
+      if (game.flags.furnaceFuel <= 0) {
+        if (inv.count("wood") < 1) { game.announce && game.announce("needs wood for fuel"); return; }
+        inv.consume("wood", 1);
+        game.flags.furnaceFuel = FUEL.wood;
+      }
+    }
+    const def = ITEMS[recipe.out];
+    let space = 0;
+    for (const s of inv.slots) { if (!s) space += def.max; else if (s.id === recipe.out) space += def.max - s.n; }
+    if (space < recipe.n) { game.announce && game.announce("bag full"); return; }
+    for (let i = 0; i < 9; i++) this.craftGrid[i] = null;
+    inv.add(recipe.out, recipe.n);
+    if (recipe.station === "furnace") game.smeltCooldown = SMELT_TIME;
+    const s = game.sfx;
+    if (s) s.craft();
+    this.dirtyInv();
   }
 
   paintChest() {
@@ -993,6 +1090,7 @@ export class UI {
         for (let i = 10; i < 50; i++) this.paintSlot(this.invSlots[i - 10], g.inventory.slots[i]);
         for (const k of ["head", "chest", "legs"]) this.paintSlot(this.armorSlots[k], g.inventory.armor[k]);
         this.paintCraftList();
+        this.paintCraftGrid();
       }
       this.paintChest();
       this.moveCursorEl();
