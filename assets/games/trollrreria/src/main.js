@@ -1678,7 +1678,7 @@ class Game {
     if (this.ui) this.ui.showScreens({});
     burst(this, p.cx, p.cy, "#ffb300", 20, { spread: 300, up: 200, glow: true });
     this.sfx && this.sfx.potion();
-    this.announce("🧌 Back up. Let's go.");
+    this.floatText(p.cx, p.y - 24, "🧌 Back up. Let's go.", "#ffb300");
   }
 
   /* Fast travel is admin-only for now (same "troll_runner" gate as the
