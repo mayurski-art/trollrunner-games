@@ -230,9 +230,18 @@
     setTok(token);
 
     const walletInput = modal.querySelector("#tc-red-wallet");
-    if (window.TrollWallet && window.TrollWallet.getAddress && window.TrollWallet.isConnected()) {
-      walletInput.value = window.TrollWallet.getAddress() || "";
-    }
+    // Prefer the address linked to the account (persists across devices, no
+    // live wallet connection needed) over the session-only connected wallet.
+    (async () => {
+      let addr = null;
+      if (window.TrollrunnerAccounts && window.TrollrunnerAccounts.getWalletAddress) {
+        try { addr = await window.TrollrunnerAccounts.getWalletAddress(); } catch (_) {}
+      }
+      if (!addr && window.TrollWallet && window.TrollWallet.getAddress && window.TrollWallet.isConnected()) {
+        addr = window.TrollWallet.getAddress();
+      }
+      if (addr && !walletInput.value) walletInput.value = addr;
+    })();
 
     const btn = modal.querySelector("#tc-red-submit");
     const status = modal.querySelector("#tc-red-status");
