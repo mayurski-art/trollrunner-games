@@ -11,6 +11,7 @@ import { SURFACE_BASE } from "./worldgen.js";
 import { saveGame, saveSettings, isGuest } from "./save.js";
 import { QUESTS, questFor, isDone } from "./quests.js";
 import { SKINS, isOwned, buySkin, equipSkin, buyRevive } from "./store.js";
+import { WAYPOINTS } from "./waypoints.js";
 
 export class UI {
   constructor(game) {
@@ -55,6 +56,9 @@ export class UI {
       deathCause: document.getElementById("death-cause"),
       btnContinue: document.getElementById("btn-continue"),
       hotkeysPanel: document.getElementById("hotkeys-panel"),
+      btnTravel: document.getElementById("btn-travel"),
+      travelPanel: document.getElementById("travel-panel"),
+      travelList: document.getElementById("travel-list"),
       questTracker: document.getElementById("quest-tracker"),
       questTitle: document.getElementById("quest-title"),
       questObjectives: document.getElementById("quest-objectives"),
@@ -69,6 +73,8 @@ export class UI {
     this._questDirty = true;
     this._areaTimer = null;
     this.hotkeysOpen = false;
+    this.travelOpen = false;
+    this._adminChecked = false;
     this._hudDirty = true;
     this._invDirty = true;
     this._statusAcc = 0;
@@ -165,6 +171,8 @@ export class UI {
     });
     document.getElementById("btn-hotkeys").addEventListener("click", () => this.toggleHotkeys());
     document.getElementById("btn-hotkeys-close").addEventListener("click", () => this.toggleHotkeys(false));
+    this.el.btnTravel.addEventListener("click", () => this.toggleTravel());
+    document.getElementById("travel-close").addEventListener("click", () => this.toggleTravel(false));
     document.getElementById("btn-coop-host").addEventListener("click", () => game.hostCoop());
     document.getElementById("btn-coop-join").addEventListener("click", () =>
       game.joinCoop(document.getElementById("coop-code").value));
@@ -790,6 +798,29 @@ export class UI {
     this.el.hotkeysPanel.hidden = !this.hotkeysOpen;
   }
 
+  toggleTravel(force) {
+    if (!this.game.isAdmin()) return;
+    this.travelOpen = force !== undefined ? force : !this.travelOpen;
+    this.el.travelPanel.hidden = !this.travelOpen;
+    if (this.travelOpen) this.paintTravelList();
+  }
+
+  paintTravelList() {
+    const list = this.el.travelList;
+    list.innerHTML = "";
+    for (const wp of WAYPOINTS) {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "travel-row";
+      row.textContent = `🧭 ${wp.name}`;
+      row.addEventListener("click", () => {
+        this.game.teleportTo(wp.id);
+        this.toggleTravel(false);
+      });
+      list.appendChild(row);
+    }
+  }
+
   toggleInventory(force) {
     this.invOpen = force !== undefined ? force : !this.invOpen;
     this.el.invPanel.hidden = !this.invOpen;
@@ -947,7 +978,14 @@ export class UI {
       row.appendChild(txt);
       row.addEventListener("mousedown", e => {
         e.stopPropagation();
-        if (can) this.fillCraftGrid(recipe);
+        if (!can) return;
+        /* clicking the same recipe that's already loaded (and matches)
+           crafts it directly -- without this, a player who doesn't
+           notice the separate output slot below just sees the row
+           "do nothing" on a second click, which reads as broken
+           (this is exactly what furnace smelting looked like). */
+        if (this._craftMatch === recipe) this.clickCraftOutput();
+        else this.fillCraftGrid(recipe);
       });
       list.appendChild(row);
     }
@@ -993,6 +1031,10 @@ export class UI {
       this.craftGrid[slot++] = { id, n };
     }
     this.dirtyInv();
+    /* paint the grid + output slot right away instead of waiting on the
+       ~0.5s craft-panel tick -- otherwise a same-row second click can
+       land before _craftMatch is even set to this recipe yet. */
+    this.paintCraftGrid();
   }
 
   /* Hand back whatever's sitting in the grid (e.g. closing the inventory
@@ -1074,6 +1116,16 @@ export class UI {
     if (input.hit("KeyE")) this.toggleInventory();
     if (input.hit("KeyM")) this.toggleBigMap();
     if (input.hit("F1")) this.toggleHotkeys();
+    if (input.hit("KeyT")) this.toggleTravel();
+    /* admin status resolves async (profile loads after login) -- a cheap
+       boolean check each frame is fine, and it flips the button on the
+       moment troll_runner's session is actually ready. */
+    const admin = g.isAdmin();
+    if (admin !== this._adminChecked) {
+      this._adminChecked = admin;
+      this.el.btnTravel.hidden = !admin;
+      if (!admin) this.toggleTravel(false);
+    }
     if (input.hit("Escape")) {
       if (this.bigMapOpen) this.toggleBigMap(false);
       else if (this.shopNpc) this.closeShop();

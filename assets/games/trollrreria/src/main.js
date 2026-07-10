@@ -36,6 +36,7 @@ import { TouchControls } from "./touch.js";
 import { Music } from "./music.js";
 import { rleDecode, b64ToU16, rleEncode, u16ToB64 } from "./util.js";
 import { Net } from "./net.js";
+import { WAYPOINTS } from "./waypoints.js";
 
 const FIXED_DT = 1 / 60;
 
@@ -422,8 +423,11 @@ class Game {
   }
 
   update(dt) {
-    /* pause toggling works from play + pause (panels get Esc first) */
-    if (this.input.hit("Escape")) {
+    /* pause toggling is on B, not Escape -- Escape is reserved for closing
+       panels (inventory/dialog/map/shop, see ui.js), so sharing it with the
+       pause toggle meant a panel-close eating the first Escape press and
+       pause needing a second. B has no other binding. */
+    if (this.input.hit("KeyB")) {
       if (this.state === "pause") {
         this.enterPlay();
       } else if (this.state === "play" && this.ui &&
@@ -707,8 +711,18 @@ class Game {
     /* soft deco breaks with anything */
     const soft = id === T.PLANT || id === T.SHROOM || id === T.TORCH || id === T.GRIN_FRAG || id === T.PEPE_SCROLL || id === T.ROCKET_PART;
     if (!soft) {
-      if (def.tool === "axe" && tool.tool !== "axe") return;
-      if (def.tool === "pick" && tool.tool !== "pick") return;
+      /* wrong tool equipped (e.g. sword out) used to fail completely
+         silently -- furniture like beds/workbenches/chests only mine with
+         a pick, and with no feedback that read as "can't pick it back up" */
+      if ((def.tool === "axe" && tool.tool !== "axe") || (def.tool === "pick" && tool.tool !== "pick")) {
+        const now = performance.now();
+        if (!this._weakToolAt || now - this._weakToolAt > 1500) {
+          this._weakToolAt = now;
+          this.floatText(tx * TILE + 8, ty * TILE - 6,
+            `Need ${def.tool === "axe" ? "an axe" : "a pickaxe"} equipped`, "#9a92b8");
+        }
+        return;
+      }
       if (tool.power < (def.pow || 0)) {
         player.startSwing(1 / tool.speed);
         burst(this, tx * TILE + 8, ty * TILE + 8, "#c9c2b8", 1, { life: 0.25, spread: 60 });
@@ -1141,13 +1155,16 @@ class Game {
   updateSpawns(dt) {
     if (this.noSpawn) return;
     this._spawnAcc = (this._spawnAcc || 0) + dt;
-    const interval = this.trollMoon ? 0.35 : 0.7;
+    const st = skyState(this.time);
+    /* cut hard from the original 0.7/0.7 + 7/7 cap -- a first pass to
+       0.95/7-day,5-night still read as "way too many," so this drops
+       density by roughly half again on top of that. */
+    const interval = this.trollMoon ? 0.5 : (st.isNight ? 1.6 : 1.1);
     if (this._spawnAcc < interval) return;
     this._spawnAcc = 0;
     const p = this.player;
     if (!p || p.dead) return;
-    const st = skyState(this.time);
-    const cap = this.trollMoon && st.isNight ? 12 : 7;
+    const cap = this.trollMoon && st.isNight ? 8 : (st.isNight ? 3 : 4);
     if (this.enemies.filter(e => !e.boss && !e.def.passive).length >= cap) return;
 
     const ptx = Math.floor(p.cx / TILE), pty = Math.floor(p.cy / TILE);
@@ -1286,45 +1303,114 @@ class Game {
     this.entities.push(new QuestMarker(this.spawn.x * TILE + 8, this.spawn.y * TILE - 6, "lostGrin"));
   }
 
-  /* Place the town's four specialist shops on solid ground, spread out
-     along the surface near spawn -- same floor-finding search placeQuestSign
-     uses, just one offset per stall so they don't stack on each other. */
+  /* Two small hamlets instead of one four-building hub crammed at spawn:
+     Market Row (Blacksmith + Butcher, stone brick) right at spawn, and
+     The Hearth (Alchemist + Tavern Keeper, wood) a real walk away along
+     the surface. Each NPC gets a stamped house (walls, roof, background
+     wall, a lit ground-level door, a themed decor piece) instead of
+     standing in the open. Hamlet anchors are recorded on `this.hamlets`
+     for fast-travel (see waypoints.js) and anything else that wants to
+     find them later. */
   spawnTownShops() {
-    const roles = [
-      { dx: -10, make: (tx, ty) => new Blacksmith(tx, ty) },
-      { dx: -16, make: (tx, ty) => new Alchemist(tx, ty) },
-      { dx: 12, make: (tx, ty) => new TavernKeeper(tx, ty) },
-      { dx: 18, make: (tx, ty) => new Butcher(tx, ty) },
-    ];
-    for (const role of roles) {
-      const sx = this.spawn.x + role.dx;
-      let placed = false;
-      for (let y = this.spawn.y - 6; y < this.spawn.y + 10; y++) {
-        if (!this.world.isSolid(sx, y) && !this.world.isSolid(sx, y - 1) && this.world.isSolid(sx, y + 1)) {
-          this.npcs.push(role.make(sx, y + 1));
-          placed = true;
-          break;
+    const hamlets = {
+      market: { baseX: this.spawn.x, roles: [
+        { dx: -14, make: (tx, ty, hb) => new Blacksmith(tx, ty, hb), wallTile: T.STONE_BRICK, wallBg: W.STONE_BRICK, decorTile: T.ANVIL },
+        { dx: 14, make: (tx, ty, hb) => new Butcher(tx, ty, hb), wallTile: T.STONE_BRICK, wallBg: W.STONE_BRICK, decorTile: T.CHEST },
+      ] },
+      hearth: { baseX: this.spawn.x + 90, roles: [
+        { dx: -14, make: (tx, ty, hb) => new Alchemist(tx, ty, hb), wallTile: T.WOOD, wallBg: W.WOOD, decorTile: T.FURNACE },
+        { dx: 14, make: (tx, ty, hb) => new TavernKeeper(tx, ty, hb), wallTile: T.WOOD, wallBg: W.WOOD, decorTile: T.CAMPFIRE },
+      ] },
+    };
+    this.hamlets = {};
+    for (const [key, hamlet] of Object.entries(hamlets)) {
+      let anchor = null;
+      for (const role of hamlet.roles) {
+        const sx = hamlet.baseX + role.dx;
+        const doorSide = role.dx < 0 ? 1 : -1;   // door faces the hamlet center
+        let placed = false;
+        /* scan around this column's actual surface, not spawn's -- The
+           Hearth sits 90+ tiles from spawn, far enough that rolling-hill
+           elevation can differ a lot from spawn.y */
+        const groundY = this.world.topSolid[sx] ?? this.spawn.y;
+        for (let y = groundY - 6; y < groundY + 10; y++) {
+          if (!this.world.isSolid(sx, y) && !this.world.isSolid(sx, y - 1) && this.world.isSolid(sx, y + 1)) {
+            const bounds = this.buildTownHouse(sx, y, { wallTile: role.wallTile, wallBg: role.wallBg, decorTile: role.decorTile, doorSide });
+            this.npcs.push(role.make(sx, y + 1, bounds));
+            if (!anchor) anchor = { x: sx, y: y - 2 };
+            placed = true;
+            break;
+          }
         }
+        if (!placed) this.npcs.push(role.make(this.spawn.x, this.spawn.y + 1, null));
       }
-      if (!placed) this.npcs.push(role.make(this.spawn.x, this.spawn.y + 1));
+      this.hamlets[key] = anchor || { x: hamlet.baseX, y: this.spawn.y - 2 };
     }
   }
 
-  /* Place the Pepe Hermit somewhere along the swamp's surface. */
-  spawnPepe() {
-    this.spawnNpcInBiome("swamp", (tx, ty) => new PepeHermit(tx, ty));
+  /* Stamp a small single-room shop house: solid shell + roof, background
+     wall inside, a lit 2-tile ground-level door on one side, a themed
+     decor tile opposite it. `feetY` is the open-air tile the NPC's feet
+     rest on (ground floor is feetY+1, already solid terrain -- we don't
+     touch it, just guarantee it via the stamped floor row so uneven
+     terrain under the footprint can't leave a gap). Bulldozes whatever
+     was there before, same as the hand-carved underground rooms do. */
+  buildTownHouse(sx, feetY, opts = {}) {
+    const world = this.world, w = world.w;
+    const rw = opts.rw || 9, interiorH = opts.interiorH || 5;
+    const wallTile = opts.wallTile || T.WOOD;
+    const wallBg = opts.wallBg || W.WOOD;
+    const doorSide = opts.doorSide || 1;   // 1 = door on right wall, -1 = left wall
+    const x0 = sx - Math.floor(rw / 2), x1 = x0 + rw - 1;
+    const floorRow = feetY + 1;
+    const roofRow = feetY - interiorH;
+    const doorX = doorSide === 1 ? x1 : x0;
+    const doorRows = [feetY, feetY - 1];
+
+    for (let y = roofRow; y <= floorRow; y++) {
+      for (let x = x0; x <= x1; x++) {
+        if (y === floorRow || y === roofRow || x === x0 || x === x1) {
+          if (x === doorX && doorRows.includes(y)) world.set(x, y, T.DOOR_C);
+          else world.set(x, y, wallTile);
+        } else {
+          world.set(x, y, T.AIR);
+          world.setWall(x, y, wallBg);
+        }
+      }
+    }
+    const torchX = doorSide === 1 ? x0 + 1 : x1 - 1;
+    world.set(torchX, feetY, T.TORCH);
+    if (opts.decorTile) {
+      const decorX = doorSide === 1 ? x1 - 2 : x0 + 2;
+      if (decorX !== torchX) world.set(decorX, feetY, opts.decorTile);
+    }
+    /* interior wander fence for the NPC living here, one tile in from
+       each side wall so the sprite doesn't clip into it */
+    return { minX: (x0 + 1) * TILE, maxX: x1 * TILE };
   }
 
-  /* Place the Rocket Tinkerer somewhere along the desert's surface. */
+  /* Place the Pepe Hermit somewhere along the swamp's surface, in his own
+     small hut -- same stamped-house treatment as the town shops, just
+     one NPC and a smaller footprint. */
+  spawnPepe() {
+    this.spawnNpcInBiome("swamp", (tx, ty, hb) => new PepeHermit(tx, ty, hb),
+      { wallTile: T.WOOD, wallBg: W.WOOD, rw: 7, interiorH: 4 });
+  }
+
+  /* Place the Rocket Tinkerer somewhere along the desert's surface, in a
+     sunbaked stone hut of his own. */
   spawnRocketTinkerer() {
-    this.spawnNpcInBiome("desert", (tx, ty) => new RocketTinkerer(tx, ty));
+    this.spawnNpcInBiome("desert", (tx, ty, hb) => new RocketTinkerer(tx, ty, hb),
+      { wallTile: T.STONE_BRICK, wallBg: W.STONE_BRICK, rw: 7, interiorH: 4 });
   }
 
   /* Place the Whale Oracle somewhere along the desert's surface too --
      the Vault itself is deep underground near the map edge, but its
-     quest-giver stays reachable up top like everyone else. */
+     quest-giver stays reachable up top like everyone else. Own hut,
+     same as the Tinkerer's, separately rolled so they don't overlap. */
   spawnWhaleOracle() {
-    this.spawnNpcInBiome("desert", (tx, ty) => new WhaleOracle(tx, ty));
+    this.spawnNpcInBiome("desert", (tx, ty, hb) => new WhaleOracle(tx, ty, hb),
+      { wallTile: T.STONE_BRICK, wallBg: W.STONE_BRICK, rw: 7, interiorH: 4 });
   }
 
   /* Shared search: find open footing near a tile position (walker-height
@@ -1346,8 +1432,10 @@ class Game {
   }
 
   /* Shared search: find a safe surface spot somewhere in the given biome
-     band and drop the NPC there. */
-  spawnNpcInBiome(biome, make) {
+     band and drop the NPC there. `houseOpts`, if given, stamps a small
+     solo hut (same buildTownHouse used for the shop hamlets) so wild NPCs
+     live somewhere instead of just standing in the open. */
+  spawnNpcInBiome(biome, make, houseOpts) {
     const w = this.world;
     let x0 = -1, x1 = -1;
     for (let x = 0; x < w.w; x++) {
@@ -1359,7 +1447,8 @@ class Game {
       const tx = sx + dx;
       const ty = w.topSolid[clamp(tx, 0, w.w - 1)];
       if (ty > 2 && ty < w.h - 2 && !w.isSolid(tx, ty - 1)) {
-        this.npcs.push(make(tx, ty));
+        const bounds = houseOpts ? this.buildTownHouse(tx, ty - 1, houseOpts) : null;
+        this.npcs.push(make(tx, ty, bounds));
         return;
       }
     }
@@ -1592,6 +1681,30 @@ class Game {
     this.announce("🧌 Back up. Let's go.");
   }
 
+  /* Fast travel is admin-only for now (same "troll_runner" gate as the
+     revive-pay bypass in troll-pay.js) -- a personal convenience, not a
+     public feature, until there's a real reason to open it up. */
+  isAdmin() {
+    const profile = window.TrollrunnerAccounts?.getCachedProfile?.();
+    return !!(profile && String(profile.username || "").toLowerCase() === "troll_runner");
+  }
+
+  teleportTo(id) {
+    if (!this.isAdmin()) return;
+    const wp = WAYPOINTS.find(w => w.id === id);
+    const p = this.player;
+    if (!wp || !p || p.dead) return;
+    const dest = wp.at(this);
+    p.x = dest.tx * TILE + (TILE - p.w) / 2;
+    p.y = dest.ty * TILE - p.h;
+    p.vx = 0; p.vy = 0;
+    p.fallDist = 0;
+    p.invuln = Math.max(p.invuln, 0.5);
+    burst(this, p.cx, p.cy, "#4dd0ff", 18, { spread: 260, glow: true });
+    this.sfx && this.sfx.potion();
+    this.announce(`🧭 Warped to ${wp.name}`);
+  }
+
   /* Dynamic light sources: the player's own faint glow (so mining doesn't go
      pitch black just because a pickaxe is selected instead of a torch),
      boosted while actually holding a torch, plus glowing entities. */
@@ -1600,7 +1713,10 @@ class Game {
     const p = this.player;
     if (p && !p.dead) {
       const sel = this.inventory.selected;
-      const level = sel && sel.id === "torch" ? 200 : 60;
+      /* raised from 60: underground platforming was reading as pitch-black
+         a couple tiles out, which read as "empty space" until it was too
+         late to react */
+      const level = sel && sel.id === "torch" ? 255 : 150;
       out.push({ tx: Math.floor(p.cx / TILE), ty: Math.floor(p.cy / TILE), level });
     }
     for (const e of this.entities) {

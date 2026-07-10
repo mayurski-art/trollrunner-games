@@ -73,6 +73,16 @@ html, body {
   font: 800 14px "DM Sans", sans-serif; cursor: pointer;
 }
 .hud-hotkeys-btn:hover { border-color: var(--tt-gold); color: var(--tt-gold); }
+.hud-travel-btn { top: 182px; }
+
+#travel-list { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.travel-row {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  border: 0.5px solid var(--tt-line); border-radius: 8px;
+  background: rgba(255,255,255,0.03); color: var(--tt-text);
+  font: 600 13px "DM Sans", sans-serif; cursor: pointer; text-align: left;
+}
+.travel-row:hover { border-color: var(--tt-gold); color: var(--tt-gold); }
 
 /* ------------------------------------------------------------ quest tracker */
 #quest-tracker {

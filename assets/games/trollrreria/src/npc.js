@@ -13,6 +13,7 @@ import {
   BLACKSMITH_OFFERS, ALCHEMIST_OFFERS, TAVERN_OFFERS, BUTCHER_OFFERS,
 } from "./defs.js";
 import { Entity } from "./entities.js";
+import { skyState } from "./render.js";
 
 const FIGHTERS = "assets/games/troll-kombat/fighters/";
 const NPCS = "assets/games/trollrreria/npcs/";
@@ -94,6 +95,13 @@ export class TownNPC extends Entity {
     this.tint = opts.tint || null;
     this.bodyH = opts.bodyH || 54;
     this.homeX = this.x;
+    /* Town NPCs living in a stamped house (see main.js buildTownHouse)
+       get a hard wander fence at the interior walls instead of the
+       generic 10-tile drift -- otherwise once a player opens their door
+       to trade, nothing stops them wandering out into the street. Wild
+       NPCs (Pepe Hermit, Whale Oracle, ...) don't get one and keep the
+       old roam-and-drift-home behavior. */
+    this.homeBounds = opts.homeBounds || null;
     this.dir = 1;
     this.walkT = 0;
     this.idleT = 2;
@@ -150,14 +158,31 @@ export class TownNPC extends Entity {
     this.animTime += dt;
     this.vy = Math.min(this.vy + GRAVITY * dt, MAX_FALL);
 
+    /* Settled town NPCs stop wandering at night -- just stand in place
+       rather than pace behind a shut door until morning. Wild NPCs (no
+       homeBounds) are unaffected, they were never confined to begin with. */
+    const settled = this.homeBounds && skyState(game.time).isNight;
+
     if (this.idleT > 0) {
       this.idleT -= dt;
       this.vx *= 0.8;
       if (this.idleT <= 0) {
-        this.walkT = 1 + Math.random() * 2.5;
-        /* wander, but drift back toward home */
-        const drift = this.x - this.homeX;
-        this.dir = Math.abs(drift) > 10 * TILE ? -Math.sign(drift) : (Math.random() < 0.5 ? -1 : 1);
+        if (settled) {
+          this.idleT = 2 + Math.random() * 2;   // re-arm idle, never start walking
+        } else {
+          this.walkT = 1 + Math.random() * 2.5;
+          if (this.homeBounds) {
+            /* hard-fenced to the building interior: pick a direction that
+               can't walk them into (or through) a wall */
+            if (this.x <= this.homeBounds.minX) this.dir = 1;
+            else if (this.x + this.w >= this.homeBounds.maxX) this.dir = -1;
+            else this.dir = Math.random() < 0.5 ? -1 : 1;
+          } else {
+            /* wander, but drift back toward home */
+            const drift = this.x - this.homeX;
+            this.dir = Math.abs(drift) > 10 * TILE ? -Math.sign(drift) : (Math.random() < 0.5 ? -1 : 1);
+          }
+        }
       }
     } else {
       this.walkT -= dt;
@@ -181,6 +206,13 @@ export class TownNPC extends Entity {
         this.dir *= -1;
         this.idleT = 1;
       }
+    }
+
+    /* hard fence: clamp position regardless of how it got out of bounds
+       (a door left open mid-wander, physics edge cases, etc.) */
+    if (this.homeBounds) {
+      if (this.x < this.homeBounds.minX) { this.x = this.homeBounds.minX; this.vx = 0; this.dir = 1; }
+      else if (this.x + this.w > this.homeBounds.maxX) { this.x = this.homeBounds.maxX - this.w; this.vx = 0; this.dir = -1; }
     }
   }
 
@@ -240,11 +272,12 @@ export class MerchantTroll extends TownNPC {
 /* Pepe: melancholic swamp mystic. Placed by worldgen next to his hut in
    the swamp; gives the Rare Pepe Recovery questline. */
 export class PepeHermit extends TownNPC {
-  constructor(tx, ty) {
+  constructor(tx, ty, homeBounds) {
     super(tx, ty, {
       name: "Pepe Hermit",
       rig: "pepe",
       bodyH: 48,
+      homeBounds,
       tips: [
         "The scrolls were rare once. Then everyone screenshotted them.",
         "feels bad, man. the swamp remembers when memes were art.",
@@ -261,11 +294,12 @@ export class PepeHermit extends TownNPC {
    far edge, close to (but safely above) the Whale Vault below. Gives the
    Whale Key questline. */
 export class WhaleOracle extends TownNPC {
-  constructor(tx, ty) {
+  constructor(tx, ty, homeBounds) {
     super(tx, ty, {
       name: "Whale Oracle",
       rig: "whaleOracle",
       bodyH: 52,
+      homeBounds,
       tips: [
         "Only diamond hands may enter the vault.",
         "The Rickroller guards the key. It will not let you go easily.",
@@ -283,11 +317,12 @@ export class WhaleOracle extends TownNPC {
    offers, wired through TownNPC.shop + .offers -> ui.paintShop()). Each
    has its own dedicated PixelLab rig. */
 export class Blacksmith extends TownNPC {
-  constructor(tx, ty) {
+  constructor(tx, ty, homeBounds) {
     super(tx, ty, {
       name: "Blacksmith Grump",
       rig: "blacksmith",
       bodyH: 54,
+      homeBounds,
       tips: [
         "Ore in, bars and blades out. That's the whole pitch.",
         "Bring copper, iron, gold. I don't ask where you dug it.",
@@ -302,11 +337,12 @@ export class Blacksmith extends TownNPC {
 }
 
 export class Alchemist extends TownNPC {
-  constructor(tx, ty) {
+  constructor(tx, ty, homeBounds) {
     super(tx, ty, {
       name: "Alchemist Fizzwick",
       rig: "alchemist",
       bodyH: 54,
+      homeBounds,
       tips: [
         "Mushroom, gel, a little patience -- Troll Brew practically makes itself.",
         "Lenses make a fine reagent. Don't ask what they used to look at.",
@@ -321,11 +357,12 @@ export class Alchemist extends TownNPC {
 }
 
 export class TavernKeeper extends TownNPC {
-  constructor(tx, ty) {
+  constructor(tx, ty, homeBounds) {
     super(tx, ty, {
       name: "Tavern Keeper Bramble",
       rig: "tavernKeeper",
       bodyH: 54,
+      homeBounds,
       tips: [
         "Cook it here or cook it yourself -- I'm not precious about it.",
         "Berries in bulk, meals in bulk. That's the whole menu.",
@@ -340,11 +377,12 @@ export class TavernKeeper extends TownNPC {
 }
 
 export class Butcher extends TownNPC {
-  constructor(tx, ty) {
+  constructor(tx, ty, homeBounds) {
     super(tx, ty, {
       name: "Butcher Cleaverson",
       rig: "butcher",
       bodyH: 54,
+      homeBounds,
       tips: [
         "Boar, hen, whatever wandered too close. I don't discriminate.",
         "Bones and gel get you meat wholesale. Everyone wins but the boar.",
@@ -362,11 +400,12 @@ export class Butcher extends TownNPC {
    Gives the Fix the Rocket questline; completing it unlocks the pad
    pair (ground + sky island) for fast travel. */
 export class RocketTinkerer extends TownNPC {
-  constructor(tx, ty) {
+  constructor(tx, ty, homeBounds) {
     super(tx, ty, {
       name: "Rocket Tinkerer",
       rig: "rocketTinkerer",
       bodyH: 52,
+      homeBounds,
       tips: [
         "I built a rocket to restore the memes. It exploded. Twice. Good data.",
         "Bring me parts. I bring you the sky. Fair trade, honestly.",

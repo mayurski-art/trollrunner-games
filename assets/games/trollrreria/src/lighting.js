@@ -7,7 +7,10 @@
 
 import { T, TILES } from "./defs.js";
 
-const AIR_DECAY = 26;    // per tile through air (0..255)
+const AIR_DECAY = 12;    // per tile through air (0..255) -- was 26, then 20;
+                          // still read as too dark underground even next to
+                          // a lit torch, so this drops it further for a much
+                          // bigger visible radius around any light source
 const SOLID_DECAY = 58;  // per tile through solids
 
 export class Lighting {

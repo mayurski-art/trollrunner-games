@@ -30,6 +30,7 @@
       <div id="hotbar" aria-label="Hotbar"></div>
       <canvas id="minimap" width="220" height="124" aria-label="Minimap"></canvas>
       <button id="btn-hotkeys" class="hud-hotkeys-btn" type="button" aria-label="Show controls" title="Controls (F1)">?</button>
+      <button id="btn-travel" class="hud-hotkeys-btn hud-travel-btn" type="button" aria-label="Fast travel" title="Fast travel (T)" hidden>🧭</button>
     </div>
 
     <!-- Active quest tracker: title + up to 3 objectives, hidden with none active -->
@@ -48,9 +49,16 @@
         <span><kbd>A</kbd><kbd>D</kbd> move · <kbd>Space</kbd> jump</span>
         <span><kbd>LMB</kbd> use / mine · <kbd>RMB</kbd> interact</span>
         <span><kbd>E</kbd> inventory · <kbd>M</kbd> map · <kbd>1–0</kbd> hotbar</span>
-        <span><kbd>Esc</kbd> pause · <kbd>F1</kbd> toggle this panel</span>
+        <span><kbd>B</kbd> pause · <kbd>F1</kbd> toggle this panel</span>
       </div>
       <button id="btn-hotkeys-close" class="btn-ghost" type="button">Close</button>
+    </div>
+
+    <!-- Fast travel: admin-only (troll_runner), see Game.isAdmin() -->
+    <div id="travel-panel" class="tt-panel" hidden>
+      <h3>Fast Travel</h3>
+      <div id="travel-list"></div>
+      <button id="travel-close" class="btn-ghost" type="button">Close</button>
     </div>
 
     <!-- Boss health -->
@@ -134,7 +142,7 @@
           <button id="btn-continue" class="btn-primary" type="button" hidden>▶ Continue</button>
           <button id="btn-new" class="btn-secondary" type="button">✚ New world</button>
           <div class="coop-row">
-            <button id="btn-coop-host" class="btn-secondary" type="button">🌐 Host co-op</button>
+            <button id="btn-coop-host" class="btn-secondary" type="button" title="Up to 20 players per room code">🌐 Host co-op</button>
             <input id="coop-code" maxlength="5" placeholder="CODE" autocomplete="off"
                    aria-label="Co-op room code">
             <button id="btn-coop-join" class="btn-secondary" type="button">Join</button>

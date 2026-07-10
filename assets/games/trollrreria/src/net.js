@@ -57,6 +57,12 @@ class SupabaseTransport {
   }
 }
 
+/* Soft cap for a shared room: this is P2P broadcast through Supabase
+   Realtime, not an authoritative server, so the host's browser is doing
+   the simulating -- past ~20 concurrent players the host's tab is the
+   bottleneck (world-sync chunking + edit fan-out), not the transport. */
+const MAX_PEERS = 20;
+
 /* ------------------------------------------------------------------- net */
 export class Net {
   constructor(game) {
@@ -139,11 +145,24 @@ export class Net {
     }
     switch (m.t) {
       case "hello":
-        if (this.isHost) this.sendWorld();
+        if (this.isHost) {
+          if (this.peers.size > MAX_PEERS) {
+            this.peers.delete(m.id);
+            this.send({ t: "full", id: this.id, to: m.id });
+            break;
+          }
+          this.sendWorld();
+        }
         this.send({ t: "here", id: this.id });   // so newcomers see us too
         break;
       case "here":
         break;                                   // presence already recorded above
+      case "full":
+        if (m.to === this.id) {
+          this.game.announce("🌐 That room is full (20 players) — try another code.");
+          this.stop();
+        }
+        break;
       case "world": {
         if (this.isHost) break;
         g.adoptRemoteWorld(m);

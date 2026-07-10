@@ -125,20 +125,10 @@ export function generateWorld(seed) {
       }
     }
   }
-  /* 3c. a few surface cave mouths */
-  for (let n = 0; n < 14; n++) {
-    const x = 40 + Math.floor(rng() * (w - 80));
-    let cy = surface[x] + 2;
-    let cx = x, dir = Math.PI / 2 + (rng() - 0.5) * 0.9;
-    const len = 30 + rng() * 50;
-    for (let s = 0; s < len; s++) {
-      dir += (rng() - 0.5) * 0.5;
-      dir = clamp(dir, Math.PI * 0.2, Math.PI * 0.8); // keep heading down-ish
-      cx += Math.cos(dir) * 1.4;
-      cy += Math.sin(dir) * 1.3;
-      carve(world, Math.round(cx), Math.round(cy), 2.2);
-    }
-  }
+  /* 3c. (removed) used to punch a few surface cave mouths down into the
+     worm-tunnel network. The surface is now kept unbroken -- every player
+     digs their own way down instead of finding a pre-cut hole, so there's
+     no free entrance straight into the dark. */
 
   /* ------------------------------------------------ 3d. Rage Comic Ruins
      A single hand-shaped room (not proc-noise like the caves above) so it
@@ -158,6 +148,22 @@ export function generateWorld(seed) {
      loot, the first real reason to dig deep under the snow instead of
      just passing through it on the surface. */
   const bunkerBounds = carveBunker(world, rng, w);
+
+  /* 3g. seal the crust: belt-and-suspenders on top of removing the surface
+     cave mouths above -- if a worm tunnel's downward drift ever happened
+     to breach close to the surface, re-solidify a shallow band right below
+     ground level so there is never a free hole into the dark. Players dig
+     their own way down. */
+  const CRUST = 5;
+  for (let x = 0; x < w; x++) {
+    const biome = biomeAt(x, w);
+    const sy = surface[x];
+    const fill = biome === "desert" ? T.SAND : biome === "snow" ? T.SNOW : biome === "swamp" ? T.MUD : T.DIRT;
+    for (let y = sy; y < sy + CRUST; y++) {
+      const i = y * w + x;
+      if (tiles[i] === T.AIR) tiles[i] = fill;
+    }
+  }
 
   /* ------------------------------------------------ 4. ores */
   scatterOre(world, rng, T.COPPER, 950, STONE_START - 30, 560, 4, 9);

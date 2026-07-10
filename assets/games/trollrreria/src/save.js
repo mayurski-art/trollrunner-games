@@ -92,9 +92,11 @@ async function loadCloudSave(userId) {
       .eq("user_id", userId)
       .eq("game_id", GAME_ID)
       .maybeSingle();
-    if (error || !data) return null;
+    if (error) { console.warn("[trollrreria] cloud load failed:", error); return null; }
+    if (!data) return null;
     return { save: data.data, updatedAt: new Date(data.updated_at).getTime() };
-  } catch {
+  } catch (e) {
+    console.warn("[trollrreria] cloud load threw:", e);
     return null;
   }
 }
@@ -109,8 +111,10 @@ async function saveCloudSave(userId, data) {
       data,
       updated_at: new Date().toISOString(),
     });
+    if (error) console.warn("[trollrreria] cloud save failed:", error);
     return !error;
-  } catch {
+  } catch (e) {
+    console.warn("[trollrreria] cloud save threw:", e);
     return false;
   }
 }
