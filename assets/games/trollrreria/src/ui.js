@@ -1191,7 +1191,7 @@ export class UI {
       const coop = document.getElementById("hud-coop");
       if (g.net && g.net.active) {
         coop.hidden = false;
-        coop.textContent = `🌐 ${g.net.room} · ${g.net.peerCount + 1} troll${g.net.peerCount ? "s" : ""}`;
+        coop.textContent = `🌐 ${g.net.room} · ${g.net.peerCount + 1} troll${g.net.peerCount ? "s" : ""}${g.pvp ? " · ⚔️ PvP" : ""}`;
       } else if (!coop.hidden) coop.hidden = true;
       if (g.player) {
         const depthTiles = Math.floor(g.player.y / TILE) - SURFACE_BASE;

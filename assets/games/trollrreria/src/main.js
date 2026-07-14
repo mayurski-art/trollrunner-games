@@ -6,7 +6,7 @@
 
 import {
   T, TILES, W, ITEMS, ENEMIES, TILE, ZOOM, CYCLE, DAY_LEN, WORLD_W, WORLD_H, CROP_GROW_TIME,
-  REACH, STATION_SCAN, STARTER_ITEMS, TRADER_POOL,
+  REACH, STATION_SCAN, STARTER_ITEMS, TRADER_POOL, PLAYER_W, PLAYER_H,
 } from "./defs.js";
 import { hashStr, clamp, lerp, fmtClock, aabb, dist2 } from "./util.js";
 import { generateWorld, biomeAt, zoneAt, BIOME_NAMES, STONE_START, DEEP_START } from "./worldgen.js";
@@ -196,6 +196,7 @@ class Game {
     this.enemies = [];
     this.npcs = [];
     this.travelingTrader = null;
+    this.pvp = false;
     this.time = 60;
     this.dayCount = 1;
     this.trollMoon = false;
@@ -470,6 +471,9 @@ class Game {
       }
     }
     if (this.state !== "play") return;
+
+    /* PvP toggle (host only, co-op only) */
+    if (this.input.hit("KeyP") && this.net.active) this.togglePvp();
 
     /* time of day */
     const prevTime = this.time;
@@ -1311,6 +1315,34 @@ class Game {
         e._swingHit = swing.id;
         e.hurt(this, dmg, p.cx, (def.knock || 200) / 200);
       }
+    }
+    /* PvP: opt-in and host-controlled. Peers are trust-based ghosts (no
+       authoritative server anywhere in the mesh), so a hit is just a
+       broadcast the target applies to itself -- same honor system as
+       every other message. Melee only for now; arrows stay PvE. */
+    if (this.pvp && this.net.connected) {
+      for (const [id, peer] of this.net.peers) {
+        if (peer._swingHit === swing.id) continue;
+        if (aabb(box, { x: peer.x, y: peer.y, w: PLAYER_W, h: PLAYER_H })) {
+          peer._swingHit = swing.id;
+          this.net.send({ t: "pvpHit", target: id, dmg: Math.round(dmg), fromX: p.cx });
+        }
+      }
+    }
+  }
+
+  /* Host flips PvP for the whole room; guests just get told. The flag
+     rides the host's 5s time broadcast (like hardmode) so late joiners
+     and droppers re-sync automatically. */
+  togglePvp() {
+    if (this.net.active && !this.net.isHost) {
+      this.announce("Only the host can toggle PvP.");
+      return;
+    }
+    this.pvp = !this.pvp;
+    this.announce(this.pvp ? "⚔️ PvP enabled — trolls can hurt trolls!" : "🕊 PvP disabled.");
+    if (this.net.connected) {
+      this.net.send({ t: "note", text: this.pvp ? "⚔️ The host enabled PvP!" : "🕊 The host disabled PvP." });
     }
   }
 
