@@ -125,6 +125,7 @@ export async function saveGame(game) {
   try {
     data = {
       v: 1,
+      w: w.w, h: w.h,
       seedStr: game.seedStr,
       time: game.time,
       dayCount: game.dayCount,
@@ -147,6 +148,11 @@ export async function saveGame(game) {
         hunger: game.player.hunger, maxHunger: game.player.maxHunger,
       } : null,
       inv: game.inventory ? game.inventory.serialize() : null,
+      animals: game.enemies
+        ? game.enemies.filter(e => e.tamed && !e.dead).map(e => ({
+            type: e.type, x: e.cx, y: e.y + e.h, baby: !!e.baby, growTimer: e.growTimer, hp: e.hp,
+          }))
+        : [],
       savedAt: Date.now(),
     };
   } catch (e) {

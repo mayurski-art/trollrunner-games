@@ -9,6 +9,7 @@ export class Inventory {
   constructor() {
     this.slots = new Array(INV_SIZE).fill(null);
     this.armor = { head: null, chest: null, legs: null };
+    this.accessory = { ring: null, back: null, feet: null };
     this.sel = 0;              // selected hotbar index
   }
 
@@ -73,7 +74,30 @@ export class Inventory {
       const s = this.armor[k];
       if (s && ITEMS[s.id]) d += (ITEMS[s.id].def || 0) + (s.ench && s.ench.def || 0);
     }
+    for (const k of ["ring", "back", "feet"]) {
+      const s = this.accessory[k];
+      if (s && ITEMS[s.id]) d += ITEMS[s.id].def || 0;
+    }
     return d;
+  }
+
+  /* Movement/utility perks granted by equipped accessories -- read fresh
+     each frame by Player.update() (three slot lookups, cheap enough that
+     caching on equip-change isn't worth the extra bookkeeping). */
+  accessoryPerks() {
+    const p = { doubleJump: false, glide: false, dash: false, speedMult: 1, jumpBoost: 0, regenBonus: 0 };
+    for (const k of ["ring", "back", "feet"]) {
+      const s = this.accessory[k];
+      const d = s && ITEMS[s.id];
+      if (!d) continue;
+      if (d.doubleJump) p.doubleJump = true;
+      if (d.glide) p.glide = true;
+      if (d.dash) p.dash = true;
+      if (d.speedMult) p.speedMult *= d.speedMult;
+      if (d.jumpBoost) p.jumpBoost += d.jumpBoost;
+      if (d.regen) p.regenBonus += d.regen;
+    }
+    return p;
   }
 
   /* ---------------------------------------------------------- crafting */
@@ -114,6 +138,7 @@ export class Inventory {
     return {
       slots: this.slots,
       armor: this.armor,
+      accessory: this.accessory,
       sel: this.sel,
     };
   }
@@ -131,6 +156,14 @@ export class Inventory {
         for (const k of ["head", "chest", "legs"]) {
           const s = data.armor[k];
           inv.armor[k] = s && ITEMS[s.id] ? { id: s.id, n: 1 } : null;
+        }
+      }
+      /* older saves predate accessories -- data.accessory is simply absent,
+         inv.accessory keeps the all-null default from the constructor */
+      if (data.accessory) {
+        for (const k of ["ring", "back", "feet"]) {
+          const s = data.accessory[k];
+          inv.accessory[k] = s && ITEMS[s.id] ? { id: s.id, n: 1 } : null;
         }
       }
       inv.sel = Math.min(9, Math.max(0, data.sel | 0));

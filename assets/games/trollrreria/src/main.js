@@ -6,7 +6,7 @@
 
 import {
   T, TILES, W, ITEMS, ENEMIES, TILE, ZOOM, CYCLE, DAY_LEN, WORLD_W, WORLD_H, CROP_GROW_TIME,
-  REACH, STATION_SCAN, STARTER_ITEMS,
+  REACH, STATION_SCAN, STARTER_ITEMS, TRADER_POOL, PLAYER_W, PLAYER_H,
 } from "./defs.js";
 import { hashStr, clamp, lerp, fmtClock, aabb, dist2 } from "./util.js";
 import { generateWorld, biomeAt, zoneAt, BIOME_NAMES, STONE_START, DEEP_START } from "./worldgen.js";
@@ -22,8 +22,18 @@ import { TrollKing, TrollEmperor, Rickroller } from "./boss.js";
 import { Archtroll, Rarepepe, ElderShibe, Anon } from "./worldbosses.js";
 import {
   MerchantTroll, PepeHermit, RocketTinkerer, WhaleOracle,
-  Blacksmith, Alchemist, TavernKeeper, Butcher, SIGN_TIPS,
+  Blacksmith, Alchemist, TavernKeeper, Butcher, SIGN_TIPS, TravelingTrader,
+  TrollChef, TrollHistorian,
 } from "./npc.js";
+
+/* Housing-gated arrivals, in order: build one qualifying house (see
+   housing.js checkHouse) and the next un-housed NPC on this list moves
+   in. Checked every 8s in Game.update() against `this.npcs`. */
+const HOUSE_ROSTER = [
+  { cls: MerchantTroll, msg: "🐕 Doge the Miner moved into your house!" },
+  { cls: TrollChef, msg: "👨‍🍳 A Troll Chef moved into your house!" },
+  { cls: TrollHistorian, msg: "📜 A Troll Historian moved into your house!" },
+];
 import { findHouseNear } from "./housing.js";
 import {
   saveGame, loadSaveData, applyWorldLayers, clearSave,
@@ -167,10 +177,14 @@ class Game {
     }, 500);
   }
 
-  newWorld(seedStr, character) {
+  /* `width` lets saved worlds keep the dimensions they were generated
+     with (old saves were 1600 wide; the current default is WORLD_W) --
+     decoding a saved layer into a grid of a different size would shear
+     every row, so dims always follow the save, never the constant. */
+  newWorld(seedStr, character, width) {
     this.seedStr = seedStr;
     this.seed = hashStr(seedStr);
-    const { world, spawn, surface, skyPad, groundPad, ruinsBounds } = generateWorld(this.seed);
+    const { world, spawn, surface, skyPad, groundPad, ruinsBounds } = generateWorld(this.seed, width || WORLD_W);
     this.world = world;
     this.spawn = spawn;
     this.skyPad = skyPad;
@@ -181,6 +195,8 @@ class Game {
     this.entities = [];
     this.enemies = [];
     this.npcs = [];
+    this.travelingTrader = null;
+    this.pvp = false;
     this.time = 60;
     this.dayCount = 1;
     this.trollMoon = false;
@@ -189,7 +205,7 @@ class Game {
     this.smeltCooldown = 0;
     this.quests = createQuestState();
     this._recorded = { blocksMined: 0, bossKills: 0 };
-    this.explored = new Uint8Array((WORLD_W >> 2) * (WORLD_H >> 2));
+    this.explored = new Uint8Array((this.world.w >> 2) * (this.world.h >> 2));
     this.inventory = new Inventory();
     for (const s of STARTER_ITEMS) this.inventory.add(s.id, s.n);
     this.player = new Player(spawn.x, spawn.y + 1, this.flags.character);
@@ -204,9 +220,10 @@ class Game {
     if (this.ui) this.ui.dirtyInv();
   }
 
-  /* Restore a saved world on top of a re-generated one (same seed). */
+  /* Restore a saved world on top of a re-generated one (same seed).
+     Old saves predate the w/h fields and were all 1600x800. */
   applySave(data) {
-    this.newWorld(data.seedStr);
+    this.newWorld(data.seedStr, undefined, data.w || 1600);
     applyWorldLayers(this.world, data);
     this.renderer.chunks.clear();
     this.world.dirtyChunks.clear();
@@ -237,7 +254,23 @@ class Game {
     }
     this.cam.x = this.player.cx - this.viewW / 2;
     this.cam.y = this.player.cy - this.viewH / 2;
+    if (Array.isArray(data.animals)) this.restoreAnimals(data.animals);
     if (this.ui) this.ui.dirtyInv();
+  }
+
+  /* Tamed/bred animals are the only enemies that persist across a save --
+     everything wild is deterministically respawned, but a ranch is player
+     investment and shouldn't vanish on reload. */
+  restoreAnimals(list) {
+    for (const a of list) {
+      if (!ENEMIES[a.type]) continue;
+      const e = new Enemy(a.type, a.x, a.y);
+      e.tamed = true;
+      e.baby = !!a.baby;
+      if (e.baby) e.growTimer = typeof a.growTimer === "number" ? a.growTimer : 60;
+      if (typeof a.hp === "number") e.hp = Math.min(e.maxHp, Math.max(1, a.hp));
+      this.enemies.push(e);
+    }
   }
 
   startNewWorld(character) {
@@ -285,7 +318,7 @@ class Game {
     if (!this.explored) return;
     const cx = Math.floor(wx / TILE / 4), cy = Math.floor(wy / TILE / 4);
     const R = 11;
-    const w4 = WORLD_W >> 2, h4 = WORLD_H >> 2;
+    const w4 = this.world.w >> 2, h4 = this.world.h >> 2;
     for (let dy = -R; dy <= R; dy++) {
       for (let dx = -R; dx <= R; dx++) {
         if (dx * dx + dy * dy > R * R) continue;
@@ -307,9 +340,10 @@ class Game {
     };
   }
 
-  /* Guest side: replace the local world with the host's snapshot. */
+  /* Guest side: replace the local world with the host's snapshot.
+     Hosts on older builds don't send dims -- their worlds were 1600. */
   adoptRemoteWorld(m) {
-    this.newWorld(m.seedStr);
+    this.newWorld(m.seedStr, undefined, m.w || 1600);
     const w = this.world, n = w.w * w.h;
     const L = m.layers;
     w.tiles.set(rleDecode(b64ToU16(L.tiles), n));
@@ -438,6 +472,9 @@ class Game {
     }
     if (this.state !== "play") return;
 
+    /* PvP toggle (host only, co-op only) */
+    if (this.input.hit("KeyP") && this.net.active) this.togglePvp();
+
     /* time of day */
     const prevTime = this.time;
     this.time += dt;
@@ -445,12 +482,18 @@ class Game {
       this.time -= CYCLE;
       this.dayCount++;
       this.trollMoon = false;
+      /* dawn world events: independent rolls, both gated a couple days in
+         so a fresh world has time to breathe first */
+      if (this.dayCount >= 3 && Math.random() < 0.12) this.spawnMeteor();
+      if (this.dayCount >= 2 && !this.travelingTrader && Math.random() < 0.3) this.spawnTravelingTrader();
     } else if (prevTime < DAY_LEN && this.time >= DAY_LEN) {
       /* nightfall: occasionally the Troll Moon rises */
       if (this.dayCount >= 2 && Math.random() < 0.15) {
         this.trollMoon = true;
         this.announce("🧌 The Troll Moon rises… problem?");
       }
+      /* the trader packs up at dusk -- a rotating visitor, not a resident */
+      if (this.travelingTrader) this.despawnTravelingTrader();
     }
     this.stats.playSec += dt;
     /* a lit furnace keeps burning in real time, whether or not you're
@@ -548,23 +591,23 @@ class Game {
     }
 
     this.checkPlates();
+    this.tickPendingPulses(dt);
+    this.tickDeviceReverts(dt);
 
-    /* housing: every 8 s, see if a valid house near the player attracts
-       the Merchant (and re-homes the Guide) */
+    /* housing: every 8s, see if a valid player-built house (housing.js
+       checkHouse) attracts the next un-housed NPC on the roster -- one
+       arrival per house, in order, same as the original single-Merchant
+       hook just generalized to more than one resident. */
     this._houseAcc = (this._houseAcc || 0) + dt;
     if (this._houseAcc >= 8 && this.player && !this.player.dead) {
       this._houseAcc = 0;
-      const ptx = Math.floor(this.player.cx / TILE), pty = Math.floor(this.player.cy / TILE);
-      const hasMerchant = this.npcs.some(n => n.shop);
-      if (!hasMerchant || this._guideHomeless !== false) {
+      const next = HOUSE_ROSTER.find(r => !this.npcs.some(n => n instanceof r.cls));
+      if (next) {
+        const ptx = Math.floor(this.player.cx / TILE), pty = Math.floor(this.player.cy / TILE);
         const house = findHouseNear(this.world, ptx, pty, 50);
         if (house) {
-          if (!hasMerchant) {
-            this.npcs.push(new MerchantTroll(house.cx, house.cy + 1));
-            this.announce("🐕 Doge the Miner moved into your house!");
-          }
-          const guide = this.npcs.find(n => !n.shop);
-          if (guide) { guide.homeX = house.cx * TILE; this._guideHomeless = false; }
+          this.npcs.push(new next.cls(house.cx, house.cy + 1));
+          this.announce(next.msg);
         }
       }
     }
@@ -883,10 +926,11 @@ class Game {
     }
 
     if (!this.creative) this.inventory.useSelected();
-    /* dart traps face away from the player */
+    /* directional placement (dart traps, repeaters): faces away from the
+       player. def.tile is the "left" id, def.rTile the "right" id. */
     let placeId = def.tile;
     if (def.faces && this.player) {
-      placeId = (tx + 0.5) * TILE >= this.player.cx ? T.DART_R : T.DART_L;
+      placeId = (tx + 0.5) * TILE >= this.player.cx ? (def.rTile || def.tile) : def.tile;
     }
     world.set(tx, ty, placeId);
     if (tdef.solid) world.setLiquid(tx, ty, 0);
@@ -921,6 +965,7 @@ class Game {
     const m = this.mouseWorld();
     const world = this.world;
     if (!this.player || !this.player.tileInReach(m.tx, m.ty)) return;
+    if (this.tryFeedAnimal(m)) return;
     const id = world.get(m.tx, m.ty);
 
     if (id === T.DOOR_C) {
@@ -959,6 +1004,12 @@ class Game {
     }
     if (id === T.LEVER) {
       this.pulseWire(m.tx, m.ty);
+      return;
+    }
+    if (id === T.TIMER_TORCH || id === T.TIMER_TORCH_OFF || id === T.TRAPDOOR_C || id === T.TRAPDOOR_O) {
+      /* right-click acts like a pulse arriving at the device, so timers
+         and trapdoors work standalone before any wire is laid */
+      this.activateDevice(m.tx, m.ty);
       return;
     }
     if (id === T.ROCKET_PAD) {
@@ -1008,6 +1059,54 @@ class Game {
     }
   }
 
+  /* Right-click a passive animal while holding its favorite food: tames it
+     if wild, or (once tamed and adult) tries to pair it with a nearby
+     tamed mate of the same species to breed. Returns true if it handled
+     the click, so interact() can fall through to normal tile logic
+     otherwise. */
+  tryFeedAnimal(m) {
+    const sel = this.inventory.selected;
+    if (!sel) return false;
+    for (const e of this.enemies) {
+      if (e.dead || !e.def.passive || !e.def.tameFood || e.def.tameFood !== sel.id) continue;
+      if (Math.abs(e.cx - m.x) > 20 || Math.abs(e.cy - m.y) > 24) continue;
+      this.inventory.useSelected();
+      this.ui && this.ui.dirtyHud();
+      if (!e.tamed) {
+        e.tamed = true;
+        e.loveCd = 0;
+        this.floatText(e.cx, e.y - 10, e.def.name + " tamed!", "#57bd5c");
+        this.sfx && this.sfx.potion();
+      } else if (e.baby) {
+        e.growTimer = Math.max(0, e.growTimer - 20);
+        this.floatText(e.cx, e.y - 10, "growing faster!", "#8fb573");
+      } else {
+        this.tryBreed(e);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  tryBreed(e) {
+    if (e.loveCd > 0) { this.floatText(e.cx, e.y - 10, "not hungry", "#8fb573"); return; }
+    const mate = this.enemies.find(o => o !== e && !o.dead && o.type === e.type &&
+      o.tamed && !o.baby && (o.loveCd || 0) <= 0 && dist2(o.cx, o.cy, e.cx, e.cy) < (TILE * 6) ** 2);
+    if (!mate) {
+      e.loveCd = 8;
+      this.floatText(e.cx, e.y - 10, "needs a mate nearby", "#c23a60");
+      return;
+    }
+    e.loveCd = 45; mate.loveCd = 45;
+    const baby = new Enemy(e.type, (e.cx + mate.cx) / 2, Math.max(e.y + e.h, mate.y + mate.h));
+    baby.tamed = true; baby.baby = true; baby.growTimer = 90;
+    baby.hp = baby.maxHp = Math.max(1, Math.round(ENEMIES[e.type].hp * 0.4));
+    this.enemies.push(baby);
+    burst(this, (e.cx + mate.cx) / 2, (e.cy + mate.cy) / 2, "#ff6d95", 14, { spread: 140, up: 60, glow: true });
+    this.floatText((e.cx + mate.cx) / 2, Math.min(e.y, mate.y) - 14, "❤", "#ff6d95");
+    this.sfx && this.sfx.potion();
+  }
+
   /* ========================================================== wiring */
   /* Wrench click: lay wire (consumes Wire) or cut existing wire (refund). */
   wireTick(tx, ty) {
@@ -1046,11 +1145,40 @@ class Game {
       this.activateDevice(x, y);
       for (const [nx, ny] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]) {
         if (!world.inBounds(nx, ny) || !world.getWire(nx, ny)) continue;
+        const nid = world.get(nx, ny);
+        if (nid === T.REPEATER_L || nid === T.REPEATER_R) {
+          /* Repeater: absorbs the pulse instead of conducting it instantly
+             -- re-emits one tile further in its facing direction after a
+             delay (ticked in update() via _pendingPulses). Doesn't join
+             the normal flood, so it genuinely gates timing rather than
+             just reacting alongside everything else. */
+          const outX = nx + (nid === T.REPEATER_L ? -1 : 1);
+          (this._pendingPulses ||= []).push({ x: outX, y: ny, t: 0.5 });
+          continue;
+        }
         const k = world.idx(nx, ny);
         if (!seen.has(k)) { seen.add(k); queue.push(k); }
       }
     }
     this.sfx && this.sfx.click();
+  }
+
+  /* Delayed re-pulses: Repeaters (forward hop after 0.5s) and Timer
+     Torches / Trapdoors (self re-pulse after they auto-revert) both just
+     schedule a {x,y,t} here instead of needing their own separate timer
+     system. */
+  tickPendingPulses(dt) {
+    if (!this._pendingPulses || !this._pendingPulses.length) return;
+    const ready = [];
+    this._pendingPulses = this._pendingPulses.filter(p => {
+      p.t -= dt;
+      if (p.t > 0) return true;
+      ready.push(p);
+      return false;
+    });
+    for (const p of ready) {
+      if (this.world.getWire(p.x, p.y)) this.pulseWire(p.x, p.y);
+    }
   }
 
   activateDevice(x, y) {
@@ -1082,7 +1210,72 @@ class Game {
         this.sfx && this.sfx.bow();
         break;
       }
+      /* Timer torch: a pulse starts a clock -- goes dark, then relights
+         a few seconds later and re-pulses its own network, which darkens
+         it again, and so on. Pulsing it while dark cancels the pending
+         relight, so one pulse starts the clock and the next stops it. */
+      case T.TIMER_TORCH: {
+        world.set(x, y, T.TIMER_TORCH_OFF);
+        (this._pendingReverts ||= []).push({ x, y, t: 3, kind: "timer" });
+        break;
+      }
+      case T.TIMER_TORCH_OFF: {
+        if (this._pendingReverts) {
+          this._pendingReverts = this._pendingReverts.filter(r => !(r.kind === "timer" && r.x === x && r.y === y));
+        }
+        world.set(x, y, T.TIMER_TORCH);
+        break;
+      }
+      case T.TRAPDOOR_C: {
+        world.set(x, y, T.TRAPDOOR_O);
+        this.sfx && this.sfx.door();
+        (this._pendingReverts ||= []).push({ x, y, t: 3, kind: "trapdoor" });
+        break;
+      }
+      case T.TRAPDOOR_O: {
+        this.tryCloseTrapdoor(x, y);
+        break;
+      }
     }
+  }
+
+  /* Auto-reverting devices (timer relight, trapdoor slam) scheduled by
+     activateDevice; ticked from update() alongside tickPendingPulses. */
+  tickDeviceReverts(dt) {
+    if (!this._pendingReverts || !this._pendingReverts.length) return;
+    const ready = [];
+    this._pendingReverts = this._pendingReverts.filter(r => {
+      r.t -= dt;
+      if (r.t > 0) return true;
+      ready.push(r);
+      return false;
+    });
+    for (const r of ready) {
+      const id = this.world.get(r.x, r.y);
+      if (r.kind === "timer" && id === T.TIMER_TORCH_OFF) {
+        this.world.set(r.x, r.y, T.TIMER_TORCH);
+        if (this.world.getWire(r.x, r.y)) (this._pendingPulses ||= []).push({ x: r.x, y: r.y, t: 0.05 });
+      } else if (r.kind === "trapdoor" && id === T.TRAPDOOR_O) {
+        if (!this.tryCloseTrapdoor(r.x, r.y)) {
+          /* something's standing in it -- try again shortly instead of
+             entombing whoever's mid-fall through the hatch */
+          r.t = 1;
+          this._pendingReverts.push(r);
+        }
+      }
+    }
+  }
+
+  tryCloseTrapdoor(x, y) {
+    const box = { x: x * TILE, y: y * TILE, w: TILE, h: TILE };
+    for (const b of [this.player, ...this.enemies, ...this.npcs]) {
+      if (b && !b.dead &&
+          box.x < b.x + b.w && box.x + box.w > b.x &&
+          box.y < b.y + b.h && box.y + box.h > b.y) return false;
+    }
+    this.world.set(x, y, T.TRAPDOOR_C);
+    this.sfx && this.sfx.door();
+    return true;
   }
 
   /* Pressure plates: anything standing on one fires it (with a cooldown). */
@@ -1122,6 +1315,34 @@ class Game {
         e._swingHit = swing.id;
         e.hurt(this, dmg, p.cx, (def.knock || 200) / 200);
       }
+    }
+    /* PvP: opt-in and host-controlled. Peers are trust-based ghosts (no
+       authoritative server anywhere in the mesh), so a hit is just a
+       broadcast the target applies to itself -- same honor system as
+       every other message. Melee only for now; arrows stay PvE. */
+    if (this.pvp && this.net.connected) {
+      for (const [id, peer] of this.net.peers) {
+        if (peer._swingHit === swing.id) continue;
+        if (aabb(box, { x: peer.x, y: peer.y, w: PLAYER_W, h: PLAYER_H })) {
+          peer._swingHit = swing.id;
+          this.net.send({ t: "pvpHit", target: id, dmg: Math.round(dmg), fromX: p.cx });
+        }
+      }
+    }
+  }
+
+  /* Host flips PvP for the whole room; guests just get told. The flag
+     rides the host's 5s time broadcast (like hardmode) so late joiners
+     and droppers re-sync automatically. */
+  togglePvp() {
+    if (this.net.active && !this.net.isHost) {
+      this.announce("Only the host can toggle PvP.");
+      return;
+    }
+    this.pvp = !this.pvp;
+    this.announce(this.pvp ? "⚔️ PvP enabled — trolls can hurt trolls!" : "🕊 PvP disabled.");
+    if (this.net.connected) {
+      this.net.send({ t: "note", text: this.pvp ? "⚔️ The host enabled PvP!" : "🕊 The host disabled PvP." });
     }
   }
 
@@ -1225,6 +1446,11 @@ class Game {
       if (!isNight) return r < 0.75 ? "copeSlime" : r < 0.95 ? "rugPullRat" : "slimeGreen";
       return r < 0.5 ? "fudPhantom" : r < 0.8 ? "copeSlime" : "rugPullRat";
     }
+    if (biome === "jungle" && ty < 310) {
+      /* Kek Jungle: lizards underfoot, wasps in the canopy */
+      if (!isNight) return r < 0.55 ? "kekLizard" : r < 0.9 ? "jungleWasp" : "slimeGreen";
+      return r < 0.45 ? "kekLizard" : r < 0.75 ? "jungleWasp" : "zombie";
+    }
     if (ty < 310) {
       /* surface */
       if (!isNight) return r < 0.8 ? "slimeGreen" : "slimeBlue";
@@ -1255,7 +1481,7 @@ class Game {
     if (!p || p.dead) return;
     const st = skyState(this.time);
     if (st.isNight) return;
-    if (this.enemies.filter(e => e.def && e.def.passive).length >= 4) return;
+    if (this.enemies.filter(e => e.def && e.def.passive && !e.tamed).length >= 4) return;
 
     const world = this.world;
     const ptx = Math.floor(p.cx / TILE), pty = Math.floor(p.cy / TILE);
@@ -1411,6 +1637,56 @@ class Game {
   spawnWhaleOracle() {
     this.spawnNpcInBiome("desert", (tx, ty, hb) => new WhaleOracle(tx, ty, hb),
       { wallTile: T.STONE_BRICK, wallBg: W.STONE_BRICK, rw: 7, interiorH: 4 });
+  }
+
+  /* World event: a meteor crashes near the player at dawn, carving a
+     small crater and salting it with Meteorite -- a rare ore worth
+     leaving the base for, tucked into a spot the player will stumble
+     across rather than a message telling them to go dig somewhere. */
+  spawnMeteor() {
+    const p = this.player;
+    if (!p) return;
+    const dir = Math.random() < 0.5 ? -1 : 1;
+    let tx = Math.floor(p.cx / TILE) + Math.round(dir * (30 + Math.random() * 50));
+    tx = Math.max(20, Math.min(this.world.w - 20, tx));
+    const groundY = this.world.topSolid[tx];
+    if (groundY == null || groundY < 0) return;
+    const cx = tx, cy = groundY;
+    const R = 4 + Math.floor(Math.random() * 2);
+    for (let y = cy - R; y <= cy + R; y++) {
+      for (let x = cx - R; x <= cx + R; x++) {
+        if (!this.world.inBounds(x, y)) continue;
+        const d2 = (x - cx) ** 2 + (y - cy) ** 2;
+        if (d2 > R * R) continue;
+        if (d2 > (R - 1.4) ** 2 && Math.random() < 0.65) this.world.set(x, y, T.METEORITE);
+        else this.world.set(x, y, T.AIR);
+      }
+    }
+    this.world.set(cx, cy, T.METEORITE);
+    this.announce("☄️ A meteor crashed nearby! Look for the crater.");
+  }
+
+  /* World event: a Traveling Trader camps near the player for one day
+     with a rotating slice of rare offers, then leaves at dusk. Not a
+     stamped-house resident -- see TravelingTrader in npc.js. */
+  spawnTravelingTrader() {
+    const p = this.player;
+    if (!p) return;
+    const spot = this.findGroundNear(Math.floor(p.cx / TILE), Math.floor(p.cy / TILE), 24);
+    if (!spot) return;
+    const trader = new TravelingTrader(spot.tx, spot.ty + 1);
+    const pool = [...TRADER_POOL].sort(() => Math.random() - 0.5).slice(0, 4);
+    trader.offers = pool;
+    this.npcs.push(trader);
+    this.travelingTrader = trader;
+    this.announce("🎪 A Traveling Trader has set up camp nearby.");
+  }
+
+  despawnTravelingTrader() {
+    this.travelingTrader.dead = true;
+    this.npcs = this.npcs.filter(n => n !== this.travelingTrader);
+    this.travelingTrader = null;
+    this.announce("The Traveling Trader packed up and left.");
   }
 
   /* Shared search: find open footing near a tile position (walker-height
@@ -1744,7 +2020,7 @@ class Game {
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     const camMidX = Math.floor((cam.x + this.viewW / 2) / TILE);
-    const biome = biomeAt(clamp(camMidX, 0, WORLD_W - 1), this.world.w);
+    const biome = biomeAt(clamp(camMidX, 0, this.world.w - 1), this.world.w);
     this.renderer.drawSky(ctx, sw, sh, this.time, cam.y, this.trollMoon);
     this.renderer.drawParallax(ctx, sw, sh, cam, this.time, biome);
 

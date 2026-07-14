@@ -213,7 +213,16 @@ export class Net {
         g.time = m.time;
         g.dayCount = m.day;
         g.trollMoon = !!m.moon;
+        g.pvp = !!m.pvp;
         if (m.hard && !g.flags.hardmode) g.enterHardmode();
+        break;
+      }
+      case "pvpHit": {
+        /* trust-based like everything else on the mesh: the target applies
+           the hit to itself, and only while it also believes PvP is on */
+        if (m.target !== this.id) break;
+        if (!g.pvp || !g.player || g.player.dead) break;
+        g.player.hurt(g, m.dmg, "another troll", m.fromX);
         break;
       }
       case "note":
@@ -233,6 +242,7 @@ export class Net {
     const msg = {
       t: "world",
       seedStr: g.seedStr,
+      w: g.world.w, h: g.world.h,
       time: g.time, day: g.dayCount, moon: g.trollMoon,
       flags: g.flags,
       spawn: g.spawn,
@@ -276,7 +286,7 @@ export class Net {
         this._timeAcc = 0;
         this.send({
           t: "time", id: this.id, time: g.time, day: g.dayCount,
-          moon: g.trollMoon, hard: !!g.flags.hardmode,
+          moon: g.trollMoon, hard: !!g.flags.hardmode, pvp: !!g.pvp,
         });
       }
     }

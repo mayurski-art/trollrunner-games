@@ -4,7 +4,13 @@
 /* ---------------------------------------------------------------- constants */
 export const TILE = 16;               // world px per tile
 export const ZOOM = 2;                // screen px per world px
-export const WORLD_W = 1600;          // tiles
+/* New worlds are half again wider than the original 1600 -- more biomes
+   need more room, and "there's always more map" is most of the Terraria
+   feel. Old 1600-wide saves keep their own dims: the save records w/h
+   and world construction honors them (see Game.applySave), so nothing
+   is ever decoded into a grid of the wrong size. Height stays fixed --
+   depth tiers (STONE_START/DEEP_START/BEDROCK) are tuned around it. */
+export const WORLD_W = 2400;          // tiles
 export const WORLD_H = 800;
 export const CHUNK = 32;              // tiles per chunk side
 export const DAY_LEN = 600;           // seconds of daylight
@@ -33,6 +39,14 @@ export const T = {
   VAULT_DOOR: 41, GRIN_ALTAR: 42,
   CAMPFIRE: 43, FARMLAND: 44, CROP1: 45, CROP2: 46, CROP3: 47, SIGN: 48,
   ROPE: 49, ENCHANT_TABLE: 50,
+  /* building-set variants (append-only past this point -- save data is
+     keyed on these numeric ids, never renumber the above) */
+  PLANKS: 51, CLAY: 52, CLAY_BRICK: 53, POLISHED_STONE: 54, CHISELED_BRICK: 55,
+  GLASS_RED: 56, GLASS_GREEN: 57, GLASS_BLUE: 58,
+  WOOD_RED: 59, WOOD_GREEN: 60, WOOD_BLUE: 61,
+  FENCE: 62, METEORITE: 63,
+  REPEATER_L: 64, REPEATER_R: 65, TIMER_TORCH: 66, TIMER_TORCH_OFF: 67,
+  TRAPDOOR_C: 68, TRAPDOOR_O: 69,
   /* wires live on their own layer, not in T */
 };
 
@@ -92,6 +106,34 @@ TILES[T.SIGN]     = { name: "Weathered sign", solid: false, hp: Infinity, noVari
 TILES[T.ROPE]     = { name: "Rope", solid: false, hp: 8, pow: 0, tool: "pick", drop: "rope", climbable: true, needsSupport: true, noVariant: true };
 TILES[T.ENCHANT_TABLE] = { name: "Enchant table", solid: false, hp: 120, pow: 0, tool: "pick", drop: "enchantTable", station: "enchant", light: 70, needsFloor: true, noVariant: true };
 
+/* Building-set variants: pure decoration, no new mechanics. Colored glass
+   reuses the .glass render path but with its own tint (glassColor) instead
+   of the default pale blue. */
+TILES[T.PLANKS]     = { name: "Planks", solid: true, hp: 70, pow: 0, tool: "pick", drop: "planks", pal: ["#8a6236", "#a8814a", "#c49c60"] };
+TILES[T.CLAY]       = { name: "Clay", solid: true, hp: 45, pow: 0, tool: "pick", drop: "clay", pal: ["#8a7a68", "#a4927c", "#b8a891"] };
+TILES[T.CLAY_BRICK] = { name: "Clay brick", solid: true, hp: 110, pow: 0, tool: "pick", drop: "clayBrick", pal: ["#7a3f2e", "#9c5138", "#b86648"] };
+TILES[T.POLISHED_STONE] = { name: "Polished stone", solid: true, hp: 130, pow: 0, tool: "pick", drop: "polishedStone", pal: ["#6b707a", "#868c97", "#a3aab5"] };
+TILES[T.CHISELED_BRICK] = { name: "Chiseled brick", solid: true, hp: 130, pow: 0, tool: "pick", drop: "chiseledBrick", pal: ["#5a5e68", "#767c87", "#939aa6"] };
+TILES[T.GLASS_RED]   = { name: "Red glass", solid: true, hp: 30, pow: 0, tool: "pick", drop: "glassRed", glass: true, glassColor: "rgba(233,90,90,0.35)", pal: ["#7fb4c9", "#a8d4e4", "#d3edf7"] };
+TILES[T.GLASS_GREEN] = { name: "Green glass", solid: true, hp: 30, pow: 0, tool: "pick", drop: "glassGreen", glass: true, glassColor: "rgba(95,191,58,0.35)", pal: ["#7fb4c9", "#a8d4e4", "#d3edf7"] };
+TILES[T.GLASS_BLUE]  = { name: "Blue glass", solid: true, hp: 30, pow: 0, tool: "pick", drop: "glassBlue", glass: true, glassColor: "rgba(79,143,211,0.35)", pal: ["#7fb4c9", "#a8d4e4", "#d3edf7"] };
+TILES[T.WOOD_RED]    = { name: "Red painted wood", solid: true, hp: 70, pow: 0, tool: "pick", drop: "woodRed", pal: ["#7a3a30", "#a04c3e", "#c05f4d"] };
+TILES[T.WOOD_GREEN]  = { name: "Green painted wood", solid: true, hp: 70, pow: 0, tool: "pick", drop: "woodGreen", pal: ["#3a6b2e", "#4f8f3d", "#63ab4d"] };
+TILES[T.WOOD_BLUE]   = { name: "Blue painted wood", solid: true, hp: 70, pow: 0, tool: "pick", drop: "woodBlue", pal: ["#2e4f7a", "#3d6aa0", "#4d82c2"] };
+TILES[T.FENCE] = { name: "Fence", solid: true, hp: 60, pow: 0, tool: "pick", drop: "fence", needsFloor: true, noVariant: true };
+TILES[T.METEORITE] = { name: "Meteorite", solid: true, hp: 240, pow: 55, tool: "pick", drop: "meteorite", ore: "#ff8f6b", light: 60, pal: ["#4a1f3a", "#6b2f52", "#8f4570"] };
+/* Wiring depth: a directional Repeater that delays a pulse instead of
+   passing it through instantly, a Timer Torch that auto-reverts a few
+   seconds after being pulsed (so it re-pulses its own network without a
+   second lever click), and an auto-closing Trapdoor. See Game.pulseWire
+   / Game._pendingPulses (main.js) for how the delay is actually timed. */
+TILES[T.REPEATER_L] = { name: "Repeater", solid: false, hp: 40, pow: 0, tool: "pick", drop: "repeater", needsFloor: true, noVariant: true };
+TILES[T.REPEATER_R] = { name: "Repeater", solid: false, hp: 40, pow: 0, tool: "pick", drop: "repeater", needsFloor: true, noVariant: true };
+TILES[T.TIMER_TORCH]     = { name: "Timer torch", solid: false, hp: 5, pow: 0, tool: "pick", drop: "timerTorch", light: 200, needsSupport: true, noVariant: true };
+TILES[T.TIMER_TORCH_OFF] = { name: "Timer torch (cooling)", solid: false, hp: 5, pow: 0, tool: "pick", drop: "timerTorch", needsSupport: true, noVariant: true };
+TILES[T.TRAPDOOR_C] = { name: "Trapdoor", solid: true, hp: 60, pow: 0, tool: "pick", drop: "trapdoor", needsFloor: true, noVariant: true };
+TILES[T.TRAPDOOR_O] = { name: "Trapdoor (open)", solid: false, hp: 60, pow: 0, tool: "pick", drop: "trapdoor", needsFloor: true, noVariant: true };
+
 export const CROP_GROW_TIME = 45;   // seconds per growth stage
 
 /* Furnace fuel: real burn time instead of free/instant smelting. Wood is
@@ -139,12 +181,28 @@ export const ITEMS = {
   bed:         { name: "Troll cot", type: "block", tile: T.BED, max: 99, needsFloor: true, desc: "Right-click to set your spawn." },
   lever:       { name: "Lever", type: "block", tile: T.LEVER, max: 99, needsSupport: true, desc: "Right-click to pulse connected wires." },
   plate:       { name: "Pressure plate", type: "block", tile: T.PLATE, max: 99, needsFloor: true, desc: "Pulses wires when stepped on." },
-  dartTrap:    { name: "Dart trap", type: "block", tile: T.DART_L, max: 99, faces: true, desc: "Fires darts when pulsed. Darts hurt everyone." },
+  dartTrap:    { name: "Dart trap", type: "block", tile: T.DART_L, rTile: T.DART_R, max: 99, faces: true, desc: "Fires darts when pulsed. Darts hurt everyone." },
+  repeater:    { name: "Repeater", type: "block", tile: T.REPEATER_L, rTile: T.REPEATER_R, max: 99, faces: true, needsFloor: true, desc: "Delays a pulse by half a second before passing it on. Faces away from you." },
+  timerTorch:  { name: "Timer torch", type: "block", tile: T.TIMER_TORCH, max: 99, needsSupport: true, desc: "Pulsing it goes dark for a few seconds, then it re-pulses its own wire network on its own." },
+  trapdoor:    { name: "Trapdoor", type: "block", tile: T.TRAPDOOR_C, max: 99, needsFloor: true, desc: "Pulse to open -- swings shut on its own a few seconds later." },
   wrench:      { name: "Wrench", type: "tool", tool: "wrench", power: 0, speed: 6, dmg: 3, desc: "Lays wire (LMB) — needs Wire in your bag. Click a wired tile to cut." },
   wire:        { name: "Wire", type: "material", max: 999 },
   platform:    { name: "Platform", type: "block", tile: T.PLATFORM, max: 999 },
   rope:        { name: "Rope", type: "block", tile: T.ROPE, max: 999, needsSupport: true, desc: "Climb it with W/S — or grab it mid-fall to stop taking fall damage." },
   enchantTable: { name: "Enchant table", type: "block", tile: T.ENCHANT_TABLE, max: 99, needsFloor: true, desc: "Right-click to enchant a tool, weapon, or armor piece." },
+  /* building-set variants */
+  planks:         { name: "Planks", type: "block", tile: T.PLANKS, max: 999 },
+  clay:           { name: "Clay", type: "block", tile: T.CLAY, max: 999 },
+  clayBrick:      { name: "Clay brick", type: "block", tile: T.CLAY_BRICK, max: 999 },
+  polishedStone:  { name: "Polished stone", type: "block", tile: T.POLISHED_STONE, max: 999 },
+  chiseledBrick:  { name: "Chiseled brick", type: "block", tile: T.CHISELED_BRICK, max: 999 },
+  glassRed:       { name: "Red glass", type: "block", tile: T.GLASS_RED, max: 999 },
+  glassGreen:     { name: "Green glass", type: "block", tile: T.GLASS_GREEN, max: 999 },
+  glassBlue:      { name: "Blue glass", type: "block", tile: T.GLASS_BLUE, max: 999 },
+  woodRed:        { name: "Red painted wood", type: "block", tile: T.WOOD_RED, max: 999 },
+  woodGreen:      { name: "Green painted wood", type: "block", tile: T.WOOD_GREEN, max: 999 },
+  woodBlue:       { name: "Blue painted wood", type: "block", tile: T.WOOD_BLUE, max: 999 },
+  fence:          { name: "Fence", type: "block", tile: T.FENCE, max: 999, needsFloor: true, desc: "Blocks animals in (and out). Break it to make a gate." },
   /* walls */
   woodWall:       { name: "Wood wall", type: "wall", wall: W.WOOD, max: 999 },
   stoneBrickWall: { name: "Stone brick wall", type: "wall", wall: W.STONE_BRICK, max: 999 },
@@ -167,6 +225,8 @@ export const ITEMS = {
   pepeScroll: { name: "Rare Pepe scroll", type: "material", max: 99, desc: "Rare. Once. Before the screenshots." },
   moonShard: { name: "Doge Moon Shard", type: "material", max: 99, desc: "Glows faintly. Smells like the moon. Very ore." },
   rocketPart: { name: "Rocket part", type: "material", max: 99, desc: "Salvaged from a prototype. Probably fine." },
+  meteorite: { name: "Meteorite", type: "material", max: 99, desc: "Still warm. Fell from somewhere important." },
+  trollCoin: { name: "Troll Coin", type: "material", max: 999, desc: "Minted by nobody, accepted by everybody. Drops off anything hostile." },
   whaleKey: { name: "Whale Key", type: "material", max: 5, desc: "Only diamond hands may enter the vault. Opens the Whale Vault door." },
   antiBotFlame: { name: "Anti-Bot Flame", type: "material", max: 5, desc: "Burns cleaner than any real fire. Doesn't like bots." },
   /* tools */
@@ -191,6 +251,7 @@ export const ITEMS = {
   trollBlade:  { name: "Troll Blade", type: "weapon", dmg: 39, knock: 340, speed: 4.2, arc: 1.5, rare: true },
   trolliumSword: { name: "Trollium sword", type: "weapon", dmg: 48, knock: 300, speed: 4.4, arc: 1.3 },
   emperorEdge: { name: "Emperor's Edge", type: "weapon", dmg: 62, knock: 380, speed: 4.4, arc: 1.7, rare: true },
+  starforgeBlade: { name: "Starforge Blade", type: "weapon", dmg: 54, knock: 320, speed: 4.3, arc: 1.35, rare: true, desc: "Struck from the sky. Still faintly warm." },
   trolliumBow: { name: "Trollium bow", type: "bow", dmg: 24, speed: 3.6 },
   woodBow:     { name: "Wooden bow", type: "bow", dmg: 9, speed: 2.6 },
   goldBow:     { name: "Golden bow", type: "bow", dmg: 17, speed: 3.2 },
@@ -212,11 +273,22 @@ export const ITEMS = {
   trolliumHelm:  { name: "Trollium helmet", type: "armor", slot: "head", def: 6 },
   trolliumChest: { name: "Trollium chestplate", type: "armor", slot: "chest", def: 8 },
   trolliumLegs:  { name: "Trollium greaves", type: "armor", slot: "legs", def: 7 },
+  /* accessories: a 4th/5th/6th equip slot on top of armor (ring/back/feet),
+     each granting a real moveset perk rather than just a stat stick --
+     see Inventory.accessoryPerks() for how these fields get read. */
+  ringVigor: { name: "Ring of Vigor", type: "accessory", slot: "ring", def: 2, regen: 0.6, desc: "Slow, steady grit. +2 defense, faster regen." },
+  ringHaste: { name: "Signet of Haste", type: "accessory", slot: "ring", speedMult: 1.12, desc: "A restless ring. +12% move speed." },
+  wingsTroll: { name: "Troll Wings", type: "accessory", slot: "back", doubleJump: true, glide: true, desc: "Molted from something enormous. Extra jump, plus a slow glide while airborne." },
+  capeSwift: { name: "Swift Cape", type: "accessory", slot: "back", speedMult: 1.18, desc: "Billows dramatically. +18% move speed." },
+  bootsDash: { name: "Dash Boots", type: "accessory", slot: "feet", dash: true, desc: "Double-tap A or D to dash." },
+  bootsSpring: { name: "Spring Boots", type: "accessory", slot: "feet", jumpBoost: 70, desc: "Coiled soles. Noticeably higher jump." },
   /* consumables + special */
   trollBrew:   { name: "Troll brew", type: "potion", heal: 50, max: 30 },
   rawMeat:     { name: "Raw meat", type: "food", hunger: 12, max: 99, raw: true, desc: "Edible. Risky. Cook it if you can." },
   cookedMeat:  { name: "Cooked meat", type: "food", hunger: 32, hpBonus: 4, max: 99, desc: "Proper troll cooking. Restores hunger and a little grit." },
   berry:       { name: "Troll berry", type: "food", hunger: 10, max: 99, desc: "Tart little thing, farmed on tilled soil." },
+  egg:         { name: "Egg", type: "food", hunger: 8, max: 99, desc: "Laid by a tamed troll hen." },
+  omelette:    { name: "Omelette", type: "food", hunger: 28, hpBonus: 3, max: 99, desc: "Ranch cooking. A proper breakfast." },
   trollTotem:  { name: "Troll totem", type: "summon", max: 5, desc: "Wakes the Troll King. Use at night." },
   emperorSigil: { name: "Emperor sigil", type: "summon", max: 5, desc: "Calls the Troll Emperor. Hardmode, night, regrets." },
   /* Grin Core relics — quest rewards, kept in the bag as trophies/keys */
@@ -303,6 +375,52 @@ export const RECIPES = [
   { out: "plate", n: 1, ing: [["stone", 2], ["copperBar", 1]], station: "workbench" },
   { out: "dartTrap", n: 1, ing: [["stone", 10], ["copperBar", 3]], station: "workbench" },
   { out: "enchantTable", n: 1, ing: [["trolliumBar", 4], ["lens", 4], ["goldBar", 3]], station: "anvil" },
+  /* building-set variants */
+  { out: "planks", n: 4, ing: [["wood", 2]], station: "workbench" },
+  { out: "clay", n: 2, ing: [["dirt", 2], ["sand", 2]], station: null },
+  { out: "clayBrick", n: 1, ing: [["clay", 2]], station: "furnace" },
+  { out: "polishedStone", n: 2, ing: [["stone", 3]], station: "workbench" },
+  { out: "chiseledBrick", n: 2, ing: [["stoneBrick", 2]], station: "anvil" },
+  { out: "glassRed", n: 2, ing: [["glass", 2], ["berry", 2]], station: "furnace" },
+  { out: "glassGreen", n: 2, ing: [["glass", 2], ["mushroom", 2]], station: "furnace" },
+  { out: "glassBlue", n: 2, ing: [["glass", 2], ["ice", 2]], station: "furnace" },
+  { out: "woodRed", n: 2, ing: [["planks", 2], ["berry", 2]], station: "workbench" },
+  { out: "woodGreen", n: 2, ing: [["planks", 2], ["mushroom", 2]], station: "workbench" },
+  { out: "woodBlue", n: 2, ing: [["planks", 2], ["ice", 2]], station: "workbench" },
+  /* accessories */
+  { out: "ringVigor", n: 1, ing: [["silverBar", 8], ["gel", 6]], station: "anvil" },
+  { out: "ringHaste", n: 1, ing: [["goldBar", 6], ["lens", 4]], station: "anvil" },
+  { out: "wingsTroll", n: 1, ing: [["trolliumBar", 10], ["bone", 8], ["moonShard", 4]], station: "anvil" },
+  { out: "capeSwift", n: 1, ing: [["silverBar", 10], ["ironBar", 6]], station: "anvil" },
+  { out: "bootsDash", n: 1, ing: [["goldBar", 8], ["gel", 8]], station: "anvil" },
+  { out: "bootsSpring", n: 1, ing: [["ironBar", 10], ["gel", 4]], station: "anvil" },
+  /* ranching */
+  { out: "fence", n: 6, ing: [["wood", 3]], station: "workbench" },
+  { out: "omelette", n: 1, ing: [["egg", 2]], station: "campfire" },
+  /* world events */
+  { out: "starforgeBlade", n: 1, ing: [["meteorite", 6], ["trolliumBar", 4]], station: "anvil" },
+  /* wiring depth */
+  { out: "repeater", n: 2, ing: [["copperBar", 4], ["stone", 4]], station: "workbench" },
+  { out: "timerTorch", n: 2, ing: [["torch", 2], ["gel", 3]], station: "workbench" },
+  { out: "trapdoor", n: 1, ing: [["wood", 6], ["ironBar", 2]], station: "anvil" },
+];
+
+/* Traveling Trader (world event, main.js spawnTravelingTrader): picks 4
+   random offers from this pool per visit, same give/get barter shape as
+   every other shop. Deliberately pricier/rarer than the settled shops. */
+export const TRADER_POOL = [
+  { give: [["goldBar", 10]], get: ["moonShard", 3] },
+  { give: [["moonShard", 5]], get: ["trolliumBar", 3] },
+  { give: [["bone", 10]], get: ["lens", 6] },
+  { give: [["gel", 15]], get: ["goldBar", 4] },
+  { give: [["silverBar", 14]], get: ["trolliumBar", 2] },
+  { give: [["ironBar", 20]], get: ["silverBar", 8] },
+  { give: [["berry", 20]], get: ["mushroom", 20] },
+  { give: [["pepeScroll", 1]], get: ["lens", 10] },
+  { give: [["rocketPart", 1]], get: ["goldBar", 6] },
+  { give: [["meteorite", 3]], get: ["trolliumBar", 3] },
+  { give: [["trollCoin", 60]], get: ["moonShard", 2] },
+  { give: [["trollCoin", 40]], get: ["goldBar", 3] },
 ];
 
 /* ----------------------------------------------------------------- enchanting */
@@ -330,8 +448,8 @@ export const ENEMIES = {
   /* Passive animals: never attack, flee when the player closes in, die in
      a couple hits, drop raw meat for the hunger/cooking loop. Spawned by
      updateAnimalSpawns() (main.js), not the hostile spawn tables. */
-  trollBoar: { name: "Troll Boar", ai: "flee", hp: 24, dmg: 0, def: 0, w: 24, h: 18, color: "#c98a72", drops: [["rawMeat", 1, 2, 1]], kb: 1.0, passive: true },
-  trollHen:  { name: "Troll Hen", ai: "flee", hp: 14, dmg: 0, def: 0, w: 18, h: 16, color: "#d9c9a3", drops: [["rawMeat", 1, 1, 1]], kb: 1.1, passive: true },
+  trollBoar: { name: "Troll Boar", ai: "flee", hp: 24, dmg: 0, def: 0, w: 24, h: 18, color: "#c98a72", drops: [["rawMeat", 1, 2, 1]], kb: 1.0, passive: true, tameFood: "berry" },
+  trollHen:  { name: "Troll Hen", ai: "flee", hp: 14, dmg: 0, def: 0, w: 18, h: 16, color: "#d9c9a3", drops: [["rawMeat", 1, 1, 1]], kb: 1.1, passive: true, tameFood: "mushroom", lays: "egg" },
   slimeGreen: { name: "Green troll slime", ai: "slime", hp: 16, dmg: 8, def: 0, w: 26, h: 18, color: "#4fd35f", drops: [["gel", 1, 2, 1]], kb: 1.0 },
   slimeBlue:  { name: "Blue troll slime", ai: "slime", hp: 26, dmg: 10, def: 2, w: 28, h: 20, color: "#4f9fd3", drops: [["gel", 1, 3, 1]], kb: 1.0 },
   zombie:     { name: "Troll zombie", ai: "walker", hp: 46, dmg: 15, def: 4, w: 22, h: 42, color: "#7ba05b", drops: [["gel", 0, 1, 0.2]], kb: 0.8 },
@@ -342,6 +460,9 @@ export const ENEMIES = {
   grinCreeper: { name: "Grin Creeper", ai: "exploder", hp: 20, dmg: 30, def: 0, w: 24, h: 24, color: "#5fbf3a", drops: [["gel", 1, 3, 1]], kb: 0.5 },
   boneArcher: { name: "Bone Archer", ai: "archer", hp: 50, dmg: 10, def: 4, w: 22, h: 42, color: "#cfc9bd", drops: [["bone", 1, 2, 0.7]], kb: 0.5 },
   shadowStalker: { name: "Shadow Stalker", ai: "teleporter", hp: 60, dmg: 18, def: 5, w: 24, h: 30, color: "#3a2a4d", drops: [["lens", 1, 2, 0.5]], kb: 0.7, noNatural: true },
+  /* Kek Jungle */
+  kekLizard: { name: "Kek Lizard", ai: "walker", hp: 34, dmg: 12, def: 2, w: 24, h: 20, color: "#6bbf3a", drops: [["gel", 1, 2, 0.8], ["berry", 0, 2, 0.4]], kb: 1.1 },
+  jungleWasp: { name: "Jungle Wasp", ai: "flyer", hp: 20, dmg: 12, def: 0, w: 20, h: 16, color: "#d8b23c", drops: [["gel", 0, 1, 0.4]], kb: 1.2, erratic: true },
   /* Pepe Swamp */
   copeSlime:  { name: "Cope Slime", ai: "slime", hp: 20, dmg: 9, def: 1, w: 26, h: 18, color: "#5f8f3a", drops: [["gel", 1, 2, 1]], kb: 1.0 },
   fudPhantom: { name: "FUD Phantom", ai: "flyer", hp: 30, dmg: 13, def: 1, w: 24, h: 24, color: "#8a7fa8", drops: [["lens", 0, 1, 0.3]], kb: 0.9, erratic: true },
@@ -359,16 +480,19 @@ export const ENEMIES = {
 /* Boss knobs (classes live in boss.js). */
 export const BOSS = {
   hp: 2600, contactDmg: 26, def: 10, tearDmg: 16,
-  drops: [["trollBlade", 1, 1, 1], ["goldBar", 15, 25, 1]],
+  drops: [["trollBlade", 1, 1, 1], ["goldBar", 15, 25, 1], ["trollCoin", 120, 180, 1]],
 };
 export const BOSS2 = {
   hp: 5200, contactDmg: 38, def: 18, tearDmg: 24,
-  drops: [["emperorEdge", 1, 1, 1], ["trolliumBar", 10, 16, 1]],
+  drops: [["emperorEdge", 1, 1, 1], ["trolliumBar", 10, 16, 1], ["trollCoin", 250, 350, 1]],
 };
 
 export const STATION_SCAN = 8;  // tiles radius for crafting-station detection
 
-/* Merchant Troll barter offers: give -> get (no currency, pure hustle). */
+/* Merchant Troll offers: give -> get. Coin rows use the exact same
+   barter shape (trollCoin is just an item), so the shop UI renders a
+   money economy and an item economy through one code path -- rows with
+   coins in `get` are "sell", rows with coins in `give` are "buy". */
 export const MERCHANT_OFFERS = [
   { give: [["wood", 10]], get: ["arrow", 15] },
   { give: [["gel", 3]], get: ["trollBrew", 1] },
@@ -377,6 +501,10 @@ export const MERCHANT_OFFERS = [
   { give: [["bone", 5]], get: ["silverBar", 1] },
   { give: [["lens", 3]], get: ["goldBar", 2] },
   { give: [["ironBar", 1]], get: ["flameArrow", 20] },
+  { give: [["trollCoin", 10]], get: ["trollBrew", 1] },
+  { give: [["trollCoin", 14]], get: ["arrow", 25] },
+  { give: [["gel", 5]], get: ["trollCoin", 6] },
+  { give: [["bone", 5]], get: ["trollCoin", 10] },
 ];
 
 /* Trollrreria Town: four specialist barter shops, same no-currency hustle
@@ -389,6 +517,9 @@ export const BLACKSMITH_OFFERS = [
   { give: [["wood", 6], ["ironBar", 5]], get: ["ironSword", 1] },
   { give: [["ironBar", 8]], get: ["ironHelm", 1] },
   { give: [["goldOre", 6]], get: ["goldBar", 2] },
+  { give: [["trollCoin", 25]], get: ["ironBar", 2] },
+  { give: [["copperOre", 8]], get: ["trollCoin", 8] },
+  { give: [["ironOre", 8]], get: ["trollCoin", 14] },
 ];
 
 export const ALCHEMIST_OFFERS = [
@@ -397,6 +528,8 @@ export const ALCHEMIST_OFFERS = [
   { give: [["mushroom", 10], ["gel", 5]], get: ["trollBrew", 8] },
   { give: [["lens", 2]], get: ["gel", 6] },
   { give: [["bone", 4]], get: ["mushroom", 6] },
+  { give: [["trollCoin", 12]], get: ["trollBrew", 2] },
+  { give: [["mushroom", 8]], get: ["trollCoin", 10] },
 ];
 
 export const TAVERN_OFFERS = [
@@ -404,6 +537,7 @@ export const TAVERN_OFFERS = [
   { give: [["berry", 4]], get: ["cookedMeat", 1] },
   { give: [["wood", 12]], get: ["cookedMeat", 4] },
   { give: [["gel", 4]], get: ["berry", 10] },
+  { give: [["trollCoin", 8]], get: ["cookedMeat", 3] },
 ];
 
 export const BUTCHER_OFFERS = [
@@ -411,6 +545,20 @@ export const BUTCHER_OFFERS = [
   { give: [["bone", 3]], get: ["rawMeat", 6] },
   { give: [["rawMeat", 1]], get: ["cookedMeat", 1] },
   { give: [["silverBar", 1]], get: ["cookedMeat", 10] },
+  { give: [["rawMeat", 5]], get: ["trollCoin", 8] },
+];
+
+/* Troll Chef: housing-gated (see HOUSE_ROSTER, main.js) -- trades ranch
+   products (eggs/omelettes from tamed animals) for crafting reagents,
+   giving the taming/breeding loop a reason to sell surplus instead of
+   just eating it. */
+export const CHEF_OFFERS = [
+  { give: [["berry", 10]], get: ["egg", 4] },
+  { give: [["egg", 4]], get: ["gel", 3] },
+  { give: [["omelette", 2]], get: ["lens", 2] },
+  { give: [["rawMeat", 6]], get: ["bone", 3] },
+  { give: [["egg", 6]], get: ["trollCoin", 10] },
+  { give: [["trollCoin", 15]], get: ["omelette", 2] },
 ];
 
 /* Starter kit (fresh worlds). */

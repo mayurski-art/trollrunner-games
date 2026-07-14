@@ -66,6 +66,8 @@ export class Player extends Entity {
     this.swing = 0;            // 0..1 swing progress (visual)
     this.swingDur = 0.28;
     this.potionCd = 0;
+    this.dashCd = 0;           // Dash Boots cooldown
+    this._tapLeftT = -99; this._tapRightT = -99;   // double-tap timestamps (dash)
     this.animTime = 0;
     this.anim = "idle";
     this.hitFlash = 0;
@@ -145,6 +147,9 @@ export class Player extends Entity {
     const jumpHit = input.hit("Space") || input.hit("KeyW") || input.hit("ArrowUp");
     const drop = input.down("KeyS") || input.down("ArrowDown");
 
+    const perks = game.inventory.accessoryPerks();
+    this.dashCd = Math.max(0, this.dashCd - dt);
+
     const water = this.inLiquid(world, 0);
     const lava = this.inLiquid(world, 1);
     const sludge = this.inLiquid(world, 2);
@@ -156,7 +161,7 @@ export class Player extends Entity {
 
     const accel = wet ? 700 : 1250;
     const fric = wet ? 320 : icy ? 190 : this.onGround ? 1350 : 260;
-    const maxSpd = wet ? 88 : 152;
+    const maxSpd = (wet ? 88 : 152) * perks.speedMult;
 
     if (left && !right) { this.vx = Math.max(this.vx - accel * dt, -maxSpd); this.dir = -1; }
     else if (right && !left) { this.vx = Math.min(this.vx + accel * dt, maxSpd); this.dir = 1; }
@@ -166,10 +171,29 @@ export class Player extends Entity {
       if (Math.sign(this.vx) !== s) this.vx = 0;
     }
 
+    /* Dash Boots: double-tap A/D within 0.3s for a burst of speed, on a
+       cooldown so it's a movement tool rather than a permanent speed mult. */
+    if (perks.dash) {
+      if (input.hit("KeyA") || input.hit("ArrowLeft")) {
+        if (this.animTime - this._tapLeftT < 0.3 && this.dashCd <= 0) {
+          this.vx = -420; this.dashCd = 0.9;
+          burst(game, this.cx, this.cy, "#e8e4da", 10, { spread: 140, life: 0.25 });
+        }
+        this._tapLeftT = this.animTime;
+      }
+      if (input.hit("KeyD") || input.hit("ArrowRight")) {
+        if (this.animTime - this._tapRightT < 0.3 && this.dashCd <= 0) {
+          this.vx = 420; this.dashCd = 0.9;
+          burst(game, this.cx, this.cy, "#e8e4da", 10, { spread: 140, life: 0.25 });
+        }
+        this._tapRightT = this.animTime;
+      }
+    }
+
     /* -------- jumping / swimming */
     this.coyote = this.onGround ? 0.09 : Math.max(0, this.coyote - dt);
     this.jumpBuf = jumpHit ? 0.09 : Math.max(0, this.jumpBuf - dt);
-    if (this.onGround) this.airJumps = game.flags.doubleJump ? 1 : 0;
+    if (this.onGround) this.airJumps = (game.flags.doubleJump || perks.doubleJump) ? 1 : 0;
     if (game.creative) {
       /* free flight: no gravity, jump/drop move straight up/down, hovers
          in place with no input instead of falling */
@@ -186,20 +210,25 @@ export class Player extends Entity {
       else this.vy -= this.vy * Math.min(1, 10 * dt);
     } else {
       if (this.jumpBuf > 0 && this.coyote > 0) {
-        this.vy = game.flags.moonBoots ? -600 : -548;
+        this.vy = (game.flags.moonBoots ? -600 : -548) - perks.jumpBoost;
         this.coyote = 0; this.jumpBuf = 0;
         game.sfx && game.sfx.jump();
       } else if (this.jumpBuf > 0 && this.airJumps > 0 && this.coyote <= 0) {
-        /* Frog Legs: one extra jump once coyote time is spent */
+        /* Frog Legs / Troll Wings: one extra jump once coyote time is spent */
         this.airJumps--;
-        this.vy = -500;
+        this.vy = -500 - perks.jumpBoost * 0.6;
         this.jumpBuf = 0;
         game.sfx && game.sfx.jump();
         burst(game, this.cx, this.y + this.h, "#5f8f3a", 8, { spread: 120, life: 0.3, gravity: 0.3 });
       }
       /* variable jump height (floor keeps tap-jumps useful on touch) */
       if (this.vy < -240 && !jumpKey) this.vy = -240;
-      this.vy = Math.min(this.vy + GRAVITY * dt, MAX_FALL);
+      if (perks.glide && jumpKey && this.vy > 40) {
+        /* Troll Wings glide: cap descent speed instead of free-falling */
+        this.vy = Math.min(this.vy + GRAVITY * 0.16 * dt, 95);
+      } else {
+        this.vy = Math.min(this.vy + GRAVITY * dt, MAX_FALL);
+      }
     }
 
     /* -------- fall tracking + move */
@@ -255,7 +284,7 @@ export class Player extends Entity {
     /* -------- regen */
     this.regenWait += dt;
     if (this.regenWait > 6 && this.hp < this.maxHp && this.hunger > 20) {
-      this._regenAcc = (this._regenAcc || 0) + dt;
+      this._regenAcc = (this._regenAcc || 0) + dt * (1 + perks.regenBonus);
       if (this._regenAcc >= 1.6) { this._regenAcc = 0; this.hp = Math.min(this.maxHp, this.hp + 1); game.ui && game.ui.dirtyHud(); }
     }
 

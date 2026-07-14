@@ -82,7 +82,7 @@ export class Renderer {
         if (def.ore) this.drawNuggets(g, ox, def.ore, id * 7 + v);
         if (def.heart) this.drawHeart(g, ox);
         if (id === T.TREE) this.drawBark(g, ox, v);
-        if (def.glass) { g.clearRect(ox + 3, 3, TILE - 6, TILE - 6); g.fillStyle = "rgba(200,235,250,0.25)"; g.fillRect(ox + 3, 3, TILE - 6, TILE - 6); }
+        if (def.glass) { g.clearRect(ox + 3, 3, TILE - 6, TILE - 6); g.fillStyle = def.glassColor || "rgba(200,235,250,0.25)"; g.fillRect(ox + 3, 3, TILE - 6, TILE - 6); }
       }
     }
     return c;
@@ -202,14 +202,25 @@ export class Renderer {
     if (openU) {
       g.fillStyle = "rgba(255,255,255,0.14)";
       g.fillRect(px, py, TILE, 2);
-      /* grass cap on forest dirt */
-      if (id === T.DIRT && biomeAt(wx, world.w) === "forest") {
+      /* grass cap on forest dirt / jungle mud */
+      const capBiome = biomeAt(wx, world.w);
+      if (id === T.DIRT && capBiome === "forest") {
         g.fillStyle = "#3e9e44";
         g.fillRect(px, py, TILE, 4);
         g.fillStyle = "#57bd5c";
         for (let n = 0; n < 4; n++) {
           const bx = Math.floor(hash2(wx * 4 + n, wy, 13) * (TILE - 1));
           g.fillRect(px + bx, py - (hash2(n, wx, 17) > 0.5 ? 2 : 1), 1, 3);
+        }
+      } else if (id === T.MUD && capBiome === "jungle") {
+        /* deeper, thicker jungle green so Kek Jungle mud reads as lush,
+           not swampy -- swamp mud stays bare */
+        g.fillStyle = "#1f7a3d";
+        g.fillRect(px, py, TILE, 5);
+        g.fillStyle = "#35a85a";
+        for (let n = 0; n < 6; n++) {
+          const bx = Math.floor(hash2(wx * 4 + n, wy, 19) * (TILE - 1));
+          g.fillRect(px + bx, py - (hash2(n, wx, 23) > 0.4 ? 3 : 1), 1, 4);
         }
       }
     }
@@ -433,6 +444,44 @@ export class Renderer {
         for (let n = 0; n < 3; n++) g.fillRect(px + 5, py + 2 + n * 5, 6, 1);
         break;
       }
+      case T.FENCE: {
+        g.fillStyle = "#6b4a26";
+        g.fillRect(px + 2, py, 2, TILE); g.fillRect(px + 12, py, 2, TILE);
+        g.fillStyle = "#8a5a2b";
+        g.fillRect(px, py + 3, TILE, 2); g.fillRect(px, py + 10, TILE, 2);
+        break;
+      }
+      case T.REPEATER_L:
+      case T.REPEATER_R: {
+        g.fillStyle = "#4e525a"; g.fillRect(px + 1, py + 10, TILE - 2, 5);
+        g.fillStyle = "#e28448";
+        g.fillRect(px + 3, py + 12, 3, 2); g.fillRect(px + 10, py + 12, 3, 2);
+        g.fillStyle = "#ffb300";
+        g.fillRect(id === T.REPEATER_L ? px + 2 : px + 11, py + 7, 3, 3);
+        break;
+      }
+      case T.TIMER_TORCH: {
+        g.fillStyle = "#8a5a2b"; g.fillRect(px + 7, py + 6, 2, 9);
+        g.fillStyle = "#5ec8d8"; g.fillRect(px + 6, py + 3, 4, 4);
+        g.fillStyle = "#c8f0f7"; g.fillRect(px + 7, py + 3, 2, 2);
+        break;
+      }
+      case T.TIMER_TORCH_OFF: {
+        g.fillStyle = "#8a5a2b"; g.fillRect(px + 7, py + 6, 2, 9);
+        g.fillStyle = "#2a3a3e"; g.fillRect(px + 6, py + 3, 4, 4);
+        break;
+      }
+      case T.TRAPDOOR_C: {
+        g.fillStyle = "#6b4a26"; g.fillRect(px, py + 12, TILE, 4);
+        g.fillStyle = "#4e3418"; g.fillRect(px, py + 12, TILE, 1);
+        g.fillStyle = "#3d4149"; g.fillRect(px + 2, py + 14, 2, 1); g.fillRect(px + 12, py + 14, 2, 1);
+        break;
+      }
+      case T.TRAPDOOR_O: {
+        g.fillStyle = "#6b4a26"; g.fillRect(px, py + 12, 4, TILE - 12);
+        g.fillStyle = "#4e3418"; g.fillRect(px, py + 12, 1, TILE - 12);
+        break;
+      }
       case T.ENCHANT_TABLE: {
         g.fillStyle = "#2f2347"; g.fillRect(px + 1, py + 9, TILE - 2, 6);
         g.fillStyle = "#4a3a70"; g.fillRect(px + 2, py + 9, TILE - 4, 2);
@@ -619,6 +668,8 @@ export class Renderer {
     if (depthFade >= 1) return;
     const base = biome === "desert" ? ["#8f7a4a", "#6e5d38"]
       : biome === "snow" ? ["#7d95ab", "#5c7286"]
+      : biome === "jungle" ? ["#2e6b3d", "#1f4d2c"]
+      : biome === "ocean" ? ["#3d5b8f", "#2c4268"]
       : ["#3d6b4b", "#2c5039"];
     const layers = [
       { col: base[0], amp: 60, speed: 0.18, yOff: 0.62 },
