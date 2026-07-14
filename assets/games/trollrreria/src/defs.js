@@ -220,6 +220,7 @@ export const ITEMS = {
   moonShard: { name: "Doge Moon Shard", type: "material", max: 99, desc: "Glows faintly. Smells like the moon. Very ore." },
   rocketPart: { name: "Rocket part", type: "material", max: 99, desc: "Salvaged from a prototype. Probably fine." },
   meteorite: { name: "Meteorite", type: "material", max: 99, desc: "Still warm. Fell from somewhere important." },
+  trollCoin: { name: "Troll Coin", type: "material", max: 999, desc: "Minted by nobody, accepted by everybody. Drops off anything hostile." },
   whaleKey: { name: "Whale Key", type: "material", max: 5, desc: "Only diamond hands may enter the vault. Opens the Whale Vault door." },
   antiBotFlame: { name: "Anti-Bot Flame", type: "material", max: 5, desc: "Burns cleaner than any real fire. Doesn't like bots." },
   /* tools */
@@ -412,6 +413,8 @@ export const TRADER_POOL = [
   { give: [["pepeScroll", 1]], get: ["lens", 10] },
   { give: [["rocketPart", 1]], get: ["goldBar", 6] },
   { give: [["meteorite", 3]], get: ["trolliumBar", 3] },
+  { give: [["trollCoin", 60]], get: ["moonShard", 2] },
+  { give: [["trollCoin", 40]], get: ["goldBar", 3] },
 ];
 
 /* ----------------------------------------------------------------- enchanting */
@@ -468,16 +471,19 @@ export const ENEMIES = {
 /* Boss knobs (classes live in boss.js). */
 export const BOSS = {
   hp: 2600, contactDmg: 26, def: 10, tearDmg: 16,
-  drops: [["trollBlade", 1, 1, 1], ["goldBar", 15, 25, 1]],
+  drops: [["trollBlade", 1, 1, 1], ["goldBar", 15, 25, 1], ["trollCoin", 120, 180, 1]],
 };
 export const BOSS2 = {
   hp: 5200, contactDmg: 38, def: 18, tearDmg: 24,
-  drops: [["emperorEdge", 1, 1, 1], ["trolliumBar", 10, 16, 1]],
+  drops: [["emperorEdge", 1, 1, 1], ["trolliumBar", 10, 16, 1], ["trollCoin", 250, 350, 1]],
 };
 
 export const STATION_SCAN = 8;  // tiles radius for crafting-station detection
 
-/* Merchant Troll barter offers: give -> get (no currency, pure hustle). */
+/* Merchant Troll offers: give -> get. Coin rows use the exact same
+   barter shape (trollCoin is just an item), so the shop UI renders a
+   money economy and an item economy through one code path -- rows with
+   coins in `get` are "sell", rows with coins in `give` are "buy". */
 export const MERCHANT_OFFERS = [
   { give: [["wood", 10]], get: ["arrow", 15] },
   { give: [["gel", 3]], get: ["trollBrew", 1] },
@@ -486,6 +492,10 @@ export const MERCHANT_OFFERS = [
   { give: [["bone", 5]], get: ["silverBar", 1] },
   { give: [["lens", 3]], get: ["goldBar", 2] },
   { give: [["ironBar", 1]], get: ["flameArrow", 20] },
+  { give: [["trollCoin", 10]], get: ["trollBrew", 1] },
+  { give: [["trollCoin", 14]], get: ["arrow", 25] },
+  { give: [["gel", 5]], get: ["trollCoin", 6] },
+  { give: [["bone", 5]], get: ["trollCoin", 10] },
 ];
 
 /* Trollrreria Town: four specialist barter shops, same no-currency hustle
@@ -498,6 +508,9 @@ export const BLACKSMITH_OFFERS = [
   { give: [["wood", 6], ["ironBar", 5]], get: ["ironSword", 1] },
   { give: [["ironBar", 8]], get: ["ironHelm", 1] },
   { give: [["goldOre", 6]], get: ["goldBar", 2] },
+  { give: [["trollCoin", 25]], get: ["ironBar", 2] },
+  { give: [["copperOre", 8]], get: ["trollCoin", 8] },
+  { give: [["ironOre", 8]], get: ["trollCoin", 14] },
 ];
 
 export const ALCHEMIST_OFFERS = [
@@ -506,6 +519,8 @@ export const ALCHEMIST_OFFERS = [
   { give: [["mushroom", 10], ["gel", 5]], get: ["trollBrew", 8] },
   { give: [["lens", 2]], get: ["gel", 6] },
   { give: [["bone", 4]], get: ["mushroom", 6] },
+  { give: [["trollCoin", 12]], get: ["trollBrew", 2] },
+  { give: [["mushroom", 8]], get: ["trollCoin", 10] },
 ];
 
 export const TAVERN_OFFERS = [
@@ -513,6 +528,7 @@ export const TAVERN_OFFERS = [
   { give: [["berry", 4]], get: ["cookedMeat", 1] },
   { give: [["wood", 12]], get: ["cookedMeat", 4] },
   { give: [["gel", 4]], get: ["berry", 10] },
+  { give: [["trollCoin", 8]], get: ["cookedMeat", 3] },
 ];
 
 export const BUTCHER_OFFERS = [
@@ -520,6 +536,7 @@ export const BUTCHER_OFFERS = [
   { give: [["bone", 3]], get: ["rawMeat", 6] },
   { give: [["rawMeat", 1]], get: ["cookedMeat", 1] },
   { give: [["silverBar", 1]], get: ["cookedMeat", 10] },
+  { give: [["rawMeat", 5]], get: ["trollCoin", 8] },
 ];
 
 /* Troll Chef: housing-gated (see HOUSE_ROSTER, main.js) -- trades ranch
@@ -531,6 +548,8 @@ export const CHEF_OFFERS = [
   { give: [["egg", 4]], get: ["gel", 3] },
   { give: [["omelette", 2]], get: ["lens", 2] },
   { give: [["rawMeat", 6]], get: ["bone", 3] },
+  { give: [["egg", 6]], get: ["trollCoin", 10] },
+  { give: [["trollCoin", 15]], get: ["omelette", 2] },
 ];
 
 /* Starter kit (fresh worlds). */

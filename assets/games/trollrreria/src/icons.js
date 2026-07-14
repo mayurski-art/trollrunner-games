@@ -331,6 +331,16 @@ function drawMaterial(g, id, m) {
     g.fillStyle = "#2c5039"; g.fillRect(12, 16, 3, 3); g.fillRect(18, 16, 3, 3);
     g.strokeStyle = "#2c5039"; g.lineWidth = 1.5;
     g.beginPath(); g.arc(16, 20, 4, 0.3, Math.PI - 0.3); g.stroke();
+  } else if (id === "trollCoin") {
+    g.fillStyle = "#c99a2e";
+    g.beginPath(); g.arc(16, 16, 10, 0, 7); g.fill();
+    g.fillStyle = "#f4c64c";
+    g.beginPath(); g.arc(16, 16, 8, 0, 7); g.fill();
+    /* the grin, of course */
+    g.strokeStyle = "#8a6512"; g.lineWidth = 1.6;
+    g.beginPath(); g.arc(16, 17, 5, 0.25, Math.PI - 0.25); g.stroke();
+    g.fillStyle = "#8a6512"; g.fillRect(12, 12, 2, 2); g.fillRect(18, 12, 2, 2);
+    g.fillStyle = "rgba(255,255,255,0.45)"; g.fillRect(11, 9, 3, 2);
   } else if (id === "lens") {
     g.fillStyle = "#e8e4da"; g.beginPath(); g.arc(16, 16, 9, 0, 7); g.fill();
     g.fillStyle = "#8c2440"; g.beginPath(); g.arc(16, 16, 4, 0, 7); g.fill();

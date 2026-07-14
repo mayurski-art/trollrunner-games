@@ -427,6 +427,14 @@ export class Enemy extends Entity {
         if (n > 0) game.spawnDrop(this.cx, this.cy, id, n);
       }
     }
+    /* coin purse: anything hostile pays out on death, scaled by toughness
+       -- passive animals don't, so farming your own ranch isn't an
+       economy exploit. Payouts feed the coin rows in the shop offers. */
+    if (!this.def.passive) {
+      let coins = Math.max(1, Math.round(this.maxHp / 10 + Math.random() * 3));
+      if (this.elite) coins *= 2;
+      game.spawnDrop(this.cx, this.cy, "trollCoin", coins);
+    }
     game.onKill && game.onKill(this);
   }
 
