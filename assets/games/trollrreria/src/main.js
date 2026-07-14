@@ -6,7 +6,7 @@
 
 import {
   T, TILES, W, ITEMS, ENEMIES, TILE, ZOOM, CYCLE, DAY_LEN, WORLD_W, WORLD_H, CROP_GROW_TIME,
-  REACH, STATION_SCAN, STARTER_ITEMS,
+  REACH, STATION_SCAN, STARTER_ITEMS, TRADER_POOL,
 } from "./defs.js";
 import { hashStr, clamp, lerp, fmtClock, aabb, dist2 } from "./util.js";
 import { generateWorld, biomeAt, zoneAt, BIOME_NAMES, STONE_START, DEEP_START } from "./worldgen.js";
@@ -22,7 +22,7 @@ import { TrollKing, TrollEmperor, Rickroller } from "./boss.js";
 import { Archtroll, Rarepepe, ElderShibe, Anon } from "./worldbosses.js";
 import {
   MerchantTroll, PepeHermit, RocketTinkerer, WhaleOracle,
-  Blacksmith, Alchemist, TavernKeeper, Butcher, SIGN_TIPS,
+  Blacksmith, Alchemist, TavernKeeper, Butcher, SIGN_TIPS, TravelingTrader,
 } from "./npc.js";
 import { findHouseNear } from "./housing.js";
 import {
@@ -181,6 +181,7 @@ class Game {
     this.entities = [];
     this.enemies = [];
     this.npcs = [];
+    this.travelingTrader = null;
     this.time = 60;
     this.dayCount = 1;
     this.trollMoon = false;
@@ -461,12 +462,18 @@ class Game {
       this.time -= CYCLE;
       this.dayCount++;
       this.trollMoon = false;
+      /* dawn world events: independent rolls, both gated a couple days in
+         so a fresh world has time to breathe first */
+      if (this.dayCount >= 3 && Math.random() < 0.12) this.spawnMeteor();
+      if (this.dayCount >= 2 && !this.travelingTrader && Math.random() < 0.3) this.spawnTravelingTrader();
     } else if (prevTime < DAY_LEN && this.time >= DAY_LEN) {
       /* nightfall: occasionally the Troll Moon rises */
       if (this.dayCount >= 2 && Math.random() < 0.15) {
         this.trollMoon = true;
         this.announce("🧌 The Troll Moon rises… problem?");
       }
+      /* the trader packs up at dusk -- a rotating visitor, not a resident */
+      if (this.travelingTrader) this.despawnTravelingTrader();
     }
     this.stats.playSec += dt;
     /* a lit furnace keeps burning in real time, whether or not you're
@@ -1476,6 +1483,56 @@ class Game {
   spawnWhaleOracle() {
     this.spawnNpcInBiome("desert", (tx, ty, hb) => new WhaleOracle(tx, ty, hb),
       { wallTile: T.STONE_BRICK, wallBg: W.STONE_BRICK, rw: 7, interiorH: 4 });
+  }
+
+  /* World event: a meteor crashes near the player at dawn, carving a
+     small crater and salting it with Meteorite -- a rare ore worth
+     leaving the base for, tucked into a spot the player will stumble
+     across rather than a message telling them to go dig somewhere. */
+  spawnMeteor() {
+    const p = this.player;
+    if (!p) return;
+    const dir = Math.random() < 0.5 ? -1 : 1;
+    let tx = Math.floor(p.cx / TILE) + Math.round(dir * (30 + Math.random() * 50));
+    tx = Math.max(20, Math.min(this.world.w - 20, tx));
+    const groundY = this.world.topSolid[tx];
+    if (groundY == null || groundY < 0) return;
+    const cx = tx, cy = groundY;
+    const R = 4 + Math.floor(Math.random() * 2);
+    for (let y = cy - R; y <= cy + R; y++) {
+      for (let x = cx - R; x <= cx + R; x++) {
+        if (!this.world.inBounds(x, y)) continue;
+        const d2 = (x - cx) ** 2 + (y - cy) ** 2;
+        if (d2 > R * R) continue;
+        if (d2 > (R - 1.4) ** 2 && Math.random() < 0.65) this.world.set(x, y, T.METEORITE);
+        else this.world.set(x, y, T.AIR);
+      }
+    }
+    this.world.set(cx, cy, T.METEORITE);
+    this.announce("☄️ A meteor crashed nearby! Look for the crater.");
+  }
+
+  /* World event: a Traveling Trader camps near the player for one day
+     with a rotating slice of rare offers, then leaves at dusk. Not a
+     stamped-house resident -- see TravelingTrader in npc.js. */
+  spawnTravelingTrader() {
+    const p = this.player;
+    if (!p) return;
+    const spot = this.findGroundNear(Math.floor(p.cx / TILE), Math.floor(p.cy / TILE), 24);
+    if (!spot) return;
+    const trader = new TravelingTrader(spot.tx, spot.ty + 1);
+    const pool = [...TRADER_POOL].sort(() => Math.random() - 0.5).slice(0, 4);
+    trader.offers = pool;
+    this.npcs.push(trader);
+    this.travelingTrader = trader;
+    this.announce("🎪 A Traveling Trader has set up camp nearby.");
+  }
+
+  despawnTravelingTrader() {
+    this.travelingTrader.dead = true;
+    this.npcs = this.npcs.filter(n => n !== this.travelingTrader);
+    this.travelingTrader = null;
+    this.announce("The Traveling Trader packed up and left.");
   }
 
   /* Shared search: find open footing near a tile position (walker-height

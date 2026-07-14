@@ -38,7 +38,7 @@ export const T = {
   PLANKS: 51, CLAY: 52, CLAY_BRICK: 53, POLISHED_STONE: 54, CHISELED_BRICK: 55,
   GLASS_RED: 56, GLASS_GREEN: 57, GLASS_BLUE: 58,
   WOOD_RED: 59, WOOD_GREEN: 60, WOOD_BLUE: 61,
-  FENCE: 62,
+  FENCE: 62, METEORITE: 63,
   /* wires live on their own layer, not in T */
 };
 
@@ -113,6 +113,7 @@ TILES[T.WOOD_RED]    = { name: "Red painted wood", solid: true, hp: 70, pow: 0, 
 TILES[T.WOOD_GREEN]  = { name: "Green painted wood", solid: true, hp: 70, pow: 0, tool: "pick", drop: "woodGreen", pal: ["#3a6b2e", "#4f8f3d", "#63ab4d"] };
 TILES[T.WOOD_BLUE]   = { name: "Blue painted wood", solid: true, hp: 70, pow: 0, tool: "pick", drop: "woodBlue", pal: ["#2e4f7a", "#3d6aa0", "#4d82c2"] };
 TILES[T.FENCE] = { name: "Fence", solid: true, hp: 60, pow: 0, tool: "pick", drop: "fence", needsFloor: true, noVariant: true };
+TILES[T.METEORITE] = { name: "Meteorite", solid: true, hp: 240, pow: 55, tool: "pick", drop: "meteorite", ore: "#ff8f6b", light: 60, pal: ["#4a1f3a", "#6b2f52", "#8f4570"] };
 
 export const CROP_GROW_TIME = 45;   // seconds per growth stage
 
@@ -202,6 +203,7 @@ export const ITEMS = {
   pepeScroll: { name: "Rare Pepe scroll", type: "material", max: 99, desc: "Rare. Once. Before the screenshots." },
   moonShard: { name: "Doge Moon Shard", type: "material", max: 99, desc: "Glows faintly. Smells like the moon. Very ore." },
   rocketPart: { name: "Rocket part", type: "material", max: 99, desc: "Salvaged from a prototype. Probably fine." },
+  meteorite: { name: "Meteorite", type: "material", max: 99, desc: "Still warm. Fell from somewhere important." },
   whaleKey: { name: "Whale Key", type: "material", max: 5, desc: "Only diamond hands may enter the vault. Opens the Whale Vault door." },
   antiBotFlame: { name: "Anti-Bot Flame", type: "material", max: 5, desc: "Burns cleaner than any real fire. Doesn't like bots." },
   /* tools */
@@ -226,6 +228,7 @@ export const ITEMS = {
   trollBlade:  { name: "Troll Blade", type: "weapon", dmg: 39, knock: 340, speed: 4.2, arc: 1.5, rare: true },
   trolliumSword: { name: "Trollium sword", type: "weapon", dmg: 48, knock: 300, speed: 4.4, arc: 1.3 },
   emperorEdge: { name: "Emperor's Edge", type: "weapon", dmg: 62, knock: 380, speed: 4.4, arc: 1.7, rare: true },
+  starforgeBlade: { name: "Starforge Blade", type: "weapon", dmg: 54, knock: 320, speed: 4.3, arc: 1.35, rare: true, desc: "Struck from the sky. Still faintly warm." },
   trolliumBow: { name: "Trollium bow", type: "bow", dmg: 24, speed: 3.6 },
   woodBow:     { name: "Wooden bow", type: "bow", dmg: 9, speed: 2.6 },
   goldBow:     { name: "Golden bow", type: "bow", dmg: 17, speed: 3.2 },
@@ -371,6 +374,24 @@ export const RECIPES = [
   /* ranching */
   { out: "fence", n: 6, ing: [["wood", 3]], station: "workbench" },
   { out: "omelette", n: 1, ing: [["egg", 2]], station: "campfire" },
+  /* world events */
+  { out: "starforgeBlade", n: 1, ing: [["meteorite", 6], ["trolliumBar", 4]], station: "anvil" },
+];
+
+/* Traveling Trader (world event, main.js spawnTravelingTrader): picks 4
+   random offers from this pool per visit, same give/get barter shape as
+   every other shop. Deliberately pricier/rarer than the settled shops. */
+export const TRADER_POOL = [
+  { give: [["goldBar", 10]], get: ["moonShard", 3] },
+  { give: [["moonShard", 5]], get: ["trolliumBar", 3] },
+  { give: [["bone", 10]], get: ["lens", 6] },
+  { give: [["gel", 15]], get: ["goldBar", 4] },
+  { give: [["silverBar", 14]], get: ["trolliumBar", 2] },
+  { give: [["ironBar", 20]], get: ["silverBar", 8] },
+  { give: [["berry", 20]], get: ["mushroom", 20] },
+  { give: [["pepeScroll", 1]], get: ["lens", 10] },
+  { give: [["rocketPart", 1]], get: ["goldBar", 6] },
+  { give: [["meteorite", 3]], get: ["trolliumBar", 3] },
 ];
 
 /* ----------------------------------------------------------------- enchanting */

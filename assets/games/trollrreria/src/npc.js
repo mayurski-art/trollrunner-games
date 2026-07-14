@@ -416,3 +416,25 @@ export class RocketTinkerer extends TownNPC {
     this.tipIdx = 0;
   }
 }
+
+/* Traveling Trader: a world-event NPC, not a stamped-house resident --
+   Game.spawnTravelingTrader() (main.js) places it in the open near the
+   player at dawn with a rotating slice of TRADER_POOL and despawns it at
+   dusk, so `.offers` is always set by the caller rather than defaulting. */
+export class TravelingTrader extends TownNPC {
+  constructor(tx, ty) {
+    super(tx, ty, {
+      name: "Traveling Trader",
+      rig: "gladiator",
+      bodyH: 54,
+      tips: [
+        "Rare goods, fair-ish prices. Won't be here long.",
+        "Picked this up three biomes over. Don't ask how.",
+        "Gone by nightfall -- literally, I don't do dark.",
+      ],
+    });
+    this.shop = true;
+    this.offers = [];
+    this.tipIdx = 0;
+  }
+}
