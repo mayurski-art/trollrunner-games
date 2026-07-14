@@ -440,6 +440,37 @@ export class Renderer {
         g.fillRect(px, py + 3, TILE, 2); g.fillRect(px, py + 10, TILE, 2);
         break;
       }
+      case T.REPEATER_L:
+      case T.REPEATER_R: {
+        g.fillStyle = "#4e525a"; g.fillRect(px + 1, py + 10, TILE - 2, 5);
+        g.fillStyle = "#e28448";
+        g.fillRect(px + 3, py + 12, 3, 2); g.fillRect(px + 10, py + 12, 3, 2);
+        g.fillStyle = "#ffb300";
+        g.fillRect(id === T.REPEATER_L ? px + 2 : px + 11, py + 7, 3, 3);
+        break;
+      }
+      case T.TIMER_TORCH: {
+        g.fillStyle = "#8a5a2b"; g.fillRect(px + 7, py + 6, 2, 9);
+        g.fillStyle = "#5ec8d8"; g.fillRect(px + 6, py + 3, 4, 4);
+        g.fillStyle = "#c8f0f7"; g.fillRect(px + 7, py + 3, 2, 2);
+        break;
+      }
+      case T.TIMER_TORCH_OFF: {
+        g.fillStyle = "#8a5a2b"; g.fillRect(px + 7, py + 6, 2, 9);
+        g.fillStyle = "#2a3a3e"; g.fillRect(px + 6, py + 3, 4, 4);
+        break;
+      }
+      case T.TRAPDOOR_C: {
+        g.fillStyle = "#6b4a26"; g.fillRect(px, py + 12, TILE, 4);
+        g.fillStyle = "#4e3418"; g.fillRect(px, py + 12, TILE, 1);
+        g.fillStyle = "#3d4149"; g.fillRect(px + 2, py + 14, 2, 1); g.fillRect(px + 12, py + 14, 2, 1);
+        break;
+      }
+      case T.TRAPDOOR_O: {
+        g.fillStyle = "#6b4a26"; g.fillRect(px, py + 12, 4, TILE - 12);
+        g.fillStyle = "#4e3418"; g.fillRect(px, py + 12, 1, TILE - 12);
+        break;
+      }
       case T.ENCHANT_TABLE: {
         g.fillStyle = "#2f2347"; g.fillRect(px + 1, py + 9, TILE - 2, 6);
         g.fillStyle = "#4a3a70"; g.fillRect(px + 2, py + 9, TILE - 4, 2);

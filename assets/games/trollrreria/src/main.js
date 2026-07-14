@@ -581,6 +581,8 @@ class Game {
     }
 
     this.checkPlates();
+    this.tickPendingPulses(dt);
+    this.tickDeviceReverts(dt);
 
     /* housing: every 8s, see if a valid player-built house (housing.js
        checkHouse) attracts the next un-housed NPC on the roster -- one
@@ -914,10 +916,11 @@ class Game {
     }
 
     if (!this.creative) this.inventory.useSelected();
-    /* dart traps face away from the player */
+    /* directional placement (dart traps, repeaters): faces away from the
+       player. def.tile is the "left" id, def.rTile the "right" id. */
     let placeId = def.tile;
     if (def.faces && this.player) {
-      placeId = (tx + 0.5) * TILE >= this.player.cx ? T.DART_R : T.DART_L;
+      placeId = (tx + 0.5) * TILE >= this.player.cx ? (def.rTile || def.tile) : def.tile;
     }
     world.set(tx, ty, placeId);
     if (tdef.solid) world.setLiquid(tx, ty, 0);
@@ -991,6 +994,12 @@ class Game {
     }
     if (id === T.LEVER) {
       this.pulseWire(m.tx, m.ty);
+      return;
+    }
+    if (id === T.TIMER_TORCH || id === T.TIMER_TORCH_OFF || id === T.TRAPDOOR_C || id === T.TRAPDOOR_O) {
+      /* right-click acts like a pulse arriving at the device, so timers
+         and trapdoors work standalone before any wire is laid */
+      this.activateDevice(m.tx, m.ty);
       return;
     }
     if (id === T.ROCKET_PAD) {
@@ -1126,11 +1135,40 @@ class Game {
       this.activateDevice(x, y);
       for (const [nx, ny] of [[x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]]) {
         if (!world.inBounds(nx, ny) || !world.getWire(nx, ny)) continue;
+        const nid = world.get(nx, ny);
+        if (nid === T.REPEATER_L || nid === T.REPEATER_R) {
+          /* Repeater: absorbs the pulse instead of conducting it instantly
+             -- re-emits one tile further in its facing direction after a
+             delay (ticked in update() via _pendingPulses). Doesn't join
+             the normal flood, so it genuinely gates timing rather than
+             just reacting alongside everything else. */
+          const outX = nx + (nid === T.REPEATER_L ? -1 : 1);
+          (this._pendingPulses ||= []).push({ x: outX, y: ny, t: 0.5 });
+          continue;
+        }
         const k = world.idx(nx, ny);
         if (!seen.has(k)) { seen.add(k); queue.push(k); }
       }
     }
     this.sfx && this.sfx.click();
+  }
+
+  /* Delayed re-pulses: Repeaters (forward hop after 0.5s) and Timer
+     Torches / Trapdoors (self re-pulse after they auto-revert) both just
+     schedule a {x,y,t} here instead of needing their own separate timer
+     system. */
+  tickPendingPulses(dt) {
+    if (!this._pendingPulses || !this._pendingPulses.length) return;
+    const ready = [];
+    this._pendingPulses = this._pendingPulses.filter(p => {
+      p.t -= dt;
+      if (p.t > 0) return true;
+      ready.push(p);
+      return false;
+    });
+    for (const p of ready) {
+      if (this.world.getWire(p.x, p.y)) this.pulseWire(p.x, p.y);
+    }
   }
 
   activateDevice(x, y) {
@@ -1162,7 +1200,72 @@ class Game {
         this.sfx && this.sfx.bow();
         break;
       }
+      /* Timer torch: a pulse starts a clock -- goes dark, then relights
+         a few seconds later and re-pulses its own network, which darkens
+         it again, and so on. Pulsing it while dark cancels the pending
+         relight, so one pulse starts the clock and the next stops it. */
+      case T.TIMER_TORCH: {
+        world.set(x, y, T.TIMER_TORCH_OFF);
+        (this._pendingReverts ||= []).push({ x, y, t: 3, kind: "timer" });
+        break;
+      }
+      case T.TIMER_TORCH_OFF: {
+        if (this._pendingReverts) {
+          this._pendingReverts = this._pendingReverts.filter(r => !(r.kind === "timer" && r.x === x && r.y === y));
+        }
+        world.set(x, y, T.TIMER_TORCH);
+        break;
+      }
+      case T.TRAPDOOR_C: {
+        world.set(x, y, T.TRAPDOOR_O);
+        this.sfx && this.sfx.door();
+        (this._pendingReverts ||= []).push({ x, y, t: 3, kind: "trapdoor" });
+        break;
+      }
+      case T.TRAPDOOR_O: {
+        this.tryCloseTrapdoor(x, y);
+        break;
+      }
     }
+  }
+
+  /* Auto-reverting devices (timer relight, trapdoor slam) scheduled by
+     activateDevice; ticked from update() alongside tickPendingPulses. */
+  tickDeviceReverts(dt) {
+    if (!this._pendingReverts || !this._pendingReverts.length) return;
+    const ready = [];
+    this._pendingReverts = this._pendingReverts.filter(r => {
+      r.t -= dt;
+      if (r.t > 0) return true;
+      ready.push(r);
+      return false;
+    });
+    for (const r of ready) {
+      const id = this.world.get(r.x, r.y);
+      if (r.kind === "timer" && id === T.TIMER_TORCH_OFF) {
+        this.world.set(r.x, r.y, T.TIMER_TORCH);
+        if (this.world.getWire(r.x, r.y)) (this._pendingPulses ||= []).push({ x: r.x, y: r.y, t: 0.05 });
+      } else if (r.kind === "trapdoor" && id === T.TRAPDOOR_O) {
+        if (!this.tryCloseTrapdoor(r.x, r.y)) {
+          /* something's standing in it -- try again shortly instead of
+             entombing whoever's mid-fall through the hatch */
+          r.t = 1;
+          this._pendingReverts.push(r);
+        }
+      }
+    }
+  }
+
+  tryCloseTrapdoor(x, y) {
+    const box = { x: x * TILE, y: y * TILE, w: TILE, h: TILE };
+    for (const b of [this.player, ...this.enemies, ...this.npcs]) {
+      if (b && !b.dead &&
+          box.x < b.x + b.w && box.x + box.w > b.x &&
+          box.y < b.y + b.h && box.y + box.h > b.y) return false;
+    }
+    this.world.set(x, y, T.TRAPDOOR_C);
+    this.sfx && this.sfx.door();
+    return true;
   }
 
   /* Pressure plates: anything standing on one fires it (with a cooldown). */

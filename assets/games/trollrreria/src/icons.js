@@ -74,6 +74,7 @@ function drawIcon(g, id, def) {
     case "summon": drawTotem(g); break;
     case "material": drawMaterial(g, id, m); break;
     case "food": drawFood(g, id); break;
+    case "accessory": drawAccessory(g, id, def); break;
     default: { g.fillStyle = "#f0f"; g.fillRect(8, 8, 16, 16); }
   }
 }
@@ -135,6 +136,24 @@ function drawFurniture(g, id) {
       g.beginPath(); g.arc(x, y, 3, 0, 7); g.fill();
     }
     g.fillStyle = "#8fb573"; g.fillRect(14, 6, 3, 10); g.fillRect(19, 8, 3, 8);
+  } else if (id === "fence") {
+    g.fillStyle = "#6b4a26";
+    g.fillRect(7, 4, 4, 24); g.fillRect(21, 4, 4, 24);
+    g.fillStyle = "#8a5a2b";
+    g.fillRect(3, 9, 26, 4); g.fillRect(3, 19, 26, 4);
+  } else if (id === "repeater") {
+    g.fillStyle = "#4e525a"; g.fillRect(4, 16, 24, 9);
+    g.fillStyle = "#e28448"; g.fillRect(8, 19, 5, 4); g.fillRect(19, 19, 5, 4);
+    g.fillStyle = "#ffb300";
+    g.beginPath(); g.moveTo(22, 8); g.lineTo(28, 12); g.lineTo(22, 16); g.closePath(); g.fill();
+  } else if (id === "timerTorch") {
+    g.fillStyle = "#8a5a2b"; g.fillRect(14, 12, 4, 16);
+    g.fillStyle = "#5ec8d8"; g.fillRect(12, 5, 8, 8);
+    g.fillStyle = "#c8f0f7"; g.fillRect(14, 7, 4, 4);
+  } else if (id === "trapdoor") {
+    g.fillStyle = "#6b4a26"; g.fillRect(3, 14, 26, 6);
+    g.fillStyle = "#4e3418"; g.fillRect(3, 14, 26, 2);
+    g.fillStyle = "#3d4149"; g.fillRect(6, 18, 4, 2); g.fillRect(22, 18, 4, 2);
   } else if (id === "campfire") {
     g.fillStyle = "#5d4326"; g.fillRect(6, 24, 4, 4); g.fillRect(22, 24, 4, 4);
     g.strokeStyle = "#3a2a17"; g.lineWidth = 3;
@@ -169,6 +188,47 @@ function drawFood(g, id) {
     g.fillStyle = "rgba(255,255,255,0.35)";
     g.fillRect(10, 12, 2, 2); g.fillRect(18, 12, 2, 2); g.fillRect(14, 18, 2, 2);
     g.fillStyle = "#8fb573"; g.fillRect(15, 5, 3, 6);
+  } else if (id === "egg") {
+    g.fillStyle = "#f2ead3";
+    g.beginPath(); g.ellipse(16, 17, 7, 10, 0, 0, 7); g.fill();
+    g.fillStyle = "rgba(255,255,255,0.5)"; g.fillRect(12, 10, 3, 5);
+  } else if (id === "omelette") {
+    g.fillStyle = "#f4c64c";
+    g.beginPath(); g.ellipse(16, 18, 11, 7, 0, 0, 7); g.fill();
+    g.fillStyle = "#e8a63c";
+    g.beginPath(); g.ellipse(16, 16, 8, 5, 0, 0, 7); g.fill();
+    g.fillStyle = "#c9645a"; g.fillRect(12, 14, 3, 3); g.fillRect(18, 16, 3, 3);
+  }
+}
+
+function drawAccessory(g, id, def) {
+  if (def.slot === "ring") {
+    g.strokeStyle = "#f4c64c"; g.lineWidth = 4;
+    g.beginPath(); g.arc(16, 18, 7, 0, 7); g.stroke();
+    g.fillStyle = id === "ringVigor" ? "#ff4d5e" : "#5ec8d8";
+    g.fillRect(13, 6, 6, 6);
+  } else if (def.slot === "back") {
+    if (def.glide) {
+      /* wings */
+      g.fillStyle = "#b9b3a8";
+      g.beginPath(); g.moveTo(15, 16); g.quadraticCurveTo(3, 6, 4, 18); g.quadraticCurveTo(9, 22, 15, 20); g.fill();
+      g.beginPath(); g.moveTo(17, 16); g.quadraticCurveTo(29, 6, 28, 18); g.quadraticCurveTo(23, 22, 17, 20); g.fill();
+      g.fillStyle = "#e8e4da"; g.fillRect(14, 12, 4, 10);
+    } else {
+      /* cape */
+      g.fillStyle = "#c23a60";
+      g.beginPath(); g.moveTo(10, 6); g.lineTo(22, 6); g.quadraticCurveTo(26, 20, 20, 27); g.lineTo(12, 27); g.quadraticCurveTo(6, 20, 10, 6); g.fill();
+      g.fillStyle = "#f4c64c"; g.fillRect(13, 5, 6, 3);
+    }
+  } else {
+    /* boots */
+    g.fillStyle = id === "bootsDash" ? "#f4c64c" : "#8a5a2b";
+    g.fillRect(9, 8, 6, 14); g.fillRect(9, 20, 11, 6);
+    g.fillStyle = "rgba(0,0,0,0.3)"; g.fillRect(9, 24, 11, 2);
+    if (id === "bootsSpring") {
+      g.strokeStyle = "#cfc9bd"; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(23, 10); g.lineTo(27, 12); g.lineTo(23, 14); g.lineTo(27, 16); g.stroke();
+    }
   }
 }
 

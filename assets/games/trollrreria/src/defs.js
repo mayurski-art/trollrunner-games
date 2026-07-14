@@ -39,6 +39,8 @@ export const T = {
   GLASS_RED: 56, GLASS_GREEN: 57, GLASS_BLUE: 58,
   WOOD_RED: 59, WOOD_GREEN: 60, WOOD_BLUE: 61,
   FENCE: 62, METEORITE: 63,
+  REPEATER_L: 64, REPEATER_R: 65, TIMER_TORCH: 66, TIMER_TORCH_OFF: 67,
+  TRAPDOOR_C: 68, TRAPDOOR_O: 69,
   /* wires live on their own layer, not in T */
 };
 
@@ -114,6 +116,17 @@ TILES[T.WOOD_GREEN]  = { name: "Green painted wood", solid: true, hp: 70, pow: 0
 TILES[T.WOOD_BLUE]   = { name: "Blue painted wood", solid: true, hp: 70, pow: 0, tool: "pick", drop: "woodBlue", pal: ["#2e4f7a", "#3d6aa0", "#4d82c2"] };
 TILES[T.FENCE] = { name: "Fence", solid: true, hp: 60, pow: 0, tool: "pick", drop: "fence", needsFloor: true, noVariant: true };
 TILES[T.METEORITE] = { name: "Meteorite", solid: true, hp: 240, pow: 55, tool: "pick", drop: "meteorite", ore: "#ff8f6b", light: 60, pal: ["#4a1f3a", "#6b2f52", "#8f4570"] };
+/* Wiring depth: a directional Repeater that delays a pulse instead of
+   passing it through instantly, a Timer Torch that auto-reverts a few
+   seconds after being pulsed (so it re-pulses its own network without a
+   second lever click), and an auto-closing Trapdoor. See Game.pulseWire
+   / Game._pendingPulses (main.js) for how the delay is actually timed. */
+TILES[T.REPEATER_L] = { name: "Repeater", solid: false, hp: 40, pow: 0, tool: "pick", drop: "repeater", needsFloor: true, noVariant: true };
+TILES[T.REPEATER_R] = { name: "Repeater", solid: false, hp: 40, pow: 0, tool: "pick", drop: "repeater", needsFloor: true, noVariant: true };
+TILES[T.TIMER_TORCH]     = { name: "Timer torch", solid: false, hp: 5, pow: 0, tool: "pick", drop: "timerTorch", light: 200, needsSupport: true, noVariant: true };
+TILES[T.TIMER_TORCH_OFF] = { name: "Timer torch (cooling)", solid: false, hp: 5, pow: 0, tool: "pick", drop: "timerTorch", needsSupport: true, noVariant: true };
+TILES[T.TRAPDOOR_C] = { name: "Trapdoor", solid: true, hp: 60, pow: 0, tool: "pick", drop: "trapdoor", needsFloor: true, noVariant: true };
+TILES[T.TRAPDOOR_O] = { name: "Trapdoor (open)", solid: false, hp: 60, pow: 0, tool: "pick", drop: "trapdoor", needsFloor: true, noVariant: true };
 
 export const CROP_GROW_TIME = 45;   // seconds per growth stage
 
@@ -162,7 +175,10 @@ export const ITEMS = {
   bed:         { name: "Troll cot", type: "block", tile: T.BED, max: 99, needsFloor: true, desc: "Right-click to set your spawn." },
   lever:       { name: "Lever", type: "block", tile: T.LEVER, max: 99, needsSupport: true, desc: "Right-click to pulse connected wires." },
   plate:       { name: "Pressure plate", type: "block", tile: T.PLATE, max: 99, needsFloor: true, desc: "Pulses wires when stepped on." },
-  dartTrap:    { name: "Dart trap", type: "block", tile: T.DART_L, max: 99, faces: true, desc: "Fires darts when pulsed. Darts hurt everyone." },
+  dartTrap:    { name: "Dart trap", type: "block", tile: T.DART_L, rTile: T.DART_R, max: 99, faces: true, desc: "Fires darts when pulsed. Darts hurt everyone." },
+  repeater:    { name: "Repeater", type: "block", tile: T.REPEATER_L, rTile: T.REPEATER_R, max: 99, faces: true, needsFloor: true, desc: "Delays a pulse by half a second before passing it on. Faces away from you." },
+  timerTorch:  { name: "Timer torch", type: "block", tile: T.TIMER_TORCH, max: 99, needsSupport: true, desc: "Pulsing it goes dark for a few seconds, then it re-pulses its own wire network on its own." },
+  trapdoor:    { name: "Trapdoor", type: "block", tile: T.TRAPDOOR_C, max: 99, needsFloor: true, desc: "Pulse to open -- swings shut on its own a few seconds later." },
   wrench:      { name: "Wrench", type: "tool", tool: "wrench", power: 0, speed: 6, dmg: 3, desc: "Lays wire (LMB) — needs Wire in your bag. Click a wired tile to cut." },
   wire:        { name: "Wire", type: "material", max: 999 },
   platform:    { name: "Platform", type: "block", tile: T.PLATFORM, max: 999 },
@@ -376,6 +392,10 @@ export const RECIPES = [
   { out: "omelette", n: 1, ing: [["egg", 2]], station: "campfire" },
   /* world events */
   { out: "starforgeBlade", n: 1, ing: [["meteorite", 6], ["trolliumBar", 4]], station: "anvil" },
+  /* wiring depth */
+  { out: "repeater", n: 2, ing: [["copperBar", 4], ["stone", 4]], station: "workbench" },
+  { out: "timerTorch", n: 2, ing: [["torch", 2], ["gel", 3]], station: "workbench" },
+  { out: "trapdoor", n: 1, ing: [["wood", 6], ["ironBar", 2]], station: "anvil" },
 ];
 
 /* Traveling Trader (world event, main.js spawnTravelingTrader): picks 4
