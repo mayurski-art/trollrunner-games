@@ -82,7 +82,7 @@ export class Renderer {
         if (def.ore) this.drawNuggets(g, ox, def.ore, id * 7 + v);
         if (def.heart) this.drawHeart(g, ox);
         if (id === T.TREE) this.drawBark(g, ox, v);
-        if (def.glass) { g.clearRect(ox + 3, 3, TILE - 6, TILE - 6); g.fillStyle = "rgba(200,235,250,0.25)"; g.fillRect(ox + 3, 3, TILE - 6, TILE - 6); }
+        if (def.glass) { g.clearRect(ox + 3, 3, TILE - 6, TILE - 6); g.fillStyle = def.glassColor || "rgba(200,235,250,0.25)"; g.fillRect(ox + 3, 3, TILE - 6, TILE - 6); }
       }
     }
     return c;

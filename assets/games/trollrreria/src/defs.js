@@ -33,6 +33,11 @@ export const T = {
   VAULT_DOOR: 41, GRIN_ALTAR: 42,
   CAMPFIRE: 43, FARMLAND: 44, CROP1: 45, CROP2: 46, CROP3: 47, SIGN: 48,
   ROPE: 49, ENCHANT_TABLE: 50,
+  /* building-set variants (append-only past this point -- save data is
+     keyed on these numeric ids, never renumber the above) */
+  PLANKS: 51, CLAY: 52, CLAY_BRICK: 53, POLISHED_STONE: 54, CHISELED_BRICK: 55,
+  GLASS_RED: 56, GLASS_GREEN: 57, GLASS_BLUE: 58,
+  WOOD_RED: 59, WOOD_GREEN: 60, WOOD_BLUE: 61,
   /* wires live on their own layer, not in T */
 };
 
@@ -92,6 +97,21 @@ TILES[T.SIGN]     = { name: "Weathered sign", solid: false, hp: Infinity, noVari
 TILES[T.ROPE]     = { name: "Rope", solid: false, hp: 8, pow: 0, tool: "pick", drop: "rope", climbable: true, needsSupport: true, noVariant: true };
 TILES[T.ENCHANT_TABLE] = { name: "Enchant table", solid: false, hp: 120, pow: 0, tool: "pick", drop: "enchantTable", station: "enchant", light: 70, needsFloor: true, noVariant: true };
 
+/* Building-set variants: pure decoration, no new mechanics. Colored glass
+   reuses the .glass render path but with its own tint (glassColor) instead
+   of the default pale blue. */
+TILES[T.PLANKS]     = { name: "Planks", solid: true, hp: 70, pow: 0, tool: "pick", drop: "planks", pal: ["#8a6236", "#a8814a", "#c49c60"] };
+TILES[T.CLAY]       = { name: "Clay", solid: true, hp: 45, pow: 0, tool: "pick", drop: "clay", pal: ["#8a7a68", "#a4927c", "#b8a891"] };
+TILES[T.CLAY_BRICK] = { name: "Clay brick", solid: true, hp: 110, pow: 0, tool: "pick", drop: "clayBrick", pal: ["#7a3f2e", "#9c5138", "#b86648"] };
+TILES[T.POLISHED_STONE] = { name: "Polished stone", solid: true, hp: 130, pow: 0, tool: "pick", drop: "polishedStone", pal: ["#6b707a", "#868c97", "#a3aab5"] };
+TILES[T.CHISELED_BRICK] = { name: "Chiseled brick", solid: true, hp: 130, pow: 0, tool: "pick", drop: "chiseledBrick", pal: ["#5a5e68", "#767c87", "#939aa6"] };
+TILES[T.GLASS_RED]   = { name: "Red glass", solid: true, hp: 30, pow: 0, tool: "pick", drop: "glassRed", glass: true, glassColor: "rgba(233,90,90,0.35)", pal: ["#7fb4c9", "#a8d4e4", "#d3edf7"] };
+TILES[T.GLASS_GREEN] = { name: "Green glass", solid: true, hp: 30, pow: 0, tool: "pick", drop: "glassGreen", glass: true, glassColor: "rgba(95,191,58,0.35)", pal: ["#7fb4c9", "#a8d4e4", "#d3edf7"] };
+TILES[T.GLASS_BLUE]  = { name: "Blue glass", solid: true, hp: 30, pow: 0, tool: "pick", drop: "glassBlue", glass: true, glassColor: "rgba(79,143,211,0.35)", pal: ["#7fb4c9", "#a8d4e4", "#d3edf7"] };
+TILES[T.WOOD_RED]    = { name: "Red painted wood", solid: true, hp: 70, pow: 0, tool: "pick", drop: "woodRed", pal: ["#7a3a30", "#a04c3e", "#c05f4d"] };
+TILES[T.WOOD_GREEN]  = { name: "Green painted wood", solid: true, hp: 70, pow: 0, tool: "pick", drop: "woodGreen", pal: ["#3a6b2e", "#4f8f3d", "#63ab4d"] };
+TILES[T.WOOD_BLUE]   = { name: "Blue painted wood", solid: true, hp: 70, pow: 0, tool: "pick", drop: "woodBlue", pal: ["#2e4f7a", "#3d6aa0", "#4d82c2"] };
+
 export const CROP_GROW_TIME = 45;   // seconds per growth stage
 
 /* Furnace fuel: real burn time instead of free/instant smelting. Wood is
@@ -145,6 +165,18 @@ export const ITEMS = {
   platform:    { name: "Platform", type: "block", tile: T.PLATFORM, max: 999 },
   rope:        { name: "Rope", type: "block", tile: T.ROPE, max: 999, needsSupport: true, desc: "Climb it with W/S — or grab it mid-fall to stop taking fall damage." },
   enchantTable: { name: "Enchant table", type: "block", tile: T.ENCHANT_TABLE, max: 99, needsFloor: true, desc: "Right-click to enchant a tool, weapon, or armor piece." },
+  /* building-set variants */
+  planks:         { name: "Planks", type: "block", tile: T.PLANKS, max: 999 },
+  clay:           { name: "Clay", type: "block", tile: T.CLAY, max: 999 },
+  clayBrick:      { name: "Clay brick", type: "block", tile: T.CLAY_BRICK, max: 999 },
+  polishedStone:  { name: "Polished stone", type: "block", tile: T.POLISHED_STONE, max: 999 },
+  chiseledBrick:  { name: "Chiseled brick", type: "block", tile: T.CHISELED_BRICK, max: 999 },
+  glassRed:       { name: "Red glass", type: "block", tile: T.GLASS_RED, max: 999 },
+  glassGreen:     { name: "Green glass", type: "block", tile: T.GLASS_GREEN, max: 999 },
+  glassBlue:      { name: "Blue glass", type: "block", tile: T.GLASS_BLUE, max: 999 },
+  woodRed:        { name: "Red painted wood", type: "block", tile: T.WOOD_RED, max: 999 },
+  woodGreen:      { name: "Green painted wood", type: "block", tile: T.WOOD_GREEN, max: 999 },
+  woodBlue:       { name: "Blue painted wood", type: "block", tile: T.WOOD_BLUE, max: 999 },
   /* walls */
   woodWall:       { name: "Wood wall", type: "wall", wall: W.WOOD, max: 999 },
   stoneBrickWall: { name: "Stone brick wall", type: "wall", wall: W.STONE_BRICK, max: 999 },
@@ -303,6 +335,18 @@ export const RECIPES = [
   { out: "plate", n: 1, ing: [["stone", 2], ["copperBar", 1]], station: "workbench" },
   { out: "dartTrap", n: 1, ing: [["stone", 10], ["copperBar", 3]], station: "workbench" },
   { out: "enchantTable", n: 1, ing: [["trolliumBar", 4], ["lens", 4], ["goldBar", 3]], station: "anvil" },
+  /* building-set variants */
+  { out: "planks", n: 4, ing: [["wood", 2]], station: "workbench" },
+  { out: "clay", n: 2, ing: [["dirt", 2], ["sand", 2]], station: null },
+  { out: "clayBrick", n: 1, ing: [["clay", 2]], station: "furnace" },
+  { out: "polishedStone", n: 2, ing: [["stone", 3]], station: "workbench" },
+  { out: "chiseledBrick", n: 2, ing: [["stoneBrick", 2]], station: "anvil" },
+  { out: "glassRed", n: 2, ing: [["glass", 2], ["berry", 2]], station: "furnace" },
+  { out: "glassGreen", n: 2, ing: [["glass", 2], ["mushroom", 2]], station: "furnace" },
+  { out: "glassBlue", n: 2, ing: [["glass", 2], ["ice", 2]], station: "furnace" },
+  { out: "woodRed", n: 2, ing: [["planks", 2], ["berry", 2]], station: "workbench" },
+  { out: "woodGreen", n: 2, ing: [["planks", 2], ["mushroom", 2]], station: "workbench" },
+  { out: "woodBlue", n: 2, ing: [["planks", 2], ["ice", 2]], station: "workbench" },
 ];
 
 /* ----------------------------------------------------------------- enchanting */
