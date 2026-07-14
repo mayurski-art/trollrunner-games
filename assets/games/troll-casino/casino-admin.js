@@ -75,6 +75,32 @@
 
   function statusClass(s) { return s === "paid" ? "paid" : s === "rejected" ? "rejected" : "pending"; }
 
+  // Sanity check for the reviewer: does this request's token add up against
+  // what this player has actually put in (deposits) and already been paid
+  // (prior paid redemptions)? Flags when the gap looks implausible given the
+  // per-call delta cap now enforced in troll_casino_adjust_balance — this is
+  // a visual nudge to look closer, not an automatic block.
+  function summaryLine(r, s) {
+    if (!s) return "<span class=\"tc-sub\">Player summary unavailable.</span>";
+    const isTroll = r.token === "TROLL";
+    const balance = isTroll ? s.troll_balance : s.usdc_balance;
+    const deposited = isTroll ? s.troll_deposited : s.usdc_deposited;
+    const paidOut = isTroll ? s.troll_paid_out : s.usdc_paid_out;
+    // Balance was already debited by this pending request, so add it back
+    // to see the gameplay position at the moment this request was filed.
+    const netGameplay = (balance + paidOut + Number(r.token_amount)) - deposited;
+    const suspiciousBar = isTroll ? Math.max(deposited * 3, 100000) : Math.max(deposited * 3, 1000);
+    const flagged = netGameplay > suspiciousBar;
+    const fmt = (n) => Number(n).toLocaleString();
+    return `
+      <p class="tc-sub" style="font-family:var(--tc-font-mono);font-size:12px;">
+        deposited: ${fmt(deposited)} ${r.token} · paid out so far: ${fmt(paidOut)} ${r.token} ·
+        current balance: ${fmt(balance)} ${r.token} · deposit count: ${s.deposit_count}<br>
+        net gameplay P&amp;L (incl. this request): <strong>${fmt(netGameplay)} ${r.token}</strong>
+        ${flagged ? "<span class=\"tc-req-status rejected\">⚠ check before paying — far above deposits</span>" : ""}
+      </p>`;
+  }
+
   async function renderPanel() {
     const c = window.TrollrunnerAccounts.getClient();
     const { backdrop, modal } = openBackdrop(`
@@ -90,7 +116,14 @@
         .eq("status", "pending").order("created_at", { ascending: true });
       if (error) { list.textContent = "Could not load requests: " + error.message; return; }
       if (!data || !data.length) { list.innerHTML = "<p class=\"tc-sub\">No pending requests.</p>"; return; }
-      list.innerHTML = data.map(r => `
+
+      const summaries = await Promise.all(data.map(r =>
+        c.rpc("troll_casino_admin_player_summary", { p_user_id: r.user_id })
+          .then(({ data: s, error: e }) => (e || !s || !s.length) ? null : s[0])
+          .catch(() => null)
+      ));
+
+      list.innerHTML = data.map((r, i) => `
         <div class="tc-modal" style="padding:14px;margin-bottom:10px;border:0.5px solid var(--tc-line);">
           <p style="font-family:var(--tc-font-mono);font-size:13px;margin-bottom:8px;">
             <strong>${Number(r.token_amount).toLocaleString()} ${r.token}</strong>
@@ -98,6 +131,7 @@
             wallet: ${r.wallet}<br>
             requested: ${new Date(r.created_at).toLocaleString()}
           </p>
+          ${summaryLine(r, summaries[i])}
           <div class="tc-field"><label>Payout tx signature</label><input type="text" data-tx-for="${r.id}"></div>
           <div style="display:flex;gap:8px;">
             <button type="button" class="tc-btn" data-paid="${r.id}">Mark paid</button>
