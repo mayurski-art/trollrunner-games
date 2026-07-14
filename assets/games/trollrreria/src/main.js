@@ -214,9 +214,6 @@ class Game {
     this.cam.y = this.player.cy - 260;
     this.placeQuestSign();
     this.spawnTownShops();
-    this.spawnPepe();
-    this.spawnRocketTinkerer();
-    this.spawnWhaleOracle();
     this.revealAround(this.player.cx, this.player.cy);
     if (this.ui) this.ui.dirtyInv();
   }
@@ -1544,54 +1541,48 @@ class Game {
     this.entities.push(new QuestMarker(this.spawn.x * TILE + 8, this.spawn.y * TILE - 6, "lostGrin"));
   }
 
-  /* Two small hamlets instead of one four-building hub crammed at spawn:
-     Market Row (Blacksmith + Butcher, stone brick) right at spawn, and
-     The Hearth (Alchemist + Tavern Keeper, wood) a real walk away along
-     the surface. Each NPC gets a stamped house (walls, roof, background
-     wall, a lit ground-level door, a themed decor piece) instead of
-     standing in the open. Hamlet anchors are recorded on `this.hamlets`
-     for fast-travel (see waypoints.js) and anything else that wants to
-     find them later. */
+  /* One town, one row: every NPC (shops + the three wild wanderers who
+     used to be scattered off in the swamp/desert) lives in its own
+     stamped house side by side at spawn, for now -- simpler to find,
+     one safe zone to defend, no cross-map treks for a quest chat.
+     Hamlet keys are kept (`market`/`hearth`) so waypoints.js and
+     anything else keying off them still resolves, just both pointing
+     into the same row now. */
   spawnTownShops() {
-    const hamlets = {
-      market: { baseX: this.spawn.x, roles: [
-        { dx: -14, make: (tx, ty, hb) => new Blacksmith(tx, ty, hb), wallTile: T.STONE_BRICK, wallBg: W.STONE_BRICK, decorTile: T.ANVIL },
-        { dx: 14, make: (tx, ty, hb) => new Butcher(tx, ty, hb), wallTile: T.STONE_BRICK, wallBg: W.STONE_BRICK, decorTile: T.CHEST },
-      ] },
-      hearth: { baseX: this.spawn.x + 90, roles: [
-        { dx: -14, make: (tx, ty, hb) => new Alchemist(tx, ty, hb), wallTile: T.WOOD, wallBg: W.WOOD, decorTile: T.FURNACE },
-        { dx: 14, make: (tx, ty, hb) => new TavernKeeper(tx, ty, hb), wallTile: T.WOOD, wallBg: W.WOOD, decorTile: T.CAMPFIRE },
-      ] },
-    };
-    this.hamlets = {};
-    for (const [key, hamlet] of Object.entries(hamlets)) {
-      let anchor = null;
-      for (const role of hamlet.roles) {
-        const sx = hamlet.baseX + role.dx;
-        const doorSide = role.dx < 0 ? 1 : -1;   // door faces the hamlet center
-        let placed = false;
-        /* scan around this column's actual surface, not spawn's -- The
-           Hearth sits 90+ tiles from spawn, far enough that rolling-hill
-           elevation can differ a lot from spawn.y */
-        const groundY = this.world.topSolid[sx] ?? this.spawn.y;
-        for (let y = groundY - 6; y < groundY + 10; y++) {
-          if (!this.world.isSolid(sx, y) && !this.world.isSolid(sx, y - 1) && this.world.isSolid(sx, y + 1)) {
-            const bounds = this.buildTownHouse(sx, y, { wallTile: role.wallTile, wallBg: role.wallBg, decorTile: role.decorTile, doorSide });
-            this.npcs.push(role.make(sx, y + 1, bounds));
-            if (!anchor) anchor = { x: sx, y: y - 2 };
-            placed = true;
-            break;
-          }
+    const roles = [
+      { dx: -84, make: (tx, ty, hb) => new Butcher(tx, ty, hb), wallTile: T.STONE_BRICK, wallBg: W.STONE_BRICK, decorTile: T.CHEST },
+      { dx: -56, make: (tx, ty, hb) => new Blacksmith(tx, ty, hb), wallTile: T.STONE_BRICK, wallBg: W.STONE_BRICK, decorTile: T.ANVIL },
+      { dx: -28, make: (tx, ty, hb) => new Alchemist(tx, ty, hb), wallTile: T.WOOD, wallBg: W.WOOD, decorTile: T.FURNACE },
+      { dx: 28, make: (tx, ty, hb) => new TavernKeeper(tx, ty, hb), wallTile: T.WOOD, wallBg: W.WOOD, decorTile: T.CAMPFIRE },
+      { dx: 56, make: (tx, ty, hb) => new PepeHermit(tx, ty, hb), wallTile: T.WOOD, wallBg: W.WOOD, rw: 7, interiorH: 4 },
+      { dx: 84, make: (tx, ty, hb) => new RocketTinkerer(tx, ty, hb), wallTile: T.STONE_BRICK, wallBg: W.STONE_BRICK, rw: 7, interiorH: 4 },
+      { dx: 112, make: (tx, ty, hb) => new WhaleOracle(tx, ty, hb), wallTile: T.STONE_BRICK, wallBg: W.STONE_BRICK, rw: 7, interiorH: 4 },
+    ];
+    let minX = Infinity, maxX = -Infinity, anchorY = this.spawn.y - 2;
+    for (const role of roles) {
+      const sx = this.spawn.x + role.dx;
+      const doorSide = role.dx < 0 ? 1 : -1;   // door faces spawn
+      let placed = false;
+      const groundY = this.world.topSolid[sx] ?? this.spawn.y;
+      for (let y = groundY - 6; y < groundY + 10; y++) {
+        if (!this.world.isSolid(sx, y) && !this.world.isSolid(sx, y - 1) && this.world.isSolid(sx, y + 1)) {
+          const bounds = this.buildTownHouse(sx, y, {
+            wallTile: role.wallTile, wallBg: role.wallBg, decorTile: role.decorTile,
+            doorSide, rw: role.rw, interiorH: role.interiorH,
+          });
+          this.npcs.push(role.make(sx, y + 1, bounds));
+          minX = Math.min(minX, sx); maxX = Math.max(maxX, sx);
+          anchorY = y - 2;
+          placed = true;
+          break;
         }
-        if (!placed) this.npcs.push(role.make(this.spawn.x, this.spawn.y + 1, null));
       }
-      this.hamlets[key] = anchor || { x: hamlet.baseX, y: this.spawn.y - 2 };
-      /* each hamlet projects a safe zone: no enemy spawns inside, and
-         hostiles that wander in get turned around at the border, so
-         trading with the residents is never interrupted mid-menu */
-      const a = this.hamlets[key];
-      this.addSafeZone(a.x, a.y, 26);
+      if (!placed) this.npcs.push(role.make(this.spawn.x, this.spawn.y + 1, null));
     }
+    const anchor = Number.isFinite(minX) ? { x: Math.round((minX + maxX) / 2), y: anchorY } : { x: this.spawn.x, y: this.spawn.y - 2 };
+    this.hamlets = { market: anchor, hearth: anchor };
+    /* single safe zone wide enough to cover the whole row */
+    this.addSafeZone(anchor.x, anchor.y, 130);
   }
 
   /* Safe zones: invisible borders around settled NPCs. `radius` is in
@@ -1648,30 +1639,6 @@ class Game {
     /* interior wander fence for the NPC living here, one tile in from
        each side wall so the sprite doesn't clip into it */
     return { minX: (x0 + 1) * TILE, maxX: x1 * TILE };
-  }
-
-  /* Place the Pepe Hermit somewhere along the swamp's surface, in his own
-     small hut -- same stamped-house treatment as the town shops, just
-     one NPC and a smaller footprint. */
-  spawnPepe() {
-    this.spawnNpcInBiome("swamp", (tx, ty, hb) => new PepeHermit(tx, ty, hb),
-      { wallTile: T.WOOD, wallBg: W.WOOD, rw: 7, interiorH: 4 });
-  }
-
-  /* Place the Rocket Tinkerer somewhere along the desert's surface, in a
-     sunbaked stone hut of his own. */
-  spawnRocketTinkerer() {
-    this.spawnNpcInBiome("desert", (tx, ty, hb) => new RocketTinkerer(tx, ty, hb),
-      { wallTile: T.STONE_BRICK, wallBg: W.STONE_BRICK, rw: 7, interiorH: 4 });
-  }
-
-  /* Place the Whale Oracle somewhere along the desert's surface too --
-     the Vault itself is deep underground near the map edge, but its
-     quest-giver stays reachable up top like everyone else. Own hut,
-     same as the Tinkerer's, separately rolled so they don't overlap. */
-  spawnWhaleOracle() {
-    this.spawnNpcInBiome("desert", (tx, ty, hb) => new WhaleOracle(tx, ty, hb),
-      { wallTile: T.STONE_BRICK, wallBg: W.STONE_BRICK, rw: 7, interiorH: 4 });
   }
 
   /* World event: a meteor crashes near the player at dawn, carving a
@@ -1740,30 +1707,6 @@ class Game {
       }
     }
     return null;
-  }
-
-  /* Shared search: find a safe surface spot somewhere in the given biome
-     band and drop the NPC there. `houseOpts`, if given, stamps a small
-     solo hut (same buildTownHouse used for the shop hamlets) so wild NPCs
-     live somewhere instead of just standing in the open. */
-  spawnNpcInBiome(biome, make, houseOpts) {
-    const w = this.world;
-    let x0 = -1, x1 = -1;
-    for (let x = 0; x < w.w; x++) {
-      if (biomeAt(x, w.w) === biome) { if (x0 < 0) x0 = x; x1 = x; }
-    }
-    if (x0 < 0) return;
-    const sx = x0 + Math.floor((x1 - x0) * (0.3 + Math.random() * 0.4));
-    for (let dx = 0; dx < 40; dx++) {
-      const tx = sx + dx;
-      const ty = w.topSolid[clamp(tx, 0, w.w - 1)];
-      if (ty > 2 && ty < w.h - 2 && !w.isSolid(tx, ty - 1)) {
-        const bounds = houseOpts ? this.buildTownHouse(tx, ty - 1, houseOpts) : null;
-        this.npcs.push(make(tx, ty, bounds));
-        this.addSafeZone(tx, ty, 14);   // wild NPC huts get a smaller bubble
-        return;
-      }
-    }
   }
 
   /* Rocket pad: hop between the ground pad near spawn and the sky-island
