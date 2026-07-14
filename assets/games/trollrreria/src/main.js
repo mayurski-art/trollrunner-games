@@ -195,6 +195,7 @@ class Game {
     this.entities = [];
     this.enemies = [];
     this.npcs = [];
+    this.safeZones = [];
     this.travelingTrader = null;
     this.pvp = false;
     this.time = 60;
@@ -536,6 +537,15 @@ class Game {
       this.revealAround(this.player.cx, this.player.cy);
       /* area-title popup on crossing into a new zone (surface biome or
          depth-layered band, e.g. surfacing out of the Moon Mines) */
+      /* safe-zone crossing notice -- the borders are invisible, so tell
+         the player when they step over one */
+      const inSafe = !!this.inSafeZone(Math.floor(this.player.cx / TILE), Math.floor(this.player.cy / TILE));
+      if (inSafe !== this._inSafeZone) {
+        if (this._inSafeZone !== undefined) {
+          this.announce(inSafe ? "🛡 Safe zone — enemies keep out" : "🛡 You left the safe zone");
+        }
+        this._inSafeZone = inSafe;
+      }
       const zone = zoneAt(Math.floor(this.player.cx / TILE), Math.floor(this.player.cy / TILE), this.world.w);
       if (zone !== this._lastBiome) {
         this._lastBiome = zone;
@@ -607,6 +617,8 @@ class Game {
         const house = findHouseNear(this.world, ptx, pty, 50);
         if (house) {
           this.npcs.push(new next.cls(house.cx, house.cy + 1));
+          /* a settled resident makes the player's base a safe zone too */
+          this.addSafeZone(house.cx, house.cy, 24);
           this.announce(next.msg);
         }
       }
@@ -1399,6 +1411,8 @@ class Game {
       if (!world.inBounds(tx, ty)) continue;
       /* must be off-screen */
       if (tx >= vx0 && tx <= vx1 && ty >= vy0 && ty <= vy1) continue;
+      /* never inside a town/NPC safe zone */
+      if (this.inSafeZone(tx, ty)) continue;
 
       const type = this.pickSpawnType(ty, st.isNight, biomeAt(clamp(tx, 0, world.w - 1), world.w));
       if (!type) continue;
@@ -1419,6 +1433,7 @@ class Game {
         if (tallOk && world.isSolid(tx, y + 1)) {
           const i = y * world.w + tx;
           if (world.liquid[i] > 3) break;
+          if (this.inSafeZone(tx, y)) break;   // walked down into a safe zone
           const e = new Enemy(type, tx * TILE + 8, (y + 1) * TILE);
           if (this.flags.hardmode && Math.random() < 0.4) e.makeElite();
           this.enemies.push(e);
@@ -1571,7 +1586,27 @@ class Game {
         if (!placed) this.npcs.push(role.make(this.spawn.x, this.spawn.y + 1, null));
       }
       this.hamlets[key] = anchor || { x: hamlet.baseX, y: this.spawn.y - 2 };
+      /* each hamlet projects a safe zone: no enemy spawns inside, and
+         hostiles that wander in get turned around at the border, so
+         trading with the residents is never interrupted mid-menu */
+      const a = this.hamlets[key];
+      this.addSafeZone(a.x, a.y, 26);
     }
+  }
+
+  /* Safe zones: invisible borders around settled NPCs. `radius` is in
+     tiles; the vertical band is fixed and generous so cave entrances
+     right under town are covered without shielding the deep mines. */
+  addSafeZone(tx, ty, radius = 24) {
+    this.safeZones.push({ x0: tx - radius, x1: tx + radius, y0: ty - 24, y1: ty + 16 });
+  }
+
+  inSafeZone(tx, ty) {
+    if (!this.safeZones) return null;
+    for (const z of this.safeZones) {
+      if (tx >= z.x0 && tx <= z.x1 && ty >= z.y0 && ty <= z.y1) return z;
+    }
+    return null;
   }
 
   /* Stamp a small single-room shop house: solid shell + roof, background
@@ -1725,6 +1760,7 @@ class Game {
       if (ty > 2 && ty < w.h - 2 && !w.isSolid(tx, ty - 1)) {
         const bounds = houseOpts ? this.buildTownHouse(tx, ty - 1, houseOpts) : null;
         this.npcs.push(make(tx, ty, bounds));
+        this.addSafeZone(tx, ty, 14);   // wild NPC huts get a smaller bubble
         return;
       }
     }

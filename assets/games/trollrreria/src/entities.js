@@ -192,6 +192,24 @@ export class Enemy extends Entity {
     const hit = this.moveCollide(game.world, dt);
     if (this.def.ai === "walker" && hit.hitX && this.onGround) this.vy = -370;
 
+    /* Town safe zones (main.js addSafeZone): hostiles hit an invisible
+       border and get pushed back out, so NPCs can be traded with in
+       peace. Bosses ignore it -- you summoned them, that's on you --
+       and passive/tamed animals are welcome in town. */
+    if (!this.boss && !this.def.passive && !this.tamed && game.inSafeZone) {
+      const z = game.inSafeZone(Math.floor(this.cx / TILE), Math.floor(this.cy / TILE));
+      if (z) {
+        const zx0 = z.x0 * TILE, zx1 = (z.x1 + 1) * TILE;
+        const away = this.cx < (zx0 + zx1) / 2 ? -1 : 1;
+        /* slide toward the nearer border (never past it) faster than any
+           AI walks inward -- reads as bumping into a wall, not a teleport */
+        if (away < 0) this.x = Math.max(zx0 - this.w, this.x - 300 * dt);
+        else this.x = Math.min(zx1, this.x + 300 * dt);
+        this.vx = away * Math.abs(this.vx);
+        this.dir = away;
+      }
+    }
+
     /* lava hurts everything */
     if (this.inLiquid(game.world, 1)) this.hurt(game, 12, null, 0);
 
