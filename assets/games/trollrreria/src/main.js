@@ -237,7 +237,23 @@ class Game {
     }
     this.cam.x = this.player.cx - this.viewW / 2;
     this.cam.y = this.player.cy - this.viewH / 2;
+    if (Array.isArray(data.animals)) this.restoreAnimals(data.animals);
     if (this.ui) this.ui.dirtyInv();
+  }
+
+  /* Tamed/bred animals are the only enemies that persist across a save --
+     everything wild is deterministically respawned, but a ranch is player
+     investment and shouldn't vanish on reload. */
+  restoreAnimals(list) {
+    for (const a of list) {
+      if (!ENEMIES[a.type]) continue;
+      const e = new Enemy(a.type, a.x, a.y);
+      e.tamed = true;
+      e.baby = !!a.baby;
+      if (e.baby) e.growTimer = typeof a.growTimer === "number" ? a.growTimer : 60;
+      if (typeof a.hp === "number") e.hp = Math.min(e.maxHp, Math.max(1, a.hp));
+      this.enemies.push(e);
+    }
   }
 
   startNewWorld(character) {
@@ -921,6 +937,7 @@ class Game {
     const m = this.mouseWorld();
     const world = this.world;
     if (!this.player || !this.player.tileInReach(m.tx, m.ty)) return;
+    if (this.tryFeedAnimal(m)) return;
     const id = world.get(m.tx, m.ty);
 
     if (id === T.DOOR_C) {
@@ -1006,6 +1023,54 @@ class Game {
         return;
       }
     }
+  }
+
+  /* Right-click a passive animal while holding its favorite food: tames it
+     if wild, or (once tamed and adult) tries to pair it with a nearby
+     tamed mate of the same species to breed. Returns true if it handled
+     the click, so interact() can fall through to normal tile logic
+     otherwise. */
+  tryFeedAnimal(m) {
+    const sel = this.inventory.selected;
+    if (!sel) return false;
+    for (const e of this.enemies) {
+      if (e.dead || !e.def.passive || !e.def.tameFood || e.def.tameFood !== sel.id) continue;
+      if (Math.abs(e.cx - m.x) > 20 || Math.abs(e.cy - m.y) > 24) continue;
+      this.inventory.useSelected();
+      this.ui && this.ui.dirtyHud();
+      if (!e.tamed) {
+        e.tamed = true;
+        e.loveCd = 0;
+        this.floatText(e.cx, e.y - 10, e.def.name + " tamed!", "#57bd5c");
+        this.sfx && this.sfx.potion();
+      } else if (e.baby) {
+        e.growTimer = Math.max(0, e.growTimer - 20);
+        this.floatText(e.cx, e.y - 10, "growing faster!", "#8fb573");
+      } else {
+        this.tryBreed(e);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  tryBreed(e) {
+    if (e.loveCd > 0) { this.floatText(e.cx, e.y - 10, "not hungry", "#8fb573"); return; }
+    const mate = this.enemies.find(o => o !== e && !o.dead && o.type === e.type &&
+      o.tamed && !o.baby && (o.loveCd || 0) <= 0 && dist2(o.cx, o.cy, e.cx, e.cy) < (TILE * 6) ** 2);
+    if (!mate) {
+      e.loveCd = 8;
+      this.floatText(e.cx, e.y - 10, "needs a mate nearby", "#c23a60");
+      return;
+    }
+    e.loveCd = 45; mate.loveCd = 45;
+    const baby = new Enemy(e.type, (e.cx + mate.cx) / 2, Math.max(e.y + e.h, mate.y + mate.h));
+    baby.tamed = true; baby.baby = true; baby.growTimer = 90;
+    baby.hp = baby.maxHp = Math.max(1, Math.round(ENEMIES[e.type].hp * 0.4));
+    this.enemies.push(baby);
+    burst(this, (e.cx + mate.cx) / 2, (e.cy + mate.cy) / 2, "#ff6d95", 14, { spread: 140, up: 60, glow: true });
+    this.floatText((e.cx + mate.cx) / 2, Math.min(e.y, mate.y) - 14, "❤", "#ff6d95");
+    this.sfx && this.sfx.potion();
   }
 
   /* ========================================================== wiring */
@@ -1255,7 +1320,7 @@ class Game {
     if (!p || p.dead) return;
     const st = skyState(this.time);
     if (st.isNight) return;
-    if (this.enemies.filter(e => e.def && e.def.passive).length >= 4) return;
+    if (this.enemies.filter(e => e.def && e.def.passive && !e.tamed).length >= 4) return;
 
     const world = this.world;
     const ptx = Math.floor(p.cx / TILE), pty = Math.floor(p.cy / TILE);

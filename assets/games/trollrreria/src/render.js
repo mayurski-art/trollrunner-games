@@ -433,6 +433,13 @@ export class Renderer {
         for (let n = 0; n < 3; n++) g.fillRect(px + 5, py + 2 + n * 5, 6, 1);
         break;
       }
+      case T.FENCE: {
+        g.fillStyle = "#6b4a26";
+        g.fillRect(px + 2, py, 2, TILE); g.fillRect(px + 12, py, 2, TILE);
+        g.fillStyle = "#8a5a2b";
+        g.fillRect(px, py + 3, TILE, 2); g.fillRect(px, py + 10, TILE, 2);
+        break;
+      }
       case T.ENCHANT_TABLE: {
         g.fillStyle = "#2f2347"; g.fillRect(px + 1, py + 9, TILE - 2, 6);
         g.fillStyle = "#4a3a70"; g.fillRect(px + 2, py + 9, TILE - 4, 2);

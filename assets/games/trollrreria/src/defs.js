@@ -38,6 +38,7 @@ export const T = {
   PLANKS: 51, CLAY: 52, CLAY_BRICK: 53, POLISHED_STONE: 54, CHISELED_BRICK: 55,
   GLASS_RED: 56, GLASS_GREEN: 57, GLASS_BLUE: 58,
   WOOD_RED: 59, WOOD_GREEN: 60, WOOD_BLUE: 61,
+  FENCE: 62,
   /* wires live on their own layer, not in T */
 };
 
@@ -111,6 +112,7 @@ TILES[T.GLASS_BLUE]  = { name: "Blue glass", solid: true, hp: 30, pow: 0, tool: 
 TILES[T.WOOD_RED]    = { name: "Red painted wood", solid: true, hp: 70, pow: 0, tool: "pick", drop: "woodRed", pal: ["#7a3a30", "#a04c3e", "#c05f4d"] };
 TILES[T.WOOD_GREEN]  = { name: "Green painted wood", solid: true, hp: 70, pow: 0, tool: "pick", drop: "woodGreen", pal: ["#3a6b2e", "#4f8f3d", "#63ab4d"] };
 TILES[T.WOOD_BLUE]   = { name: "Blue painted wood", solid: true, hp: 70, pow: 0, tool: "pick", drop: "woodBlue", pal: ["#2e4f7a", "#3d6aa0", "#4d82c2"] };
+TILES[T.FENCE] = { name: "Fence", solid: true, hp: 60, pow: 0, tool: "pick", drop: "fence", needsFloor: true, noVariant: true };
 
 export const CROP_GROW_TIME = 45;   // seconds per growth stage
 
@@ -177,6 +179,7 @@ export const ITEMS = {
   woodRed:        { name: "Red painted wood", type: "block", tile: T.WOOD_RED, max: 999 },
   woodGreen:      { name: "Green painted wood", type: "block", tile: T.WOOD_GREEN, max: 999 },
   woodBlue:       { name: "Blue painted wood", type: "block", tile: T.WOOD_BLUE, max: 999 },
+  fence:          { name: "Fence", type: "block", tile: T.FENCE, max: 999, needsFloor: true, desc: "Blocks animals in (and out). Break it to make a gate." },
   /* walls */
   woodWall:       { name: "Wood wall", type: "wall", wall: W.WOOD, max: 999 },
   stoneBrickWall: { name: "Stone brick wall", type: "wall", wall: W.STONE_BRICK, max: 999 },
@@ -258,6 +261,8 @@ export const ITEMS = {
   rawMeat:     { name: "Raw meat", type: "food", hunger: 12, max: 99, raw: true, desc: "Edible. Risky. Cook it if you can." },
   cookedMeat:  { name: "Cooked meat", type: "food", hunger: 32, hpBonus: 4, max: 99, desc: "Proper troll cooking. Restores hunger and a little grit." },
   berry:       { name: "Troll berry", type: "food", hunger: 10, max: 99, desc: "Tart little thing, farmed on tilled soil." },
+  egg:         { name: "Egg", type: "food", hunger: 8, max: 99, desc: "Laid by a tamed troll hen." },
+  omelette:    { name: "Omelette", type: "food", hunger: 28, hpBonus: 3, max: 99, desc: "Ranch cooking. A proper breakfast." },
   trollTotem:  { name: "Troll totem", type: "summon", max: 5, desc: "Wakes the Troll King. Use at night." },
   emperorSigil: { name: "Emperor sigil", type: "summon", max: 5, desc: "Calls the Troll Emperor. Hardmode, night, regrets." },
   /* Grin Core relics — quest rewards, kept in the bag as trophies/keys */
@@ -363,6 +368,9 @@ export const RECIPES = [
   { out: "capeSwift", n: 1, ing: [["silverBar", 10], ["ironBar", 6]], station: "anvil" },
   { out: "bootsDash", n: 1, ing: [["goldBar", 8], ["gel", 8]], station: "anvil" },
   { out: "bootsSpring", n: 1, ing: [["ironBar", 10], ["gel", 4]], station: "anvil" },
+  /* ranching */
+  { out: "fence", n: 6, ing: [["wood", 3]], station: "workbench" },
+  { out: "omelette", n: 1, ing: [["egg", 2]], station: "campfire" },
 ];
 
 /* ----------------------------------------------------------------- enchanting */
@@ -390,8 +398,8 @@ export const ENEMIES = {
   /* Passive animals: never attack, flee when the player closes in, die in
      a couple hits, drop raw meat for the hunger/cooking loop. Spawned by
      updateAnimalSpawns() (main.js), not the hostile spawn tables. */
-  trollBoar: { name: "Troll Boar", ai: "flee", hp: 24, dmg: 0, def: 0, w: 24, h: 18, color: "#c98a72", drops: [["rawMeat", 1, 2, 1]], kb: 1.0, passive: true },
-  trollHen:  { name: "Troll Hen", ai: "flee", hp: 14, dmg: 0, def: 0, w: 18, h: 16, color: "#d9c9a3", drops: [["rawMeat", 1, 1, 1]], kb: 1.1, passive: true },
+  trollBoar: { name: "Troll Boar", ai: "flee", hp: 24, dmg: 0, def: 0, w: 24, h: 18, color: "#c98a72", drops: [["rawMeat", 1, 2, 1]], kb: 1.0, passive: true, tameFood: "berry" },
+  trollHen:  { name: "Troll Hen", ai: "flee", hp: 14, dmg: 0, def: 0, w: 18, h: 16, color: "#d9c9a3", drops: [["rawMeat", 1, 1, 1]], kb: 1.1, passive: true, tameFood: "mushroom", lays: "egg" },
   slimeGreen: { name: "Green troll slime", ai: "slime", hp: 16, dmg: 8, def: 0, w: 26, h: 18, color: "#4fd35f", drops: [["gel", 1, 2, 1]], kb: 1.0 },
   slimeBlue:  { name: "Blue troll slime", ai: "slime", hp: 26, dmg: 10, def: 2, w: 28, h: 20, color: "#4f9fd3", drops: [["gel", 1, 3, 1]], kb: 1.0 },
   zombie:     { name: "Troll zombie", ai: "walker", hp: 46, dmg: 15, def: 4, w: 22, h: 42, color: "#7ba05b", drops: [["gel", 0, 1, 0.2]], kb: 0.8 },

@@ -200,8 +200,32 @@ export class Enemy extends Entity {
       p.hurt(game, this.contactDmg, (this.elite ? "an elite " : "") + this.def.name, this.cx);
     }
 
-    /* despawn far from the player */
-    if (p && dist2(this.cx, this.cy, p.cx, p.cy) > (TILE * 110) ** 2) this.dead = true;
+    /* Ranching: tamed animals grow up, cool down from breeding, and lay
+       ranch products on a timer -- see Game.tryFeedAnimal/tryBreed for how
+       taming/breeding itself gets triggered (right-click with the right
+       food, main.js interact()). */
+    if (this.tamed) {
+      if (this.loveCd > 0) this.loveCd -= dt;
+      if (this.baby) {
+        this.growTimer -= dt;
+        if (this.growTimer <= 0) {
+          this.baby = false;
+          this.hp = this.maxHp = this.def.hp;
+          game.floatText(this.cx, this.y - 10, this.def.name + " grew up!", "#57bd5c");
+        }
+      } else if (this.def.lays) {
+        this.layTimer = this.layTimer ?? (60 + Math.random() * 40);
+        this.layTimer -= dt;
+        if (this.layTimer <= 0) {
+          this.layTimer = 70 + Math.random() * 40;
+          game.spawnDrop(this.cx, this.y, this.def.lays, 1);
+        }
+      }
+    }
+
+    /* despawn far from the player -- tamed animals are a player investment
+       and shouldn't vanish just because the player wandered off the farm */
+    if (!this.tamed && p && dist2(this.cx, this.cy, p.cx, p.cy) > (TILE * 110) ** 2) this.dead = true;
   }
 
   runAI(dt, game, p) {
@@ -252,8 +276,17 @@ export class Enemy extends Entity {
         }
         break;
       }
-      /* Passive animals: wander idly, bolt away once the player gets close. */
+      /* Passive animals: wander idly, bolt away once the player gets close
+         -- unless tamed, in which case they're calm around their owner. */
       case "flee": {
+        if (this.tamed) {
+          if (this.aiTimer <= 0) {
+            this.aiTimer = 1.2 + Math.random() * 2;
+            this.vx = (Math.random() < 0.5 ? -1 : 1) * (14 + Math.random() * 10);
+            this.dir = Math.sign(this.vx) || this.dir;
+          } else this.vx *= 0.92;
+          break;
+        }
         const d2 = dist2(this.cx, this.cy, p.cx, p.cy);
         if (d2 < (TILE * 5) ** 2) {
           this.dir = -toward;
@@ -409,6 +442,7 @@ export class Enemy extends Entity {
     }
     ctx.save();
     if (this.hitFlash > 0) { ctx.globalAlpha = 0.85; ctx.filter = "brightness(2.2)"; }
+    if (this.baby) { ctx.translate(this.cx, this.y + this.h); ctx.scale(0.6, 0.6); ctx.translate(-this.cx, -(this.y + this.h)); }
     const d = this.def;
     switch (d.ai) {
       case "slime": this.drawSlime(ctx, d); break;
