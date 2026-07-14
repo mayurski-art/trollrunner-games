@@ -502,6 +502,17 @@ export const BUTCHER_OFFERS = [
   { give: [["silverBar", 1]], get: ["cookedMeat", 10] },
 ];
 
+/* Troll Chef: housing-gated (see HOUSE_ROSTER, main.js) -- trades ranch
+   products (eggs/omelettes from tamed animals) for crafting reagents,
+   giving the taming/breeding loop a reason to sell surplus instead of
+   just eating it. */
+export const CHEF_OFFERS = [
+  { give: [["berry", 10]], get: ["egg", 4] },
+  { give: [["egg", 4]], get: ["gel", 3] },
+  { give: [["omelette", 2]], get: ["lens", 2] },
+  { give: [["rawMeat", 6]], get: ["bone", 3] },
+];
+
 /* Starter kit (fresh worlds). */
 export const STARTER_ITEMS = [
   { id: "woodPick", n: 1 }, { id: "woodAxe", n: 1 }, { id: "woodSword", n: 1 },

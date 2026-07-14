@@ -10,7 +10,7 @@
 
 import {
   TILE, GRAVITY, MAX_FALL,
-  BLACKSMITH_OFFERS, ALCHEMIST_OFFERS, TAVERN_OFFERS, BUTCHER_OFFERS,
+  BLACKSMITH_OFFERS, ALCHEMIST_OFFERS, TAVERN_OFFERS, BUTCHER_OFFERS, CHEF_OFFERS,
 } from "./defs.js";
 import { Entity } from "./entities.js";
 import { skyState } from "./render.js";
@@ -411,6 +411,49 @@ export class RocketTinkerer extends TownNPC {
         "Bring me parts. I bring you the sky. Fair trade, honestly.",
         "The pad works on vibes and moon shards. Mostly vibes.",
         "Every crash is just a launch that hasn't finished yet.",
+      ],
+    });
+    this.tipIdx = 0;
+  }
+}
+
+/* Housing-gated roster: like the Merchant, these only appear once the
+   player builds a qualifying house (housing.js checkHouse) -- Game's
+   housing tick (main.js) works down HOUSE_ROSTER in order, one new
+   arrival per house built. Reuse existing rigs with a tint (same
+   mechanism as store.js cosmetic skins) instead of commissioning new
+   art for NPCs that only exist to reward player building. */
+export class TrollChef extends TownNPC {
+  constructor(tx, ty) {
+    super(tx, ty, {
+      name: "Troll Chef",
+      rig: "doge",
+      tint: "hue-rotate(130deg) saturate(1.4)",
+      bodyH: 50,
+      tips: [
+        "Bring me ranch goods. I'll make it worth your while.",
+        "An egg a day keeps the Rug Pull Rat away. Unproven, but I believe it.",
+        "Cooking is just chemistry you're allowed to eat.",
+      ],
+    });
+    this.shop = true;
+    this.offers = CHEF_OFFERS;
+    this.tipIdx = 0;
+  }
+}
+
+export class TrollHistorian extends TownNPC {
+  constructor(tx, ty) {
+    super(tx, ty, {
+      name: "Troll Historian",
+      rig: "pepe",
+      tint: "grayscale(0.5) sepia(0.3)",
+      bodyH: 48,
+      tips: [
+        "Before the Grin Core, there was just... a grin. No core. Simpler times.",
+        "I've catalogued every meme this world has ever forgotten. Nobody asked.",
+        "The Troll King wasn't always a boss. He used to just heckle from the sidelines.",
+        "History is written by whoever's still standing when the raid ends.",
       ],
     });
     this.tipIdx = 0;

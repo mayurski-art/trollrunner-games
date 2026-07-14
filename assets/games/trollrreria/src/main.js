@@ -23,7 +23,17 @@ import { Archtroll, Rarepepe, ElderShibe, Anon } from "./worldbosses.js";
 import {
   MerchantTroll, PepeHermit, RocketTinkerer, WhaleOracle,
   Blacksmith, Alchemist, TavernKeeper, Butcher, SIGN_TIPS, TravelingTrader,
+  TrollChef, TrollHistorian,
 } from "./npc.js";
+
+/* Housing-gated arrivals, in order: build one qualifying house (see
+   housing.js checkHouse) and the next un-housed NPC on this list moves
+   in. Checked every 8s in Game.update() against `this.npcs`. */
+const HOUSE_ROSTER = [
+  { cls: MerchantTroll, msg: "🐕 Doge the Miner moved into your house!" },
+  { cls: TrollChef, msg: "👨‍🍳 A Troll Chef moved into your house!" },
+  { cls: TrollHistorian, msg: "📜 A Troll Historian moved into your house!" },
+];
 import { findHouseNear } from "./housing.js";
 import {
   saveGame, loadSaveData, applyWorldLayers, clearSave,
@@ -572,22 +582,20 @@ class Game {
 
     this.checkPlates();
 
-    /* housing: every 8 s, see if a valid house near the player attracts
-       the Merchant (and re-homes the Guide) */
+    /* housing: every 8s, see if a valid player-built house (housing.js
+       checkHouse) attracts the next un-housed NPC on the roster -- one
+       arrival per house, in order, same as the original single-Merchant
+       hook just generalized to more than one resident. */
     this._houseAcc = (this._houseAcc || 0) + dt;
     if (this._houseAcc >= 8 && this.player && !this.player.dead) {
       this._houseAcc = 0;
-      const ptx = Math.floor(this.player.cx / TILE), pty = Math.floor(this.player.cy / TILE);
-      const hasMerchant = this.npcs.some(n => n.shop);
-      if (!hasMerchant || this._guideHomeless !== false) {
+      const next = HOUSE_ROSTER.find(r => !this.npcs.some(n => n instanceof r.cls));
+      if (next) {
+        const ptx = Math.floor(this.player.cx / TILE), pty = Math.floor(this.player.cy / TILE);
         const house = findHouseNear(this.world, ptx, pty, 50);
         if (house) {
-          if (!hasMerchant) {
-            this.npcs.push(new MerchantTroll(house.cx, house.cy + 1));
-            this.announce("🐕 Doge the Miner moved into your house!");
-          }
-          const guide = this.npcs.find(n => !n.shop);
-          if (guide) { guide.homeX = house.cx * TILE; this._guideHomeless = false; }
+          this.npcs.push(new next.cls(house.cx, house.cy + 1));
+          this.announce(next.msg);
         }
       }
     }
