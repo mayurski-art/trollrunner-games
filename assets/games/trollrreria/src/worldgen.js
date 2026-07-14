@@ -16,14 +16,22 @@ export const DEEP_START = 650;
 export const BEDROCK_START = WORLD_H - 14;
 
 export function biomeAt(x, w) {
-  /* snow on the far left, forest (Meme Meadow / spawn) centered, then
-     Pepe Swamp, then desert on the far right. Spawn sits at w/2, well
-     inside the forest band so a fresh world never starts in the swamp. */
+  /* ocean at both map edges, then snow | forest (Meme Meadow / spawn,
+     centered) | jungle | Pepe Swamp | desert. Spawn sits at w/2, well
+     inside the forest band so a fresh world never starts in the swamp.
+     Borders get a smooth low-frequency wobble (seedless, so render/
+     spawn/gen all agree) so biome edges wander over ~±15 tiles instead
+     of falling on a razor-straight vertical line. */
   const f = x / w;
-  if (f < 0.18) return "snow";
-  if (f < 0.62) return "forest";
-  if (f < 0.80) return "swamp";
-  return "desert";
+  const wob = (octave1(x, 424242, 1 / 40, 2) - 0.5) * 0.02;
+  const g = f + wob;
+  if (g < 0.05) return "ocean";
+  if (g < 0.18) return "snow";
+  if (g < 0.55) return "forest";
+  if (g < 0.68) return "jungle";
+  if (g < 0.82) return "swamp";
+  if (g < 0.95) return "desert";
+  return "ocean";
 }
 
 /* Player-facing zone names for the area-title popup. forest + swamp are
@@ -34,6 +42,8 @@ export const BIOME_NAMES = {
   swamp: "Pepe Swamp",
   snow: "Frostbite Reach",
   desert: "Sunbaked Wastes",
+  jungle: "Kek Jungle",
+  ocean: "The Normie Sea",
   moonMines: "Doge Moon Mines",
   deepweb: "The Deep Web",
 };
@@ -65,6 +75,10 @@ export function generateWorld(seed) {
     /* flatten the spawn area in the middle of the forest */
     const mid = w / 2, flat = clamp(1 - Math.abs(x - mid) / 60, 0, 1);
     y = y * (1 - flat * 0.7) + SURFACE_BASE * flat * 0.7;
+    /* ocean basins: sink the terrain toward the sea floor at both map
+       edges so fillOceans() has an actual bowl to pour water into */
+    const edgeF = Math.min(x, w - 1 - x) / w;
+    if (edgeF < 0.06) y += (1 - edgeF / 0.06) * 34;
     surface[x] = Math.round(y);
   }
 
@@ -79,7 +93,9 @@ export function generateWorld(seed) {
       if (y >= BEDROCK_START) { tiles[i] = T.BEDROCK; continue; }
       let t;
       if (y < sy + dirtDepth && y < stoneY) {
-        t = biome === "desert" ? T.SAND : biome === "snow" ? T.SNOW : biome === "swamp" ? T.MUD : T.DIRT;
+        t = biome === "desert" || biome === "ocean" ? T.SAND
+          : biome === "snow" ? T.SNOW
+          : biome === "swamp" || biome === "jungle" ? T.MUD : T.DIRT;
         /* snow biome gets an ice shelf under the snow */
         if (biome === "snow" && y > sy + 8) t = T.ICE;
       } else {
@@ -158,7 +174,9 @@ export function generateWorld(seed) {
   for (let x = 0; x < w; x++) {
     const biome = biomeAt(x, w);
     const sy = surface[x];
-    const fill = biome === "desert" ? T.SAND : biome === "snow" ? T.SNOW : biome === "swamp" ? T.MUD : T.DIRT;
+    const fill = biome === "desert" || biome === "ocean" ? T.SAND
+      : biome === "snow" ? T.SNOW
+      : biome === "swamp" || biome === "jungle" ? T.MUD : T.DIRT;
     for (let y = sy; y < sy + CRUST; y++) {
       const i = y * w + x;
       if (tiles[i] === T.AIR) tiles[i] = fill;
@@ -216,6 +234,7 @@ export function generateWorld(seed) {
 
   /* ------------------------------------------------ 6. surface water pools */
   fillSurfaceWater(world, surface);
+  fillOceans(world, surface);
 
   /* ------------------------------------------------ 7. troll hearts + glowshrooms */
   let hearts = 0;
@@ -264,6 +283,26 @@ export function generateWorld(seed) {
          comb the whole starting zone for the last one */
       tiles[(sy - 1) * w + x] = T.GRIN_FRAG;
       lastGrin = x;
+    }
+  }
+
+  /* ------------------------------------------------ 8a2. jungle canopy
+     Denser and taller than the forest's -- the Kek Jungle should read as
+     thick the moment you walk in. Grows on mud, same tree machinery. */
+  let lastJTree = -10;
+  for (let x = 8; x < w - 8; x++) {
+    if (biomeAt(x, w) !== "jungle") continue;
+    const sy = surface[x];
+    if (tiles[sy * w + x] !== T.MUD) continue;
+    if (tiles[(sy - 1) * w + x] !== T.AIR) continue;
+    if (x - lastJTree >= 3 && hash2(x, 87, seed) < 0.34) {
+      const th = 9 + Math.floor(hash2(x, 88, seed) * 9);
+      if (sy - th < 4) continue;
+      for (let ty = sy - 1; ty > sy - 1 - th; ty--) tiles[ty * w + x] = T.TREE;
+      world.trees.push({ x, yBase: sy - 1, h: th, seed: (seed + x) >>> 0 });
+      lastJTree = x;
+    } else if (hash2(x, 89, seed) < 0.42) {
+      tiles[(sy - 1) * w + x] = T.PLANT;
     }
   }
 
@@ -449,9 +488,11 @@ function carveVault(world, rng, w) {
    structure of its own. Silver-heavy loot gives the new silver armor
    tier somewhere to actually drop from. */
 function carveBunker(world, rng, w) {
-  const bandX1 = Math.floor(w * 0.16);
+  /* band starts past the ocean edge (biome band 0-0.05) so the bunker
+     always sits under snow proper, not under the Normie Sea */
+  const bandX0 = Math.floor(w * 0.07), bandX1 = Math.floor(w * 0.16);
   const rw = 22, rh = 11;
-  const x0 = 20 + Math.floor(rng() * Math.max(1, bandX1 - rw - 20));
+  const x0 = bandX0 + Math.floor(rng() * Math.max(1, bandX1 - rw - bandX0));
   const y0 = STONE_START + 30 + Math.floor(rng() * 60);
   for (let y = y0; y < y0 + rh; y++) {
     for (let x = x0; x < x0 + rw; x++) {
@@ -607,6 +648,26 @@ function fillSurfaceWater(world, surface) {
             world.liquidActive.add(i);
           }
         }
+      }
+    }
+  }
+}
+
+/* Oceans: fillSurfaceWater's dip detector needs higher ground on the
+   LEFT of a depression, which an edge basin sloping toward the map
+   boundary never has -- so the two ocean bands get filled explicitly,
+   down from a fixed sea level to whatever floor the basin carved. */
+function fillOceans(world, surface) {
+  const w = world.w;
+  const seaLevel = SURFACE_BASE + 6;
+  for (let x = 1; x < w - 1; x++) {
+    if (biomeAt(x, w) !== "ocean") continue;
+    for (let y = seaLevel; y < surface[x]; y++) {
+      const i = y * w + x;
+      if (world.tiles[i] === T.AIR) {
+        world.liquid[i] = 8;
+        world.liquidType[i] = 0;
+        world.liquidActive.add(i);
       }
     }
   }

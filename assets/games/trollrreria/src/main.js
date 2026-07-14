@@ -1408,6 +1408,11 @@ class Game {
       if (!isNight) return r < 0.75 ? "copeSlime" : r < 0.95 ? "rugPullRat" : "slimeGreen";
       return r < 0.5 ? "fudPhantom" : r < 0.8 ? "copeSlime" : "rugPullRat";
     }
+    if (biome === "jungle" && ty < 310) {
+      /* Kek Jungle: lizards underfoot, wasps in the canopy */
+      if (!isNight) return r < 0.55 ? "kekLizard" : r < 0.9 ? "jungleWasp" : "slimeGreen";
+      return r < 0.45 ? "kekLizard" : r < 0.75 ? "jungleWasp" : "zombie";
+    }
     if (ty < 310) {
       /* surface */
       if (!isNight) return r < 0.8 ? "slimeGreen" : "slimeBlue";

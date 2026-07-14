@@ -454,6 +454,9 @@ export const ENEMIES = {
   grinCreeper: { name: "Grin Creeper", ai: "exploder", hp: 20, dmg: 30, def: 0, w: 24, h: 24, color: "#5fbf3a", drops: [["gel", 1, 3, 1]], kb: 0.5 },
   boneArcher: { name: "Bone Archer", ai: "archer", hp: 50, dmg: 10, def: 4, w: 22, h: 42, color: "#cfc9bd", drops: [["bone", 1, 2, 0.7]], kb: 0.5 },
   shadowStalker: { name: "Shadow Stalker", ai: "teleporter", hp: 60, dmg: 18, def: 5, w: 24, h: 30, color: "#3a2a4d", drops: [["lens", 1, 2, 0.5]], kb: 0.7, noNatural: true },
+  /* Kek Jungle */
+  kekLizard: { name: "Kek Lizard", ai: "walker", hp: 34, dmg: 12, def: 2, w: 24, h: 20, color: "#6bbf3a", drops: [["gel", 1, 2, 0.8], ["berry", 0, 2, 0.4]], kb: 1.1 },
+  jungleWasp: { name: "Jungle Wasp", ai: "flyer", hp: 20, dmg: 12, def: 0, w: 20, h: 16, color: "#d8b23c", drops: [["gel", 0, 1, 0.4]], kb: 1.2, erratic: true },
   /* Pepe Swamp */
   copeSlime:  { name: "Cope Slime", ai: "slime", hp: 20, dmg: 9, def: 1, w: 26, h: 18, color: "#5f8f3a", drops: [["gel", 1, 2, 1]], kb: 1.0 },
   fudPhantom: { name: "FUD Phantom", ai: "flyer", hp: 30, dmg: 13, def: 1, w: 24, h: 24, color: "#8a7fa8", drops: [["lens", 0, 1, 0.3]], kb: 0.9, erratic: true },

@@ -202,14 +202,25 @@ export class Renderer {
     if (openU) {
       g.fillStyle = "rgba(255,255,255,0.14)";
       g.fillRect(px, py, TILE, 2);
-      /* grass cap on forest dirt */
-      if (id === T.DIRT && biomeAt(wx, world.w) === "forest") {
+      /* grass cap on forest dirt / jungle mud */
+      const capBiome = biomeAt(wx, world.w);
+      if (id === T.DIRT && capBiome === "forest") {
         g.fillStyle = "#3e9e44";
         g.fillRect(px, py, TILE, 4);
         g.fillStyle = "#57bd5c";
         for (let n = 0; n < 4; n++) {
           const bx = Math.floor(hash2(wx * 4 + n, wy, 13) * (TILE - 1));
           g.fillRect(px + bx, py - (hash2(n, wx, 17) > 0.5 ? 2 : 1), 1, 3);
+        }
+      } else if (id === T.MUD && capBiome === "jungle") {
+        /* deeper, thicker jungle green so Kek Jungle mud reads as lush,
+           not swampy -- swamp mud stays bare */
+        g.fillStyle = "#1f7a3d";
+        g.fillRect(px, py, TILE, 5);
+        g.fillStyle = "#35a85a";
+        for (let n = 0; n < 6; n++) {
+          const bx = Math.floor(hash2(wx * 4 + n, wy, 19) * (TILE - 1));
+          g.fillRect(px + bx, py - (hash2(n, wx, 23) > 0.4 ? 3 : 1), 1, 4);
         }
       }
     }
@@ -657,6 +668,8 @@ export class Renderer {
     if (depthFade >= 1) return;
     const base = biome === "desert" ? ["#8f7a4a", "#6e5d38"]
       : biome === "snow" ? ["#7d95ab", "#5c7286"]
+      : biome === "jungle" ? ["#2e6b3d", "#1f4d2c"]
+      : biome === "ocean" ? ["#3d5b8f", "#2c4268"]
       : ["#3d6b4b", "#2c5039"];
     const layers = [
       { col: base[0], amp: 60, speed: 0.18, yOff: 0.62 },
