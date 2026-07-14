@@ -233,6 +233,7 @@ export class Net {
     const msg = {
       t: "world",
       seedStr: g.seedStr,
+      w: g.world.w, h: g.world.h,
       time: g.time, day: g.dayCount, moon: g.trollMoon,
       flags: g.flags,
       spawn: g.spawn,

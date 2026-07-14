@@ -4,7 +4,13 @@
 /* ---------------------------------------------------------------- constants */
 export const TILE = 16;               // world px per tile
 export const ZOOM = 2;                // screen px per world px
-export const WORLD_W = 1600;          // tiles
+/* New worlds are half again wider than the original 1600 -- more biomes
+   need more room, and "there's always more map" is most of the Terraria
+   feel. Old 1600-wide saves keep their own dims: the save records w/h
+   and world construction honors them (see Game.applySave), so nothing
+   is ever decoded into a grid of the wrong size. Height stays fixed --
+   depth tiers (STONE_START/DEEP_START/BEDROCK) are tuned around it. */
+export const WORLD_W = 2400;          // tiles
 export const WORLD_H = 800;
 export const CHUNK = 32;              // tiles per chunk side
 export const DAY_LEN = 600;           // seconds of daylight

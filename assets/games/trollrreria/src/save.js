@@ -125,6 +125,7 @@ export async function saveGame(game) {
   try {
     data = {
       v: 1,
+      w: w.w, h: w.h,
       seedStr: game.seedStr,
       time: game.time,
       dayCount: game.dayCount,

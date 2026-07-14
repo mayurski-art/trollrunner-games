@@ -2,7 +2,7 @@
    inventory + crafting panel, chest panel, tooltips, drag & drop. */
 
 import {
-  ITEMS, TILES, T, DAY_LEN, CYCLE, TILE, STATION_SCAN, WORLD_W, WORLD_H,
+  ITEMS, TILES, T, DAY_LEN, CYCLE, TILE, STATION_SCAN,
   MERCHANT_OFFERS, RECIPES, FUEL, SMELT_TIME, ENCHANTS, ENCHANT_COST,
 } from "./defs.js";
 import { getIcon } from "./icons.js";
@@ -284,7 +284,7 @@ export class UI {
     const data = img.data;
     const ptx = Math.floor(g.player.cx / TILE), pty = Math.floor(g.player.cy / TILE);
     const x0 = ptx - W, y0 = pty - H;           // *2 tiles per px, centered
-    const w4 = WORLD_W >> 2;
+    const w4 = g.world.w >> 2;
     for (let py = 0; py < H; py++) {
       const ty = y0 + py * 2;
       for (let px = 0; px < W; px++) {
@@ -310,13 +310,13 @@ export class UI {
     cv.hidden = !this.bigMapOpen;
     if (!this.bigMapOpen) return;
     const g = this.game;
-    const W = WORLD_W >> 1, H = WORLD_H >> 1;    // 1 px = 2 tiles, whole world
+    const W = g.world.w >> 1, H = g.world.h >> 1;   // 1 px = 2 tiles, whole world
     const off = this._bigOff || (this._bigOff = document.createElement("canvas"));
     off.width = W; off.height = H;
     const octx = off.getContext("2d");
     const img = octx.createImageData(W, H);
     const data = img.data;
-    const w4 = WORLD_W >> 2;
+    const w4 = g.world.w >> 2;
     for (let py = 0; py < H; py++) {
       const ty = py * 2;
       for (let px = 0; px < W; px++) {

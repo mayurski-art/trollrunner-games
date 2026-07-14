@@ -58,13 +58,18 @@ export function zoneAt(tx, ty, w) {
   return biomeAt(tx, w);
 }
 
-export function generateWorld(seed) {
-  const world = new World(WORLD_W, WORLD_H);
+export function generateWorld(seed, width = WORLD_W) {
+  const world = new World(width, WORLD_H);
   const rng = mulberry32(seed);
   const w = world.w, h = world.h;
   const tiles = world.tiles;
   const walls = world.walls;
   const spawnX = Math.floor(w / 2);
+  /* absolute feature counts below were tuned on a 1600-wide world --
+     scale them with width so density (ore per screen, cave frequency)
+     stays constant instead of thinning out as the world grows */
+  const SC = w / 1600;
+  const sc = n => Math.round(n * SC);
 
   /* ------------------------------------------------ 1. surface heightmap */
   const surface = new Int16Array(w);
@@ -111,7 +116,7 @@ export function generateWorld(seed) {
 
   /* ------------------------------------------------ 3. caves */
   /* 3a. worm tunnels */
-  const wormCount = 230;
+  const wormCount = sc(230);
   for (let n = 0; n < wormCount; n++) {
     let x = rng() * w;
     let y = STONE_START - 40 + rng() * (BEDROCK_START - STONE_START);
@@ -184,22 +189,23 @@ export function generateWorld(seed) {
   }
 
   /* ------------------------------------------------ 4. ores */
-  scatterOre(world, rng, T.COPPER, 950, STONE_START - 30, 560, 4, 9);
-  scatterOre(world, rng, T.IRON, 700, 380, DEEP_START, 4, 8);
-  scatterOre(world, rng, T.SILVER, 460, 480, BEDROCK_START - 20, 3, 7);
-  scatterOre(world, rng, T.GOLD, 320, DEEP_START - 60, BEDROCK_START - 10, 3, 6);
+  scatterOre(world, rng, T.COPPER, sc(950), STONE_START - 30, 560, 4, 9);
+  scatterOre(world, rng, T.IRON, sc(700), 380, DEEP_START, 4, 8);
+  scatterOre(world, rng, T.SILVER, sc(460), 480, BEDROCK_START - 20, 3, 7);
+  scatterOre(world, rng, T.GOLD, sc(320), DEEP_START - 60, BEDROCK_START - 10, 3, 6);
   /* Doge Moon Mines -- the mid-depth stone band (STONE_START..DEEP_START),
      reframed with its own glowing ore rather than a whole new x-restricted
      zone, since the depth tier already has the right shape (dangerous,
      cave-dwelling enemies, worth digging toward). */
-  scatterOre(world, rng, T.MOONROCK, 520, STONE_START + 10, DEEP_START, 3, 7);
+  scatterOre(world, rng, T.MOONROCK, sc(520), STONE_START + 10, DEEP_START, 3, 7);
 
   /* unstable debris in the Moon Mines: sits flush in a cave wall (so it's
      discoverable, like ore) but falls the moment whatever's under it gets
      mined out -- world.set()'s wake-on-edit already handles that once
      it's tagged fallable, nothing bespoke needed here. */
   let debris = 0, dguard = 0;
-  while (debris < 140 && dguard++ < 6000) {
+  const debrisMax = sc(140), dguardMax = sc(6000);
+  while (debris < debrisMax && dguard++ < dguardMax) {
     const x = 4 + Math.floor(rng() * (w - 8));
     const y = STONE_START + 20 + Math.floor(rng() * (DEEP_START - STONE_START - 30));
     const i = y * w + x;
@@ -211,7 +217,7 @@ export function generateWorld(seed) {
   }
 
   /* ------------------------------------------------ 5. lava + obsidian deep down */
-  for (let n = 0; n < 60; n++) {
+  for (let n = 0; n < sc(60); n++) {
     const x = 20 + Math.floor(rng() * (w - 40));
     const y = DEEP_START + Math.floor(rng() * (BEDROCK_START - DEEP_START - 20));
     poolLiquid(world, x, y, 3 + Math.floor(rng() * 6), 1);
@@ -220,7 +226,7 @@ export function generateWorld(seed) {
      stone band (not just the deep zone) -- gives mid-depth mining some
      natural light and hazard before the player has proper gear, matching
      how Minecraft players run into lava well before full depth. */
-  for (let n = 0; n < 22; n++) {
+  for (let n = 0; n < sc(22); n++) {
     const x = 20 + Math.floor(rng() * (w - 40));
     const y = STONE_START + 100 + Math.floor(rng() * Math.max(1, DEEP_START - STONE_START - 110));
     poolLiquid(world, x, y, 2 + Math.floor(rng() * 3), 1);
@@ -238,7 +244,8 @@ export function generateWorld(seed) {
 
   /* ------------------------------------------------ 7. troll hearts + glowshrooms */
   let hearts = 0;
-  while (hearts < 26) {
+  const heartMax = sc(26);
+  while (hearts < heartMax) {
     const x = 20 + Math.floor(rng() * (w - 40));
     const y = STONE_START + 30 + Math.floor(rng() * (BEDROCK_START - STONE_START - 60));
     const i = y * w + x;
@@ -247,7 +254,7 @@ export function generateWorld(seed) {
   /* glowshrooms grow in small patches (like real mushroom clusters) rather
      than uniform single-tile scatter, so the underground has real pockets
      of natural light instead of one dim tile every so often. */
-  for (let n = 0; n < 130; n++) {
+  for (let n = 0; n < sc(130); n++) {
     const cx = 10 + Math.floor(rng() * (w - 20));
     const cy = STONE_START + Math.floor(rng() * (BEDROCK_START - STONE_START - 10));
     const clusterSize = 3 + Math.floor(rng() * 5);
@@ -344,7 +351,8 @@ export function generateWorld(seed) {
 
   /* ------------------------------------------------ 9. underground loot chests */
   let placedChests = 0, guard = 0;
-  while (placedChests < 22 && guard++ < 4000) {
+  const chestMax = sc(22), chestGuardMax = sc(4000);
+  while (placedChests < chestMax && guard++ < chestGuardMax) {
     const x = 20 + Math.floor(rng() * (w - 40));
     const y = STONE_START + Math.floor(rng() * (BEDROCK_START - STONE_START - 30));
     const i = y * w + x;
@@ -564,7 +572,8 @@ function buildSkyIslands(world, rng, w, surface, spawnX) {
   world.tiles[gy * w + gx] = T.ROCKET_PAD;
 
   let placed = 0, guard = 0;
-  while (placed < 10 && guard++ < 400) {
+  const islandMax = Math.round(10 * (w / 1600));
+  while (placed < islandMax && guard++ < 400) {
     const ix = 30 + Math.floor(rng() * (w - 60));
     if (Math.abs(ix - spawnX) < 40) continue;
     const iy = 50 + Math.floor(rng() * 110);

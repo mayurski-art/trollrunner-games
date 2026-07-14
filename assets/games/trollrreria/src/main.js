@@ -177,10 +177,14 @@ class Game {
     }, 500);
   }
 
-  newWorld(seedStr, character) {
+  /* `width` lets saved worlds keep the dimensions they were generated
+     with (old saves were 1600 wide; the current default is WORLD_W) --
+     decoding a saved layer into a grid of a different size would shear
+     every row, so dims always follow the save, never the constant. */
+  newWorld(seedStr, character, width) {
     this.seedStr = seedStr;
     this.seed = hashStr(seedStr);
-    const { world, spawn, surface, skyPad, groundPad, ruinsBounds } = generateWorld(this.seed);
+    const { world, spawn, surface, skyPad, groundPad, ruinsBounds } = generateWorld(this.seed, width || WORLD_W);
     this.world = world;
     this.spawn = spawn;
     this.skyPad = skyPad;
@@ -200,7 +204,7 @@ class Game {
     this.smeltCooldown = 0;
     this.quests = createQuestState();
     this._recorded = { blocksMined: 0, bossKills: 0 };
-    this.explored = new Uint8Array((WORLD_W >> 2) * (WORLD_H >> 2));
+    this.explored = new Uint8Array((this.world.w >> 2) * (this.world.h >> 2));
     this.inventory = new Inventory();
     for (const s of STARTER_ITEMS) this.inventory.add(s.id, s.n);
     this.player = new Player(spawn.x, spawn.y + 1, this.flags.character);
@@ -215,9 +219,10 @@ class Game {
     if (this.ui) this.ui.dirtyInv();
   }
 
-  /* Restore a saved world on top of a re-generated one (same seed). */
+  /* Restore a saved world on top of a re-generated one (same seed).
+     Old saves predate the w/h fields and were all 1600x800. */
   applySave(data) {
-    this.newWorld(data.seedStr);
+    this.newWorld(data.seedStr, undefined, data.w || 1600);
     applyWorldLayers(this.world, data);
     this.renderer.chunks.clear();
     this.world.dirtyChunks.clear();
@@ -312,7 +317,7 @@ class Game {
     if (!this.explored) return;
     const cx = Math.floor(wx / TILE / 4), cy = Math.floor(wy / TILE / 4);
     const R = 11;
-    const w4 = WORLD_W >> 2, h4 = WORLD_H >> 2;
+    const w4 = this.world.w >> 2, h4 = this.world.h >> 2;
     for (let dy = -R; dy <= R; dy++) {
       for (let dx = -R; dx <= R; dx++) {
         if (dx * dx + dy * dy > R * R) continue;
@@ -334,9 +339,10 @@ class Game {
     };
   }
 
-  /* Guest side: replace the local world with the host's snapshot. */
+  /* Guest side: replace the local world with the host's snapshot.
+     Hosts on older builds don't send dims -- their worlds were 1600. */
   adoptRemoteWorld(m) {
-    this.newWorld(m.seedStr);
+    this.newWorld(m.seedStr, undefined, m.w || 1600);
     const w = this.world, n = w.w * w.h;
     const L = m.layers;
     w.tiles.set(rleDecode(b64ToU16(L.tiles), n));
@@ -1982,7 +1988,7 @@ class Game {
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     const camMidX = Math.floor((cam.x + this.viewW / 2) / TILE);
-    const biome = biomeAt(clamp(camMidX, 0, WORLD_W - 1), this.world.w);
+    const biome = biomeAt(clamp(camMidX, 0, this.world.w - 1), this.world.w);
     this.renderer.drawSky(ctx, sw, sh, this.time, cam.y, this.trollMoon);
     this.renderer.drawParallax(ctx, sw, sh, cam, this.time, biome);
 
