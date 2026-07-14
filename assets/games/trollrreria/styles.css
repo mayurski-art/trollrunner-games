@@ -187,6 +187,7 @@ html, body {
 #inv-grid { display: grid; grid-template-columns: repeat(10, var(--slot)); gap: 6px; }
 .inv-bottom { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
 #armor-col { display: flex; gap: 6px; }
+#accessory-col { display: flex; gap: 6px; }
 .slot-armor::before {
   content: attr(data-ph); position: absolute; font-size: 15px; opacity: 0.3;
 }

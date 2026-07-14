@@ -244,6 +244,15 @@ export const ITEMS = {
   trolliumHelm:  { name: "Trollium helmet", type: "armor", slot: "head", def: 6 },
   trolliumChest: { name: "Trollium chestplate", type: "armor", slot: "chest", def: 8 },
   trolliumLegs:  { name: "Trollium greaves", type: "armor", slot: "legs", def: 7 },
+  /* accessories: a 4th/5th/6th equip slot on top of armor (ring/back/feet),
+     each granting a real moveset perk rather than just a stat stick --
+     see Inventory.accessoryPerks() for how these fields get read. */
+  ringVigor: { name: "Ring of Vigor", type: "accessory", slot: "ring", def: 2, regen: 0.6, desc: "Slow, steady grit. +2 defense, faster regen." },
+  ringHaste: { name: "Signet of Haste", type: "accessory", slot: "ring", speedMult: 1.12, desc: "A restless ring. +12% move speed." },
+  wingsTroll: { name: "Troll Wings", type: "accessory", slot: "back", doubleJump: true, glide: true, desc: "Molted from something enormous. Extra jump, plus a slow glide while airborne." },
+  capeSwift: { name: "Swift Cape", type: "accessory", slot: "back", speedMult: 1.18, desc: "Billows dramatically. +18% move speed." },
+  bootsDash: { name: "Dash Boots", type: "accessory", slot: "feet", dash: true, desc: "Double-tap A or D to dash." },
+  bootsSpring: { name: "Spring Boots", type: "accessory", slot: "feet", jumpBoost: 70, desc: "Coiled soles. Noticeably higher jump." },
   /* consumables + special */
   trollBrew:   { name: "Troll brew", type: "potion", heal: 50, max: 30 },
   rawMeat:     { name: "Raw meat", type: "food", hunger: 12, max: 99, raw: true, desc: "Edible. Risky. Cook it if you can." },
@@ -347,6 +356,13 @@ export const RECIPES = [
   { out: "woodRed", n: 2, ing: [["planks", 2], ["berry", 2]], station: "workbench" },
   { out: "woodGreen", n: 2, ing: [["planks", 2], ["mushroom", 2]], station: "workbench" },
   { out: "woodBlue", n: 2, ing: [["planks", 2], ["ice", 2]], station: "workbench" },
+  /* accessories */
+  { out: "ringVigor", n: 1, ing: [["silverBar", 8], ["gel", 6]], station: "anvil" },
+  { out: "ringHaste", n: 1, ing: [["goldBar", 6], ["lens", 4]], station: "anvil" },
+  { out: "wingsTroll", n: 1, ing: [["trolliumBar", 10], ["bone", 8], ["moonShard", 4]], station: "anvil" },
+  { out: "capeSwift", n: 1, ing: [["silverBar", 10], ["ironBar", 6]], station: "anvil" },
+  { out: "bootsDash", n: 1, ing: [["goldBar", 8], ["gel", 8]], station: "anvil" },
+  { out: "bootsSpring", n: 1, ing: [["ironBar", 10], ["gel", 4]], station: "anvil" },
 ];
 
 /* ----------------------------------------------------------------- enchanting */

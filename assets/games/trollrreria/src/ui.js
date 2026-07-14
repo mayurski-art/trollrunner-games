@@ -27,6 +27,7 @@ export class UI {
       invPanel: document.getElementById("inv-panel"),
       invGrid: document.getElementById("inv-grid"),
       armorCol: document.getElementById("armor-col"),
+      accessoryCol: document.getElementById("accessory-col"),
       trash: document.getElementById("trash-slot"),
       craftList: document.getElementById("craft-list"),
       craftGridEl: document.getElementById("craft-grid"),
@@ -573,6 +574,15 @@ export class UI {
       this.el.armorCol.appendChild(d);
       this.armorSlots[slot] = d;
     }
+    this.el.accessoryCol.innerHTML = "";
+    this.accessorySlots = {};
+    for (const [slot, ph] of [["ring", "💍"], ["back", "🪽"], ["feet", "👢"]]) {
+      const d = this.makeSlot(slot, "accessory");
+      d.classList.add("slot-armor");
+      d.dataset.ph = ph;
+      this.el.accessoryCol.appendChild(d);
+      this.accessorySlots[slot] = d;
+    }
     this.chestSlots = [];
     this.el.chestGrid.innerHTML = "";
     for (let i = 0; i < 24; i++) {
@@ -613,6 +623,7 @@ export class UI {
   getStack(kind, key) {
     if (kind === "inv") return this.game.inventory.slots[key];
     if (kind === "armor") return this.game.inventory.armor[key];
+    if (kind === "accessory") return this.game.inventory.accessory[key];
     if (kind === "chest") return this.chest ? this.chest.items[key] : null;
     if (kind === "craft") return this.craftGrid[key];
     if (kind === "craft-output") return this._craftMatch ? { id: this._craftMatch.out, n: this._craftMatch.n } : null;
@@ -623,6 +634,7 @@ export class UI {
   setStack(kind, key, stack) {
     if (kind === "inv") this.game.inventory.slots[key] = stack;
     else if (kind === "armor") this.game.inventory.armor[key] = stack;
+    else if (kind === "accessory") this.game.inventory.accessory[key] = stack;
     else if (kind === "chest" && this.chest) this.chest.items[key] = stack;
     else if (kind === "craft") this.craftGrid[key] = stack;
     else if (kind === "enchant") this.enchantSlot = stack;
@@ -645,11 +657,12 @@ export class UI {
       return;
     }
 
-    if (kind === "armor") {
-      /* armor slots only accept the matching piece */
+    if (kind === "armor" || kind === "accessory") {
+      /* armor/accessory slots only accept a matching piece -- item.type is
+         literally "armor" or "accessory", so it doubles as the kind check */
       if (this.cursor) {
         const d = ITEMS[this.cursor.id];
-        if (!(d.type === "armor" && d.slot === key)) return;
+        if (!(d.type === kind && d.slot === key)) return;
       }
       const tmp = cur || null;
       this.setStack(kind, key, this.cursor);
@@ -690,13 +703,13 @@ export class UI {
   quickMove(kind, key, stack) {
     const inv = this.game.inventory;
     const def = ITEMS[stack.id];
-    /* equip armor via shift-click */
-    if (kind !== "armor" && def.type === "armor" && !inv.armor[def.slot]) {
-      inv.armor[def.slot] = stack;
+    /* equip armor/accessory via shift-click */
+    if (kind !== "armor" && kind !== "accessory" && (def.type === "armor" || def.type === "accessory") && !inv[def.type][def.slot]) {
+      inv[def.type][def.slot] = stack;
       this.setStack(kind, key, null);
       return;
     }
-    if (kind === "armor") {
+    if (kind === "armor" || kind === "accessory") {
       const left = inv.add(stack.id, stack.n);
       if (left === 0) this.setStack(kind, key, null);
       return;
@@ -778,6 +791,17 @@ export class UI {
     if (def.type === "weapon" || def.type === "bow") sub.push(`${def.dmg} damage`);
     if (def.type === "ammo") sub.push(`+${def.dmg} arrow damage`);
     if (def.type === "armor") sub.push(`+${def.def} defense · ${def.slot}`);
+    if (def.type === "accessory") {
+      const perks = [];
+      if (def.def) perks.push(`+${def.def} defense`);
+      if (def.speedMult) perks.push(`+${Math.round((def.speedMult - 1) * 100)}% speed`);
+      if (def.jumpBoost) perks.push("higher jump");
+      if (def.doubleJump) perks.push("extra jump");
+      if (def.glide) perks.push("glide");
+      if (def.dash) perks.push("dash");
+      if (def.regen) perks.push("faster regen");
+      sub.push(perks.join(" · "));
+    }
     if (def.type === "potion") sub.push(`heals ${def.heal} HP`);
     if (def.type === "block") sub.push("placeable");
     if (def.type === "wall") sub.push("background wall");
@@ -1216,6 +1240,7 @@ export class UI {
       if (this.invOpen) {
         for (let i = 10; i < 50; i++) this.paintSlot(this.invSlots[i - 10], g.inventory.slots[i]);
         for (const k of ["head", "chest", "legs"]) this.paintSlot(this.armorSlots[k], g.inventory.armor[k]);
+        for (const k of ["ring", "back", "feet"]) this.paintSlot(this.accessorySlots[k], g.inventory.accessory[k]);
         this.paintCraftList();
         this.paintCraftGrid();
         if (this.enchantOpen) this.paintEnchant();
