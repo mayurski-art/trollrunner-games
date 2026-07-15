@@ -10,8 +10,40 @@ const LANE_LERP = 13;
 // fires automatically within this window instead of being dropped.
 const INPUT_BUFFER = 0.16;
 
-// Placeholder runner built from primitives (body, head, limbs, coin chain).
-// Final character models swap in via buildMesh without touching state logic.
+const SPRITE_BASE = new URL('../../assets/sprites/', import.meta.url).href;
+const SPRITE_WIDTH = 1.5;
+const SPRITE_HEIGHT = 1.9;
+const RUN_FRAME_COUNT = 8;
+const JUMP_FRAME_COUNT = 8;
+const SLIDE_FRAME_COUNT = 6;
+const DEATH_FRAME_COUNT = 7;
+const JUMP_FPS = 12;
+const DEATH_FPS = 10;
+
+// Only the "north" (back-facing) frames are ever shown in-game: the chase
+// camera sits behind the runner the whole time. "south" frames exist on
+// disk for a future front-facing menu/character-select screen.
+const frameCache = new Map();
+
+function loadFrames(charId, anim, count) {
+  const key = `${charId}:${anim}`;
+  if (frameCache.has(key)) return frameCache.get(key);
+  const loader = new THREE.TextureLoader();
+  const frames = Array.from({ length: count }, (_, i) => {
+    const idx = String(i).padStart(2, '0');
+    const tex = loader.load(`${SPRITE_BASE}${charId}/${anim}_north_${idx}.png`);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    tex.generateMipmaps = false;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  });
+  frameCache.set(key, frames);
+  return frames;
+}
+
+// Sprite-based runner: a single camera-facing billboard whose texture swaps
+// between pre-rendered PixelLab frames depending on state (run/jump/slide/death).
 export class Player {
   constructor(scene, characterDef) {
     this.scene = scene;
@@ -23,33 +55,24 @@ export class Player {
 
   buildMesh(def) {
     this.group.clear();
-    const c = def.colors;
-    const bodyMat = new THREE.MeshStandardMaterial({ color: c.body, roughness: 0.7 });
-    const headMat = new THREE.MeshStandardMaterial({ color: c.head, roughness: 0.5 });
-    const accentMat = new THREE.MeshStandardMaterial({
-      color: c.accent, emissive: c.accent, emissiveIntensity: 0.45, roughness: 0.3,
+    this.frames = {
+      run: loadFrames(def.id, 'run', RUN_FRAME_COUNT),
+      jump: loadFrames(def.id, 'jump', JUMP_FRAME_COUNT),
+      slide: loadFrames(def.id, 'slide', SLIDE_FRAME_COUNT),
+      death: loadFrames(def.id, 'death', DEATH_FRAME_COUNT),
+    };
+
+    const spriteMat = new THREE.SpriteMaterial({
+      map: this.frames.run[0],
+      transparent: true,
+      alphaTest: 0.05,
     });
-    const trimMat = new THREE.MeshStandardMaterial({ color: c.trim, roughness: 0.6 });
-
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.72, 0.4), bodyMat);
-    body.position.y = 0.86;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.36, 20, 16), headMat);
-    head.position.y = 1.52;
-    const chain = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.05, 16), accentMat);
-    chain.rotation.x = Math.PI / 2;
-    chain.position.set(0, 1.02, 0.22);
-
-    this.armL = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.5, 0.16), bodyMat);
-    this.armL.position.set(-0.45, 0.98, 0);
-    this.armR = this.armL.clone();
-    this.armR.position.x = 0.45;
-    this.legL = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.5, 0.2), trimMat);
-    this.legL.position.set(-0.16, 0.28, 0);
-    this.legR = this.legL.clone();
-    this.legR.position.x = 0.16;
-
-    this.group.add(body, head, chain, this.armL, this.armR, this.legL, this.legR);
-    this.addAccessories(def, { headMat, accentMat, trimMat });
+    this.sprite = new THREE.Sprite(spriteMat);
+    this.sprite.scale.set(SPRITE_WIDTH, SPRITE_HEIGHT, 1);
+    // Sprites are centered on their position by default; lift so the
+    // feet (bottom of the frame) sit on the ground reference instead.
+    this.sprite.position.y = SPRITE_HEIGHT / 2;
+    this.group.add(this.sprite);
 
     // Diamond Hands shield bubble, toggled by PowerupManager state.
     this.shieldMesh = new THREE.Mesh(
@@ -64,77 +87,6 @@ export class Player {
     this.group.add(this.shieldMesh);
   }
 
-  // Per-character silhouette accessories so each runner reads instantly
-  // even on the placeholder rig. Final models replace all of this.
-  addAccessories(def, { accentMat, trimMat }) {
-    switch (def.id) {
-      case 'pepe': {
-        // Red scarf + hoodie bump.
-        const scarf = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.09, 8, 14), trimMat);
-        scarf.rotation.x = Math.PI / 2;
-        scarf.position.y = 1.24;
-        const hood = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 10), new THREE.MeshStandardMaterial({ color: 0x2b4faa, roughness: 0.8 }));
-        hood.position.set(0, 1.4, -0.28);
-        this.group.add(scarf, hood);
-        break;
-      }
-      case 'doge': {
-        // Shiba ears + cap brim + shades bar.
-        const earGeo = new THREE.ConeGeometry(0.11, 0.26, 8);
-        const earMat = new THREE.MeshStandardMaterial({ color: 0xd9a441, roughness: 0.7 });
-        for (const x of [-0.2, 0.2]) {
-          const ear = new THREE.Mesh(earGeo, earMat);
-          ear.position.set(x, 1.9, -0.04);
-          this.group.add(ear);
-        }
-        const brim = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.05, 0.3), new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.6 }));
-        brim.position.set(0, 1.72, 0.24);
-        const shades = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.1, 0.06), new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.25 }));
-        shades.position.set(0, 1.58, 0.32);
-        this.group.add(brim, shades);
-        break;
-      }
-      case 'skyrunner': {
-        // Sunglasses + rocket boots with cyan thrusters.
-        const shades = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.11, 0.06), new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.2 }));
-        shades.position.set(0, 1.58, 0.32);
-        this.group.add(shades);
-        const thrustGeo = new THREE.CylinderGeometry(0.07, 0.11, 0.16, 10);
-        for (const leg of [this.legL, this.legR]) {
-          const boot = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.14, 0.3), new THREE.MeshStandardMaterial({ color: 0x222831, roughness: 0.4, metalness: 0.5 }));
-          boot.position.set(0, -0.24, 0.03);
-          leg.add(boot);
-          const thrust = new THREE.Mesh(thrustGeo, accentMat);
-          thrust.position.set(0, -0.36, 0.03);
-          leg.add(thrust);
-        }
-        break;
-      }
-      case 'laserexec': {
-        // Gold tie + red laser eyes.
-        const tie = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.4, 0.05), accentMat);
-        tie.position.set(0, 0.95, 0.23);
-        this.group.add(tie);
-        const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff2038, toneMapped: false });
-        for (const x of [-0.13, 0.13]) {
-          const eye = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), eyeMat);
-          eye.position.set(x, 1.6, 0.33);
-          this.group.add(eye);
-        }
-        break;
-      }
-      default: {
-        // Trollface: wide white grin plate on the head front.
-        const grin = new THREE.Mesh(
-          new THREE.BoxGeometry(0.34, 0.1, 0.05),
-          new THREE.MeshStandardMaterial({ color: 0x1c1c1c, roughness: 0.4 }),
-        );
-        grin.position.set(0, 1.42, 0.32);
-        this.group.add(grin);
-      }
-    }
-  }
-
   reset() {
     this.lane = 1;
     this.x = LANES[1];
@@ -143,11 +95,15 @@ export class Player {
     this.state = 'running'; // running | jumping | sliding | dead
     this.slideTimer = 0;
     this.runTime = 0;
+    this.animTime = 0;
     this.buffered = null; // { action: 'jump' | 'slide', t }
     this.flying = false; // Rocket Boost: hover above the track
     if (this.shieldMesh) this.shieldMesh.visible = false;
+    if (this.sprite) {
+      this.sprite.material.map = this.frames.run[0];
+      this.sprite.material.rotation = 0;
+    }
     this.group.position.set(this.x, 0, 0);
-    this.group.rotation.set(0, 0, 0);
     this.group.scale.set(1, 1, 1);
   }
 
@@ -175,6 +131,7 @@ export class Player {
     }
     this.state = 'jumping';
     this.slideTimer = 0;
+    this.animTime = 0;
     this.buffered = null;
     this.vy = JUMP_VELOCITY;
     return true;
@@ -196,6 +153,7 @@ export class Player {
 
   die() {
     this.state = 'dead';
+    this.animTime = 0;
   }
 
   update(dt, speed) {
@@ -236,30 +194,37 @@ export class Player {
       }
     }
 
-    // Run-cycle animation.
+    // Run-cycle phase (also drives the idle ground bob).
     this.runTime += dt * Math.max(6, speed * 0.62);
-    const swing = Math.sin(this.runTime);
     const grounded = this.grounded;
-    if (this.state !== 'dead') {
-      this.armL.rotation.x = grounded ? swing * 0.9 : -0.6;
-      this.armR.rotation.x = grounded ? -swing * 0.9 : -0.6;
-      this.legL.rotation.x = grounded ? -swing * 0.9 : 0.5;
-      this.legR.rotation.x = grounded ? swing * 0.9 : 0.5;
-    }
     const bob = grounded && this.state === 'running' ? Math.abs(Math.cos(this.runTime)) * 0.07 : 0;
 
-    // Slide pose: squash down; lean into lane changes.
-    const targetScaleY = this.state === 'sliding' ? 0.5 : 1;
-    this.group.scale.y += (targetScaleY - this.group.scale.y) * Math.min(1, 16 * dt);
+    // Lean into lane changes via a screen-plane sprite roll.
     const lean = this.state === 'dead' ? 0 : (this.x - targetX) * 0.28;
-    this.group.rotation.z += (lean - this.group.rotation.z) * Math.min(1, 10 * dt);
+    this.sprite.material.rotation += (-lean - this.sprite.material.rotation) * Math.min(1, 10 * dt);
 
-    if (this.state === 'dead') {
-      // Fall backward.
-      this.group.rotation.x = Math.max(this.group.rotation.x - dt * 4, -Math.PI / 2.2);
-    }
+    this.animTime += dt;
+    this.sprite.material.map = this.pickFrame();
 
     this.group.position.set(this.x, this.y + bob, 0);
+  }
+
+  pickFrame() {
+    if (this.state === 'dead') {
+      const idx = Math.min(DEATH_FRAME_COUNT - 1, Math.floor(this.animTime * DEATH_FPS));
+      return this.frames.death[idx];
+    }
+    if (this.state === 'sliding') {
+      const progress = 1 - Math.max(0, this.slideTimer) / SLIDE_DURATION;
+      const idx = Math.min(SLIDE_FRAME_COUNT - 1, Math.floor(progress * SLIDE_FRAME_COUNT));
+      return this.frames.slide[idx];
+    }
+    if (this.state === 'jumping' && !this.flying) {
+      const idx = Math.floor(this.animTime * JUMP_FPS) % JUMP_FRAME_COUNT;
+      return this.frames.jump[idx];
+    }
+    const idx = Math.floor((this.runTime / (Math.PI * 2)) * RUN_FRAME_COUNT) % RUN_FRAME_COUNT;
+    return this.frames.run[idx];
   }
 
   // Idle running-in-place for the menu backdrop.
