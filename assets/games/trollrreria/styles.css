@@ -21,8 +21,11 @@ html, body {
 #tt-root { position: fixed; inset: 0; }
 #tt-canvas {
   position: absolute; inset: 0; width: 100%; height: 100%;
-  image-rendering: pixelated; cursor: crosshair; display: block;
+  image-rendering: pixelated; cursor: default; display: block;
 }
+/* crosshair only while a tool/weapon is actively equipped (aiming);
+   bare-handed/unequipped keeps the plain arrow so the state reads at a glance */
+#tt-canvas.tt-equipped { cursor: crosshair; }
 
 /* ------------------------------------------------------------------ HUD */
 #hud { position: absolute; inset: 0; pointer-events: none; }
@@ -136,6 +139,7 @@ html, body {
 }
 .slot:hover { border-color: rgba(255, 179, 0, 0.55); }
 .slot.sel { border-color: var(--tt-gold); box-shadow: 0 0 8px rgba(255, 179, 0, 0.35); }
+.slot.unequipped { border-color: var(--tt-gold); opacity: 0.55; }
 .slot canvas { width: 36px; height: 36px; image-rendering: pixelated; pointer-events: none; }
 .slot .n {
   position: absolute; right: 4px; bottom: 2px; font-size: 11px;

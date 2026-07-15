@@ -11,9 +11,10 @@ export class Inventory {
     this.armor = { head: null, chest: null, legs: null };
     this.accessory = { ring: null, back: null, feet: null };
     this.sel = 0;              // selected hotbar index
+    this.unequipped = false;   // true = bare hands, even though `sel` still points at a slot
   }
 
-  get selected() { return this.slots[this.sel]; }
+  get selected() { return this.unequipped ? null : this.slots[this.sel]; }
 
   /* Add items; returns count that did NOT fit. Fills existing stacks first. */
   add(id, n) {

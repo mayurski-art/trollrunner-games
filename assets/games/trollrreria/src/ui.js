@@ -644,9 +644,11 @@ export class UI {
     const inv = this.game.inventory;
     const cur = this.getStack(kind, key);
 
-    /* hotbar quick-select when nothing is being dragged */
+    /* hotbar quick-select when nothing is being dragged; clicking the
+       already-selected slot again unequips it (bare hands) */
     if (kind === "inv" && key < 10 && !this.cursor && !isShift && !isRight && !this.invOpen) {
-      inv.sel = key;
+      if (inv.sel === key && !inv.unequipped) inv.unequipped = true;
+      else { inv.sel = key; inv.unequipped = false; }
       this.dirtyHud();
       return;
     }
@@ -1287,7 +1289,8 @@ export class UI {
     const inv = this.game.inventory;
     for (let i = 0; i < 10; i++) {
       const el = this.hotbarSlots[i];
-      el.classList.toggle("sel", inv.sel === i);
+      el.classList.toggle("sel", inv.sel === i && !inv.unequipped);
+      el.classList.toggle("unequipped", inv.sel === i && inv.unequipped);
       this.paintSlot(el, inv.slots[i]);
     }
   }

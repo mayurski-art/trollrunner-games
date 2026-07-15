@@ -262,18 +262,23 @@ export class Player extends Entity {
     if (lava) this.hurt(game, 24, "lava", this.cx - this.dir * 10);
     if (sludge) this.hurt(game, 4, "the sludge", null);
 
-    /* -------- hunger: drains over time (faster while sprinting), starves
-       you once empty. Passive regen needs a well-fed troll (matches the
-       Minecraft "regen needs hunger" gate). */
+    /* -------- hunger: drains from activity, not idle time -- standing
+       still barely costs anything, walking costs more, sprinting costs
+       the most (matches Minecraft's exhaustion-from-actions model, where
+       a stationary player's hunger bar practically never moves). Starves
+       you once empty; passive regen needs a well-fed troll (also matches
+       Minecraft's "regen needs hunger" gate). */
     const sprinting = this.onGround && Math.abs(this.vx) > maxSpd * 0.7;
-    this.hunger = Math.max(0, this.hunger - dt * (sprinting ? 0.155 : 0.11));
+    const walking = this.onGround && Math.abs(this.vx) > 12;
+    const hungerRate = sprinting ? 0.075 : walking ? 0.035 : 0.012;
+    this.hunger = Math.max(0, this.hunger - dt * hungerRate);
     if (this.hunger <= 0) {
       this._starveAcc = (this._starveAcc || 0) + dt;
-      if (this._starveAcc >= 2) {
+      if (this._starveAcc >= 4) {
         this._starveAcc = 0;
-        this.hp = Math.max(0, this.hp - 2);
+        this.hp = Math.max(0, this.hp - 3);
         this.hitFlash = 0.22;
-        game.floatText(this.cx, this.y - 4, 2, "#ff4d5e");
+        game.floatText(this.cx, this.y - 4, 3, "#ff4d5e");
         game.ui && game.ui.dirtyHud();
         if (this.hp <= 0 && !this.dead) { this.dead = true; game.onPlayerDeath("starvation"); }
       }
@@ -288,15 +293,26 @@ export class Player extends Entity {
       if (this._regenAcc >= 1.6) { this._regenAcc = 0; this.hp = Math.min(this.maxHp, this.hp + 1); game.ui && game.ui.dirtyHud(); }
     }
 
-    /* -------- hotbar selection */
+    /* -------- hotbar selection (hitting the already-selected slot's key
+       again unequips it -- bare hands -- same as clicking that slot) */
     for (let k = 0; k < 10; k++) {
-      if (input.hit("Digit" + ((k + 1) % 10))) { game.inventory.sel = k; game.ui && game.ui.dirtyHud(); }
+      if (input.hit("Digit" + ((k + 1) % 10))) {
+        const inv = game.inventory;
+        if (inv.sel === k && !inv.unequipped) inv.unequipped = true;
+        else { inv.sel = k; inv.unequipped = false; }
+        game.ui && game.ui.dirtyHud();
+      }
     }
     if (input.wheel !== 0) {
       game.inventory.sel = (game.inventory.sel + input.wheel + 10) % 10;
+      game.inventory.unequipped = false;
       game.ui && game.ui.dirtyHud();
     }
     if (input.hit("KeyQ")) this.tossSelected(game);
+
+    /* -------- cursor: crosshair while something is equipped (aiming a
+       tool/weapon), default arrow when bare-handed/unequipped */
+    game.canvas.classList.toggle("tt-equipped", !!game.inventory.selected);
 
     /* -------- use / interact */
     if (!game.pointerOverUI) {
