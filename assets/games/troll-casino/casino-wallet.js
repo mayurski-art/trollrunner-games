@@ -101,6 +101,7 @@
   function saveQueue(q) { try { localStorage.setItem(SYNC_KEY, JSON.stringify(q.slice(-200))); } catch (_) {} }
 
   let syncing = false;
+  let staleNotified = false;
   async function flushQueue() {
     if (syncing || !state.userId) return;
     const c = client();
@@ -114,12 +115,46 @@
           const { error } = await c.rpc("troll_casino_adjust_balance", {
             p_delta: item.delta, p_currency: item.currency, p_reason: item.reason || null,
           });
-          if (error) break; // network/db hiccup — stop, retry on next flush
+          if (error) {
+            // The server reached and REJECTED this delta (rate limit, loss
+            // cap, self-exclusion, range check) — retrying it forever would
+            // wedge every item queued behind it. Park it and pull the real
+            // balance from the server so the local optimistic number can't
+            // silently drift from truth for the rest of the session.
+            queue.shift();
+            saveQueue(queue);
+            await reconcileFromServer(`Blocked: ${error.message || "balance update rejected"}`);
+            continue;
+          }
           queue.shift();
           saveQueue(queue);
-        } catch (_) { break; }
+        } catch (_) { break; } // thrown = network/offline — stop, retry next flush, keep the item
+      }
+      // Anything still queued after 2 minutes is either offline for a long
+      // stretch or stuck — resync from server truth so the visible balance
+      // never silently diverges, then keep draining on the next flush.
+      const oldest = queue[0];
+      if (oldest && Date.now() - oldest.ts > 120000 && !staleNotified) {
+        staleNotified = true;
+        await reconcileFromServer("Reconnected after a delay — balance re-synced from the server.");
+      } else if (!queue.length) {
+        staleNotified = false;
       }
     } finally { syncing = false; }
+  }
+
+  async function reconcileFromServer(note) {
+    const c = client();
+    if (!c) return;
+    try {
+      const { data, error } = await c.rpc("troll_casino_ensure_wallet");
+      if (!error && data) {
+        state.balances.TROLL = Number(data.troll_balance) || 0;
+        state.balances.USDC = Number(data.usdc_balance) || 0;
+        if (note) record(note, 0, state.currency);
+        emit();
+      }
+    } catch (_) {}
   }
   function queueDelta(delta, currency, reason) {
     const q = loadQueue();

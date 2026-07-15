@@ -200,8 +200,8 @@
     let token = wallet().getCurrency();
     const { modal, close } = openBackdrop(`
       <h2>Redeem</h2>
-      <p class="tc-sub">Cash out your balance to a real wallet. Requests are reviewed manually —
-         you'll see a Pending status until it's paid.</p>
+      <p class="tc-sub">Cash out your balance to a real wallet. Requests are reviewed manually,
+         typically within 24 hours — you'll see a Pending status until it's paid.</p>
       <div class="tc-token-toggle" id="tc-red-tok">
         <button type="button" data-t="TROLL">$TROLL</button>
         <button type="button" data-t="USDC">USDC</button>
@@ -247,12 +247,18 @@
     const status = modal.querySelector("#tc-red-status");
     const listEl = modal.querySelector("#tc-red-list");
 
+    function ageLabel(iso) {
+      const hrs = (Date.now() - new Date(iso).getTime()) / 3600000;
+      if (hrs < 1) return "just now";
+      if (hrs < 24) return `${Math.round(hrs)}h ago`;
+      return `${Math.round(hrs / 24)}d ago`;
+    }
     async function renderList() {
       const rows = await wallet().listMyRedemptions();
       listEl.innerHTML = rows.length ? rows.slice(0, 10).map(r => `
         <li>
           <span>${wallet().fmt(Number(r.token_amount), r.token)}</span>
-          <span class="tc-req-status ${r.status}">${r.status}</span>
+          <span class="tc-req-status ${r.status}">${r.status}${r.status === "pending" ? ` · ${ageLabel(r.created_at)}` : ""}</span>
         </li>`).join("") : "";
     }
     renderList();
@@ -277,5 +283,99 @@
     });
   }
 
-  window.TrollCasinoMoneyUI = { openDeposit, openRedeem };
+  /* ================= FULL STATEMENT (server ledger) ================= */
+  // The "Activity" rail on the floor only shows the current session. This
+  // reads assets/supabase/troll_casino_v2.sql's troll_casino_adjustments —
+  // an append-only audit row per bet/win, RLS-scoped to the caller — so a
+  // player can see every real-money movement on their account, forever.
+  async function openStatement() {
+    if (!wallet() || !wallet().isReady()) { alert("Log in first."); return; }
+    const { modal } = openBackdrop(`
+      <h2>Full statement</h2>
+      <p class="tc-sub">Every balance change on your account, most recent first.</p>
+      <ul class="tc-req-list" id="tc-stmt-list">Loading…</ul>`);
+    const c = window.TrollrunnerAccounts && window.TrollrunnerAccounts.getClient();
+    const listEl = modal.querySelector("#tc-stmt-list");
+    if (!c) { listEl.textContent = "Unavailable."; return; }
+    try {
+      const { data, error } = await c.from("troll_casino_adjustments")
+        .select("delta,currency,reason,balance_after,created_at")
+        .order("created_at", { ascending: false }).limit(100);
+      if (error) { listEl.textContent = "Could not load statement: " + error.message; return; }
+      listEl.innerHTML = (data && data.length) ? data.map(r => `
+        <li>
+          <span>${new Date(r.created_at).toLocaleString()} · ${r.reason || "adjustment"}</span>
+          <span class="${r.delta > 0 ? "amt-win" : r.delta < 0 ? "amt-loss" : ""}">
+            ${r.delta > 0 ? "+" : ""}${Number(r.delta).toLocaleString()} ${r.currency}
+          </span>
+        </li>`).join("") : "<li>No activity yet.</li>";
+    } catch (e) { listEl.textContent = "Could not load statement: " + ((e && e.message) || e); }
+  }
+
+  /* ================= RESPONSIBLE-GAMBLING LIMITS ================= */
+  // Backed by troll_casino_set_limits() (troll_casino_v2.sql): a daily loss
+  // cap and/or self-exclusion window, enforced server-side inside
+  // troll_casino_adjust_balance — not just a client-side checkbox. Both can
+  // only be tightened/extended once set, by design (see that function).
+  async function openLimits() {
+    if (!wallet() || !wallet().isReady()) { alert("Log in first."); return; }
+    const c = window.TrollrunnerAccounts && window.TrollrunnerAccounts.getClient();
+    const { modal } = openBackdrop(`
+      <h2>Play limits</h2>
+      <p class="tc-sub">Optional, self-imposed guardrails. A loss cap can only be lowered once
+         set, and self-exclusion can only be extended — never shortened — so a losing streak
+         can't talk you out of your own limit.</p>
+      <p class="tc-sub" id="tc-lim-current">Loading current limits…</p>
+      <div class="tc-field">
+        <label>Daily loss cap ($TROLL — leave blank for none)</label>
+        <input type="number" id="tc-lim-cap" min="1" step="1">
+      </div>
+      <div class="tc-field">
+        <label>Self-exclude for (hours — leave blank to skip)</label>
+        <input type="number" id="tc-lim-hours" min="1" step="1">
+      </div>
+      <button type="button" class="tc-btn" id="tc-lim-save">Save limits</button>
+      <p class="tc-status" id="tc-lim-status" aria-live="polite"></p>`);
+
+    const currentEl = modal.querySelector("#tc-lim-current");
+    async function loadCurrent() {
+      if (!c) { currentEl.textContent = ""; return; }
+      try {
+        const { data } = await c.from("troll_casino_limits").select("*").maybeSingle();
+        if (data && (data.daily_loss_cap || (data.self_exclude_until && new Date(data.self_exclude_until) > new Date()))) {
+          currentEl.textContent = [
+            data.daily_loss_cap ? `Daily loss cap: ${Number(data.daily_loss_cap).toLocaleString()} TROLL` : null,
+            data.self_exclude_until && new Date(data.self_exclude_until) > new Date()
+              ? `Self-excluded until ${new Date(data.self_exclude_until).toLocaleString()}` : null,
+          ].filter(Boolean).join(" · ");
+        } else {
+          currentEl.textContent = "No limits currently set.";
+        }
+      } catch (_) { currentEl.textContent = ""; }
+    }
+    loadCurrent();
+
+    const status = modal.querySelector("#tc-lim-status");
+    modal.querySelector("#tc-lim-save").addEventListener("click", async () => {
+      if (!c) return;
+      const cap = Number(modal.querySelector("#tc-lim-cap").value) || null;
+      const hours = Number(modal.querySelector("#tc-lim-hours").value) || null;
+      status.className = "tc-status";
+      status.textContent = "Saving…";
+      try {
+        const { error } = await c.rpc("troll_casino_set_limits", {
+          p_daily_loss_cap: cap, p_self_exclude_hours: hours,
+        });
+        if (error) { status.className = "tc-status is-bad"; status.textContent = error.message; return; }
+        status.className = "tc-status is-ok";
+        status.textContent = "Saved.";
+        loadCurrent();
+      } catch (e) {
+        status.className = "tc-status is-bad";
+        status.textContent = (e && e.message) || "Could not save.";
+      }
+    });
+  }
+
+  window.TrollCasinoMoneyUI = { openDeposit, openRedeem, openStatement, openLimits };
 })();

@@ -36,7 +36,10 @@
     return Math.random();
   }
 
-  // Hidden crash multiplier for one round (≥ 1.00, 2 decimals).
+  // Hidden crash multiplier for one round (≥ 1.00, 2 decimals). Local
+  // fallback only — the live game prefers the server-derived, provably-fair
+  // point from troll_casino_crash_round (see PROVABLY-FAIR below) and only
+  // falls back to this when that RPC is unreachable.
   function sampleCrash(rand = crRand01) {
     const u = rand();
     if (u < CR_EDGE) return 1.00;
@@ -54,6 +57,47 @@
   const wallet = () => window.TrollCasinoWallet;
   const audio = () => window.TrollCasino.audio;
   const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ==========================================================================
+     PROVABLY-FAIR — troll_casino_crash_round() (assets/supabase/
+     troll_casino_v2.sql) commits a fresh server seed, HMACs it with our
+     client seed + a per-user nonce, and hands back the crash point plus the
+     seed itself in one call — the seed's hash could only have come from a
+     value fixed before it saw our client seed, so nothing here lets the
+     server pick a point after the fact. We prefetch the next round while the
+     current one plays so LAUNCH never waits on a network round trip; if the
+     RPC is ever unreachable we fall back to the local sampleCrash() above
+     and label the round "unverified" rather than blocking play.
+     ========================================================================== */
+  const CLIENT_SEED_KEY = "troll-casino-crash-client-seed";
+  function clientSeed() {
+    let s = localStorage.getItem(CLIENT_SEED_KEY);
+    if (!s) {
+      s = Array.from(crypto.getRandomValues(new Uint8Array(8))).map(b => b.toString(16).padStart(2, "0")).join("");
+      localStorage.setItem(CLIENT_SEED_KEY, s);
+    }
+    return s;
+  }
+  function rerollClientSeed() {
+    localStorage.removeItem(CLIENT_SEED_KEY);
+    return clientSeed();
+  }
+  function supa() {
+    const a = window.TrollrunnerAccounts;
+    return a && a.getClient && a.getClient();
+  }
+  async function fetchServerRound() {
+    const c = supa();
+    if (!c) return null;
+    try {
+      const { data, error } = await c.rpc("troll_casino_crash_round", { p_client_seed: clientSeed() });
+      if (error || !data) return null;
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row || !(row.crash_point >= 1)) return null;
+      return row;
+    } catch (_) { return null; }
+  }
+  function prefetchRound() { C.nextRound = fetchServerRound(); }
 
   const ELON = {
     idle: "Launch window is open.",
@@ -76,6 +120,8 @@
     history: [],
     fx: null,
     canvas: null, ctx: null,
+    nextRound: null,   // Promise<server round> | null — prefetched provably-fair round
+    lastFair: null,    // last round's { server_seed, server_seed_hash, client_seed, nonce } for the Verify link
   };
 
   /* --- room registration --------------------------------------------------------- */
@@ -86,7 +132,7 @@
     cta: "Approach the console",
     art: "assets/games/troll-casino/art/whale-launch-hero.png",
     playArt: "assets/games/troll-casino/art/whale-launch-gameplay.png",
-    onEnter: () => { setLine(ELON.idle); sizeCanvas(); drawIdle(); },
+    onEnter: () => { setLine(ELON.idle); sizeCanvas(); drawIdle(); prefetchRound(); },
   });
 
   /* --- markup ----------------------------------------------------------------------- */
@@ -132,6 +178,7 @@
           </div>
 
           <div class="cr-history" id="cr-history"><span class="crh-empty">No launches yet</span></div>
+          <p class="cr-fair" id="cr-fair"></p>
           <div class="result-banner" id="cr-banner" role="status" aria-live="assertive"></div>
           <canvas id="cr-fx" aria-hidden="true" style="position:absolute;inset:0;pointer-events:none"></canvas>
         </div>
@@ -167,22 +214,36 @@
   }
 
   /* --- round flow ---------------------------------------------------------------------- */
-  function launch() {
+  async function launch() {
     if (C.phase !== "idle" && C.phase !== "crashed" && C.phase !== "cashed") return;
     const wager = Math.floor(Number($("#cr-wager").value));
     if (!(wager > 0)) { setStatus("Enter a wager first"); return; }
     if (!wallet().canAfford(wager)) { setStatus("Not enough balance for that wager"); return; }
     if (!wallet().debit(wager, "Whale Launch wager")) return;
 
+    C.phase = "counting";  // set synchronously so a double-click can't race the await below
     C.wager = wager;
-    C.crashPoint = sampleCrash();          // decided NOW, before anything moves
+    setButton("counting");
+    setStatus(`Wager <strong>${wallet().fmt(wager)}</strong> — ignition…`);
+
+    // Prefer the server-derived provably-fair round prefetched on room
+    // entry / after the last round; fall back to local RNG (and say so)
+    // only if the RPC never came back.
+    const round = C.nextRound ? await C.nextRound : null;
+    if (round) {
+      C.crashPoint = round.crash_point;
+      C.lastFair = round;
+    } else {
+      C.crashPoint = sampleCrash();
+      C.lastFair = null;
+    }
+    prefetchRound(); // line up the next round while this one plays
+
     C.mult = 1;
     C.points = [];
     hideBanner();
     audio().ensure();
-    setButton("counting");
     setLine(ELON.counting);
-    setStatus(`Wager <strong>${wallet().fmt(wager)}</strong> — ignition…`);
 
     // 3·2·1 countdown, then the whale flies.
     C.phase = "counting";
@@ -248,6 +309,7 @@
     showBanner("CASHED OUT" + (auto ? " · AUTO" : ""), `+${wallet().fmt(payout)} @ ${m.toFixed(2)}×`, "#3dff8a", true);
     setLine(m >= 10 ? ELON.bigCash : ELON.cashed);
     setStatus(`Cashed <strong>${wallet().fmt(payout)}</strong> — the whale crashed later at ${C.crashPoint.toFixed(2)}×`);
+    renderFairness();
     if (m >= 10) { audio().whale(); C.fx.burst(["#3dff8a", "#ffc94d", "#fff"], 70); }
     else { audio().win(); C.fx.burst(["#3dff8a", "#ffc94d"]); }
 
@@ -270,6 +332,7 @@
     showBanner("RUGGED @ " + C.crashPoint.toFixed(2) + "×", `-${wallet().fmt(C.wager)}`, "#ff3358", false);
     setLine(instant ? ELON.instant : ELON.crash);
     setStatus(`Crashed at <strong>${C.crashPoint.toFixed(2)}×</strong> — wager lost`);
+    renderFairness();
     audio().rug();
 
     pushHistory(C.crashPoint, false);
@@ -383,6 +446,22 @@
 
   function setLine(text) { const el = $("#cr-line"); if (el) el.textContent = text; }
   function setStatus(html) { const el = $("#cr-status"); if (el) el.innerHTML = html; }
+
+  function renderFairness() {
+    const el = $("#cr-fair");
+    if (!el) return;
+    if (!C.lastFair) { el.textContent = "This launch used local fallback RNG — the fairness log was unreachable."; return; }
+    const f = C.lastFair;
+    el.innerHTML = `Provably fair · seed hash <code>${f.server_seed_hash.slice(0, 12)}…</code> ·
+      <button type="button" class="cr-fair-toggle" data-act="fair">show seed to verify</button>`;
+    el.querySelector("[data-act=fair]")?.addEventListener("click", () => {
+      el.innerHTML = `Server seed <code>${f.server_seed}</code> hashes (SHA-256) to
+        <code>${f.server_seed_hash}</code> · client seed <code>${f.client_seed}</code> ·
+        nonce <code>${f.nonce}</code> → HMAC-SHA256(client:nonce, server) → ${f.crash_point.toFixed(2)}×.
+        <button type="button" class="cr-fair-toggle" data-act="reroll">reroll my client seed</button>`;
+      el.querySelector("[data-act=reroll]")?.addEventListener("click", () => { rerollClientSeed(); prefetchRound(); renderFairness(); });
+    });
+  }
 
   function showBanner(title, sub, color, isWin) {
     const el = $("#cr-banner");

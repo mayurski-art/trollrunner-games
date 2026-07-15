@@ -177,16 +177,41 @@
       if (!error && data != null) { jackpotCache[cur] = Number(data); renderMeter(); }
     } catch (_) {}
   }
-  async function meterTake(share, cur) {
+  async function meterTake(share, cur, tier) {
     const c = dbClient();
     if (!c) return 0;
     try {
-      const { data, error } = await c.rpc("troll_casino_jackpot_win", { p_currency: cur, p_share: share });
+      const { data, error } = await c.rpc("troll_casino_jackpot_win", { p_currency: cur, p_share: share, p_tier: tier || null });
       if (error) return 0;
       const won = Number(data) || 0;
       await refreshJackpot();
+      refreshJackpotFeed();
       return won;
     } catch (_) { return 0; }
+  }
+
+  /* --- public jackpot-win feed — anyone can read troll_casino_jackpot_wins
+     (see troll_casino_v2.sql), so the pot's payouts are visible, not just
+     its running total. Shows the last few hits across ALL players. */
+  async function refreshJackpotFeed() {
+    const c = dbClient();
+    const el = document.getElementById("sl-jackpot-feed");
+    if (!c || !el) return;
+    try {
+      const { data } = await c.from("troll_casino_jackpot_wins")
+        .select("currency,amount,tier,created_at").order("created_at", { ascending: false }).limit(5);
+      el.innerHTML = (data && data.length)
+        ? data.map(w => `<li>${w.tier || "JACKPOT"} · ${Number(w.amount).toLocaleString()} ${w.currency}
+            <span class="sl-jackpot-ago">${timeAgo(w.created_at)}</span></li>`).join("")
+        : "<li class=\"sl-jackpot-empty\">No jackpot hits yet — be the first.</li>";
+    } catch (_) {}
+  }
+  function timeAgo(iso) {
+    const m = (Date.now() - new Date(iso).getTime()) / 60000;
+    if (m < 1) return "just now";
+    if (m < 60) return `${Math.round(m)}m ago`;
+    if (m < 1440) return `${Math.round(m / 60)}h ago`;
+    return `${Math.round(m / 1440)}d ago`;
   }
 
   /* --- room registration -------------------------------------------------------- */
@@ -197,7 +222,7 @@
     cta: "Pull the handle",
     art: "assets/games/troll-casino/art/doge-jackpot-hero.png",
     playArt: "assets/games/troll-casino/art/doge-jackpot-gameplay.png",
-    onEnter: () => { setLine(DOGE.idle); renderMeter(); refreshJackpot(); },
+    onEnter: () => { setLine(DOGE.idle); renderMeter(); refreshJackpot(); refreshJackpotFeed(); },
     onLeave: () => stopAutoplay(),
   });
 
@@ -230,6 +255,7 @@
             <div class="sl-jackpot">
               <span class="sj-label">Grand jackpot · 3🐕 minor · 4🐕 major · 5🐕 grand</span>
               <strong id="sl-meter">—</strong>
+              <ul class="sl-jackpot-feed" id="sl-jackpot-feed" aria-label="Recent jackpot wins, all players"></ul>
             </div>
 
             <div class="sl-reels" id="sl-reels" aria-label="Slot reels"></div>
@@ -380,7 +406,7 @@
     let jackpotWon = 0, tierName = null;
     if (result.jackpotTier) {
       [tierName] = result.jackpotTier;
-      jackpotWon = await meterTake(result.jackpotTier[1], cur);
+      jackpotWon = await meterTake(result.jackpotTier[1], cur, tierName);
       credited += jackpotWon;
       if (jackpotWon > 0) wallet().credit(jackpotWon, `${tierName} jackpot 🐕`);
     }

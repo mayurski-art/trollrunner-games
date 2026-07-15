@@ -70,16 +70,32 @@
     };
   }
 
-  function secureRandomSegment() {
+  // Shared secure RNG — same shape as blackjack.js's rand01, slots.js's
+  // slRand01, crash.js's crRand01. Kept duplicated on purpose (each MODEL
+  // block stays a dependency-free, node-testable unit) — if you touch the
+  // algorithm here, mirror the change in the other three files' RNG helper.
+  function secureRandom01() {
     const c = (typeof globalThis !== "undefined" && globalThis.crypto) || null;
     if (c && c.getRandomValues) {
-      // Rejection sampling keeps the distribution exactly uniform over 24.
-      const limit = Math.floor(256 / SEGMENTS.length) * SEGMENTS.length; // 240
+      const buf = new Uint32Array(1);
+      c.getRandomValues(buf);
+      return buf[0] / 4294967296;
+    }
+    return Math.random();
+  }
+  function secureRandomInt(n) {
+    const c = (typeof globalThis !== "undefined" && globalThis.crypto) || null;
+    if (c && c.getRandomValues && n > 0 && n <= 256) {
+      // Rejection sampling keeps the distribution exactly uniform over n.
+      const limit = Math.floor(256 / n) * n;
       const buf = new Uint8Array(1);
       do { c.getRandomValues(buf); } while (buf[0] >= limit);
-      return buf[0] % SEGMENTS.length;
+      return buf[0] % n;
     }
-    return Math.floor(Math.random() * SEGMENTS.length);
+    return Math.floor(secureRandom01() * n);
+  }
+  function secureRandomSegment() {
+    return secureRandomInt(SEGMENTS.length);
   }
   /* MODEL:END */
 
@@ -675,6 +691,8 @@
 
     $("#deposit-btn")?.addEventListener("click", () => window.TrollCasinoMoneyUI?.openDeposit());
     $("#redeem-btn")?.addEventListener("click", () => window.TrollCasinoMoneyUI?.openRedeem());
+    $("#statement-btn")?.addEventListener("click", () => window.TrollCasinoMoneyUI?.openStatement());
+    $("#limits-btn")?.addEventListener("click", () => window.TrollCasinoMoneyUI?.openLimits());
   }
 
   /* ==========================================================================
@@ -812,6 +830,7 @@
   window.TrollCasino = {
     registerGame, openRoom, backToFloor, reportRound,
     audio: AudioFX, makeFX,
+    rng: { random01: secureRandom01, randomInt: secureRandomInt },
     spin,
     model: { ZONES, SEGMENTS, zoneCounts, resolveSpin },
   };

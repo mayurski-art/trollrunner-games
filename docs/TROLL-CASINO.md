@@ -17,7 +17,7 @@ Live page: `troll-casino.html` · Hub card: `index.html` (004).
 | `assets/games/troll-casino/rooms.css` | — | Casino floor, room hero pattern, blackjack/slots/crash UI |
 | `assets/games/troll-casino/scenes.js` | `TrollCasinoScenes` | The 5-scene cinematic walkthrough, transitions, parallax, gameplay handoff |
 | `assets/games/troll-casino/casino-wallet.js` | `TrollCasinoWallet` | REAL $TROLL/USDC balances (Supabase, per account), history, deposit()/requestRedemption() |
-| `assets/games/troll-casino/casino-money-ui.js` | `TrollCasinoGate`, `TrollCasinoMoneyUI` | Hard login gate (guests blocked) + deposit/redeem modals |
+| `assets/games/troll-casino/casino-money-ui.js` | `TrollCasinoGate`, `TrollCasinoMoneyUI` | Hard login gate (guests blocked) + deposit/redeem/statement/limits modals |
 | `assets/games/troll-casino/casino-admin.js` | — | `?admin=1` manual redemption review panel (password UI gate + server-side `is_admin` RLS) |
 | `assets/games/troll-casino/game.js` | `TrollCasino` | Casino core: floor + room registry, shared audio/FX/reportRound — plus the Troll Wheel |
 | `assets/games/troll-casino/blackjack.js` | `TrollCasinoBlackjack` | Pepe's Diamond Hands Blackjack (room module) |
@@ -48,10 +48,11 @@ single leaderboard + XP integration point).
   (pays on total bet), 🐕 gold-doge jackpot: 3/4/5 anywhere = 25%/60%/100% of
   a REAL shared progressive pool (`troll_casino_jackpot` in Supabase, per
   currency, fed 1.5% of each bet — every player feeds the same pot).
-- **Crash** — P(crash ≥ m) = 0.96/m (4% edge, ~4% instant rugs, median ≈1.9×);
-  crash point sampled by crypto RNG before ignition. Auto-exit beats frame
-  quantization by design. Provably-fair seam: swap `sampleCrash`'s RNG for a
-  committed server-seed reveal.
+- **Crash** — P(crash ≥ m) = 0.96/m (4% edge, ~4% instant rugs, median ≈1.9×).
+  The live game gets its crash point from `troll_casino_crash_round()`
+  (provably fair — see "Real money" below); `sampleCrash`'s local crypto RNG
+  is now only a fallback for when that RPC is unreachable. Auto-exit beats
+  frame quantization by design either way.
 
 Separation rules the code follows (keep them):
 - Scene logic never touches gameplay; it emits `"gameplay"` and game.js reacts.
@@ -137,7 +138,29 @@ Balances are real, per-account, and live in Supabase
 (`assets/supabase/troll_casino.sql`, main site repo) — `troll_casino_wallet`,
 `troll_casino_deposits`, `troll_casino_redemptions`, `troll_casino_jackpot`.
 Run that SQL once (and flip your own `troll_profiles.is_admin` to `true` by
-hand) before this page can work.
+hand) before this page can work — the whole file is idempotent, so re-running
+it later to pick up a change is safe. It now also includes:
+
+- **Audit trail + rate limit + limits gate.** Every `troll_casino_adjust_balance`
+  call now writes a row to `troll_casino_adjustments` and enforces a burst
+  rate limit, plus an optional player-set daily loss cap / self-exclusion
+  window (`troll_casino_set_limits`, wired to the "🛑 Limits" button).
+  `casino-wallet.js`'s sync queue treats a server *rejection* (rate limit,
+  cap, bad delta) as permanent — it drops that item and reconciles the local
+  balance from the server instead of retrying it forever.
+- **Provably-fair Whale Launch Crash.** `troll_casino_crash_round()` commits
+  a server seed, HMACs it with a per-player client seed + nonce, and returns
+  the crash point plus the seed itself in one call. `crash.js` prefetches the
+  next round while the current one plays; a "show seed to verify" link on
+  each result reveals the seed/hash/nonce for independent verification. This
+  is the provably-fair seam this doc used to flag as a known gap — it's
+  closed for Crash specifically, not for the other three games' RNG.
+- **Public jackpot-win feed.** `troll_casino_jackpot_win()` now also logs to
+  `troll_casino_jackpot_wins` (anyone can read it); the slots room shows the
+  last 5 hits across all players next to the pot meter.
+- **Full statement.** "📜 Full statement" reads `troll_casino_adjustments`
+  directly — every balance change on the account, forever, not just the
+  current session's Activity rail.
 
 **Deliberately still manual:** redemptions are NOT auto-paid. A request
 debits the player's balance and sits `pending`; you review it at

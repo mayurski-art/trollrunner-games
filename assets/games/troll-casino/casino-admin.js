@@ -123,11 +123,15 @@
           .catch(() => null)
       ));
 
-      list.innerHTML = data.map((r, i) => `
-        <div class="tc-modal" style="padding:14px;margin-bottom:10px;border:0.5px solid var(--tc-line);">
+      list.innerHTML = data.map((r, i) => {
+        const hrsOld = (Date.now() - new Date(r.created_at).getTime()) / 3600000;
+        const overdue = hrsOld > 24;
+        return `
+        <div class="tc-modal" style="padding:14px;margin-bottom:10px;border:0.5px solid ${overdue ? "var(--tc-red, #ff3358)" : "var(--tc-line)"};">
           <p style="font-family:var(--tc-font-mono);font-size:13px;margin-bottom:8px;">
             <strong>${Number(r.token_amount).toLocaleString()} ${r.token}</strong>
-            <span class="tc-req-status ${statusClass(r.status)}">${r.status}</span><br>
+            <span class="tc-req-status ${statusClass(r.status)}">${r.status}</span>
+            ${overdue ? `<span class="tc-req-status rejected">⏰ ${Math.round(hrsOld)}h — past 24h SLA</span>` : ""}<br>
             wallet: ${r.wallet}<br>
             requested: ${new Date(r.created_at).toLocaleString()}
           </p>
@@ -137,7 +141,8 @@
             <button type="button" class="tc-btn" data-paid="${r.id}">Mark paid</button>
             <button type="button" class="tc-btn tc-btn--ghost" data-reject="${r.id}">Reject (refund)</button>
           </div>
-        </div>`).join("");
+        </div>`;
+      }).join("");
 
       list.querySelectorAll("[data-paid]").forEach(btn => btn.addEventListener("click", async () => {
         const id = btn.dataset.paid;
