@@ -12,97 +12,169 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;700;900&family=DM+Mono:wght@500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/games/troll-dash/style.css?v=hub-v2-20260627">
+  <link rel="stylesheet" href="assets/games/hub/arcade-hub.css?v=hub-v3-20260715">
 </head>
-<body>
-  <div class="crt-overlay" aria-hidden="true"></div>
+<body class="intro-complete">
+  <div class="hub-shell">
+    <aside class="hub-sidebar">
+      <div class="hub-logo">TROLLRUNNER<span>ARCADE</span></div>
 
-  <section id="arcade-intro" class="arcade-intro" aria-label="Trollrunner game night arcade hub">
-    <div class="intro-cinema" aria-hidden="true">
-      <img class="intro-photo" src="assets/animations/troll-gamewithmefigure.png" alt="">
-      <div class="controller-rumble"></div>
-      <div class="handoff-flash"></div>
-    </div>
+      <nav class="hub-nav" aria-label="Arcade sections">
+        <a class="hub-nav-link" href="#top"><span class="hub-nav-icon">🏠</span> Home</a>
+        <a class="hub-nav-link is-active" href="#hub-games" aria-current="page"><span class="hub-nav-icon">🎮</span> Games</a>
+        <a class="hub-nav-link" href="https://trollrunner.net" data-fs="Main Site"><span class="hub-nav-icon">🌐</span> Main Site</a>
+      </nav>
 
-    <div class="intro-title-panel">
-      <p class="eyebrow">Trollrunner presents</p>
-      <h1>Trollrunner Game Night</h1>
-      <p>Take the controller. The TV knows where the chaos lives.</p>
-      <button id="take-controller-button" class="primary-btn" type="button">Take Controller</button>
-    </div>
+      <div class="hub-sidebar-spacer"></div>
 
-    <div class="tv-menu-shell" aria-live="polite">
-      <div class="tv-bezel">
-        <div class="tv-screen">
-          <div id="tv-main-menu" class="tv-panel is-active">
-            <p class="tv-kicker">Controller connected</p>
-            <h2>Trollrunner Arcade</h2>
-            <div class="tv-menu-grid">
-              <button id="choose-games-button" class="tv-menu-btn is-primary" type="button">Choose Games</button>
-              <a class="tv-menu-btn" href="https://trollrunner.net" data-fs="Main Site">Main Site</a>
-              <a class="tv-menu-btn" href="https://blog.trollrunner.net" data-fs="Blog">Blog</a>
-              <a class="tv-menu-btn" href="https://finance.trollrunner.net" data-fs="Finances">Finances</a>
-              <a class="tv-menu-btn" href="https://stickers.trollrunner.net" data-fs="Stickers">Stickers</a>
-              <a class="tv-menu-btn" href="https://videos.trollrunner.net" data-fs="Videos">Videos</a>
+      <div class="hub-profile-card">
+        <div class="hub-profile-avatar">🧌</div>
+        <p>User profile<br>placeholder</p>
+      </div>
+
+      <a class="hub-nav-link" href="#top"><span class="hub-nav-icon">⚙️</span> Settings</a>
+    </aside>
+
+    <main class="hub-main" id="hub-games">
+      <div class="hub-topbar">
+        <label class="hub-search">
+          <span aria-hidden="true">🔎</span>
+          <input id="hub-search-input" type="search" placeholder="Search games…" aria-label="Search games">
+        </label>
+      </div>
+
+      <div class="hub-hero">
+        <h1>Choose Games</h1>
+      </div>
+
+      <div class="hub-categories" role="group" aria-label="Filter games by category">
+        <button type="button" class="hub-pill is-active" data-category="all">All Games</button>
+        <button type="button" class="hub-pill" data-category="fighting">Fighting</button>
+        <button type="button" class="hub-pill" data-category="arcade">Arcade</button>
+        <button type="button" class="hub-pill" data-category="sandbox">Sandbox</button>
+        <button type="button" class="hub-pill" data-category="casino">Casino</button>
+        <button type="button" class="hub-pill" data-category="adventure">Adventure</button>
+      </div>
+
+      <div class="hub-grid">
+        <article class="hub-card" data-accent="green" data-category="fighting" data-title="troll kombat" data-feature="game_troll_kombat">
+          <div class="hub-card-art">
+            <span class="hub-card-tag">Fighting</span>
+            <img src="assets/games/troll-kombat/ui/trollkombat-prescreen.jpg" alt="Troll Kombat key art — Pepe, the gladiator trollface, and Doge facing off">
+          </div>
+          <div class="hub-card-body">
+            <h3>Troll Kombat</h3>
+            <p class="hub-card-meta">👥 2-Player</p>
+            <a class="hub-card-play" href="troll-kombat.html" data-fs="Troll Kombat">Play Now ▶</a>
+          </div>
+        </article>
+
+        <article class="hub-card" data-accent="cyan" data-category="arcade" data-title="dash meme metro" data-feature="game_meme_metro">
+          <div class="hub-card-art">
+            <span class="hub-card-tag">Arcade</span>
+            <div class="hub-card-art-placeholder">
+              <span class="icon">🖼️</span>
+              <strong>Placeholder background</strong>
+              <span>1920 x 1080px</span>
+              <span>(Replace this image)</span>
             </div>
           </div>
+          <div class="hub-card-body">
+            <h3>Dash: Meme Metro</h3>
+            <p class="hub-card-meta">∞ Endless</p>
+            <a class="hub-card-play" href="meme-metro.html" data-fs="Troll Dash: Meme Metro">Play Now ▶</a>
+          </div>
+        </article>
 
-          <div id="tv-game-select" class="tv-panel">
-            <div class="tv-panel-head">
-              <div>
-                <p class="tv-kicker">Live arcade</p>
-                <h2>Choose Games</h2>
-              </div>
-              <button id="back-to-tv-menu" class="tv-back-btn" type="button">Back</button>
+        <article class="hub-card" data-accent="gold" data-category="sandbox" data-title="trollrreria" data-feature="game_trollrreria">
+          <div class="hub-card-art">
+            <span class="hub-card-tag">Sandbox</span>
+            <div class="hub-card-art-placeholder">
+              <span class="icon">🖼️</span>
+              <strong>Placeholder background</strong>
+              <span>1920 x 1080px</span>
+              <span>(Replace this image)</span>
             </div>
-            <div class="game-scroll-list" tabindex="0" aria-label="Available Trollrunner games">
-              <article class="game-select-card game-select-card-metro" data-feature="game_meme_metro">
-                <a id="boot-meme-metro" class="game-select-hit" href="meme-metro.html" data-fs="Troll Dash: Meme Metro" aria-label="Play Troll Dash: Meme Metro"></a>
-                <img class="game-select-art" src="assets/animations/troll_playable_character.PNG" alt="" aria-hidden="true">
-                <span class="game-select-number">001 · Live</span>
-                <h3>Troll Dash: Meme Metro</h3>
-                <p>3D endless runner. Dodge rugs, bear trains and laser gates. Stack Troll Coins.</p>
-                <span class="game-select-boot">▶ Ride the Metro</span>
-              </article>
-              <article class="game-select-card game-select-card-kombat" data-feature="game_troll_kombat">
-                <a id="boot-troll-kombat" class="game-select-hit" href="troll-kombat.html" data-fs="Troll Kombat" aria-label="Play Troll Kombat"></a>
-                <img class="game-select-art game-select-art-left" src="assets/games/troll-kombat/fighters/doge.png" alt="" aria-hidden="true">
-                <img class="game-select-art game-select-art-right" src="assets/games/troll-kombat/fighters/pepe.png" alt="" aria-hidden="true">
-                <span class="game-select-number">002 · Live</span>
-                <h3>Troll Kombat</h3>
-                <p>Pixel or Toy mode. Meme champions. Moving arenas. Problem?</p>
-                <span class="game-select-boot">▶ Enter Arena</span>
-              </article>
-              <article class="game-select-card game-select-card-terra" data-feature="game_trollrreria">
-                <a id="boot-trollrreria" class="game-select-hit" href="trollrreria.html" data-fs="Trollrreria" aria-label="Play Trollrreria"></a>
-                <img class="game-select-art" src="assets/games/troll-kombat/fighters/gladiator/portrait.png" alt="" aria-hidden="true">
-                <span class="game-select-number">003 · Live</span>
-                <h3>Trollrreria</h3>
-                <p>2D sandbox survival. Dig, build, craft — then wake the Troll King. Problem?</p>
-                <span class="game-select-boot">▶ Start Digging</span>
-              </article>
-              <article class="game-select-card game-select-card-casino" data-feature="game_troll_casino">
-                <a id="boot-troll-casino" class="game-select-hit" href="troll-casino.html?boot=1" data-fs="Troll Casino" aria-label="Play Troll Casino"></a>
-                <img class="game-select-art" src="assets/animations/troll-grin.gif" alt="" aria-hidden="true">
-                <span class="game-select-number">004 · Live</span>
-                <h3>Troll Casino</h3>
-                <p>Neon crypto casino. Spin the Troll Wheel with $TROLL or USDC. The house always trolls.</p>
-                <span class="game-select-boot">▶ Enter Casino</span>
-              </article>
-              <article class="game-select-card is-locked">
-                <img class="game-select-art" src="assets/animations/troll-wizardfigure.png" alt="" aria-hidden="true">
-                <span class="game-select-number">005 · Soon</span>
-                <h3>Troll Wizard</h3>
-                <p>Cast green candles. Hex the FUD. Coming soon.</p>
-                <span class="game-select-boot">Locked</span>
-              </article>
+          </div>
+          <div class="hub-card-body">
+            <h3>Trollrreria</h3>
+            <p class="hub-card-meta">🤝 Co-op</p>
+            <a class="hub-card-play" href="trollrreria.html" data-fs="Trollrreria">Play Now ▶</a>
+          </div>
+        </article>
+
+        <article class="hub-card" data-accent="red" data-category="casino" data-title="troll casino" data-feature="game_troll_casino">
+          <div class="hub-card-art">
+            <span class="hub-card-tag">Casino</span>
+            <div class="hub-card-art-placeholder">
+              <span class="icon">🖼️</span>
+              <strong>Placeholder background</strong>
+              <span>1920 x 1080px</span>
+              <span>(Replace this image)</span>
+            </div>
+          </div>
+          <div class="hub-card-body">
+            <h3>Troll Casino</h3>
+            <p class="hub-card-meta">👤 1-Player</p>
+            <a class="hub-card-play" href="troll-casino.html?boot=1" data-fs="Troll Casino">Play Now ▶</a>
+          </div>
+        </article>
+
+        <article class="hub-card is-locked" data-accent="purple" data-category="adventure" data-title="troll wizard">
+          <div class="hub-card-art">
+            <span class="hub-card-tag">Adventure</span>
+            <div class="hub-card-art-placeholder">
+              <span class="icon">🖼️</span>
+              <strong>Placeholder background</strong>
+              <span>1920 x 1080px</span>
+              <span>(Replace this image)</span>
+            </div>
+          </div>
+          <div class="hub-card-body">
+            <h3>Troll Wizard</h3>
+            <p class="hub-card-meta">👤 1-Player · Soon</p>
+            <span class="hub-card-play">Locked</span>
+          </div>
+        </article>
+      </div>
+
+      <div class="hub-footer">
+        <div class="hub-stats">
+          <div class="hub-stat">
+            <span class="hub-stat-icon">🎮</span>
+            <div>
+              <p class="hub-stat-label">Games played</p>
+              <p class="hub-stat-value">--</p>
+            </div>
+          </div>
+          <div class="hub-stat">
+            <span class="hub-stat-icon">👑</span>
+            <div>
+              <p class="hub-stat-label">High score</p>
+              <p class="hub-stat-value">--</p>
+            </div>
+          </div>
+          <div class="hub-stat">
+            <span class="hub-stat-icon">⭐</span>
+            <div>
+              <p class="hub-stat-label">Achievements</p>
+              <p class="hub-stat-value">-- / --</p>
+            </div>
+          </div>
+          <div class="hub-stat">
+            <span class="hub-stat-icon">🏆</span>
+            <div>
+              <p class="hub-stat-label">Rank</p>
+              <p class="hub-stat-value">--</p>
             </div>
           </div>
         </div>
+        <div class="hub-tip">💡 Hover a game card to see more details and stats for that game.</div>
       </div>
-    </div>
-  </section>
+    </main>
+  </div>
 
-  <script src="assets/games/troll-dash/arcade-intro.js?v=hub-v2-20260627" defer></script>
+  <script src="assets/games/hub/arcade-hub.js?v=hub-v3-20260715" defer></script>
   <script src="assets/js/fs-launcher.js?v=fsl-v1" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.3" integrity="sha384-uVefCux0Kf6w34gQVv8+jUPUwvwFUdnrcwI1kOJHs7sfPPXdDDucwcrPrppD6oUe" crossorigin="anonymous"></script>
   <script src="assets/js/site-lock.js"></script>
