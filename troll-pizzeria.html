@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://mayurski-art.github.io https://trollrunner.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://tjsyhfplxjtakdfkpdtg.supabase.co wss://tjsyhfplxjtakdfkpdtg.supabase.co https://solana-rpc.publicnode.com https://api.devnet.solana.com https://lite-api.jup.ag; object-src 'none'; base-uri 'self'; frame-ancestors 'self';">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#1a0f08">
+  <meta name="description" content="Papa Troll's Pizzeria: a nostalgic order-build-bake-cut cooking game in the Troll Runner Arcade. Serve the memes. Mind the pineapple.">
+  <title>Papa Troll's Pizzeria | Troll Runner Arcade</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%231a0f08'/%3E%3Ctext x='8' y='44' font-size='34'%3E%F0%9F%8D%95%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=DM+Sans:wght@500;700;900&family=DM+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/troll-leaderboard.css?v=lb-engine-v1">
+  <link rel="stylesheet" href="assets/games/troll-pizzeria/style.css?v=pizzeria-v1">
+</head>
+<body>
+
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Troll Runner Arcade home">
+      <span class="brand-mark">$TROLL</span>
+      <span class="brand-copy">
+        <span>Troll Runner</span>
+        <small>Pizzeria</small>
+      </span>
+    </a>
+    <nav class="site-nav" aria-label="Primary">
+      <a href="/">Arcade</a>
+      <a href="troll-kombat.html">Troll Kombat</a>
+      <a href="troll-casino.html">Casino</a>
+      <a href="https://trollrunner.net">Main Site</a>
+    </nav>
+  </header>
+
+  <main class="arcade-shell">
+
+    <!-- ================= GAME CABINET ================= -->
+    <section class="pizzeria-cabinet" id="pizzeria-cabinet" aria-label="Papa Troll's Pizzeria">
+
+      <!-- Title screen (game.js hides it once a shift starts) -->
+      <div class="pz-title" id="pz-title">
+        <div class="pz-title-inner">
+          <p class="pz-title-eyebrow">Troll Runner Arcade presents</p>
+          <h1 class="pz-logo">Papa Troll's<br><span>Pizzeria</span></h1>
+          <div class="pz-title-chef" id="pz-title-chef" aria-hidden="true"></div>
+          <p class="pz-title-tag">Take orders. Build pies. Bake. Cut. Problem?</p>
+          <div class="pz-title-actions">
+            <button type="button" class="pz-btn pz-btn-primary" id="pz-start-btn">Start shift</button>
+            <button type="button" class="pz-btn pz-btn-ghost" id="pz-howto-btn">How to play</button>
+          </div>
+          <p class="pz-title-stats" id="pz-title-stats" hidden></p>
+        </div>
+      </div>
+
+      <!-- How to play overlay -->
+      <div class="pz-overlay" id="pz-howto" hidden>
+        <div class="pz-overlay-card">
+          <h2>How to play</h2>
+          <ol class="pz-howto-list">
+            <li><strong>Order</strong> — greet the customer at the counter and take their ticket. Everyone waiting loses patience, so keep the line moving.</li>
+            <li><strong>Build</strong> — tap the sauce and cheese buttons to hit the right amount, then drag toppings from the bins. Watch for half-and-half orders.</li>
+            <li><strong>Bake</strong> — slide the pie into an oven slot. Pull it at the doneness the ticket asks for. Ovens keep cooking while you work elsewhere.</li>
+            <li><strong>Cut</strong> — the cutter sweeps around the pie. Click to cut when it lines up with the guides. Right slices, clean angles.</li>
+            <li><strong>Serve</strong> — three meters, one tip. Best day score goes on the weekly ladder.</li>
+          </ol>
+          <button type="button" class="pz-btn pz-btn-primary" id="pz-howto-close">Got it</button>
+        </div>
+      </div>
+
+      <!-- ================= SHIFT UI ================= -->
+      <div class="pz-game" id="pz-game" hidden>
+
+        <!-- top HUD -->
+        <div class="pz-hud">
+          <span class="pz-hud-chip" id="pz-hud-day">Day 1</span>
+          <span class="pz-hud-chip pz-hud-coins" id="pz-hud-coins" title="Tips earned today">🪙 0</span>
+          <span class="pz-hud-chip" id="pz-hud-score" title="Day score">⭐ 0</span>
+          <div class="pz-ticket-rack" id="pz-ticket-rack" aria-label="Open tickets"></div>
+          <button type="button" class="pz-icon-btn" id="pz-sound-toggle" aria-pressed="true" title="Toggle sound" aria-label="Toggle sound">
+            <span class="when-on">🔊</span><span class="when-off">🔇</span>
+          </button>
+        </div>
+
+        <!-- station viewport: game.js toggles .is-active on stations -->
+        <div class="pz-stage">
+
+          <!-- 1 · LOBBY / ORDER -->
+          <section class="pz-station pz-lobby is-active" id="st-order" aria-label="Order station">
+            <div class="pz-lobby-scene" id="pz-lobby-scene">
+              <div class="pz-lobby-queue" id="pz-lobby-queue"></div>
+              <div class="pz-counter" aria-hidden="true"></div>
+              <div class="pz-waiting-row" id="pz-waiting-row" aria-label="Customers waiting for their order"></div>
+            </div>
+            <div class="pz-station-controls" id="pz-order-controls">
+              <p class="pz-hint" id="pz-lobby-hint">Waiting for customers…</p>
+              <button type="button" class="pz-btn pz-btn-primary" id="pz-take-order" hidden>📋 Take order</button>
+            </div>
+          </section>
+
+          <!-- 2 · BUILD -->
+          <section class="pz-station pz-build" id="st-build" aria-label="Build station">
+            <div class="pz-build-layout">
+              <aside class="pz-build-ticket" id="pz-build-ticket"></aside>
+              <div class="pz-build-table">
+                <div class="pz-pizza-wrap" id="pz-build-pizza"></div>
+                <div class="pz-amount-btns">
+                  <button type="button" class="pz-btn pz-btn-small" id="pz-sauce-btn">🥫 Sauce: <strong>none</strong></button>
+                  <button type="button" class="pz-btn pz-btn-small" id="pz-cheese-btn">🧀 Cheese: <strong>none</strong></button>
+                  <button type="button" class="pz-btn pz-btn-small pz-btn-danger" id="pz-clear-btn" title="Scrape the pie clean">🗑 Start over</button>
+                </div>
+                <button type="button" class="pz-btn pz-btn-primary pz-to-oven" id="pz-to-oven">To the oven →</button>
+              </div>
+              <div class="pz-bins" id="pz-bins" aria-label="Topping bins"></div>
+            </div>
+            <p class="pz-hint" id="pz-build-hint"></p>
+          </section>
+
+          <!-- 3 · BAKE -->
+          <section class="pz-station pz-bake" id="st-bake" aria-label="Bake station">
+            <div class="pz-oven" id="pz-oven">
+              <div class="pz-oven-art" id="pz-oven-art" aria-hidden="true"></div>
+              <div class="pz-oven-slots" id="pz-oven-slots"></div>
+            </div>
+            <div class="pz-shelf" id="pz-built-shelf" aria-label="Built pizzas waiting to bake">
+              <p class="pz-shelf-label">Ready to bake</p>
+              <div class="pz-shelf-row" id="pz-built-row"></div>
+            </div>
+            <p class="pz-hint" id="pz-bake-hint">Click a raw pie, then an empty slot. Click a baking pie to pull it out.</p>
+          </section>
+
+          <!-- 4 · CUT -->
+          <section class="pz-station pz-cut" id="st-cut" aria-label="Cut station">
+            <div class="pz-cut-layout">
+              <div class="pz-shelf pz-cut-shelf" id="pz-cut-shelf" aria-label="Baked pizzas waiting to be cut">
+                <p class="pz-shelf-label">Out of the oven</p>
+                <div class="pz-shelf-row" id="pz-cutshelf-row"></div>
+              </div>
+              <div class="pz-cut-table">
+                <div class="pz-pizza-wrap pz-cut-pizza" id="pz-cut-pizza"></div>
+                <div class="pz-cut-controls">
+                  <p class="pz-hint" id="pz-cut-hint">Pick a baked pie from the shelf.</p>
+                  <button type="button" class="pz-btn pz-btn-primary" id="pz-cut-btn" hidden>🔪 Cut!</button>
+                  <button type="button" class="pz-btn pz-btn-primary" id="pz-serve-btn" hidden>🛎 Serve</button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- station tabs -->
+        <nav class="pz-tabs" aria-label="Stations">
+          <button type="button" class="pz-tab is-active" data-station="order" aria-label="Order station (key 1)">
+            <span class="pz-tab-icon">🛎</span> Order <span class="pz-tab-badge" hidden></span>
+          </button>
+          <button type="button" class="pz-tab" data-station="build" aria-label="Build station (key 2)">
+            <span class="pz-tab-icon">🍅</span> Build <span class="pz-tab-badge" hidden></span>
+          </button>
+          <button type="button" class="pz-tab" data-station="bake" aria-label="Bake station (key 3)">
+            <span class="pz-tab-icon">🔥</span> Bake <span class="pz-tab-badge" hidden></span>
+          </button>
+          <button type="button" class="pz-tab" data-station="cut" aria-label="Cut station (key 4)">
+            <span class="pz-tab-icon">🔪</span> Cut <span class="pz-tab-badge" hidden></span>
+          </button>
+        </nav>
+      </div>
+
+      <!-- Serve / score overlay (game.js fills) -->
+      <div class="pz-overlay" id="pz-serve-overlay" hidden></div>
+
+      <!-- End of day overlay (game.js fills) -->
+      <div class="pz-overlay" id="pz-day-overlay" hidden></div>
+    </section>
+
+    <!-- Weekly leaderboard (shared engine, mock rivals — same as every game) -->
+    <section class="arcade-rack leaderboard-rack" aria-labelledby="lb-title">
+      <div class="section-heading">
+        <p class="eyebrow">Weekly ladder</p>
+        <h2 id="lb-title">Head Chefs</h2>
+      </div>
+      <div id="lb-root" class="lb-root">
+        <p class="lb-foot">Loading leaderboard…</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Leaderboard engine + game -->
+  <script src="assets/js/troll-leaderboard.js?v=lb-engine-v1" defer></script>
+  <script src="assets/games/troll-pizzeria/leaderboard.js?v=pizzeria-lb-v1" defer></script>
+  <script src="assets/games/troll-pizzeria/game.js?v=pizzeria-v1" defer></script>
+
+  <!-- Accounts (XP), site lock, cross-site notifications — arcade standard -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.3" integrity="sha384-uVefCux0Kf6w34gQVv8+jUPUwvwFUdnrcwI1kOJHs7sfPPXdDDucwcrPrppD6oUe" crossorigin="anonymous"></script>
+  <script src="https://mayurski-art.github.io/assets/js/troll-accounts.js"></script>
+  <script src="assets/js/site-lock.js"></script>
+  <script src="https://mayurski-art.github.io/assets/js/troll-notis.js"></script>
+  <script src="https://mayurski-art.github.io/assets/js/coming-soon.js"></script>
+</body>
+</html>
