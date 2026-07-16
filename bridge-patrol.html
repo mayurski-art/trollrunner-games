@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'self';">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0c130e">
+  <meta name="description" content="Bridge Patrol — you are the bridge troll. Place troll towers, stop the normies, make them pay the toll.">
+  <title>Bridge Patrol | Troll Runner Arcade</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230c130e'/%3E%3Ctext x='6' y='44' font-size='30' font-family='monospace'%3E%F0%9F%A7%8C%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,500;0,700;0,900;1,900&family=DM+Mono:wght@500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/games/bridge-patrol/styles.css?v=bp1">
+</head>
+<body>
+  <div id="bp-root">
+    <header id="bp-hud" hidden>
+      <div class="hud-left">
+        <span class="hud-stat" id="hud-coins" aria-label="Toll coins">🪙 0</span>
+        <span class="hud-stat hud-chest" aria-label="Toll chest">
+          💰 <span class="chest-meter" role="img" aria-label="Chest health"><span id="chest-fill"></span></span>
+          <span id="chest-num">100</span>
+        </span>
+      </div>
+      <div class="hud-mid">
+        <span class="hud-stat" id="hud-wave">Wave 1</span>
+        <span class="hud-stat hud-dim" id="hud-left">—</span>
+      </div>
+      <div class="hud-right">
+        <button id="btn-wave" type="button">Start Wave 1 ▶</button>
+        <button id="btn-speed" type="button" aria-label="Toggle game speed" aria-pressed="false">1×</button>
+        <button id="btn-pause" type="button" aria-label="Pause game" aria-pressed="false">⏸</button>
+      </div>
+    </header>
+
+    <div id="bp-stage">
+      <canvas id="bp-canvas" width="960" height="560" aria-label="Bridge Patrol battlefield"></canvas>
+
+      <!-- Build menu: shown when an empty plot is tapped -->
+      <div id="build-menu" class="bp-pop" hidden role="menu" aria-label="Build tower"></div>
+
+      <!-- Tower panel: shown when a placed tower is tapped -->
+      <div id="tower-panel" class="bp-pop" hidden role="menu" aria-label="Tower options"></div>
+    </div>
+
+    <!-- Title screen -->
+    <div id="screen-title" class="bp-screen">
+      <div class="bp-card">
+        <div class="bp-logo">🧌</div>
+        <h1>Bridge Patrol</h1>
+        <p class="bp-tag">Pay the toll. Or else.</p>
+        <p class="bp-how">Normies are trying to cross your bridge without paying.
+          Tap a stump to build a troll tower. Every kill drops toll coins.
+          Anyone who reaches the bridge raids your chest — empty chest, run over.</p>
+        <button id="btn-start" type="button" class="bp-cta">Start Patrol ▶</button>
+        <p class="bp-best" id="title-best" hidden></p>
+      </div>
+    </div>
+
+    <!-- Game over / continue -->
+    <div id="screen-over" class="bp-screen" hidden>
+      <div class="bp-card">
+        <div class="bp-logo">💀</div>
+        <h1 id="over-title">Chest looted!</h1>
+        <p class="bp-how" id="over-stats"></p>
+        <button id="btn-continue" type="button" class="bp-cta">Use free continue 🧌</button>
+        <button id="btn-retry" type="button" class="bp-cta bp-cta-ghost">Restart run ↺</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/games/bridge-patrol/game.js?v=bp1" defer></script>
+</body>
+</html>
