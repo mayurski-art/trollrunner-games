@@ -61,7 +61,7 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
   await page.waitForSelector('#build-menu:not([hidden])');
   await page.screenshot({ path: path.join(OUT, 'shot-2-build-menu.png') });
   const btns = await page.$$('#build-menu button');
-  log(btns.length === 3, 'build menu opens on stump with 3 tower options');
+  log(btns.length === 5, 'build menu opens on stump with 5 tower options');
   await btns[0].click();
   let st = await page.evaluate(() => ({ towers: window.__bp.G.towers.length, coins: window.__bp.G.coins }));
   log(st.towers === 1 && st.coins === 70, `club troll placed, coins 120->${st.coins}`);
@@ -85,6 +85,13 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
   await page.keyboard.press('Escape');
   const popsClosed = await page.$eval('#build-menu', (el) => el.hidden);
   log(popsClosed, 'PROBE: Escape closes the build menu');
+
+  // Guard post on the path offers only the Bridge Guard
+  await clickCanvas(80, 120); // guard spot (2,3)
+  await page.waitForSelector('#build-menu:not([hidden])');
+  const guardBtns = await page.$$eval('#build-menu button', (bs) => bs.length);
+  log(guardBtns === 1, 'guard post menu offers only Bridge Guard');
+  await page.keyboard.press('Escape');
 
   // Run wave 1 at 2x
   await page.click('#btn-wave');
@@ -152,6 +159,37 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
   await page.click('#btn-retry');
   st = await page.evaluate(() => ({ state: window.__bp.G.state, coins: window.__bp.G.coins, towers: window.__bp.G.towers.length, wave: window.__bp.G.wave }));
   log(st.coins === 120 && st.towers === 0 && st.wave === 0, 'retry resets the run (120 coins, 0 towers, wave 0)');
+
+  // ---- Phase 2 autopilot: strong layout, waves 1-12 at 8x sim speed ----
+  await page.evaluate(() => {
+    const bp = window.__bp;
+    [['cannon', 1, 2], ['cannon', 7, 2], ['cannon', 12, 2], ['cannon', 14, 2],
+     ['spit', 0, 2], ['spit', 9, 2], ['spit', 11, 2],
+     ['cold', 2, 1], ['cold', 10, 1], ['club', 6, 2], ['booth', 3, 2]]
+      .forEach(([ty, pl, ti]) => bp.debugPlace(ty, pl, ti));
+    bp.debugGuard(4, 2);
+  });
+  const towers = await page.evaluate(() => window.__bp.G.towers.length);
+  log(towers === 12, `autopilot layout placed (${towers} towers incl. bridge guard)`);
+  let died = false;
+  for (let w = 1; w <= 12 && !died; w++) {
+    await page.evaluate(() => { window.__bp.startWave(); window.__bp.G.speed = 8; });
+    if (w === 10) {
+      await new Promise((r) => setTimeout(r, 2500));
+      await page.screenshot({ path: path.join(OUT, 'shot-7-boss.png') });
+    }
+    await page.waitForFunction("['idle','over'].includes(window.__bp.G.state)", { timeout: 90000, polling: 250 });
+    if ((await page.evaluate(() => window.__bp.G.state)) === 'over') died = true;
+  }
+  const fin = await page.evaluate(() => ({
+    wave: window.__bp.G.wave, chest: window.__bp.G.chest, tolls: window.__bp.G.tolls,
+    bosses: window.__bp.G.bossesSlain, stuns: window.__bp.G.stunCount, log: window.__bp.G.spawnLog,
+  }));
+  log(!died && fin.wave === 12, `autopilot survived to wave 12 (chest ${fin.chest}/100, tolls ${fin.tolls})`);
+  log(fin.log.karen > 0 && fin.log.wojak >= 8 && fin.log.bro > 0, `new enemies spawned: ${JSON.stringify(fin.log)}`);
+  log(fin.bosses >= 1, `wave-10 boss slain (bossesSlain=${fin.bosses})`);
+  log(fin.stuns > 0, `karen/manager stuns landed: ${fin.stuns}`);
+  await page.screenshot({ path: path.join(OUT, 'shot-8-endless.png') });
 
   // PROBE: best-run persisted to localStorage
   const best = await page.evaluate(() => localStorage.getItem('bp_best_v1'));

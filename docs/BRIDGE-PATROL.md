@@ -1,8 +1,11 @@
-# Bridge Patrol — Tower Defense (game 005)
+# Bridge Patrol — Tower Defense (game 006)
 
-**Status: APPROVED 2026-07-16.** Decisions locked: top-down perspective,
-single endless mode, name "Bridge Patrol" (the toll-paying theme stays —
-Toll Coins, toll chest, Toll Booth tower).
+**Status: phases 1–2 COMPLETE on branch bridge-patrol-phase1 (2026-07-16).**
+Decisions locked: top-down perspective, single endless mode, name
+"Bridge Patrol" (the toll-paying theme stays — Toll Coins, toll chest,
+Toll Booth tower). Game number moved 005 → 006 after Papa Troll's
+Pizzeria shipped as 005. Verified by tools/bridge-patrol-smoke.js
+(27 checks incl. a 12-wave autopilot campaign).
 
 ## Pitch
 You are the bridge troll. Waves of normies march toward your bridge trying to

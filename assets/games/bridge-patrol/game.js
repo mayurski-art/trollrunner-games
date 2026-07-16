@@ -53,32 +53,80 @@
         { slow: 0.55, range: 2.8, cost: 75 },
       ],
     },
+    cannon: {
+      name: 'Meme Cannon', badge: '💣', hue: '#af52de', cost: 110,
+      desc: 'Lobs giant troll heads, splash damage',
+      tiers: [
+        { dmg: 18, range: 2.8, rate: 2.2, splash: 1.2, cost: 0 },
+        { dmg: 30, range: 3.2, rate: 2.0, splash: 1.35, cost: 90 },
+        { dmg: 50, range: 3.6, rate: 1.8, splash: 1.5, cost: 140 },
+      ],
+    },
+    booth: {
+      name: 'Toll Booth', badge: '🎟️', hue: '#ffd60a', cost: 70,
+      desc: 'No damage — passing normies pay up',
+      tiers: [
+        { toll: 3, range: 1.6, cost: 0 },
+        { toll: 5, range: 1.8, cost: 55 },
+        { toll: 8, range: 2.0, cost: 85 },
+      ],
+    },
+    guard: {
+      name: 'Bridge Guard', badge: '🛡️', hue: '#8e8e93', cost: 65,
+      desc: 'Stands ON the path and holds the line',
+      tiers: [
+        { hp: 150, dmg: 4, cost: 0 },
+        { hp: 280, dmg: 8, cost: 50 },
+        { hp: 450, dmg: 14, cost: 80 },
+      ],
+    },
   };
+  const MENU_TOWERS = ['club', 'spit', 'cold', 'cannon', 'booth'];  // plot menu; guard is spot-only
 
   const ENEMIES = {
-    normie: { name: 'Normie', emoji: '🚶', hp: 20, speed: 1.1, bounty: 4, steal: 5, r: 11, hue: '#8e8e93' },
-    jogger: { name: 'Jogger', emoji: '🏃', hp: 14, speed: 2.0, bounty: 5, steal: 4, r: 10, hue: '#ffd60a' },
-    chad:   { name: 'Chad',   emoji: '💪', hp: 95, speed: 0.65, bounty: 14, steal: 12, r: 14, hue: '#ff453a' },
+    normie: { name: 'Normie', emoji: '🚶', hp: 20, speed: 1.1, bounty: 4, steal: 5, r: 11, hue: '#8e8e93', dps: 6 },
+    jogger: { name: 'Jogger', emoji: '🏃', hp: 14, speed: 2.0, bounty: 5, steal: 4, r: 10, hue: '#ffd60a', dps: 5 },
+    chad:   { name: 'Chad',   emoji: '💪', hp: 95, speed: 0.65, bounty: 14, steal: 12, r: 14, hue: '#ff453a', dps: 20 },
+    karen:  { name: 'Karen',  emoji: '💁‍♀️', hp: 40, speed: 0.9, bounty: 10, steal: 8, r: 12, hue: '#ff9500', dps: 6, stuns: true },
+    wojak:  { name: 'Wojak',  emoji: '😐', hp: 8, speed: 1.3, bounty: 2, steal: 2, r: 8, hue: '#c7c7cc', dps: 3 },
+    bro:    { name: 'Crypto Bro', emoji: '🤑', hp: 30, speed: 1.0, bounty: 20, steal: 8, r: 11, hue: '#30d158', dps: 8, sprints: true },
+    manager:  { name: 'The Manager', emoji: '👔', hp: 550, speed: 0.5, bounty: 100, steal: 25, r: 17, hue: '#5e5ce6', dps: 35, boss: true, aura: 2.2 },
+    gigachad: { name: 'Giga Chad', emoji: '🗿', hp: 1300, speed: 0.45, bounty: 150, steal: 30, r: 19, hue: '#a2845e', dps: 0, boss: true, smashes: true },
+    landlord: { name: 'The Landlord', emoji: '🎩', hp: 1000, speed: 0.55, bounty: 200, steal: 40, r: 18, hue: '#ffd60a', dps: 45, boss: true },
   };
 
   function buildWave(n) {
     const scale = Math.pow(1.13, n - 1);
     const spawns = [];
     let t = 0.5;
-    const count = 6 + Math.floor(n * 1.6);
+    const add = (type, gap) => { t += gap; spawns.push({ type, at: t, scale }); };
+    const boss = n % 10 === 0;
+    const count = boss ? 4 + Math.floor(n * 0.8) : 6 + Math.floor(n * 1.6);
     for (let i = 0; i < count; i++) {
       let type = 'normie';
-      if (n >= 5 && i % 5 === 4) type = 'chad';
+      if (n >= 7 && i % 6 === 3) type = 'karen';
+      else if (n >= 6 && i % 7 === 5) type = 'bro';
+      else if (n >= 5 && i % 5 === 4) type = 'chad';
       else if (n >= 3 && i % 3 === 2) type = 'jogger';
-      t += type === 'jogger' ? 0.55 : 0.95;
-      spawns.push({ type, at: t, scale });
+      add(type, type === 'jogger' ? 0.55 : 0.95);
+    }
+    // Wojak hordes: packs of 8 weaklings shuffling in shoulder to shoulder.
+    if (n >= 9) {
+      const packs = n >= 15 ? 2 : 1;
+      for (let p = 0; p < packs; p++) {
+        t += 1.6;
+        for (let j = 0; j < 8; j++) add('wojak', 0.22);
+      }
     }
     // Late waves: a chad squad marches in at the end.
-    if (n >= 8) {
-      for (let j = 0; j < Math.floor((n - 6) / 2); j++) {
-        t += 1.4;
-        spawns.push({ type: 'chad', at: t, scale });
-      }
+    if (n >= 8 && !boss) {
+      for (let j = 0; j < Math.floor((n - 6) / 2); j++) add('chad', 1.4);
+    }
+    // Every 10th wave a boss brings up the rear.
+    if (boss) {
+      t += 2.5;
+      const type = n === 10 ? 'manager' : n === 20 ? 'gigachad' : 'landlord';
+      spawns.push({ type, at: t, scale });
     }
     return spawns;
   }
@@ -113,6 +161,19 @@
     if (cx >= 0 && cx < COLS) pathTiles.add(cx + ',' + cy);
   }
 
+  // Guard spots: reinforced grates ON the path where a Bridge Guard can
+  // stand. d = distance along the path, precomputed by scanning.
+  const GUARD_SPOTS = [[2, 3], [6, 9], [12, 3], [17, 10], [19, 7]].map(([gx, gy]) => {
+    const pos = { x: gx * TILE, y: gy * TILE };
+    let bestD = 0, bestDist = 1e9;
+    for (let d = 0; d <= PATH_LEN; d += 4) {
+      const p = pointAt(d);
+      const dist = Math.hypot(p.x - pos.x, p.y - pos.y);
+      if (dist < bestDist) { bestDist = dist; bestD = d; }
+    }
+    return { x: pos.x, y: pos.y, d: bestD };
+  });
+
   // ---------- State ----------
   const G = {};
   function resetRun() {
@@ -130,9 +191,14 @@
     G.fx = [];
     G.spawnQueue = [];
     G.waveT = 0;
+    G.simT = 0;                  // running sim clock (stun timers)
     G.continueLeft = 1;
-    G.selected = null;           // { kind:'plot'|'tower', idx }
+    G.selected = null;           // { kind:'plot'|'tower'|'spot', idx }
     G.chestShake = 0;
+    G.towerSeq = 0;
+    G.bossesSlain = 0;
+    G.stunCount = 0;             // Karen/Manager stuns landed (debug + stats)
+    G.spawnLog = {};             // type -> count spawned this run (balancing)
   }
 
   // ---------- DOM ----------
@@ -214,13 +280,25 @@
       g.strokeStyle = 'rgba(0,0,0,0.35)';
       g.beginPath(); g.arc(cx, cy, 6, 0, 7); g.stroke();
     }
+    // Guard posts — reinforced grates set into the path.
+    for (const s of GUARD_SPOTS) {
+      g.fillStyle = 'rgba(40, 32, 22, 0.9)';
+      g.fillRect(s.x - 14, s.y - 14, 28, 28);
+      g.strokeStyle = '#a08054';
+      g.strokeRect(s.x - 14, s.y - 14, 28, 28);
+      g.fillStyle = '#6f5a38';
+      for (let i = -1; i <= 1; i++) g.fillRect(s.x - 12, s.y + i * 8 - 2, 24, 4);
+    }
   }
   drawGround();
 
   // ---------- Helpers ----------
   const fmt = (n) => Math.floor(n).toLocaleString('en-US');
   function towerStat(t) { return TOWERS[t.type].tiers[t.tier]; }
-  function towerPos(t) { return { x: PLOTS[t.plot][0] * TILE, y: PLOTS[t.plot][1] * TILE }; }
+  function towerPos(t) {
+    if (t.spot !== undefined) return { x: GUARD_SPOTS[t.spot].x, y: GUARD_SPOTS[t.spot].y };
+    return { x: PLOTS[t.plot][0] * TILE, y: PLOTS[t.plot][1] * TILE };
+  }
   function invested(t) {
     const spec = TOWERS[t.type];
     let sum = spec.cost;
@@ -250,8 +328,23 @@
     syncHud();
   }
 
+  const isStunned = (t) => (t.stunnedUntil || 0) > G.simT;
+  function stun(t, secs) {
+    if (!isStunned(t)) G.stunCount += 1;
+    t.stunnedUntil = Math.max(t.stunnedUntil || 0, G.simT + secs);
+  }
+  function killGuard(t, str) {
+    const i = G.towers.indexOf(t);
+    if (i === -1) return;
+    G.towers.splice(i, 1);
+    const gp = towerPos(t);
+    addFx({ kind: 'text', str, x: gp.x, y: gp.y - 16, life: 1.2, color: '#ff453a' });
+    if (G.selected && G.selected.kind === 'tower') closePops();
+  }
+
   function update(dt) {
     if (G.state !== 'wave' && G.state !== 'idle') return;
+    G.simT += dt;
     G.chestShake = Math.max(0, G.chestShake - dt * 3);
 
     // Spawning
@@ -260,25 +353,90 @@
       while (G.spawnQueue.length && G.spawnQueue[0].at <= G.waveT) {
         const s = G.spawnQueue.shift();
         const spec = ENEMIES[s.type];
+        G.spawnLog[s.type] = (G.spawnLog[s.type] || 0) + 1;
         G.enemies.push({
           type: s.type, d: 0,
           hp: spec.hp * s.scale, hpMax: spec.hp * s.scale,
           wobble: Math.random() * 7,
+          paid: {},              // booth ids already tolled
+          abT: 2,                // Karen: seconds until next manager call
+          sprintT: Math.random() * 2.4,
         });
+        if (spec.boss) {
+          addFx({ kind: 'text', str: '⚠️ ' + spec.name + ' incoming!', x: W / 2, y: H / 2 - 60, life: 2, color: '#ff453a', big: true });
+        }
       }
     }
 
-    // Enemy movement (cold towers recompute slow every frame)
-    const colds = G.towers.filter((t) => t.type === 'cold');
+    // Enemy movement + abilities (cold slow, guard blocks, karen stuns,
+    // manager aura, bro sprints, booth tolls — all recomputed per frame)
+    const colds = G.towers.filter((t) => t.type === 'cold' && !isStunned(t));
+    const booths = G.towers.filter((t) => t.type === 'booth' && !isStunned(t));
+    const guards = G.towers.filter((t) => t.type === 'guard');
     for (const e of G.enemies) {
       const spec = ENEMIES[e.type];
-      let slow = 0;
       const p = pointAt(e.d);
+      let slow = 0;
       for (const t of colds) {
         const st = towerStat(t), tp = towerPos(t);
         if (Math.hypot(p.x - tp.x, p.y - tp.y) <= st.range * TILE) slow = Math.max(slow, st.slow);
       }
-      e.d += spec.speed * (1 - slow) * TILE * dt;
+      // Toll booths shake down everyone walking past (once per booth).
+      for (const t of booths) {
+        const st = towerStat(t), tp = towerPos(t);
+        if (!e.paid[t.id] && Math.hypot(p.x - tp.x, p.y - tp.y) <= st.range * TILE) {
+          e.paid[t.id] = 1;
+          earn(st.toll, p.x, p.y - 18);
+        }
+      }
+      // Karen periodically calls the manager on the nearest tower.
+      if (spec.stuns) {
+        e.abT -= dt;
+        if (e.abT <= 0) {
+          e.abT = 6;
+          let best = null, bestDist = 4 * TILE;
+          for (const t of G.towers) {
+            const tp = towerPos(t);
+            const dist = Math.hypot(p.x - tp.x, p.y - tp.y);
+            if (dist < bestDist) { best = t; bestDist = dist; }
+          }
+          if (best) {
+            stun(best, 2.5);
+            addFx({ kind: 'text', str: '📢 MANAGER!!', x: p.x, y: p.y - 24, life: 1, color: '#ff9500' });
+          }
+        }
+      }
+      // The Manager's aura disables every tower he lumbers past.
+      if (spec.aura) {
+        for (const t of G.towers) {
+          const tp = towerPos(t);
+          if (Math.hypot(p.x - tp.x, p.y - tp.y) <= spec.aura * TILE) stun(t, 0.25);
+        }
+      }
+      // Crypto bros sprint in erratic bursts.
+      let mult = 1;
+      if (spec.sprints) {
+        e.sprintT += dt;
+        mult = (e.sprintT % 2.4) < 0.7 ? 2.4 : 0.8;
+      }
+      let move = spec.speed * (1 - slow) * mult * TILE * dt;
+      // Bridge Guards physically block the path (Giga Chad smashes through).
+      e.blocked = null;
+      for (const g of guards) {
+        const stopAt = g.spotD - 13;
+        if (e.d <= g.spotD && e.d + move >= stopAt) {
+          if (spec.smashes) {
+            killGuard(g, '🗿 SMASHED!');
+          } else {
+            move = Math.max(0, stopAt - e.d);
+            e.blocked = g;
+            g.hp -= spec.dps * dt;
+            if (g.hp <= 0) killGuard(g, '💥 Guard down!');
+          }
+          break;
+        }
+      }
+      e.d += move;
       e.slowed = slow > 0;
       e.wobble += dt * 10;
     }
@@ -297,10 +455,18 @@
 
     // Towers attack
     for (const t of G.towers) {
+      if (isStunned(t) || t.type === 'booth') continue;
       if (t.type === 'cold') { t.pulse = (t.pulse || 0) + dt; continue; }
+      const st = towerStat(t), tp = towerPos(t);
+      // Guards swing continuously at whoever is beating on them.
+      if (t.type === 'guard') {
+        for (const e of G.enemies.slice()) {
+          if (e.blocked === t) hit(e, st.dmg * dt);
+        }
+        continue;
+      }
       t.cd = (t.cd || 0) - dt;
       if (t.cd > 0) continue;
-      const st = towerStat(t), tp = towerPos(t);
       // Target the enemy furthest along the path within range.
       let best = null;
       for (const e of G.enemies) {
@@ -315,20 +481,28 @@
         const p = pointAt(best.d);
         addFx({ kind: 'text', str: '💥', x: p.x, y: p.y - 8, life: 0.35, color: '#fff' });
       } else {
-        G.shots.push({ x: tp.x, y: tp.y - 14, target: best, dmg: st.dmg });
+        G.shots.push({ x: tp.x, y: tp.y - 14, target: best, dmg: st.dmg, splash: st.splash || 0 });
       }
     }
 
-    // Spitball projectiles (homing)
+    // Projectiles (homing): spitballs hit one enemy, troll heads splash.
     for (let i = G.shots.length - 1; i >= 0; i--) {
       const s = G.shots[i];
       if (!G.enemies.includes(s.target)) { G.shots.splice(i, 1); continue; }
       const p = pointAt(s.target.d);
       const dx = p.x - s.x, dy = p.y - s.y;
       const dist = Math.hypot(dx, dy);
-      const step = 7.5 * TILE * dt;
+      const step = (s.splash ? 5.5 : 7.5) * TILE * dt;
       if (dist <= step) {
-        hit(s.target, s.dmg);
+        if (s.splash) {
+          addFx({ kind: 'text', str: '💥', x: p.x, y: p.y - 6, life: 0.4, color: '#fff', big: true });
+          for (const e of G.enemies.slice()) {
+            const ep = pointAt(e.d);
+            if (Math.hypot(ep.x - p.x, ep.y - p.y) <= s.splash * TILE) hit(e, s.dmg);
+          }
+        } else {
+          hit(s.target, s.dmg);
+        }
         G.shots.splice(i, 1);
       } else {
         s.x += (dx / dist) * step;
@@ -348,6 +522,7 @@
     // Wave cleared?
     if (G.state === 'wave' && !G.spawnQueue.length && !G.enemies.length) {
       G.wave += 1;
+      saveBest(G.wave, G.tolls);
       const bonus = waveBonus(G.wave);
       earn(bonus, CHEST.x, CHEST.y - 44);
       addFx({ kind: 'text', str: 'Wave ' + G.wave + ' cleared!', x: W / 2, y: H / 2 - 40, life: 1.4, color: '#34c759', big: true });
@@ -362,8 +537,13 @@
       const i = G.enemies.indexOf(e);
       if (i !== -1) {
         G.enemies.splice(i, 1);
+        const spec = ENEMIES[e.type];
         const p = pointAt(e.d);
-        earn(ENEMIES[e.type].bounty, p.x, p.y - 14);
+        earn(spec.bounty, p.x, p.y - 14);
+        if (spec.boss) {
+          G.bossesSlain += 1;
+          addFx({ kind: 'text', str: '👑 ' + spec.name + ' slain!', x: W / 2, y: H / 2 - 40, life: 2, color: '#ffd60a', big: true });
+        }
       }
     }
   }
@@ -434,28 +614,49 @@
     pop.style.top = top + 'px';
   }
 
+  function makeBuildButton(key, onBuild) {
+    const spec = TOWERS[key];
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.disabled = G.coins < spec.cost;
+    b.innerHTML = '<span>' + spec.badge + ' ' + spec.name + '<br><span class="pop-sub">' + spec.desc +
+      '</span></span><span class="cost">🪙 ' + spec.cost + '</span>';
+    b.addEventListener('click', () => {
+      if (G.coins < spec.cost) return;
+      G.coins -= spec.cost;
+      onBuild(spec);
+      closePops();
+      syncHud();
+    });
+    return b;
+  }
+
   function openBuildMenu(plotIdx) {
     closePops();
     G.selected = { kind: 'plot', idx: plotIdx };
     const [px, py] = PLOTS[plotIdx];
     buildMenu.innerHTML = '<h3>Build tower</h3>';
-    for (const key of Object.keys(TOWERS)) {
-      const spec = TOWERS[key];
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.disabled = G.coins < spec.cost;
-      b.innerHTML = '<span>🧌 ' + spec.name + '<br><span class="pop-sub">' + spec.desc +
-        '</span></span><span class="cost">🪙 ' + spec.cost + '</span>';
-      b.addEventListener('click', () => {
-        if (G.coins < spec.cost) return;
-        G.coins -= spec.cost;
-        G.towers.push({ type: key, plot: plotIdx, tier: 0, cd: 0, bump: 0 });
-        closePops();
-        syncHud();
-      });
-      buildMenu.appendChild(b);
+    for (const key of MENU_TOWERS) {
+      buildMenu.appendChild(makeBuildButton(key, () => {
+        G.towers.push({ id: ++G.towerSeq, type: key, plot: plotIdx, tier: 0, cd: 0, bump: 0 });
+      }));
     }
     placePop(buildMenu, px * TILE, py * TILE);
+    buildMenu.querySelector('button:not(:disabled)')?.focus();
+  }
+
+  function openGuardMenu(spotIdx) {
+    closePops();
+    G.selected = { kind: 'spot', idx: spotIdx };
+    const spot = GUARD_SPOTS[spotIdx];
+    buildMenu.innerHTML = '<h3>Guard post</h3><span class="pop-sub">Blocks the path itself</span>';
+    buildMenu.appendChild(makeBuildButton('guard', (spec) => {
+      G.towers.push({
+        id: ++G.towerSeq, type: 'guard', spot: spotIdx, spotD: spot.d,
+        tier: 0, hp: spec.tiers[0].hp, cd: 0, bump: 0,
+      });
+    }));
+    placePop(buildMenu, spot.x, spot.y);
     buildMenu.querySelector('button:not(:disabled)')?.focus();
   }
 
@@ -466,8 +667,11 @@
     const spec = TOWERS[t.type];
     const tp = towerPos(t);
     const tierLabel = ['I', 'II', 'III'][t.tier];
-    towerPanel.innerHTML = '<h3>🧌 ' + spec.name + ' · Tier ' + tierLabel + '</h3>' +
-      '<span class="pop-sub">' + spec.desc + '</span>';
+    const hpLine = t.type === 'guard'
+      ? '<br>HP ' + Math.ceil(t.hp) + ' / ' + towerStat(t).hp
+      : '';
+    towerPanel.innerHTML = '<h3>' + spec.badge + ' ' + spec.name + ' · Tier ' + tierLabel + '</h3>' +
+      '<span class="pop-sub">' + spec.desc + hpLine + '</span>';
     if (t.tier < 2) {
       const next = spec.tiers[t.tier + 1];
       const up = document.createElement('button');
@@ -479,6 +683,10 @@
         if (G.coins < next.cost) return;
         G.coins -= next.cost;
         t.tier += 1;
+        // Guards heal by the tier's HP delta when reinforced.
+        if (t.type === 'guard') {
+          t.hp = Math.min(next.hp, t.hp + (next.hp - spec.tiers[t.tier - 1].hp));
+        }
         openTowerPanel(towerIdx);
         syncHud();
       });
@@ -511,10 +719,15 @@
       const tp = towerPos(G.towers[i]);
       if (Math.hypot(x - tp.x, y - tp.y) <= 20) { openTowerPanel(i); return; }
     }
-    // …then empty plots.
+    // …then empty plots…
     for (let i = 0; i < PLOTS.length; i++) {
       if (G.towers.some((t) => t.plot === i)) continue;
       if (Math.hypot(x - PLOTS[i][0] * TILE, y - PLOTS[i][1] * TILE) <= 22) { openBuildMenu(i); return; }
+    }
+    // …then empty guard posts on the path.
+    for (let i = 0; i < GUARD_SPOTS.length; i++) {
+      if (G.towers.some((t) => t.spot === i)) continue;
+      if (Math.hypot(x - GUARD_SPOTS[i].x, y - GUARD_SPOTS[i].y) <= 22) { openGuardMenu(i); return; }
     }
     closePops();
   });
@@ -578,6 +791,8 @@
         cx = tp.x; cy = tp.y; range = towerStat(t).range * TILE;
       } else if (G.selected.kind === 'plot') {
         cx = PLOTS[G.selected.idx][0] * TILE; cy = PLOTS[G.selected.idx][1] * TILE;
+      } else if (G.selected.kind === 'spot') {
+        cx = GUARD_SPOTS[G.selected.idx].x; cy = GUARD_SPOTS[G.selected.idx].y;
       }
       if (cx !== undefined) {
         if (range) {
@@ -619,6 +834,16 @@
       for (let i = 0; i < t.tier; i++) {
         ctx.beginPath(); ctx.arc(tp.x - 10 + i * 8, tp.y + 14, 2.5, 0, 7); ctx.fill();
       }
+      // Guard HP bar
+      if (t.type === 'guard') {
+        const maxHp = towerStat(t).hp, w = 28;
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(tp.x - w / 2, tp.y + 18, w, 4);
+        ctx.fillStyle = t.hp / maxHp > 0.35 ? '#34c759' : '#ff453a';
+        ctx.fillRect(tp.x - w / 2, tp.y + 18, w * Math.max(0, t.hp / maxHp), 4);
+      }
+      // Stunned by a Karen or the Manager
+      if (isStunned(t)) emoji('💤', tp.x - 12, tp.y - 20, 14);
     }
 
     // Enemies
@@ -633,20 +858,31 @@
         ctx.beginPath(); ctx.arc(p.x, p.y + bob, spec.r + 2, 0, 7); ctx.stroke();
       }
       emoji(spec.emoji, p.x, p.y + bob - 2, spec.r * 1.6);
-      // HP bar once damaged
-      if (e.hp < e.hpMax) {
-        const w = 24;
+      // HP bar once damaged (bosses always show one, wider, plus a name)
+      if (e.hp < e.hpMax || spec.boss) {
+        const w = spec.boss ? 42 : 24;
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
         ctx.fillRect(p.x - w / 2, p.y + bob - spec.r - 9, w, 4);
-        ctx.fillStyle = '#34c759';
+        ctx.fillStyle = spec.boss ? '#ffd60a' : '#34c759';
         ctx.fillRect(p.x - w / 2, p.y + bob - spec.r - 9, w * Math.max(0, e.hp / e.hpMax), 4);
+      }
+      if (spec.boss) {
+        ctx.fillStyle = '#fff';
+        ctx.font = '700 11px "DM Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(spec.name, p.x, p.y + bob - spec.r - 18);
       }
     }
 
-    // Spitballs
-    ctx.fillStyle = '#7be382';
+    // Projectiles: green spitballs, flying troll heads for the cannon
     for (const s of G.shots) {
-      ctx.beginPath(); ctx.arc(s.x, s.y, 5, 0, 7); ctx.fill();
+      if (s.splash) {
+        emoji('🧌', s.x, s.y, 18);
+      } else {
+        ctx.fillStyle = '#7be382';
+        ctx.beginPath(); ctx.arc(s.x, s.y, 5, 0, 7); ctx.fill();
+      }
     }
 
     // FX
@@ -679,7 +915,21 @@
 
   // ---------- Boot ----------
   // Debug handle for balancing + automated smoke tests.
-  window.__bp = { G, startWave, gameOver, buildWave };
+  function debugPlace(type, plotIdx, tier) {
+    const t = { id: ++G.towerSeq, type, plot: plotIdx, tier: tier || 0, cd: 0, bump: 0 };
+    G.towers.push(t);
+    return t;
+  }
+  function debugGuard(spotIdx, tier) {
+    const tr = tier || 0;
+    const t = {
+      id: ++G.towerSeq, type: 'guard', spot: spotIdx, spotD: GUARD_SPOTS[spotIdx].d,
+      tier: tr, hp: TOWERS.guard.tiers[tr].hp, cd: 0, bump: 0,
+    };
+    G.towers.push(t);
+    return t;
+  }
+  window.__bp = { G, startWave, gameOver, buildWave, debugPlace, debugGuard };
   resetRun();
   G.state = 'title';
   const best = loadBest();
