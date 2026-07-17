@@ -315,6 +315,9 @@ button:focus-visible, a:focus-visible {
 /* --- top bar: balances / currency / wallet / utilities --- */
 .game-topbar {
   grid-column: 1 / -1;
+  position: sticky;
+  top: 0;
+  z-index: 20;
   display: flex;
   flex-wrap: wrap;
   align-items: center;

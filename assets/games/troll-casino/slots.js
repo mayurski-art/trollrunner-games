@@ -374,7 +374,13 @@
   async function spin() {
     if (S.spinning) return;
     const cur = wallet().getCurrency();
-    if (!wallet().canAfford(S.bet)) { setLine("Not enough chips. Much empty."); stopAutoplay(); return; }
+    if (!wallet().canAfford(S.bet)) {
+      stopAutoplay();
+      setLine("Much empty wallet. Add funds first.");
+      showBanner("Add funds to spin", "Not enough chips", "#ffc94d", false);
+      window.TrollCasinoMoneyUI?.openDeposit();
+      return;
+    }
     if (!wallet().debit(S.bet, "Doge Reels spin")) return;
 
     S.spinning = true;
