@@ -40,3 +40,10 @@ serving the repo and driving the real page in headless Chrome.
   blur it explicitly or keyboard shortcuts get eaten by the button.
 - The `frame-ancestors` CSP console warning is expected — that directive
   is ignored in `<meta>` tags; the other games emit it too.
+- Any game page that includes the arcade-standard bottom scripts loads
+  `coming-soon.js`, a site-wide pre-launch gate that overlays the whole
+  page and swallows every click. Its unlock flag isn't a simple
+  localStorage toggle — it triggers a real Supabase admin-session
+  check and silently re-locks if that fails, so it can't be faked
+  offline. For headless testing, intercept requests and abort the
+  `coming-soon.js` request instead (see tools/bridge-patrol-smoke.js).

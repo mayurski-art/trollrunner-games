@@ -221,6 +221,17 @@ html, body {
   align-items: center;
 }
 
+.bp-screen-top { z-index: 30; }
+
+.bp-card-wide {
+  max-width: 620px;
+  max-height: 88dvh;
+  overflow-y: auto;
+  text-align: left;
+}
+
+.bp-card-wide h1 { font-size: 20px; text-align: center; }
+
 .bp-logo { font-size: 52px; line-height: 1; }
 
 .bp-card h1 {

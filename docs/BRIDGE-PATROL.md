@@ -1,11 +1,22 @@
 # Bridge Patrol — Tower Defense (game 006)
 
-**Status: phases 1–2 COMPLETE on branch bridge-patrol-phase1 (2026-07-16).**
+**Status: phases 1–4 COMPLETE on branch bridge-patrol-phase1 (2026-07-16/17).**
 Decisions locked: top-down perspective, single endless mode, name
 "Bridge Patrol" (the toll-paying theme stays — Toll Coins, toll chest,
 Toll Booth tower). Game number moved 005 → 006 after Papa Troll's
 Pizzeria shipped as 005. Verified by tools/bridge-patrol-smoke.js
 (27 checks incl. a 12-wave autopilot campaign).
+
+Real PixelLab art is wired in with graceful emoji/procedural fallback
+for anything not yet generated: all 6 towers (3 tiers each, states of
+the Trollface Runner v3 base), 8 of 9 enemies (Normie, Jogger, Chad,
+Karen, Wojak, Crypto Bro, The Manager, The Landlord — Giga Chad stays
+on emoji since its generated state came back in the wrong "side" view
+and wasn't worth a costly regenerate), a Wang-autotiled dirt/grass
+tileset for the ground, plus bridge/chest/stump props. Leaderboard,
+TrollNotis, hub card (Defense category), and fs-launcher are wired
+per the arcade-standard pattern. Remaining: phase 5 (balance pass,
+mobile touch verification, final polish).
 
 ## Pitch
 You are the bridge troll. Waves of normies march toward your bridge trying to

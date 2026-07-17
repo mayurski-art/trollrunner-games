@@ -223,7 +223,39 @@
     }
   }
 
-  // ---------- Ground pre-render (placeholder art) ----------
+  // ---------- Art (PixelLab renders; emoji/procedural fallback if unloaded) ----------
+  const ART_ROOT = 'assets/games/bridge-patrol/art/';
+  function loadArt(src) {
+    const o = { img: new Image(), ready: false };
+    o.img.onload = () => { o.ready = true; onArtLoaded(); };
+    o.img.src = ART_ROOT + src;
+    return o;
+  }
+  const TOWER_ART = {
+    club: loadArt('towers/club.png'), spit: loadArt('towers/spit.png'),
+    cold: loadArt('towers/cold.png'), cannon: loadArt('towers/cannon.png'),
+    booth: loadArt('towers/booth.png'), guard: loadArt('towers/guard.png'),
+  };
+  const ENEMY_ART = {
+    normie: loadArt('enemies/normie.png'), jogger: loadArt('enemies/jogger.png'),
+    karen: loadArt('enemies/karen.png'), bro: loadArt('enemies/bro.png'),
+    chad: loadArt('enemies/chad.png'), wojak: loadArt('enemies/wojak.png'),
+    manager: loadArt('enemies/manager.png'), gigachad: loadArt('enemies/gigachad.png'),
+    landlord: loadArt('enemies/landlord.png'),
+  };
+  const PROP_ART = { bridge: loadArt('props/bridge.png'), chest: loadArt('props/chest.png'), stump: loadArt('props/stump.png') };
+  const TILESET = loadArt('tiles/dirt-grass-wang.png');
+  // Wang tile lookup: 32px source tiles keyed by NE+NW+SE+SW corner terrain
+  // (L=lower/dirt, U=upper/grass). Positions come from the generated tileset metadata.
+  const WANG = {
+    UUUL: { x: 0, y: 0 }, LULU: { x: 32, y: 0 }, ULLL: { x: 64, y: 0 }, UULL: { x: 96, y: 0 },
+    ULLU: { x: 0, y: 32 }, LULL: { x: 32, y: 32 }, LLLL: { x: 64, y: 32 }, LLUL: { x: 96, y: 32 },
+    LUUU: { x: 0, y: 64 }, LLUU: { x: 32, y: 64 }, LLLU: { x: 64, y: 64 }, ULUL: { x: 96, y: 64 },
+    UUUU: { x: 0, y: 96 }, UULU: { x: 32, y: 96 }, LUUL: { x: 64, y: 96 }, ULUU: { x: 96, y: 96 },
+  };
+  function onArtLoaded() { if (TILESET.ready) drawGround(); }
+
+  // ---------- Ground pre-render ----------
   const ground = document.createElement('canvas');
   ground.width = W; ground.height = H;
   function hash(x, y) {
@@ -231,8 +263,13 @@
     h = (h ^ (h >> 13)) * 1274126177;
     return ((h ^ (h >> 16)) >>> 0) / 4294967295;
   }
+  function isPathVertex(vx, vy) {
+    return pathTiles.has((vx - 1) + ',' + (vy - 1)) || pathTiles.has(vx + ',' + (vy - 1)) ||
+      pathTiles.has((vx - 1) + ',' + vy) || pathTiles.has(vx + ',' + vy);
+  }
   function drawGround() {
     const g = ground.getContext('2d');
+    const useWang = TILESET.ready;
     for (let y = 0; y < ROWS; y++) {
       for (let x = 0; x < COLS; x++) {
         const v = hash(x, y);
@@ -240,6 +277,13 @@
           // Chasm — nearly black, faint depth banding.
           g.fillStyle = v > 0.5 ? '#0a0e13' : '#0d1218';
           g.fillRect(x * TILE, y * TILE, TILE, TILE);
+          continue;
+        }
+        if (useWang) {
+          const code = (vx, vy) => (isPathVertex(vx, vy) ? 'L' : 'U');
+          const key = code(x + 1, y) + code(x, y) + code(x + 1, y + 1) + code(x, y + 1);
+          const tile = WANG[key] || WANG.UUUU;
+          g.drawImage(TILESET.img, tile.x, tile.y, 32, 32, x * TILE, y * TILE, TILE, TILE);
           continue;
         }
         if (pathTiles.has(x + ',' + y)) {
@@ -261,18 +305,26 @@
     g.fillStyle = 'rgba(120,160,120,0.25)';
     g.fillRect(RAVINE_COLS[0] * TILE - 2, 0, 2, H);
     g.fillRect((RAVINE_COLS[1] + 1) * TILE, 0, 2, H);
-    // Bridge planks across the ravine.
+    // Bridge crossing the ravine.
     const bx = RAVINE_COLS[0] * TILE, by = (BRIDGE_ROW - 0.5) * TILE;
-    g.fillStyle = '#9c6b3f';
-    g.fillRect(bx - 4, by, 2 * TILE + 8, TILE);
-    g.fillStyle = 'rgba(0,0,0,0.28)';
-    for (let i = 0; i < 8; i++) g.fillRect(bx - 4 + i * 11, by, 3, TILE);
-    g.fillStyle = '#6f4a28';
-    g.fillRect(bx - 4, by - 4, 2 * TILE + 8, 4);
-    g.fillRect(bx - 4, by + TILE, 2 * TILE + 8, 4);
+    if (PROP_ART.bridge.ready) {
+      g.drawImage(PROP_ART.bridge.img, bx - 4, by, 2 * TILE + 8, TILE);
+    } else {
+      g.fillStyle = '#9c6b3f';
+      g.fillRect(bx - 4, by, 2 * TILE + 8, TILE);
+      g.fillStyle = 'rgba(0,0,0,0.28)';
+      for (let i = 0; i < 8; i++) g.fillRect(bx - 4 + i * 11, by, 3, TILE);
+      g.fillStyle = '#6f4a28';
+      g.fillRect(bx - 4, by - 4, 2 * TILE + 8, 4);
+      g.fillRect(bx - 4, by + TILE, 2 * TILE + 8, 4);
+    }
     // Build plots — tree stumps.
     for (const [px, py] of PLOTS) {
       const cx = px * TILE, cy = py * TILE;
+      if (PROP_ART.stump.ready) {
+        g.drawImage(PROP_ART.stump.img, cx - 20, cy - 20, 40, 40);
+        continue;
+      }
       g.fillStyle = '#5d4126';
       g.beginPath(); g.arc(cx, cy, 15, 0, 7); g.fill();
       g.fillStyle = '#7a5733';
@@ -553,6 +605,16 @@
     closePops();
     const waveReached = G.wave + 1;
     saveBest(G.wave, G.tolls);
+    // Arcade-standard integrations (no-ops when scripts are absent)
+    if (window.TrollLeaderboard) {
+      window.TrollLeaderboard.record('bridge-patrol', { wave: G.wave, tolls: G.tolls, bosses: G.bossesSlain });
+    }
+    if (window.TrollNotis && typeof window.TrollNotis.push === 'function') {
+      window.TrollNotis.push({
+        icon: '🧌', title: 'Bridge Patrol',
+        body: 'Chest looted on wave ' + waveReached + ' — 🪙 ' + fmt(G.tolls) + ' tolls collected.',
+      });
+    }
     $('over-stats').innerHTML =
       'The normies looted your chest on <b>wave ' + waveReached + '</b>.<br>' +
       'Tolls collected: <b>🪙 ' + fmt(G.tolls) + '</b>';
@@ -766,6 +828,13 @@
     syncHud();
   });
 
+  // Weekly ladder overlay (stacks above title/game-over screens)
+  const screenLadder = $('screen-ladder');
+  const openLadder = () => { screenLadder.hidden = false; };
+  $('btn-ladder').addEventListener('click', openLadder);
+  $('btn-ladder2').addEventListener('click', openLadder);
+  $('btn-ladder-close').addEventListener('click', () => { screenLadder.hidden = true; });
+
   // ---------- Render ----------
   function emoji(str, x, y, size) {
     ctx.font = size + 'px "Segoe UI Emoji", "Apple Color Emoji", sans-serif';
@@ -809,11 +878,16 @@
 
     // Chest
     const shake = G.chestShake > 0 ? Math.sin(now / 25) * 3 * G.chestShake : 0;
-    emoji('💰', CHEST.x + shake, CHEST.y - 4, 30);
+    if (PROP_ART.chest.ready) {
+      ctx.drawImage(PROP_ART.chest.img, CHEST.x + shake - 24, CHEST.y - 28, 48, 48);
+    } else {
+      emoji('💰', CHEST.x + shake, CHEST.y - 4, 30);
+    }
 
     // Towers
     for (const t of G.towers) {
       const spec = TOWERS[t.type];
+      const art = TOWER_ART[t.type];
       const tp = towerPos(t);
       const s = 1 + (t.bump || 0) * 0.25;
       // Cold aura pulse
@@ -823,12 +897,17 @@
         ctx.strokeStyle = 'rgba(90,200,250,' + (0.35 * (1 - ph)) + ')';
         ctx.beginPath(); ctx.arc(tp.x, tp.y, r * ph, 0, 7); ctx.stroke();
       }
-      ctx.fillStyle = spec.hue;
-      ctx.beginPath(); ctx.arc(tp.x, tp.y, 16, 0, 7); ctx.fill();
-      ctx.strokeStyle = 'rgba(0,0,0,0.4)';
-      ctx.beginPath(); ctx.arc(tp.x, tp.y, 16, 0, 7); ctx.stroke();
-      emoji('🧌', tp.x, tp.y - 6, Math.round(24 * s));
-      emoji(spec.badge, tp.x + 12, tp.y + 10, 12);
+      if (art.ready) {
+        const size = 46 * s;
+        ctx.drawImage(art.img, tp.x - size / 2, tp.y - size * 0.62, size, size);
+      } else {
+        ctx.fillStyle = spec.hue;
+        ctx.beginPath(); ctx.arc(tp.x, tp.y, 16, 0, 7); ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+        ctx.beginPath(); ctx.arc(tp.x, tp.y, 16, 0, 7); ctx.stroke();
+        emoji('🧌', tp.x, tp.y - 6, Math.round(24 * s));
+        emoji(spec.badge, tp.x + 12, tp.y + 10, 12);
+      }
       // Tier pips
       ctx.fillStyle = '#ffd60a';
       for (let i = 0; i < t.tier; i++) {
@@ -849,15 +928,21 @@
     // Enemies
     for (const e of G.enemies) {
       const spec = ENEMIES[e.type];
+      const art = ENEMY_ART[e.type];
       const p = pointAt(e.d);
       const bob = Math.sin(e.wobble) * 2;
-      ctx.fillStyle = spec.hue;
-      ctx.beginPath(); ctx.arc(p.x, p.y + bob, spec.r, 0, 7); ctx.fill();
+      if (art.ready) {
+        const size = spec.r * (spec.boss ? 3.6 : 2.8);
+        ctx.drawImage(art.img, p.x - size / 2, p.y + bob - size * 0.58, size, size);
+      } else {
+        ctx.fillStyle = spec.hue;
+        ctx.beginPath(); ctx.arc(p.x, p.y + bob, spec.r, 0, 7); ctx.fill();
+        emoji(spec.emoji, p.x, p.y + bob - 2, spec.r * 1.6);
+      }
       if (e.slowed) {
         ctx.strokeStyle = 'rgba(90,200,250,0.9)';
         ctx.beginPath(); ctx.arc(p.x, p.y + bob, spec.r + 2, 0, 7); ctx.stroke();
       }
-      emoji(spec.emoji, p.x, p.y + bob - 2, spec.r * 1.6);
       // HP bar once damaged (bosses always show one, wider, plus a name)
       if (e.hp < e.hpMax || spec.boss) {
         const w = spec.boss ? 42 : 24;

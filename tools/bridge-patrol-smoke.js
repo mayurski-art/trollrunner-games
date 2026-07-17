@@ -38,6 +38,15 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
   await page.setViewport({ width: 1024, height: 720 });
   page.on('console', (m) => { if (['error', 'warning'].includes(m.type())) consoleIssues.push(m.type() + ': ' + m.text()); });
   page.on('pageerror', (e) => consoleIssues.push('pageerror: ' + e.message));
+  // The site-wide "coming soon" gate (assets/js/coming-soon.js) requires a
+  // real Supabase admin session to unlock — it's a pre-launch marketing
+  // gate unrelated to the game itself, so block it here to keep the
+  // headless smoke test independent of live auth state.
+  await page.setRequestInterception(true);
+  page.on('request', (req) => {
+    if (req.url().includes('coming-soon.js')) req.abort();
+    else req.continue();
+  });
 
   await page.goto(`http://localhost:${PORT}/bridge-patrol.html`, { waitUntil: 'networkidle0' });
   await page.waitForFunction('window.__bp && window.__bp.G.state === "title"');
