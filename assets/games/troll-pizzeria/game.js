@@ -146,22 +146,102 @@
     lastTick: 0, ticketSeq: 1,
   };
 
-  function save() {
+  /* Cross-device progress: when logged in, mirrored into the shared
+     troll_game_saves table (same table/pattern Trollrreria uses) so a
+     shift picked up on another device resumes with the right day/XP/tips.
+     Guests keep the old device-local SAVE_KEY only. */
+  const cloudCacheKey = (uid) => `${SAVE_KEY}:cloud-cache:${uid}`;
+  let cachedUserId = null;
+
+  function snapshot() {
+    return {
+      day: S.day, xp: S.xp, lifetimeTips: S.lifetimeTips, bestDay: S.bestDay,
+      daysWorked: S.daysWorked, servedTotal: S.servedTotal,
+    };
+  }
+  function applySnapshot(d) {
+    if (!d) return;
+    Object.assign(S, {
+      day: d.day || 1, xp: d.xp || 0, lifetimeTips: d.lifetimeTips || 0,
+      bestDay: d.bestDay || 0, daysWorked: d.daysWorked || 0, servedTotal: d.servedTotal || 0,
+    });
+  }
+  function readLocal(key) {
+    try { return JSON.parse(localStorage.getItem(key) || "null"); } catch (_) { return null; }
+  }
+
+  async function loadCloudSave(userId) {
+    const sb = window.TrollrunnerAccounts?.getClient?.();
+    if (!sb) return null;
     try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify({
-        day: S.day, xp: S.xp, lifetimeTips: S.lifetimeTips, bestDay: S.bestDay,
-        daysWorked: S.daysWorked, servedTotal: S.servedTotal,
-      }));
-    } catch (_) {}
+      const { data, error } = await sb.from("troll_game_saves")
+        .select("data, updated_at").eq("user_id", userId).eq("game_id", GAME_ID).maybeSingle();
+      if (error) { console.warn("[pizzeria] cloud load failed:", error); return null; }
+      if (!data) return null;
+      return { save: data.data, updatedAt: new Date(data.updated_at).getTime() };
+    } catch (e) { console.warn("[pizzeria] cloud load threw:", e); return null; }
+  }
+
+  async function saveCloudSave(userId, data) {
+    const sb = window.TrollrunnerAccounts?.getClient?.();
+    if (!sb) return false;
+    try {
+      const { error } = await sb.from("troll_game_saves").upsert({
+        user_id: userId, game_id: GAME_ID, data, updated_at: new Date().toISOString(),
+      });
+      if (error) console.warn("[pizzeria] cloud save failed:", error);
+      return !error;
+    } catch (e) { console.warn("[pizzeria] cloud save threw:", e); return false; }
+  }
+
+  function save() {
+    const data = snapshot();
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (_) {}
+    if (cachedUserId) {
+      try { localStorage.setItem(cloudCacheKey(cachedUserId), JSON.stringify({ ...data, savedAt: Date.now() })); } catch (_) {}
+      void saveCloudSave(cachedUserId, data);
+    }
   }
   function load() {
+    applySnapshot(readLocal(SAVE_KEY));
+  }
+
+  /* Reconciles local progress against the cloud once a session resolves:
+     prefers whichever of (cloud row, this device's cloud cache) is newer,
+     and seeds the cloud from local play the first time an account logs in
+     on a device that already has unsynced progress. */
+  async function reconcileCloudSave() {
+    if (!cachedUserId) return;
+    const cloud = await loadCloudSave(cachedUserId);
+    const cached = readLocal(cloudCacheKey(cachedUserId));
+    if (cloud && (!cached || cloud.updatedAt >= (cached.savedAt || 0))) {
+      applySnapshot(cloud.save);
+    } else if (cached) {
+      applySnapshot(cached);
+      if (!cloud || cached.savedAt > cloud.updatedAt) void saveCloudSave(cachedUserId, snapshot());
+    } else {
+      const legacy = readLocal(SAVE_KEY);
+      if (legacy && legacy.daysWorked > 0) {
+        applySnapshot(legacy);
+        void saveCloudSave(cachedUserId, legacy);
+      }
+    }
+    if (S.screen === "title") showTitle();
+  }
+
+  window.addEventListener("trollrunner:auth-changed", (e) => {
+    const uid = e.detail?.userId || null;
+    cachedUserId = uid;
+    if (uid) void reconcileCloudSave();
+    else { load(); if (S.screen === "title") showTitle(); }
+  });
+
+  async function initCloudSync() {
     try {
-      const d = JSON.parse(localStorage.getItem(SAVE_KEY) || "null");
-      if (d) Object.assign(S, {
-        day: d.day || 1, xp: d.xp || 0, lifetimeTips: d.lifetimeTips || 0,
-        bestDay: d.bestDay || 0, daysWorked: d.daysWorked || 0, servedTotal: d.servedTotal || 0,
-      });
-    } catch (_) {}
+      const session = await window.TrollrunnerAccounts?.getSession?.();
+      cachedUserId = session?.userId || null;
+    } catch (_) { cachedUserId = null; }
+    if (cachedUserId) await reconcileCloudSave();
   }
 
   const rankName = (xp) => { let r = RANKS[0][1]; for (const [need, name] of RANKS) if (xp >= need) r = name; return r; };
@@ -1114,6 +1194,7 @@
 
   function boot() {
     load();
+    void initCloudSync();
 
     // title chef sprite + lobby backdrop + oven art (all with fallbacks)
     $("#pz-title-chef").appendChild(sprite("char-chef.png", "🧌"));
