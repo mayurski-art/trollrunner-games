@@ -290,3 +290,24 @@ html, body {
   #bp-hud button { font-size: 12px; padding: 6px 9px; }
   #bp-canvas { border-radius: 10px; }
 }
+
+/* Bridge Patrol's battlefield is wide (12:7) — on a narrow portrait phone
+   most of the screen is empty margin. Nudge toward landscape instead of
+   silently leaving a cramped, mostly-black screen. */
+#bp-rotate-hint {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 40;
+  padding: 8px 14px;
+  text-align: center;
+  font-family: "DM Sans", sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  color: #06240f;
+  background: #ffd60a;
+}
+@media (max-width: 600px) and (orientation: portrait) {
+  #bp-rotate-hint { display: block; }
+  #bp-root { padding-top: 34px; }
+}

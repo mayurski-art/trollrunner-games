@@ -1,6 +1,7 @@
 # Bridge Patrol — Tower Defense (game 006)
 
-**Status: phases 1–4 COMPLETE on branch bridge-patrol-phase1 (2026-07-16/17).**
+**Status: phases 1–5 COMPLETE on branch bridge-patrol-phase1 (2026-07-16/17),
+awaiting merge to main (merge deferred until the user asks for it).**
 Decisions locked: top-down perspective, single endless mode, name
 "Bridge Patrol" (the toll-paying theme stays — Toll Coins, toll chest,
 Toll Booth tower). Game number moved 005 → 006 after Papa Troll's
@@ -15,8 +16,17 @@ on emoji since its generated state came back in the wrong "side" view
 and wasn't worth a costly regenerate), a Wang-autotiled dirt/grass
 tileset for the ground, plus bridge/chest/stump props. Leaderboard,
 TrollNotis, hub card (Defense category), and fs-launcher are wired
-per the arcade-standard pattern. Remaining: phase 5 (balance pass,
-mobile touch verification, final polish).
+per the arcade-standard pattern.
+
+Phase 5 polish: added a non-blocking rotate-to-landscape hint for
+narrow portrait phones — the 12:7 battlefield is landscape-shaped and
+was leaving large empty margins above/below on portrait screens;
+landscape mobile already fills the viewport well. Full balance
+tuning (wave curve, tower costs) is left for real playtesting rather
+than bot-driven guesses — the autopilot smoke test confirms all
+systems interact correctly (stuns, splash, tolls, boss mechanics)
+but a deliberately strong static layout surviving 12 waves untouched
+isn't a balance signal on its own.
 
 ## Pitch
 You are the bridge troll. Waves of normies march toward your bridge trying to
