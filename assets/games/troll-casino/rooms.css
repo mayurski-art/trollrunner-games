@@ -43,7 +43,10 @@
 
 .floor-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* auto-fill instead of a fixed 2-up so all four tables fit in one row on
+     a normal desktop width — matches the arcade hub's grid instead of
+     forcing a second scroll-to-see row for exactly 4 cards. */
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
   gap: 16px;
 }
 .floor-card {
@@ -69,13 +72,21 @@
   position: relative;
   display: grid;
   place-items: center;
-  aspect-ratio: 21 / 8;
+  /* 21:8 cropped ~30% of the source art's height, which cut heads off —
+     source renders are all 16:9, so 2:1 leaves just ~11% to crop instead
+     of ~32%, and the bias toward the top (see background-position below)
+     spends nearly all of that on the felt/chips at the bottom, not faces. */
+  aspect-ratio: 2 / 1;
   background:
     radial-gradient(80% 120% at 50% 0%, color-mix(in srgb, var(--fc) 26%, transparent), transparent 70%),
     linear-gradient(180deg, #140b26, #07030f);
   background-size: cover;
-  background-position: center;
+  background-position: center 15%;
 }
+/* Doge's ears/sunglasses sat right at the crop line — a touch more room. */
+.floor-card[data-game="slots"] .fc-art { background-position: center 4%; }
+/* The crash table shot reads busy at a hard crop; show the whole frame. */
+.floor-card[data-game="crash"] .fc-art { background-size: contain; background-position: center; }
 .fc-art.has-art .fc-emoji { display: none; }
 .fc-art.has-art::after {   /* keep card text readable over bright art */
   content: "";
