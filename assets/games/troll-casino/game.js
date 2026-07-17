@@ -317,50 +317,6 @@
 
   const stakedTotal = () => Object.values(table.staged).reduce((a, b) => a + b, 0);
 
-  /* --------------------------------------------------------------------------
-     Ambient backdrop — #room-ambient (a dedicated element game.js exclusively
-     owns; see troll-casino.html) sits dimmed and blurred behind EVERY view
-     (floor + all rooms) once the walkthrough ends, swapped per-view so the
-     floor shows the lobby and each room shows its own gameplay art instead of
-     one static photo forever. Kept off scenes.js's own scene-5 node so there's
-     no race between two separate image preloaders writing the same element.
-     -------------------------------------------------------------------------- */
-  const LOBBY_AMBIENT = "assets/games/troll-casino/scenes/scene-01-lobby.mp4";
-  let ambientTimer = 0;
-  let ambientReady = false;    // has #room-ambient ever shown an image yet?
-  function setAmbient(url) {
-    const el = $("#room-ambient");
-    if (!el || !url || el.dataset.ambient === url) return;
-    el.dataset.ambient = url;
-    clearTimeout(ambientTimer);   // cancel any in-flight swap so only the latest call ever lands
-    const swap = () => { paintAmbient(el, url); el.classList.add("is-shown"); ambientReady = true; };
-    if (!ambientReady) { swap(); return; }   // first image ever: nothing to fade out
-    el.classList.remove("is-shown");
-    ambientTimer = setTimeout(swap, 320);
-  }
-
-  // An .mp4 ambient gets a muted looping <video> child (inheriting the
-  // element's blur/dim filter); its .png twin paints underneath as the
-  // instant poster. Static art keeps the plain background-image path.
-  function paintAmbient(el, url) {
-    const isVideo = /\.mp4$/i.test(url);
-    el.style.backgroundImage = `url("${isVideo ? url.replace(/\.mp4$/i, ".png") : url}")`;
-    let v = el.querySelector("video");
-    if (isVideo && !REDUCED) {
-      if (!v) {
-        v = document.createElement("video");
-        v.muted = true; v.loop = true; v.playsInline = true;
-        v.setAttribute("playsinline", ""); v.preload = "auto";
-        v.addEventListener("error", () => v.remove());
-        el.appendChild(v);
-      }
-      if (!v.src.endsWith(url)) v.src = url;
-      v.play().catch(() => {});
-    } else if (v) {
-      v.pause(); v.remove();
-    }
-  }
-
   function init() {
     const canvas = $("#wheel-canvas");
     if (!canvas || !wallet()) return;
@@ -388,7 +344,6 @@
     // Scene engine handoff: the walkthrough always lands on the casino floor.
     window.TrollCasinoScenes?.on("gameplay", () => {
       if (activeRoom) backToFloor();
-      setAmbient(LOBBY_AMBIENT);
       requestAnimationFrame(() => { table.renderer.resize(); table.renderer.draw(table.rotation); });
     });
   }
@@ -764,7 +719,6 @@
     if (back) back.hidden = false;
     activeRoom = id;
     AudioFX.ensure(); AudioFX.chip();
-    setAmbient(def.playArt || def.art);
     try { def.onEnter && def.onEnter(); } catch (_) {}
     // One click on the floor card means "play" — auto-sit past the room's
     // hero CTA so nobody has to scroll down and click a second button.
@@ -782,7 +736,6 @@
     $("#floor-view").hidden = false;
     const back = $("#back-to-floor");
     if (back) back.hidden = true;
-    setAmbient(LOBBY_AMBIENT);
   }
 
   // Side-rail quick links from the wheel room to the other tables.
@@ -820,7 +773,6 @@
     host: "Hosted by Trollface", tagline: "24 segments. One rug. The house always trolls.",
     cta: "Spin the wheel",
     art: "assets/games/troll-casino/scenes/scene-05-first-person-wheel.png",
-    playArt: "assets/games/troll-casino/scenes/scene-05-first-person-wheel.mp4",
     onEnter: () => requestAnimationFrame(() => { table.renderer.resize(); table.renderer.draw(table.rotation); }),
   });
 

@@ -131,7 +131,6 @@
     host: "Hosted by Elon", tagline: "Ride the whale up. Exit before the rug. Simple.",
     cta: "Approach the console",
     art: "assets/games/troll-casino/art/whale-launch-hero.png",
-    playArt: "assets/games/troll-casino/art/whale-launch-gameplay.png",
     onEnter: () => { setLine(ELON.idle); sizeCanvas(); drawIdle(); prefetchRound(); },
   });
 

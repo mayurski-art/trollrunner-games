@@ -221,7 +221,6 @@
     host: "Hosted by Doge", tagline: "5 reels, 10 lines, one very gold dog. Wow.",
     cta: "Pull the handle",
     art: "assets/games/troll-casino/art/doge-jackpot-hero.png",
-    playArt: "assets/games/troll-casino/art/doge-jackpot-gameplay.png",
     onEnter: () => { setLine(DOGE.idle); renderMeter(); refreshJackpot(); refreshJackpotFeed(); },
     onLeave: () => stopAutoplay(),
   });

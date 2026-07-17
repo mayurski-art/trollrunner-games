@@ -130,7 +130,6 @@
     host: "Hosted by Pepe", tagline: "Hit, stand, split, double. Pepe hits soft 17 and never blinks.",
     cta: "Sit at the table",
     art: "assets/games/troll-casino/art/pepe-blackjack-hero.png",
-    playArt: "assets/games/troll-casino/art/pepe-blackjack-gameplay.png",
     onEnter: () => setLine(PEPE.idle),
   });
 

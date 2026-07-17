@@ -48,19 +48,19 @@
          gradient fallbacks below render until the PNGs exist. -->
     <section class="casino-viewport" id="casino-viewport" aria-label="Troll Casino">
 
-      <div class="scene-stage" id="scene-stage" aria-hidden="true">
-        <div class="scene" data-scene="1"><div class="scene-inner"><div class="scene-bg"></div><div class="scene-haze"></div><div class="scene-vignette"></div></div></div>
-        <div class="scene" data-scene="2"><div class="scene-inner"><div class="scene-bg"></div><div class="scene-haze"></div><div class="scene-vignette"></div></div></div>
-        <div class="scene" data-scene="3"><div class="scene-inner"><div class="scene-bg"></div><div class="scene-haze"></div><div class="scene-vignette"></div></div></div>
-        <div class="scene" data-scene="4"><div class="scene-inner"><div class="scene-bg"></div><div class="scene-haze"></div><div class="scene-vignette"></div></div></div>
-        <div class="scene" data-scene="5"><div class="scene-inner"><div class="scene-bg"></div><div class="scene-haze"></div><div class="scene-vignette"></div></div></div>
+      <!-- Framed "screen" — keeps the low-res source footage contained
+           instead of stretched edge-to-edge across the viewport (which
+           made the upscaling blur obvious). Hidden outright once gameplay
+           starts; the floor/game view underneath carries no video backdrop. -->
+      <div class="scene-frame" id="scene-frame">
+        <div class="scene-stage" id="scene-stage" aria-hidden="true">
+          <div class="scene" data-scene="1"><div class="scene-inner"><div class="scene-bg"></div><div class="scene-haze"></div><div class="scene-vignette"></div></div></div>
+          <div class="scene" data-scene="2"><div class="scene-inner"><div class="scene-bg"></div><div class="scene-haze"></div><div class="scene-vignette"></div></div></div>
+          <div class="scene" data-scene="3"><div class="scene-inner"><div class="scene-bg"></div><div class="scene-haze"></div><div class="scene-vignette"></div></div></div>
+          <div class="scene" data-scene="4"><div class="scene-inner"><div class="scene-bg"></div><div class="scene-haze"></div><div class="scene-vignette"></div></div></div>
+          <div class="scene" data-scene="5"><div class="scene-inner"><div class="scene-bg"></div><div class="scene-haze"></div><div class="scene-vignette"></div></div></div>
+        </div>
       </div>
-
-      <!-- Post-walkthrough ambient backdrop — game.js owns this exclusively and
-           swaps its image per floor/room (lobby art, each game's own gameplay
-           art). Kept separate from .scene-stage above so nothing else ever
-           writes to this element. -->
-      <div class="room-ambient" id="room-ambient" aria-hidden="true"></div>
 
       <!-- caption block — scenes.js rewrites this per scene -->
       <div class="scene-caption" aria-live="polite"></div>

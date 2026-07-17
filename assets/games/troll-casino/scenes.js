@@ -7,7 +7,7 @@
      scene 2  moving closer  (main table, all four characters)
      scene 3  circling       (side angle on the wheel table)
      scene 4  the host       (Trollface close-up, reaching out)
-     scene 5  seated         (first-person view — becomes the gameplay backdrop)
+     scene 5  seated         (first-person view — last beat before the floor)
 
    The engine only manipulates the stage DOM + emits events; it knows nothing
    about wagers or wallets. game.js listens for "gameplay" to show the table.
@@ -150,8 +150,8 @@
   }
 
   // Play only the active scene's loop; everything else pauses (battery, decode).
-  // During gameplay the stage is hidden (#room-ambient took over), so nothing
-  // plays at all — an async play() must never outrace the gameplay pause.
+  // During gameplay the whole framed stage is hidden, so nothing plays at
+  // all — an async play() must never outrace the gameplay pause.
   function playActiveVideo() {
     state.videos.forEach((v, n) => {
       if (n === state.current && !state.gameplay) {
@@ -267,8 +267,9 @@
   function skip() { enterGameplayMode(); }
 
   /* --------------------------------------------------------------------------
-     Gameplay handoff — scene 5 stays mounted as the dimmed, blurred backdrop
-     (CSS handles the treatment via .is-gameplay). game.js takes it from here.
+     Gameplay handoff — the framed cinematic (scene-frame) is hidden outright
+     by CSS (.is-gameplay); the floor/game view carries no video backdrop.
+     game.js takes it from here.
      -------------------------------------------------------------------------- */
   function enterGameplayMode() {
     clearTimeout(state.timer);
@@ -277,8 +278,8 @@
     show(5, "zoom");
     state.viewport.classList.remove("is-cinematic");
     state.viewport.classList.add("is-gameplay");
-    // The scene stage is hidden during gameplay (#room-ambient takes over),
-    // so stop every loop instead of decoding video nobody can see.
+    // The whole framed stage is hidden during gameplay, so stop every loop
+    // instead of decoding video nobody can see.
     state.videos.forEach(v => { if (!v.paused) v.pause(); });
     emit("cinematic", { playing: false });
     emit("gameplay", {});

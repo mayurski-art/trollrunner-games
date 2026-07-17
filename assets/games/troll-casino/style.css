@@ -96,6 +96,25 @@ button:focus-visible, a:focus-visible {
   overflow: hidden;
 }
 
+/* Framed screen — contains the cinematic instead of stretching it
+   edge-to-edge, so the (low native-res) source footage isn't blown up
+   nearly as far. Sized down on the long edge, not just capped, so it
+   reads as a "screen" rather than a slightly-smaller fullscreen. */
+.scene-frame {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(70vw, 860px);
+  aspect-ratio: 16 / 9;
+  max-height: 62vh;
+  border-radius: 22px;
+  overflow: hidden;
+  background: #000;
+  border: 1px solid var(--tc-line);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 30px 80px rgba(0, 0, 0, 0.7), var(--tc-glow-purple);
+}
+.casino-viewport.is-gameplay .scene-frame { display: none; }
+
 .scene-stage { position: absolute; inset: 0; background: var(--tc-bg); }
 
 .scene {
@@ -176,14 +195,8 @@ button:focus-visible, a:focus-visible {
 @keyframes tc-in-focus { from { opacity: 0; transform: scale(1.25); filter: blur(6px); }
                          to   { opacity: 1; transform: scale(1); filter: blur(0); } }
 
-/* During gameplay the active scene stays up as ambience, dimmed just enough
-   that the real HTML UI (which carries its own backdrop-filter blur) reads
-   clearly on top of it — the footage itself stays sharp and visible.
-   Captions/CTA get out of the way; the table is the interface now. */
-.casino-viewport.is-gameplay .scene.is-active .scene-bg {
-  filter: brightness(0.7) saturate(1.1);
-  animation: none;
-}
+/* Gameplay hides the whole framed cinematic (.scene-frame above) — no
+   video backdrop behind the floor/game view. Captions/CTA go with it. */
 .casino-viewport.is-gameplay .scene-caption,
 .casino-viewport.is-gameplay .landing-cta { display: none; }
 
