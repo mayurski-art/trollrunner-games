@@ -146,6 +146,10 @@
     return { backdrop, modal: backdrop.querySelector(".tc-modal"), close };
   }
 
+  // USD preset amounts shown per currency — TROLL's top preset is lower than
+  // USDC's since it's the "cheap fun money" side of the till.
+  const DEPOSIT_PRESETS = { USDC: [1, 4.20, 20, 69], TROLL: [1, 4.20, 6.9] };
+
   function openDeposit() {
     if (!wallet() || !wallet().isReady()) { alert("Log in first to deposit."); return; }
     let token = wallet().getCurrency();
@@ -157,15 +161,49 @@
         <button type="button" data-t="TROLL">$TROLL</button>
         <button type="button" data-t="USDC">USDC</button>
       </div>
+      <div class="tc-preset-row" id="tc-dep-presets"></div>
       <div class="tc-field">
         <label>Amount (USD)</label>
         <input type="number" id="tc-dep-amount" min="1" step="0.01" placeholder="10.00">
       </div>
+      <p class="tc-sub" id="tc-dep-preview"></p>
       <button type="button" class="tc-btn" id="tc-dep-submit">Deposit</button>
       <p class="tc-status" id="tc-dep-status" aria-live="polite"></p>`);
 
     const tokBtns = modal.querySelectorAll("#tc-dep-tok button");
-    function setTok(t) { token = t; tokBtns.forEach(b => b.classList.toggle("is-active", b.dataset.t === t)); }
+    const presetsEl = modal.querySelector("#tc-dep-presets");
+    const amountInput = modal.querySelector("#tc-dep-amount");
+    const previewEl = modal.querySelector("#tc-dep-preview");
+
+    function renderPresets() {
+      presetsEl.innerHTML = DEPOSIT_PRESETS[token].map(v => `
+        <button type="button" class="tc-preset-btn" data-v="${v}">$${v.toFixed(2).replace(/\.00$/, "")}</button>`
+      ).join("") + `<button type="button" class="tc-preset-btn" data-v="custom">Custom</button>`;
+      presetsEl.querySelectorAll(".tc-preset-btn").forEach(b => b.addEventListener("click", () => {
+        presetsEl.querySelectorAll(".tc-preset-btn").forEach(x => x.classList.remove("is-active"));
+        b.classList.add("is-active");
+        if (b.dataset.v === "custom") { amountInput.value = ""; amountInput.focus(); }
+        else amountInput.value = b.dataset.v;
+        updatePreview();
+      }));
+    }
+
+    async function updatePreview() {
+      const amount = Number(amountInput.value);
+      if (!(amount > 0)) { previewEl.textContent = ""; return; }
+      if (token === "USDC") { previewEl.textContent = `= $${amount.toFixed(2)} USDC`; return; }
+      previewEl.textContent = "Pricing in $TROLL…";
+      const price = await (window.TrollPayments && window.TrollPayments.trollUsdPrice());
+      previewEl.textContent = price ? `≈ ${Math.round(amount / price).toLocaleString()} $TROLL` : "";
+    }
+    amountInput.addEventListener("input", updatePreview);
+
+    function setTok(t) {
+      token = t;
+      tokBtns.forEach(b => b.classList.toggle("is-active", b.dataset.t === t));
+      renderPresets();
+      updatePreview();
+    }
     tokBtns.forEach(b => b.addEventListener("click", () => setTok(b.dataset.t)));
     setTok(token);
 

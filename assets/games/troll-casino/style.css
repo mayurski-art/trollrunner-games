@@ -705,6 +705,14 @@ button:focus-visible, a:focus-visible {
   color: var(--tc-dim); font-weight: 700;
 }
 .tc-token-toggle button.is-active { color: var(--tc-bg); background: var(--tc-green); border-color: var(--tc-green); }
+.tc-preset-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.tc-preset-btn {
+  flex: 1 1 auto; padding: 8px 10px; border-radius: 10px;
+  border: 0.5px solid var(--tc-line);
+  background: rgba(255,255,255,0.03);
+  color: var(--tc-dim); font-weight: 700; font-size: 13px;
+}
+.tc-preset-btn.is-active { color: var(--tc-bg); background: var(--tc-green); border-color: var(--tc-green); }
 .tc-btn {
   width: 100%; padding: 13px; border-radius: 12px; border: none;
   background: var(--tc-green); color: #04150a; font-weight: 900;
