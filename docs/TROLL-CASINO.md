@@ -87,9 +87,9 @@ ambience never fights table SFX. `#room-ambient` accepts `.mp4` URLs too
 floor loops scene 1, the wheel room loops scene 5.
 
 **Fewer clicks.** `?boot=1` (how the hub launches the page) skips the Enter
-button: first-ever visit auto-plays the walkthrough, repeats jump straight to
-the floor (`tc-intro-seen` in localStorage). `openRoom()` also auto-clicks the
-room hero's sit CTA, so one tap on a floor card lands in the game.
+button and auto-plays the full walkthrough on every launch. `openRoom()` also
+auto-clicks the room hero's sit CTA, so one tap on a floor card lands in the
+game.
 
 ## The Troll Wheel
 

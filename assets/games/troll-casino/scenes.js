@@ -252,7 +252,11 @@
   function queueNext() {
     clearTimeout(state.timer);
     if (!state.playing) return;
-    const hold = state.reducedMotion ? 1200 : CINEMATIC_HOLD_MS;
+    // Let a longer scene video finish at least one full loop before cutting
+    // away — a 3s hold was chopping clips that run longer than that.
+    const v = state.videos.get(state.current);
+    const videoMs = v && v.duration && isFinite(v.duration) ? v.duration * 1000 : 0;
+    const hold = state.reducedMotion ? 1200 : Math.max(CINEMATIC_HOLD_MS, videoMs);
     state.timer = setTimeout(advance, hold);
   }
 
