@@ -32,13 +32,13 @@
   position: absolute; inset: -6%;
   background-size: cover;
   background-position: center;
-  filter: blur(7px) brightness(0.45) saturate(1.15);
+  filter: brightness(0.7) saturate(1.1);
   opacity: 0;
   transition: opacity 320ms ease;
 }
 .room-ambient.is-shown { opacity: 1; }
 /* game.js drops a muted looping <video> in here for .mp4 ambients; it fills
-   the element and inherits its blur/dim filter, with the .png twin painting
+   the element and inherits its dim filter, with the .png twin painting
    underneath as the instant poster. */
 .room-ambient video {
   position: absolute; inset: 0;

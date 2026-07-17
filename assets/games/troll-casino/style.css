@@ -176,11 +176,12 @@ button:focus-visible, a:focus-visible {
 @keyframes tc-in-focus { from { opacity: 0; transform: scale(1.25); filter: blur(6px); }
                          to   { opacity: 1; transform: scale(1); filter: blur(0); } }
 
-/* During gameplay the active scene stays up as ambience — dimmed and softened
-   so the real HTML UI reads clearly on top of it. Captions/CTA get out of
-   the way; the table is the interface now. */
+/* During gameplay the active scene stays up as ambience, dimmed just enough
+   that the real HTML UI (which carries its own backdrop-filter blur) reads
+   clearly on top of it — the footage itself stays sharp and visible.
+   Captions/CTA get out of the way; the table is the interface now. */
 .casino-viewport.is-gameplay .scene.is-active .scene-bg {
-  filter: blur(7px) brightness(0.45) saturate(1.15);
+  filter: brightness(0.7) saturate(1.1);
   animation: none;
 }
 .casino-viewport.is-gameplay .scene-caption,

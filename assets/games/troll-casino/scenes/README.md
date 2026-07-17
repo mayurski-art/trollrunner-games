@@ -26,7 +26,7 @@ Guidelines:
 - **Keep critical detail centered.** Edges crop on tall phone screens.
 - **No baked-in UI text.** Balances, buttons, results are real HTML on top.
   Environmental signage inside the art (TROLL CASINO neon etc.) is fine.
-- Scene 5 is dimmed + blurred behind the game table during play, so it can
-  be busy — it only needs to read as atmosphere.
+- Scene 5 is dimmed (not blurred) behind the game table during play, so it
+  can be busy — it stays sharp and visible as atmosphere.
 
 To change captions/copy per scene, edit `SCENES` at the top of `../scenes.js`.
