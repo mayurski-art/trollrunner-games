@@ -80,6 +80,8 @@
 }
 .lb-table tbody tr.lb-you { background: rgba(77, 238, 255, 0.09); box-shadow: inset 3px 0 0 var(--cyan); }
 .lb-table tbody tr.lb-you:hover { background: rgba(77, 238, 255, 0.14); }
+.lb-empty-cell { text-align: center; color: var(--muted); font-style: italic; padding: 22px 10px; }
+.lb-table tbody tr.lb-empty:hover { background: none; }
 .lb-foot { padding: 12px 16px; margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
 .lb-foot strong { color: var(--cyan); }
 

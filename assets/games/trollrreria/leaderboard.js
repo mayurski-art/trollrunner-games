@@ -43,7 +43,7 @@
       sessions: 1 + Math.floor(rng() * 30),
     }),
 
-    footNote: "Rivals are simulated for now. <strong>Your</strong> row is real — deepest dig, blocks mined and Troll King takedowns, reset every Monday.",
+    footNote: "Every row here is a real player — deepest dig, blocks mined and Troll King takedowns, reset every Monday.",
 
     prizes: {
       poolLabel: "Mock prize pool · Trollrreria",

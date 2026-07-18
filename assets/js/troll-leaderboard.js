@@ -8,8 +8,11 @@
    and call register(). See LEADERBOARD.md.
 
    BACKEND-READY: the UI only talks to a per-game `provider` exposing
-   `getBoard()` (async) and `recordEvent(ev)`. The default MockProvider is built
-   from the config. Swap in a real backend with setProvider(gameId, provider).
+   `getBoard()` (async) and `recordEvent(ev)`. The default LiveProvider talks to
+   the real Supabase backend (window.TrollrunnerAccounts / troll_accounts.sql —
+   table troll_leaderboard, RPC troll_record_game_result) when the viewer is
+   logged in, and falls back to a local-only cache otherwise. Swap in a
+   different backend entirely with setProvider(gameId, provider).
 
    SAFETY: prizes are DISPLAY-ONLY placeholders. No wallet code, no claim flow,
    no payouts live here. `prizes.live` is a guard kept false. Do not wire real
@@ -110,27 +113,104 @@
   const saveYou = (cfg, d) => lsSet(keyFor(cfg), d);
   const youEntry = cfg => Object.assign({}, loadYou(cfg), { id: "you", you: true });
 
-  /* ---------- default mock provider (built from the config) -------------- */
-  function makeMockProvider(cfg) {
+  /* ---------- local-only provider (this browser's cache, no bots) -------- */
+  // No bot/rival generation: the board starts empty and fills in only with
+  // real recorded plays. cfg.mockRival / cfg.rivalNames / cfg.rivalCount are
+  // intentionally ignored here.
+  function makeLocalProvider(cfg) {
     return {
-      name: "mock",
+      name: "local",
       async getBoard() {
         const wid = weekId();
-        const rng = mulberry32(hashStr(cfg.gameId + "|" + wid));
-        const names = (cfg.rivalNames || RIVAL_NAMES).slice().sort((a, b) => hashStr(wid + a) - hashStr(wid + b));
-        const count = Math.min(cfg.rivalCount || 9, names.length);
-        const entries = [];
-        for (let i = 0; i < count; i++) {
-          const base = cfg.mockRival ? cfg.mockRival(rng, i, wid) : {};
-          entries.push(Object.assign({ id: "rival-" + i, name: base.name || names[i], you: false }, base));
-        }
-        entries.push(youEntry(cfg));
-        return { weekId: wid, weekLabel: weekLabel(), resetsIn: timeLeft(), source: "mock", entries };
+        const you = loadYou(cfg);
+        const entries = you._played ? [Object.assign({}, you, { id: "you", you: true })] : [];
+        return { weekId: wid, weekLabel: weekLabel(), resetsIn: timeLeft(), source: "local", entries, loggedIn: false };
       },
       recordEvent(ev) {
         const y = loadYou(cfg);
         if (cfg.reduce) cfg.reduce(y, ev);
+        y._played = true;
         saveYou(cfg, y);
+      },
+    };
+  }
+
+  /* ---------- primary rank key (used as the backend's sortable score) ---- */
+  const primaryKey = cfg => (cfg.rankBy && cfg.rankBy[0]) || (cfg.columns[0] && cfg.columns[0].key);
+
+  /* ---------- live provider: real Supabase sync across players/devices --- */
+  // Reads/writes through window.TrollrunnerAccounts (assets/js/troll-accounts.js,
+  // schema in assets/supabase/troll_accounts.sql — table `troll_leaderboard`,
+  // RPC `troll_record_game_result`, view `troll_leaderboard_view`). That RPC
+  // requires a logged-in session; anonymous visitors can still READ the live
+  // board but their own plays stay local-only until they log in. Falls back to
+  // the local provider whenever the backend, client, or session isn't ready —
+  // never breaks a game.
+  function makeLiveProvider(cfg) {
+    const local = makeLocalProvider(cfg);
+    const client = () => {
+      const a = window.TrollrunnerAccounts;
+      return a && a.getClient ? a.getClient() : null;
+    };
+    const session = () => {
+      const a = window.TrollrunnerAccounts;
+      if (!a) return null;
+      return (a.getCachedProfile && a.getCachedProfile()) || null;
+    };
+    return {
+      name: "live",
+      async getBoard() {
+        const sb = client();
+        if (!sb) return local.getBoard();
+        const wid = weekId();
+        const { start, end } = weekWindow();
+        let rows;
+        try {
+          const { data, error } = await sb
+            .from("troll_leaderboard_view")
+            .select("user_id,username,score,meta,achieved_at")
+            .eq("game_id", cfg.gameId)
+            .gte("achieved_at", start.toISOString())
+            .lt("achieved_at", end.toISOString())
+            .order("achieved_at", { ascending: false })
+            .limit(500);
+          if (error) throw error;
+          rows = data || [];
+        } catch (err) {
+          console.warn("[leaderboard] live fetch failed for " + cfg.gameId + ", showing local cache:", err);
+          return local.getBoard();
+        }
+        const me = session();
+        const myId = me && me.userId;
+        const seen = new Set();
+        const entries = [];
+        for (const r of rows) {
+          if (seen.has(r.user_id)) continue;   // first hit per user = most recent (order desc) = current weekly aggregate
+          seen.add(r.user_id);
+          entries.push(Object.assign({ id: r.user_id, name: r.username, you: r.user_id === myId }, r.meta || {}));
+        }
+        if (myId) {
+          // keep the logged-in viewer's own row on their freshest local write —
+          // covers the gap between an optimistic local update and the RPC insert landing.
+          const you = loadYou(cfg);
+          if (you._played) {
+            const row = Object.assign({}, you, { id: myId, name: me.username || you.name, you: true });
+            const idx = entries.findIndex(e => e.id === myId);
+            if (idx >= 0) entries[idx] = row; else entries.push(row);
+          }
+        }
+        return { weekId: wid, weekLabel: weekLabel(), resetsIn: timeLeft(), source: "live", entries, loggedIn: !!myId };
+      },
+      recordEvent(ev) {
+        local.recordEvent(ev);   // always keep the local optimistic cache current, logged in or not
+        const sb = client();
+        const me = session();
+        if (!sb || !me) return;   // not logged in: local-only for now
+        const you = loadYou(cfg);
+        const score = Number(you[primaryKey(cfg)]) || 0;
+        sb.rpc("troll_record_game_result", { p_game_id: cfg.gameId, p_score: score, p_meta: you })
+          .then(({ error }) => { if (error) console.warn("[leaderboard] sync failed for " + cfg.gameId + ":", error.message); })
+          .catch(err => console.warn("[leaderboard] sync failed for " + cfg.gameId + ":", err));
       },
     };
   }
@@ -199,9 +279,13 @@
     const cfg = g.config;
     if (!g.rootEl) return;
     const headCols = cfg.columns.map(c => `<th class="${colClass(c)}">${esc(c.label)}</th>`).join("");
-    const rows = rankEntries(cfg, board.entries).slice(0, cfg.boardSize || 10).map(e => rowMarkup(cfg, e)).join("");
-    const foot = cfg.footNote ||
-      "Rivals are simulated for now. <strong>Your</strong> row is real — it tracks what you play this week and resets every Monday.";
+    const ranked = rankEntries(cfg, board.entries).slice(0, cfg.boardSize || 10);
+    const rows = ranked.map(e => rowMarkup(cfg, e)).join("") ||
+      `<tr class="lb-empty"><td class="lb-empty-cell" colspan="${cfg.columns.length + 2}">No plays yet this week — be the first on the board.</td></tr>`;
+    const foot = (cfg.footNote || (board.source === "live"
+      ? "Live — synced across every player and device. Resets every Monday."
+      : "Scores here are real. The board fills in as people play this week and resets every Monday."))
+      + (board.source === "live" && !board.loggedIn ? " <strong>Log in</strong> to add your own score to the board." : "");
     g.rootEl.innerHTML = `
       <div class="lb-bar">
         <div class="lb-week">
@@ -209,7 +293,7 @@
           <span class="lb-week-id">${esc(board.weekId)}</span>
         </div>
         <div class="lb-reset"><span class="lb-reset-label">Resets in</span><strong class="lb-reset-time" data-lb-reset>${esc(board.resetsIn)}</strong></div>
-        <span class="lb-source">${board.source === "mock" ? "MOCK DATA" : "LIVE"}</span>
+        <span class="lb-source">${board.source === "live" ? "LIVE" : "LOCAL"}</span>
       </div>
       ${prizeMarkup(cfg)}
       <div class="lb-table-wrap">
@@ -249,7 +333,7 @@
     if (!cfg || !cfg.gameId) throw new Error("TrollLeaderboard.register needs a gameId");
     cfg.prizes = cfg.prizes === undefined ? Object.assign({}, DEFAULT_PRIZES)
                : (cfg.prizes && Object.assign({}, DEFAULT_PRIZES, cfg.prizes, { live: false }));  // never allow live:true
-    const g = games[cfg.gameId] = { config: cfg, provider: makeMockProvider(cfg), rootEl: null, timer: null };
+    const g = games[cfg.gameId] = { config: cfg, provider: makeLiveProvider(cfg), rootEl: null, timer: null };
     if (cfg.mount) {
       const el = typeof cfg.mount === "string" ? document.querySelector(cfg.mount) : cfg.mount;
       if (el) mount(cfg.gameId, el);
@@ -286,6 +370,12 @@
     const y = loadYou(g.config); y.name = name; saveYou(g.config, y);
     refresh(g);
   }
+
+  // Logging in/out changes whose row is "you" and whether recordEvent can
+  // sync at all — re-render every mounted board when it happens.
+  window.addEventListener("trollrunner:auth-changed", () => {
+    for (const id in games) refresh(games[id]);
+  });
 
   window.TrollLeaderboard = {
     __engine: true,

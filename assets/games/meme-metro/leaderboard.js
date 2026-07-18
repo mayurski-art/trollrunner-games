@@ -46,7 +46,7 @@
       };
     },
 
-    footNote: "Rivals are simulated for now. <strong>Your</strong> row is real — it tracks your best run this week and resets every Monday.",
+    footNote: "Every row here is a real player — tracks your best run this week and resets every Monday.",
 
     prizes: {
       poolLabel: "Mock prize pool · Meme Metro",

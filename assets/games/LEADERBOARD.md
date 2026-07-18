@@ -14,6 +14,44 @@ or payout anywhere in the engine, and `prizes.live` is forced `false` (the engin
 strips `live:true` if a config sets it). Do not add real USDC / $TROLL payouts here
 without a separate, audited money path.
 
+## No bots — and real sync across players/devices
+The engine does **not** generate fake rivals. Boards start empty and only ever
+show real recorded plays (`cfg.mockRival` / `cfg.rivalNames` / `cfg.rivalCount`
+are accepted for backward compat but ignored).
+
+Every registered game gets the same **live provider** automatically — no
+per-game code needed. It talks to the real Supabase backend from
+[troll_accounts.sql](https://github.com/mayurski-art/mayurski-art.github.io/blob/main/assets/supabase/troll_accounts.sql)
+(table `troll_leaderboard`, RPC `troll_record_game_result`, view
+`troll_leaderboard_view`) via `window.TrollrunnerAccounts.getClient()`:
+
+- **Reading** the board works for everyone, logged in or not (RLS grants
+  `select` to `anon`).
+- **Writing** (`record()`) requires a logged-in session — the RPC is
+  `security definer` and rejects `auth.uid() is null`. If the viewer isn't
+  logged in, their play still updates the local-only cache (so their own
+  device shows it) but doesn't sync to other players until they log in. The
+  footer shows "Log in to add your own score to the board" in that case.
+- The backend score column is just `cfg.rankBy[0]` (or the first column key)
+  — a coarse sort hint for the DB row. **Final on-page ranking always uses the
+  full `rankBy` tuple**, computed client-side from `meta` after fetching, so
+  the single numeric backend score never has to be a perfect encoding of a
+  multi-key sort.
+- `getBoard()` pulls this ISO week's rows (`achieved_at` between Monday
+  00:00 and next Monday), newest first, and keeps only the first (=freshest)
+  row per `user_id` — since `reduce()` sends the full cumulative aggregate on
+  every call, that freshest row already *is* the player's current weekly
+  stat line.
+- If the backend/client/session isn't available for any reason, everything
+  falls back to the local-only provider silently — a game never breaks
+  because of this.
+
+No new SQL, script tags, or per-game config changes are needed — `troll_accounts.sql`
+was already run project-wide, and every game page already loads `supabase-js`
++ `troll-accounts.js`. To point a game at a *different* backend entirely, call
+`TrollLeaderboard.setProvider(gameId, provider)` with your own
+`{ getBoard(), recordEvent(ev) }` implementation.
+
 ## Add it to a new game (4 steps)
 
 **1. Load the shared engine + styles** in the game's HTML:
