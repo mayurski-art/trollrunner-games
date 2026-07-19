@@ -200,10 +200,20 @@
         room.classList.add("is-playing");
         seedWagerInput();
         sizeCanvas(); drawIdle();
+        if (!(wallet().getBalance() > 0)) showBalanceHint();
       }
       if (btn.dataset.act === "launch") launch();
       if (btn.dataset.act === "cashout") cashOut();
+      if (btn.dataset.act === "deposit") window.TrollCasinoMoneyUI?.openDeposit();
     });
+  }
+
+  // The #1 confusion at this table: bets spend your DEPOSITED casino balance,
+  // not the coins sitting in Phantom — say so instead of a vague "not enough".
+  function showBalanceHint() {
+    setStatus(`Casino balance: <strong>${wallet().fmt(wallet().getBalance())}</strong> — bets spend deposits,
+      not the coins in your Phantom wallet.
+      <button type="button" class="cr-add-funds" data-act="deposit">＋ Add funds</button>`);
   }
 
   function seedWagerInput() {
@@ -217,7 +227,7 @@
     if (C.phase !== "idle" && C.phase !== "crashed" && C.phase !== "cashed") return;
     const wager = Math.floor(Number($("#cr-wager").value));
     if (!(wager > 0)) { setStatus("Enter a wager first"); return; }
-    if (!wallet().canAfford(wager)) { setStatus("Not enough balance for that wager"); return; }
+    if (!wallet().canAfford(wager)) { showBalanceHint(); return; }
     if (!wallet().debit(wager, "Whale Launch wager")) return;
 
     C.phase = "counting";  // set synchronously so a double-click can't race the await below
