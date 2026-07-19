@@ -47,3 +47,20 @@ serving the repo and driving the real page in headless Chrome.
   check and silently re-locks if that fails, so it can't be faked
   offline. For headless testing, intercept requests and abort the
   `coming-soon.js` request instead (see tools/bridge-patrol-smoke.js).
+
+## Troll Casino specifically
+
+- Hard login gate (`#tc-gate`): real Supabase auth, no guest mode. Test
+  account `clddbg`-prefixed throwaways work — signup via the gate's
+  "Create account" tab (username + password only) returns a live session.
+  Existing drained test account: `clddbgau438k` / `Debug-Pass-1234`.
+- Bets spend the SERVER-SIDE casino ledger (`troll_casino_wallet` via
+  `TrollCasinoWallet`), NOT the connected Phantom wallet's on-chain
+  balance. A fresh account has 0 — game buttons will refuse with a
+  status-line message, which looks like a dead button. To fund a test:
+  `window.TrollCasinoWallet.credit(50000, "test")` in page context (the
+  v1 `troll_casino_adjust_balance` RPC accepts client deltas — known
+  trust model). Drain with `.debit()` when done so the real ledger stays
+  clean.
+- `?boot=1` skips the Enter click; then click `#skip-intro`, a floor
+  card, and the room's `[data-act="sit"]` button to reach the controls.
