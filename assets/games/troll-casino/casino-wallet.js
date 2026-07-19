@@ -36,7 +36,7 @@
     TROLL: { code: "TROLL", label: "$TROLL", decimals: 0,
              chips: [500, 1000, 5000, 25000], color: "#3dff8a" },
     USDC:  { code: "USDC",  label: "USDC",   decimals: 2,
-             chips: [1, 5, 25, 100], color: "#3ea8ff" },
+             chips: [1, 4.2, 6.9, 20], color: "#3ea8ff" },
   };
 
   const state = {
@@ -68,7 +68,15 @@
   const def = (cur) => CURRENCIES[cur || state.currency];
   const list = () => Object.values(CURRENCIES).map(c => ({ ...c }));
   const getBalance = (cur) => state.balances[cur || state.currency] || 0;
-  const canAfford = (amount, cur) => amount > 0 && state.ready && getBalance(cur) >= amount;
+  // Round to the currency's own precision so float drift (e.g. repeated
+  // 4.2/6.9 USDC chip bets) can't leave a balance like 0.9999999999999998
+  // sitting one epsilon under a whole-number wager.
+  const roundCur = (n, cur) => {
+    const d = def(cur).decimals;
+    const f = 10 ** d;
+    return Math.round((Number(n) + Number.EPSILON) * f) / f;
+  };
+  const canAfford = (amount, cur) => amount > 0 && state.ready && roundCur(getBalance(cur), cur) >= roundCur(amount, cur);
   const isReady = () => state.ready;
 
   function fmt(amount, cur) {
@@ -168,8 +176,8 @@
      false (and changes nothing) when not logged in or the debit doesn't cover. */
   function debit(amount, label, cur) {
     cur = cur || state.currency;
-    if (!state.ready || !(amount > 0) || state.balances[cur] < amount) return false;
-    state.balances[cur] -= amount;
+    if (!canAfford(amount, cur)) return false;
+    state.balances[cur] = roundCur(state.balances[cur] - amount, cur);
     record(label || "Debit", -amount, cur);
     queueDelta(-amount, cur, label);
     emit();
@@ -178,7 +186,7 @@
   function credit(amount, label, cur) {
     cur = cur || state.currency;
     if (!state.ready || !(amount > 0)) return false;
-    state.balances[cur] += amount;
+    state.balances[cur] = roundCur(state.balances[cur] + amount, cur);
     record(label || "Credit", +amount, cur);
     queueDelta(amount, cur, label);
     emit();
