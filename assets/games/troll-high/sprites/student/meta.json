@@ -1,0 +1,8 @@
+{
+  "frameW": 64,
+  "frameH": 64,
+  "anchorX": 31,
+  "anchorY": 47,
+  "walkFrames": 6,
+  "fps": 8
+}

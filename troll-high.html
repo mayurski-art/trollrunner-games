@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://mayurski-art.github.io https://trollrunner.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://tjsyhfplxjtakdfkpdtg.supabase.co wss://tjsyhfplxjtakdfkpdtg.supabase.co; object-src 'none'; base-uri 'self'; frame-ancestors 'self';">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#14110c">
+  <meta name="description" content="Troll High — walk the halls of the internet's most nostalgic school. A 2000s childhood MMO by Troll Runner.">
+  <title>Troll High | Troll Runner Arcade</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%2314110c'/%3E%3Ctext x='6' y='44' font-size='30' font-family='monospace'%3E%F0%9F%8F%AB%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,500;0,700;0,900;1,900&family=DM+Mono:wght@500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/games/troll-high/styles.css?v=th-p0">
+</head>
+<body>
+  <div id="th-root">
+    <canvas id="th-canvas" aria-label="Troll High school world"></canvas>
+
+    <!-- Title screen (Phase 0: simple; becomes the account gate in Phase 6) -->
+    <div id="th-title">
+      <div class="th-title-card">
+        <div class="th-title-emoji" aria-hidden="true">🏫</div>
+        <h1>Troll High</h1>
+        <p class="th-tagline">the halls remember you</p>
+        <button id="th-start" type="button">Start School Day ▶</button>
+        <p class="th-build">Phase 0 proof · hallway + room 3B</p>
+      </div>
+    </div>
+
+    <!-- In-game HUD -->
+    <div id="th-hud" hidden>
+      <span id="th-zone-name">—</span>
+      <span id="th-clock">—</span>
+    </div>
+
+    <!-- Interaction hint ("E — Look at lockers") -->
+    <div id="th-hint" hidden></div>
+
+    <!-- Touch controls -->
+    <div id="th-touch" hidden>
+      <div id="th-stick" aria-label="Move"><div id="th-stick-nub"></div></div>
+      <button id="th-btn-act" type="button" aria-label="Interact">E</button>
+    </div>
+
+    <!-- Loading -->
+    <div id="th-loading"><span>🧌 sharpening pencils…</span></div>
+  </div>
+
+  <script type="module" src="assets/games/troll-high/src/main.js?v=th-p0"></script>
+</body>
+</html>

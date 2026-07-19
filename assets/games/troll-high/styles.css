@@ -1,0 +1,226 @@
+/* Troll High — page chrome. World rendering happens on the canvas;
+   this file only styles the shell (title, HUD, touch, loading). */
+
+:root {
+  --th-bg: #14110c;
+  --th-paper: #f5f0e4;
+  --th-ink: #2b2417;
+  --th-gold: #f5b52e;
+  --th-navy: #27408b;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* display:flex on containers would otherwise beat the hidden attribute's
+   UA display:none — hidden overlays then swallow clicks (see verify skill) */
+[hidden] { display: none !important; }
+
+html, body {
+  height: 100%;
+  background: var(--th-bg);
+  font-family: "DM Sans", system-ui, sans-serif;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+#th-root { position: fixed; inset: 0; overflow: hidden; }
+
+#th-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  background: var(--th-bg);
+}
+
+/* ------------------------------------------------------------ title */
+#th-title {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(245, 181, 46, 0.14), transparent 60%),
+    var(--th-bg);
+  z-index: 30;
+}
+
+.th-title-card {
+  text-align: center;
+  color: var(--th-paper);
+  padding: 28px 34px;
+  border: 2px solid rgba(245, 181, 46, 0.35);
+  border-radius: 14px;
+  background: rgba(20, 17, 12, 0.82);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
+}
+
+.th-title-emoji { font-size: 44px; margin-bottom: 6px; }
+
+.th-title-card h1 {
+  font-weight: 900;
+  font-size: clamp(34px, 7vw, 56px);
+  letter-spacing: 0.04em;
+  color: var(--th-gold);
+  text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.5);
+}
+
+.th-tagline {
+  font-family: "DM Mono", monospace;
+  font-size: 13px;
+  opacity: 0.75;
+  margin: 6px 0 20px;
+}
+
+#th-start {
+  font: 700 17px "DM Sans", sans-serif;
+  color: var(--th-ink);
+  background: linear-gradient(180deg, #ffd977, var(--th-gold));
+  border: 0;
+  border-radius: 999px;
+  padding: 13px 30px;
+  cursor: pointer;
+  box-shadow: 0 4px 0 #a97a12, 0 10px 24px rgba(0, 0, 0, 0.4);
+  transition: transform 0.08s ease;
+}
+#th-start:hover { transform: translateY(-1px); }
+#th-start:active { transform: translateY(2px); box-shadow: 0 2px 0 #a97a12; }
+#th-start:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+
+.th-build {
+  margin-top: 16px;
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+  opacity: 0.45;
+}
+
+/* -------------------------------------------------------------- hud */
+#th-hud {
+  position: absolute;
+  top: max(10px, env(safe-area-inset-top));
+  left: 12px;
+  display: flex;
+  gap: 8px;
+  z-index: 20;
+  pointer-events: none;
+}
+
+#th-hud span {
+  font-family: "DM Mono", monospace;
+  font-size: 12px;
+  color: var(--th-paper);
+  background: rgba(20, 17, 12, 0.72);
+  border: 1px solid rgba(245, 240, 228, 0.18);
+  border-radius: 8px;
+  padding: 5px 10px;
+}
+
+/* interaction hint */
+#th-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 18%;
+  transform: translateX(-50%);
+  z-index: 20;
+  pointer-events: none;
+  font: 700 14px "DM Sans", sans-serif;
+  color: var(--th-ink);
+  background: var(--th-paper);
+  border-radius: 999px;
+  padding: 8px 16px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+}
+#th-hint kbd {
+  font-family: "DM Mono", monospace;
+  background: var(--th-navy);
+  color: #fff;
+  border-radius: 5px;
+  padding: 1px 7px;
+  margin-right: 6px;
+}
+
+/* memory popup card (Polaroid-ish) */
+#th-memory {
+  position: absolute;
+  left: 50%;
+  bottom: 12%;
+  transform: translateX(-50%);
+  z-index: 25;
+  width: min(340px, 86vw);
+  background: var(--th-paper);
+  color: var(--th-ink);
+  border-radius: 10px;
+  padding: 14px 16px 12px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(43, 36, 23, 0.15);
+}
+#th-memory h3 { font-size: 15px; font-weight: 900; margin-bottom: 4px; }
+#th-memory p { font-size: 13px; line-height: 1.45; }
+#th-memory .th-mem-close {
+  margin-top: 8px;
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+  opacity: 0.55;
+}
+
+/* ------------------------------------------------------------ touch */
+#th-touch { position: absolute; inset: 0; z-index: 15; pointer-events: none; }
+
+#th-stick {
+  position: absolute;
+  left: 22px;
+  bottom: max(22px, env(safe-area-inset-bottom));
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  background: rgba(245, 240, 228, 0.08);
+  border: 1.5px solid rgba(245, 240, 228, 0.25);
+  pointer-events: auto;
+}
+#th-stick-nub {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(245, 240, 228, 0.28);
+}
+
+#th-btn-act {
+  position: absolute;
+  right: 26px;
+  bottom: max(38px, env(safe-area-inset-bottom));
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(245, 240, 228, 0.35);
+  background: rgba(245, 181, 46, 0.85);
+  color: var(--th-ink);
+  font: 900 22px "DM Sans", sans-serif;
+  pointer-events: auto;
+}
+#th-btn-act:active { transform: scale(0.94); }
+
+/* ---------------------------------------------------------- loading */
+#th-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--th-bg);
+  z-index: 40;
+  color: var(--th-paper);
+  font-family: "DM Mono", monospace;
+  font-size: 14px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #th-start { transition: none; }
+}
