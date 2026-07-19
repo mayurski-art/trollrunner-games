@@ -28,8 +28,6 @@
     </a>
     <nav class="site-nav" aria-label="Primary">
       <a href="/">Arcade</a>
-      <a href="meme-metro.html">Meme Metro</a>
-      <a href="https://blog.trollrunner.net">Blog</a>
     </nav>
   </header>
 
@@ -128,6 +126,58 @@
                 </button>
               </div>
               <button type="button" class="diff-back" data-act="back-matchtype">← Back</button>
+            </div>
+          </div>
+
+          <!-- 1c · Multiplayer mode: Local (one keyboard) vs Online (invite code) -->
+          <div id="tk-mpmode" class="game-overlay flow-overlay">
+            <div class="overlay-card flow-card diff-card">
+              <p class="overlay-kicker">Multiplayer</p>
+              <h2>Where's your opponent?</h2>
+              <div class="diff-grid mpmode-grid">
+                <button type="button" class="diff-btn is-med" data-act="mpm-local">
+                  <span class="diff-icon">🛋️</span>
+                  <strong>Local</strong>
+                  <p>One keyboard, two trolls. Elbow your rival in person, like the old days.</p>
+                </button>
+                <button type="button" class="diff-btn is-easy" data-act="mpm-online">
+                  <span class="diff-icon">🌐</span>
+                  <strong>Online</strong>
+                  <p>Two devices, one invite code. Host a match or join a friend's.</p>
+                </button>
+              </div>
+              <button type="button" class="diff-back" data-act="back-matchtype">← Back</button>
+            </div>
+          </div>
+
+          <!-- 1d · Online lobby: host shows an invite code, joiner types one -->
+          <div id="tk-lobby" class="game-overlay flow-overlay">
+            <div class="overlay-card flow-card lobby-card">
+              <p class="overlay-kicker">Online match</p>
+              <h2>Invite a challenger</h2>
+              <div class="lobby-grid">
+                <div class="lobby-pane">
+                  <h3>Host a match</h3>
+                  <p class="lobby-blurb">Get a code, send it to your victim.</p>
+                  <button type="button" class="primary-btn" id="lobby-host">Create match</button>
+                  <div class="lobby-code" id="lobby-code" hidden aria-live="polite">
+                    <span class="lobby-code-label">Invite code</span>
+                    <strong id="lobby-code-value">—</strong>
+                    <button type="button" class="lobby-copy" id="lobby-copy" aria-label="Copy invite code">Copy</button>
+                  </div>
+                </div>
+                <div class="lobby-pane">
+                  <h3>Join a match</h3>
+                  <p class="lobby-blurb">Got a code? Type it in.</p>
+                  <div class="lobby-join-row">
+                    <input id="lobby-input" class="lobby-input" type="text" inputmode="latin" autocomplete="off"
+                           spellcheck="false" maxlength="5" placeholder="TR8XK" aria-label="Invite code">
+                    <button type="button" class="primary-btn" id="lobby-join">Join</button>
+                  </div>
+                </div>
+              </div>
+              <p class="lobby-status" id="lobby-status" aria-live="polite"></p>
+              <button type="button" class="diff-back" id="lobby-back">← Back</button>
             </div>
           </div>
 
@@ -255,6 +305,18 @@
               </div>
             </div>
           </div>
+
+          <!-- Online: opponent dropped / left -->
+          <div id="tk-netlost" class="game-overlay netlost-overlay" aria-live="assertive" hidden>
+            <div class="overlay-card netlost-card">
+              <span class="overlay-kicker">Online match</span>
+              <h2 id="netlost-title">Connection lost</h2>
+              <p id="netlost-detail">Your opponent dropped. Problem?</p>
+              <div class="overlay-actions">
+                <button id="netlost-quit" class="primary-btn" type="button">Back to menu</button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Touch controls -->
@@ -312,7 +374,8 @@
   <script src="assets/js/troll-leaderboard.js?v=lb-engine-v1" defer></script>
   <script src="assets/games/troll-kombat/leaderboard.js?v=kombat-lb-v2" defer></script>
   <script src="assets/games/troll-kombat/finisher-sequencer.js?v=phase11b-v1" defer></script>
-  <script src="assets/games/troll-kombat/game.js?v=kombat-v30-quick-fighter-swap" defer></script>
+  <script src="assets/games/troll-kombat/net.js?v=kombat-online-v1" defer></script>
+  <script src="assets/games/troll-kombat/game.js?v=kombat-v31-online-invite" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.3" integrity="sha384-uVefCux0Kf6w34gQVv8+jUPUwvwFUdnrcwI1kOJHs7sfPPXdDDucwcrPrppD6oUe" crossorigin="anonymous"></script>
   <script src="https://mayurski-art.github.io/assets/js/troll-accounts.js"></script>
   <script src="assets/js/site-lock.js"></script>
