@@ -1570,7 +1570,10 @@
       this.diff = diff;
       this.controllers = controllers;
       this.mode = controllers.some(c => c.type === "ai") ? "cpu" : "mp";
-      const humans = controllers.filter(c => c.type === "human").length;
+      // Online: each device only has ONE local human (the other fighter's
+      // input arrives over the network), so both host and guest use the solo
+      // WASD+arrows layout on slot 0 — never the split local-versus keymaps.
+      const humans = online.active ? 1 : controllers.filter(c => c.type === "human").length;
       setupInputs(humans);
       this.fighters = defs.map((def, i) => {
         const c = controllers[i];
@@ -1698,7 +1701,9 @@
         // Each fighter pulls intent from its own controller (human slot or AI),
         // so input/state ownership stays cleanly per-player.
         const fs = this.fighters;
-        const intents = fs.map(f => f.ai ? f.ai.think(f, this.other(f), dt) : readIntent(f.inputSlot));
+        const intents = fs.map((f, i) => f.ai ? f.ai.think(f, this.other(f), dt)
+          : this.controllers[i].remote ? online.remoteIntent()
+          : readIntent(f.inputSlot));
         fs.forEach((f, i) => f.update(dt, intents[i], this.other(f), "fight"));
         // separation: stop overlap
         separate(p1, p2);
@@ -1787,11 +1792,15 @@
     }
   }
 
+  // Tracked so the online host can tell a guest "this exact announcement fired"
+  // without re-triggering on every unrelated snapshot (see online.hostBroadcast).
+  const lastAnnounce = { text: "", seq: 0 };
   function announce(text, dur, big) {
     els.announce.textContent = text;
     els.announce.className = "tk-announce is-show" + (big ? " is-big" : "");
     clearTimeout(announce._t);
     announce._t = setTimeout(() => { els.announce.className = "tk-announce"; }, dur * 1000);
+    lastAnnounce.text = text; lastAnnounce.seq++;
   }
 
   /* ==========================================================================
@@ -2131,6 +2140,16 @@
     if (tag === "SELECT" || tag === "INPUT" || tag === "TEXTAREA") return;
     if (window.TrollrunnerSiteLock?.getComputedRecord?.()?.mode === "locked") return;
     if (!pause.canControl()) return;
+    // Online: each device has only one local player, so any of the pause keys
+    // means "my own pause action" — the host's `pause` object is authoritative
+    // either way, this just routes the press to it (locally or over the wire).
+    if (online.active) {
+      if (e.key === "Escape" || e.key === "p" || e.key === "P" || e.key === "Enter") {
+        e.preventDefault();
+        if (online.isHost) pause.press(0); else online.send("pauseReq", {});
+      }
+      return;
+    }
     const live = new Set(pause.humans());
     for (let slot = 0; slot < PAUSE_KEYS.length; slot++) {
       if (!PAUSE_KEYS[slot][e.key]) continue;
@@ -2142,13 +2161,25 @@
   });
 
   // On-screen / touch pause button acts as P1 (slot 0 — the local/solo player).
-  if (pauseEls.btn) pauseEls.btn.addEventListener("click", e => { e.currentTarget.blur(); pause.press(0); });
-  if (pauseEls.reqCancel) pauseEls.reqCancel.addEventListener("click", () => pause.cancel("PAUSE CANCELLED"));
-  if (pauseEls.resumeBtn) pauseEls.resumeBtn.addEventListener("click", e => { e.currentTarget.blur(); pause.resume(); });
+  if (pauseEls.btn) pauseEls.btn.addEventListener("click", e => {
+    e.currentTarget.blur();
+    if (online.active) { if (online.isHost) pause.press(0); else online.send("pauseReq", {}); return; }
+    pause.press(0);
+  });
+  if (pauseEls.reqCancel) pauseEls.reqCancel.addEventListener("click", () => {
+    if (online.active) { if (online.isHost) pause.cancel("PAUSE CANCELLED"); else online.send("pauseCancel", {}); return; }
+    pause.cancel("PAUSE CANCELLED");
+  });
+  if (pauseEls.resumeBtn) pauseEls.resumeBtn.addEventListener("click", e => {
+    e.currentTarget.blur();
+    if (online.active) { if (online.isHost) pause.press(0); else online.send("pauseReq", {}); return; }
+    pause.resume();
+  });
   if (pauseEls.quitBtn) pauseEls.quitBtn.addEventListener("click", () => {
     pause.reset();
     match.phase = "select";
     match.fighters = [];
+    if (online.active) { online.net && online.net.leave(false); online.active = false; }
     flow.go("matchtype");
   });
 
@@ -2244,6 +2275,8 @@
     screens: {
       matchtype: document.getElementById("tk-matchtype"),
       difficulty: document.getElementById("tk-difficulty"),
+      mpmode: document.getElementById("tk-mpmode"),
+      lobby: document.getElementById("tk-lobby"),
       playercount: document.getElementById("tk-playercount"),
       fighter: document.getElementById("tk-fighter"),
       stage: document.getElementById("tk-stage"),
@@ -2267,7 +2300,7 @@
      background; transparent `.hot` buttons sit over the painted controls and
      dispatch on data-act. CPU difficulty defaults to Normal (the mockup has no
      selector) — `diffSel` is read when present. */
-  document.querySelectorAll(".flow-overlay .hot, #tk-difficulty .diff-btn, #tk-difficulty .diff-back").forEach(el => {
+  document.querySelectorAll(".flow-overlay .hot, #tk-difficulty .diff-btn, #tk-difficulty .diff-back, #tk-mpmode .diff-btn, #tk-mpmode .diff-back").forEach(el => {
     el.addEventListener("click", () => {
       const act = el.dataset.act;
       blip(660, 880);
@@ -2276,7 +2309,11 @@
           setup.mode = "cpu"; setup.playerCount = 1;
           flow.go("difficulty"); break;
         case "mt-mp":
+          flow.go("mpmode"); break;
+        case "mpm-local":
           setup.mode = "mp"; setup.playerCount = 2; flow.go("playercount"); break;
+        case "mpm-online":
+          online.enterLobby(); break;
         case "diff-easy": case "diff-med": case "diff-hard":
           setup.diff = parseInt(el.dataset.diff, 10);
           enterFighterSelect(); break;
@@ -2298,7 +2335,7 @@
     cell.type = "button"; cell.className = "fsel-cell"; cell.dataset.id = def.id;
     cell.setAttribute("role", "option");
     cell.setAttribute("aria-label", def.name);
-    cell.addEventListener("click", () => pickFighter(def.id));
+    cell.addEventListener("click", () => { online.active ? pickFighterOnline(def.id) : pickFighter(def.id); });
     fselGrid.appendChild(cell);
   });
 
@@ -2306,6 +2343,10 @@
     setup.picks = [];
     setup.current = 0;
     document.getElementById("fsel-p2").hidden = humanCount() < 2;
+    if (!online.active) {
+      document.getElementById("fsel-back").hidden = false;
+      document.getElementById("fsel-reset").hidden = false;
+    }
     renderFighterSelect();
     flow.go("fighter");
   }
@@ -2321,6 +2362,17 @@
     if (setup.picks.includes(id)) { blip(180, 120); return; }   // locked by another player
     setup.picks[setup.current] = id;
     advanceCurrent();
+    blip(720, 940);
+    renderFighterSelect();
+  }
+  // Online: each device picks only its OWN slot (host=0, guest=1) — no shared
+  // "current" turn order, since the two players are on separate screens.
+  function pickFighterOnline(id) {
+    const slot = online.mySlot;
+    if (setup.picks[slot] === id) return;
+    if (setup.picks[1 - slot] === id) { blip(180, 120); return; }   // opponent already has it
+    setup.picks[slot] = id;
+    online.send("pick", { slot, id });
     blip(720, 940);
     renderFighterSelect();
   }
@@ -2341,9 +2393,20 @@
     if (mp) setPanel(1, "fsel-p2");
     // hint + continue gate
     const hint = document.getElementById("fsel-hint");
-    const allPicked = setup.current < 0;
-    hint.textContent = allPicked ? "Ready — choose your stage." : `${SLOT_LABEL[setup.current]}, pick your fighter`;
-    document.getElementById("fsel-continue").disabled = !allPicked;
+    const contBtn = document.getElementById("fsel-continue");
+    if (online.active) {
+      const mine = setup.picks[online.mySlot], theirs = setup.picks[1 - online.mySlot];
+      if (!mine) hint.textContent = "Pick your fighter";
+      else if (!theirs) hint.textContent = "Waiting for opponent…";
+      else hint.textContent = online.isHost ? "Ready — choose your stage." : "Ready — waiting for host…";
+      contBtn.disabled = !(mine && theirs) || !online.isHost;
+      contBtn.textContent = online.isHost ? "Choose Stage →" : "Waiting for host…";
+    } else {
+      const allPicked = setup.current < 0;
+      hint.textContent = allPicked ? "Ready — choose your stage." : `${SLOT_LABEL[setup.current]}, pick your fighter`;
+      contBtn.disabled = !allPicked;
+      contBtn.textContent = "Choose Stage →";
+    }
   }
   function setPanel(slot, panelId) {
     const panel = document.getElementById(panelId);
@@ -2370,7 +2433,13 @@
   document.getElementById("fsel-reset").addEventListener("click", () => {
     setup.picks = []; setup.current = 0; renderFighterSelect(); blip(300, 200);
   });
-  document.getElementById("fsel-continue").addEventListener("click", () => enterStageSelect());
+  document.getElementById("fsel-continue").addEventListener("click", () => {
+    if (online.active) {
+      if (!online.isHost) return;   // guest's button is disabled; belt & suspenders
+      online.send("advance", { screen: "stage" });
+    }
+    enterStageSelect();
+  });
 
   /* --- 4 · STAGE SELECT (mockup art + live hero preview overlay) ------------ */
   const stageHeroLive = document.getElementById("stage-hero-live");
@@ -2390,10 +2459,12 @@
   document.querySelectorAll("#tk-stage .stage-thumb").forEach(thumb => {
     const s = STAGES[+thumb.dataset.stage];
     if (!s) return;
-    thumb.addEventListener("mouseenter", () => { loadStageImage(s); showStageHero(s); });
-    thumb.addEventListener("mouseleave", () => showStageHero(setup.stage));
+    thumb.addEventListener("mouseenter", () => { if (online.isGuest) return; loadStageImage(s); showStageHero(s); });
+    thumb.addEventListener("mouseleave", () => { if (online.isGuest) return; showStageHero(setup.stage); });
     thumb.addEventListener("click", () => {
+      if (online.isGuest) return;   // spectate-only; CSS also blocks pointer events
       setup.stage = s; loadStageImage(s); showStageHero(s); markSelectedThumb(s); blip(680, 880);
+      if (online.isHost) online.send("stage", { id: s.id, random: setup.randomStage });
     });
   });
   // random-map toggle (two pills over the baked OFF/ON)
@@ -2403,15 +2474,25 @@
       o.classList.toggle("is-active", (o.dataset.rand === "on") === on));
   }
   document.querySelectorAll("#tk-stage .rand-opt").forEach(o =>
-    o.addEventListener("click", () => { setRandom(o.dataset.rand === "on"); blip(520, 640); }));
+    o.addEventListener("click", () => {
+      if (online.isGuest) return;
+      setRandom(o.dataset.rand === "on"); blip(520, 640);
+      if (online.isHost) online.send("stage", { id: setup.stage.id, random: setup.randomStage });
+    }));
   function enterStageSelect() {
     showStageHero(setup.stage);
     markSelectedThumb(setup.stage);
     flow.go("stage");
   }
-  document.querySelector("#tk-stage [data-act='stage-back']").addEventListener("click", () => enterFighterSelect());
+  document.querySelector("#tk-stage [data-act='stage-back']").addEventListener("click", () => {
+    if (online.isGuest) return;
+    if (online.isHost) online.send("advance", { screen: "fighter" });
+    enterFighterSelect();
+  });
   document.querySelector("#tk-stage [data-act='stage-fight']").addEventListener("click", async e => {
     e.currentTarget.blur();
+    if (online.isGuest) return;
+    if (online.isHost) { online.hostStartFight(); return; }   // wagers are local-only; no wager flow online
     // Optional wager (isolated module): validate manual-review terms before the match
     // starts; abort the launch if the terms are incomplete.
     // No wallet, payment, or settlement logic lives in the fight engine.
@@ -2434,6 +2515,10 @@
   }
   function buildControllers() {
     if (setup.mode === "cpu") return [{ type: "human", slot: 0 }, { type: "ai" }];
+    // Online: fighter 1 is driven by network input, not a local key slot. Both
+    // screens build this identically from the host's "fight" message so HUD
+    // labels/corners match on both devices.
+    if (online.active) return [{ type: "human", slot: 0 }, { type: "human", slot: 1, remote: true }];
     return setup.picks.slice(0, setup.playerCount).map((_, i) => ({ type: "human", slot: i }));
   }
   function startMatch() {
@@ -2493,7 +2578,14 @@
       : `Rugged by the CPU's ${winner.def.name}. Run it back?`;
     resultOverlay.classList.toggle("is-loss", !isMP && !youWon);
     resultOverlay.classList.add("is-visible");
-    document.getElementById("tk-rematch").focus();
+    const rematchBtn = document.getElementById("tk-rematch"), changeBtn = document.getElementById("tk-change");
+    if (online.isGuest) {
+      rematchBtn.hidden = true; changeBtn.hidden = true;
+      document.getElementById("result-detail").textContent += " Waiting for the host to choose what's next…";
+    } else {
+      rematchBtn.hidden = false; changeBtn.hidden = false;
+      rematchBtn.focus();
+    }
     // Wager payout hook (isolated): lets a wagered winner submit for manual
     // approval. No money logic here — wager.js owns it.
     if (window.KombatWager && window.KombatWager.onResult) {
@@ -2509,13 +2601,19 @@
     }
   }
   document.getElementById("tk-rematch").addEventListener("click", e => {
+    if (online.isGuest) return;   // guest's button is hidden; host drives rematches
     resultOverlay.classList.remove("is-visible");
     e.currentTarget.blur();
+    if (online.isHost) {
+      online.send("fight", { p1: setup.picks[0], p2: setup.picks[1], stage: currentStage.id, random: setup.randomStage, diff: match.diff });
+    }
     // Re-run the same matchup with the same controllers (same defs + slots).
     match.init(match.fighters.map(f => f.def), match.controllers, match.diff);
   });
   document.getElementById("tk-change").addEventListener("click", () => {
+    if (online.isGuest) return;   // guest's button is hidden; host drives this
     resultOverlay.classList.remove("is-visible");
+    if (online.isHost) online.send("advance", { screen: "fighter" });
     // Jump straight to fighter select — same mode/difficulty/player count,
     // just re-pick who's fighting. Use "fsel-back" to fall back to matchtype
     // for a full setup change instead.
@@ -2533,6 +2631,376 @@
   });
 
   /* ==========================================================================
+     ONLINE MULTIPLAYER  —  invite-code lobby + host-authoritative netplay.
+     The host runs the one true simulation (see match.update's intent line and
+     the loop() branch below); the guest never calls match.update() at all —
+     it applies the host's snapshots and interpolated pose animation instead.
+     Session/transport lives in net.js (window.KombatNet). Design doc:
+     docs/TROLL-KOMBAT-ONLINE.md
+     ========================================================================== */
+  const lobbyEls = {
+    hostBtn: document.getElementById("lobby-host"),
+    joinBtn: document.getElementById("lobby-join"),
+    input: document.getElementById("lobby-input"),
+    codeBox: document.getElementById("lobby-code"),
+    codeVal: document.getElementById("lobby-code-value"),
+    copyBtn: document.getElementById("lobby-copy"),
+    status: document.getElementById("lobby-status"),
+    back: document.getElementById("lobby-back"),
+  };
+  const netlostEls = {
+    overlay: document.getElementById("tk-netlost"),
+    detail: document.getElementById("netlost-detail"),
+    quit: document.getElementById("netlost-quit"),
+  };
+  const stageEl = document.getElementById("tk-stage");
+  const stageMockup = stageEl && stageEl.querySelector(".mockup-screen");
+  const stageSpectateHint = document.createElement("div");
+  stageSpectateHint.className = "stage-spectate-hint";
+  stageSpectateHint.textContent = "Host is choosing the stage…";
+  stageSpectateHint.hidden = true;
+  if (stageMockup) stageMockup.appendChild(stageSpectateHint);
+
+  const online = {
+    net: window.KombatNet,
+    active: false,         // paired & running an online session (lobby through match)
+    isHost: false,
+    mySlot: 0,              // 0 = host, 1 = guest — fixed for the whole session
+    heldIntent: { left: false, right: false, up: false, crouch: false, block: false },
+    remoteTap: { punch: false, kick: false, special: false, dash: false },
+    _pendingTap: { punch: false, kick: false, special: false, dash: false },
+    _lastSentHeld: "",
+    _sendAcc: 0,
+    _snapAcc: 0,
+    _lastSnap: null,
+    _resultShown: false,
+
+    get isGuest() { return this.active && !this.isHost; },
+
+    setStatus(text, cls) {
+      if (!lobbyEls.status) return;
+      lobbyEls.status.textContent = text || "";
+      lobbyEls.status.className = "lobby-status" + (cls ? " is-" + cls : "");
+    },
+
+    enterLobby() {
+      this.active = false; this.isHost = false;
+      if (lobbyEls.codeBox) lobbyEls.codeBox.hidden = true;
+      if (lobbyEls.input) lobbyEls.input.value = "";
+      this.setStatus("");
+      flow.go("lobby");
+    },
+
+    async hostMatch() {
+      if (!this.net) { this.setStatus("Online play isn't available right now.", "error"); return; }
+      this.setStatus("Opening a room…");
+      const code = this.net.makeCode();
+      const kind = await this.net.host(code);
+      if (!kind) { this.setStatus("Couldn't reach the network. Try again.", "error"); return; }
+      if (lobbyEls.codeBox) lobbyEls.codeBox.hidden = false;
+      if (lobbyEls.codeVal) lobbyEls.codeVal.textContent = code;
+      this.setStatus("Waiting for a challenger…", "live");
+    },
+
+    async joinMatch() {
+      if (!this.net) { this.setStatus("Online play isn't available right now.", "error"); return; }
+      const code = ((lobbyEls.input && lobbyEls.input.value) || "").trim().toUpperCase();
+      if (code.length < 4) { this.setStatus("Enter the invite code first.", "error"); return; }
+      this.setStatus("Joining…");
+      const result = await this.net.join(code);
+      if (result === "ok") { this.setStatus("Connected!", "live"); return; }   // onPaired() takes it from here
+      if (result === "full") this.setStatus("That room already has two players.", "error");
+      else if (result === "timeout") this.setStatus("No one's hosting that code.", "error");
+      else this.setStatus("Couldn't reach the network. Try again.", "error");
+    },
+
+    leaveLobby() {
+      if (this.net) this.net.leave(false);
+      this.active = false;
+      flow.go("mpmode");
+    },
+
+    /* --------------------------------------------------------- handshake */
+    onPaired() {
+      this.active = true;
+      this.isHost = this.net.role === "host";
+      this.mySlot = this.isHost ? 0 : 1;
+      setup.mode = "mp"; setup.playerCount = 2;
+      setup.picks = []; setup.current = 0;
+      this._sendAcc = 0; this._snapAcc = 0; this._lastSnap = null; this._resultShown = false;
+      document.getElementById("fsel-p2").hidden = false;
+      document.getElementById("fsel-back").hidden = true;
+      document.getElementById("fsel-reset").hidden = true;
+      renderFighterSelect();
+      flow.go("fighter");
+    },
+
+    onPeerLeft(why) {
+      if (!this.active) return;
+      const midMatch = document.body.dataset.gameState === "fight";
+      if (netlostEls.detail) {
+        netlostEls.detail.textContent = why === "timeout"
+          ? "Your opponent's connection dropped."
+          : "Your opponent left the match.";
+      }
+      if (netlostEls.overlay) netlostEls.overlay.hidden = false;
+      if (midMatch) { pauseEls.btn && (pauseEls.btn.hidden = true); pause.reset(); }
+      this.active = false;
+    },
+
+    onMessage(t, m) {
+      switch (t) {
+        case "pick":
+          setup.picks[m.slot] = m.id;
+          renderFighterSelect();
+          blip(720, 940);
+          return;
+        case "advance":
+          if (m.screen === "stage") {
+            enterStageSelect();
+            if (this.isGuest) { stageEl.classList.add("is-spectate"); stageSpectateHint.hidden = false; }
+          } else if (m.screen === "fighter") {
+            setup.picks = []; setup.current = 0; enterFighterSelect();
+          }
+          return;
+        case "stage": {
+          const s = stageById(m.id);
+          if (!s) return;
+          setup.stage = s; loadStageImage(s); showStageHero(s); markSelectedThumb(s);
+          setRandom(!!m.random);
+          return;
+        }
+        case "fight":
+          if (this.isGuest) this._startGuestMatch(m);
+          return;
+        case "input":
+          if (this.isHost) this._applyRemoteInput(m);
+          return;
+        case "snap":
+          if (this.isGuest) this._applySnapshot(m);
+          return;
+        case "pauseReq":
+          if (this.isHost) pause.press(1);
+          return;
+        case "pauseCancel":
+          if (this.isHost) pause.cancel("PAUSE CANCELLED");
+          return;
+      }
+    },
+
+    /* -------------------------------------------------------- match start */
+    // Host calls this to launch (or relaunch) a match on both screens.
+    hostStartFight() {
+      const p1 = byId(setup.picks[0]), p2 = byId(setup.picks[1]);
+      this.send("fight", { p1: p1.id, p2: p2.id, stage: setup.stage.id, random: setup.randomStage, diff: setup.diff });
+      startMatch();
+    },
+    _startGuestMatch(m) {
+      stageEl.classList.remove("is-spectate"); stageSpectateHint.hidden = true;
+      setup.picks = [m.p1, m.p2];
+      setup.stage = stageById(m.stage) || STAGES[0];
+      setup.randomStage = !!m.random;
+      setup.diff = m.diff;
+      audio.ensure(); audio.on = true;
+      soundBtn.classList.add("is-on"); soundBtn.setAttribute("aria-pressed", "true");
+      currentStage = setup.stage;
+      loadStageImage(currentStage);
+      if (els.stageName) els.stageName.textContent = currentStage.name;
+      flow.hideAll();
+      document.body.dataset.gameState = "fight";
+      match.randomStage = setup.randomStage;
+      match.init(buildDefs(), buildControllers(), setup.diff);
+      canvas.scrollIntoView({ behavior: "smooth", block: "center" });
+    },
+
+    /* ----------------------------------------------------------- transport */
+    send(t, payload) { if (this.net) this.net.send(t, payload); },
+
+    /* --------------------------------------------------- per-frame (guest) */
+    // Samples local input every frame and ships it upstream. Taps latch until
+    // consumed, mirroring the local edge-trigger semantics in readIntent().
+    sendInput(dt) {
+      const s = inputs[0];
+      this._pendingTap.punch   = this._pendingTap.punch   || s.edge.punch;
+      this._pendingTap.kick    = this._pendingTap.kick    || s.edge.kick;
+      this._pendingTap.special = this._pendingTap.special || s.edge.special;
+      this._pendingTap.dash    = this._pendingTap.dash    || s.edge.dash;
+      s.edge.punch = s.edge.kick = s.edge.special = s.edge.dash = false;
+      this._sendAcc += dt;
+      const heldKey = s.held.left + "," + s.held.right + "," + s.held.up + "," + s.held.crouch + "," + s.held.block;
+      const dueTap = this._pendingTap.punch || this._pendingTap.kick || this._pendingTap.special || this._pendingTap.dash;
+      if (this._sendAcc >= 0.05 || heldKey !== this._lastSentHeld || dueTap) {
+        this._sendAcc = 0;
+        this._lastSentHeld = heldKey;
+        this.send("input", {
+          left: !!s.held.left, right: !!s.held.right, up: !!s.held.up,
+          crouch: !!s.held.crouch, block: !!s.held.block,
+          punch: this._pendingTap.punch, kick: this._pendingTap.kick,
+          special: this._pendingTap.special, dash: this._pendingTap.dash,
+        });
+        this._pendingTap = { punch: false, kick: false, special: false, dash: false };
+      }
+    },
+    _applyRemoteInput(m) {
+      this.heldIntent = { left: !!m.left, right: !!m.right, up: !!m.up, crouch: !!m.crouch, block: !!m.block };
+      if (m.punch) this.remoteTap.punch = true;
+      if (m.kick) this.remoteTap.kick = true;
+      if (m.special) this.remoteTap.special = true;
+      if (m.dash) this.remoteTap.dash = true;
+    },
+    // Read by match.update() for the controller flagged `remote: true`.
+    remoteIntent() {
+      const i = {
+        left: this.heldIntent.left, right: this.heldIntent.right, up: this.heldIntent.up,
+        crouch: this.heldIntent.crouch, block: this.heldIntent.block,
+        punch: this.remoteTap.punch, kick: this.remoteTap.kick,
+        special: this.remoteTap.special, dash: this.remoteTap.dash,
+      };
+      this.remoteTap = { punch: false, kick: false, special: false, dash: false };
+      return i;
+    },
+
+    /* ---------------------------------------------------- per-frame (host) */
+    hostBroadcast(dt) {
+      this._snapAcc += dt;
+      if (this._snapAcc < 0.05) return;
+      this._snapAcc = 0;
+      const fs = match.fighters;
+      if (!fs.length) return;
+      this.send("snap", {
+        ph: match.phase, timer: match.timer, round: match.round,
+        stage: currentStage && currentStage.id,
+        winnerIdx: (match.phase === "roundend" || match.phase === "matchend") ? match.winnerIdx : -1,
+        byKO: !!match.byKO,
+        ann: lastAnnounce.text, annSeq: lastAnnounce.seq,
+        p: fs.map(f => ({
+          x: Math.round(f.x), y: Math.round(f.y), vy: Math.round(f.vy), facing: f.facing,
+          state: f.state, atk: f.attack ? f.attack.type : null, atkT: f.attack ? +f.attack.t.toFixed(2) : 0,
+          hp: Math.round(f.hp), meter: Math.round(f.meter), stamina: Math.round(f.stamina),
+          rounds: f.rounds, dmgDealt: Math.round(f.dmgDealt), kos: f.kos, tookDamage: f.tookDamage,
+        })),
+        proj: projectiles.map(p => ({ x: Math.round(p.x), y: Math.round(p.y), r: p.r, color: p.color, kind: p.kind, text: p.text, facing: p.facing })),
+        pause: { active: pause.active, pending: pause.pending, requester: pause.requester, approvals: [...pause.approvals], needed: pause.needed, reqT: pause.reqT },
+      });
+    },
+
+    /* --------------------------------------------------------- guest apply */
+    _applySnapshot(m) {
+      if (!match.fighters.length) return;
+      const prevAnnSeq = this._lastSnap ? this._lastSnap.annSeq : -1;
+      this._lastSnap = m;
+
+      // stage swap (random map mid-fight)
+      if (m.stage && (!currentStage || currentStage.id !== m.stage)) {
+        const s = stageById(m.stage);
+        if (s) { currentStage = s; loadStageImage(s); if (els.stageName) els.stageName.textContent = s.name; }
+      }
+
+      match.fighters.forEach((f, i) => {
+        const d = m.p[i]; if (!d) return;
+        const wasState = f.state;
+        f.x = d.x; f.y = d.y; f.vy = d.vy; f.facing = d.facing;
+        f.state = d.state; f.hp = d.hp; f.meter = d.meter; f.stamina = d.stamina;
+        f.rounds = d.rounds; f.dmgDealt = d.dmgDealt; f.kos = d.kos; f.tookDamage = d.tookDamage;
+        if (d.atk) {
+          if (!f.attack || f.attack.type !== d.atk) f.attack = { type: d.atk, def: ATTACKS[d.atk], t: d.atkT, hasHit: true, fired: true };
+          else f.attack.t = d.atkT;
+        } else f.attack = null;
+        // Light local feedback on transitions the guest didn't simulate itself.
+        if (wasState !== "hit" && d.state === "hit") { f.flash = 0.16; audio.hitSpark(); }
+        if (wasState !== "ko" && d.state === "ko") audio.ko();
+      });
+
+      match.phase = m.ph; match.timer = m.timer; match.round = m.round;
+      match.winnerIdx = m.winnerIdx; match.byKO = m.byKO;
+      projectiles = (m.proj || []).map(p => Object.assign({ life: 1, hit: true, owner: null }, p));
+
+      if (m.annSeq !== prevAnnSeq && m.ann) announce(m.ann, 1.0, true);
+      if (m.ph === "matchend" && !this._resultShown) {
+        this._resultShown = true;
+        // The host's match.endMatch() records ITS OWN leaderboard/XP result;
+        // do the same here for the guest's account (mirrors local mp, where
+        // only "you" — slot 0 on that device — gets recorded).
+        const you = match.fighters[this.mySlot];
+        if (you && window.TrollLeaderboard) {
+          window.TrollLeaderboard.record("troll-kombat", {
+            char: you.def.id, won: m.winnerIdx === this.mySlot, kos: you.kos,
+            damage: Math.round(you.dmgDealt), mode: "mp",
+          });
+        }
+        void window.TrollrunnerAccounts?.awardXp?.("versus_match", "troll-kombat");
+        if (you) {
+          void window.TrollrunnerAccounts?.reportGameResult?.("troll-kombat", Math.round(you.dmgDealt), {
+            char: you.def.id, won: m.winnerIdx === this.mySlot, kos: you.kos, mode: "mp",
+          });
+        }
+        showResult(m.winnerIdx, m.byKO, match.fighters, "mp");
+      }
+      if (m.ph !== "matchend") this._resultShown = false;
+
+      this.applyPause(m.pause);
+      updateHUD();
+    },
+
+    // Mirrors the host's authoritative pause object onto the guest's local one
+    // (which never runs its own vote logic) so the existing render code works
+    // unmodified on both screens.
+    applyPause(p) {
+      if (!p) return;
+      pause.active = p.active; pause.pending = p.pending; pause.requester = p.requester;
+      pause.approvals = new Set(p.approvals || []); pause.needed = p.needed || 0; pause.reqT = p.reqT || 0;
+      if (pause.pending) pause.renderReq(); else pause.hideReq();
+      if (pause.active) { pause.renderPaused(); document.body.dataset.paused = "1"; }
+      else { pause.hidePaused(); document.body.dataset.paused = ""; }
+    },
+
+    /* ----------------------------------------------------- per-frame tick */
+    // Called from the main loop every frame regardless of screen.
+    tick(dt) {
+      if (!this.net) return;
+      this.net.tick();
+      if (!this.active || document.body.dataset.gameState !== "fight") return;
+      if (this.isHost) this.hostBroadcast(dt);
+      else this.sendInput(dt);
+    },
+
+    /* -------------------------------------------------- guest render tick */
+    // The guest never calls match.update(); this drives fighter pose lerps
+    // + particles/projectile motion so the interpolated snapshot still reads
+    // as a living scene between snap packets.
+    guestVisualTick(dt) {
+      for (const f of match.fighters) f.animate(dt, NEUTRAL);
+    },
+  };
+
+  if (online.net) {
+    online.net.on({
+      paired: () => online.onPaired(),
+      peerLeft: why => online.onPeerLeft(why),
+      message: (t, m) => online.onMessage(t, m),
+    });
+  }
+
+  if (lobbyEls.hostBtn) lobbyEls.hostBtn.addEventListener("click", () => { blip(660, 880); online.hostMatch(); });
+  if (lobbyEls.joinBtn) lobbyEls.joinBtn.addEventListener("click", () => { blip(660, 880); online.joinMatch(); });
+  if (lobbyEls.input) lobbyEls.input.addEventListener("keydown", e => { if (e.key === "Enter") online.joinMatch(); });
+  if (lobbyEls.copyBtn) lobbyEls.copyBtn.addEventListener("click", () => {
+    const code = lobbyEls.codeVal && lobbyEls.codeVal.textContent;
+    if (code && navigator.clipboard) navigator.clipboard.writeText(code).catch(() => {});
+  });
+  if (lobbyEls.back) lobbyEls.back.addEventListener("click", () => online.leaveLobby());
+  if (netlostEls.quit) netlostEls.quit.addEventListener("click", () => {
+    if (netlostEls.overlay) netlostEls.overlay.hidden = true;
+    document.body.dataset.paused = "";
+    if (online.net) online.net.leave(true);
+    online.active = false;
+    match.phase = "select"; match.fighters = [];
+    if (pauseEls.btn) pauseEls.btn.hidden = true;
+    resultOverlay.classList.remove("is-visible");
+    flow.go("matchtype");
+  });
+
+  /* ==========================================================================
      MAIN LOOP
      ========================================================================== */
   let lastT = performance.now();
@@ -2541,8 +3009,12 @@
     lastT = now;
     dt = Math.min(dt, 0.05);
 
+    online.tick(dt);
+
     // The pause request timer ticks in real time, even while the sim is frozen.
-    pause.tick(dt);
+    // (Online guest: pause.active/pending mirror the host's state via snapshots,
+    // so this no-ops harmlessly — the guest's own pending timer isn't authoritative.)
+    if (!online.isGuest) pause.tick(dt);
 
     // An approved pause freezes the whole simulation (movement, attacks, timers,
     // map switching, CPU behaviour) — we keep rendering the last frame so the
@@ -2554,7 +3026,12 @@
     let simDt = dt;
     if (!frozen && hitstopT > 0) { hitstopT -= dt; simDt = 0.0005; }
 
-    if (live && !frozen) {
+    if (online.isGuest) {
+      // Thin client: never simulate — just lerp fighter poses toward the
+      // state the last snapshot set, so movement/attacks read as animated
+      // between the ~20 Hz packets from the host.
+      if (live) online.guestVisualTick(dt);
+    } else if (live && !frozen) {
       match.update(simDt);
       updateProjectiles(simDt, match.fighters);
       if (window.FinisherSequencer) window.FinisherSequencer.update(simDt);

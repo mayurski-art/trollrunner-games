@@ -755,6 +755,72 @@ h1 {
   .diff-grid { grid-template-columns: 1fr; }
 }
 
+/* ---- Multiplayer mode (Local vs Online) --------------------------------- */
+.mpmode-grid { grid-template-columns: repeat(2, 1fr); max-width: 620px; margin-inline: auto; }
+
+/* ---- Online lobby (host code / join code) ------------------------------- */
+.lobby-card { max-width: 820px; }
+.lobby-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 22px 0 6px;
+}
+.lobby-pane {
+  display: grid; gap: 10px; align-content: start; justify-items: center;
+  padding: 22px 18px; border-radius: 12px;
+  border: 2px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.05);
+}
+.lobby-pane h3 { font-size: 15px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--cyan); }
+.lobby-blurb { font-size: 12px; color: var(--muted); }
+.lobby-code {
+  display: grid; gap: 6px; justify-items: center; margin-top: 4px;
+  padding: 12px 18px; border-radius: 10px;
+  border: 1px dashed rgba(77,255,115,0.55); background: rgba(77,255,115,0.07);
+}
+.lobby-code-label { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.2em; color: var(--muted); }
+.lobby-code strong {
+  font-family: var(--mono); font-size: clamp(28px, 4.4vw, 40px); font-weight: 700;
+  letter-spacing: 0.24em; padding-left: 0.24em; color: var(--green);
+  text-shadow: 0 0 18px rgba(77,255,115,0.5);
+}
+.lobby-copy {
+  border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; background: none;
+  color: var(--muted); font-size: 11px; padding: 4px 12px; cursor: pointer;
+  transition: border-color 140ms, color 140ms;
+}
+.lobby-copy:hover { border-color: rgba(255,255,255,0.5); color: var(--ink); }
+.lobby-join-row { display: flex; gap: 8px; width: 100%; max-width: 280px; }
+.lobby-input {
+  flex: 1; min-width: 0; padding: 10px 12px; border-radius: 8px;
+  border: 2px solid rgba(77,238,255,0.4); background: rgba(0,0,0,0.4);
+  color: var(--ink); font-family: var(--mono); font-size: 20px; font-weight: 700;
+  letter-spacing: 0.2em; text-transform: uppercase; text-align: center;
+}
+.lobby-input:focus-visible { outline: none; border-color: var(--cyan); box-shadow: 0 0 18px -4px rgba(77,238,255,0.6); }
+.lobby-status { min-height: 20px; margin: 10px 0 14px; font-family: var(--mono); font-size: 13px; color: var(--gold); }
+.lobby-status.is-error { color: var(--red); }
+.lobby-status.is-live  { color: var(--green); }
+@media (max-width: 600px) {
+  .mpmode-grid, .lobby-grid { grid-template-columns: 1fr; }
+}
+
+/* ---- Online: guest spectates the host's stage pick ----------------------- */
+#tk-stage.is-spectate .stage-thumb,
+#tk-stage.is-spectate .rand-opt,
+#tk-stage.is-spectate .stage-btn.is-fight { pointer-events: none; opacity: 0.6; }
+#tk-stage.is-spectate .stage-btn.is-back { display: none; }
+.stage-spectate-hint {
+  position: absolute; left: 50%; bottom: 3.5%; transform: translateX(-50%);
+  padding: 8px 16px; border-radius: 999px; white-space: nowrap;
+  border: 1px solid rgba(77,238,255,0.5); background: rgba(2,0,5,0.85);
+  color: var(--cyan); font-family: var(--mono); font-size: 12px;
+}
+
+/* ---- Online: connection lost --------------------------------------------- */
+.netlost-overlay { opacity: 1; pointer-events: auto; z-index: 9; background: rgba(2, 0, 5, 0.9); }
+.netlost-overlay[hidden] { display: none; }
+.netlost-card { text-align: center; }
+.netlost-card h2 { color: var(--red); text-shadow: 0 0 28px rgba(255, 49, 79, 0.5); }
+.netlost-card p { margin-top: 8px; color: var(--muted); }
+
 /* --- mockup-art screens (approved ChatGPT designs as full-bleed UI) ------- */
 /* The canvas area is always wider than the 1672:941 mockups, so the image is
    height-constrained; aspect-ratio keeps the box == the image, which means the
