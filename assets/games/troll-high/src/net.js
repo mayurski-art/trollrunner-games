@@ -77,6 +77,15 @@ export class Net {
     this.onChat = null;         // (peerId, name, text) => void
     this.onEmote = null;        // (peerId, name, emoji) => void
     this.onRosterChange = null; // (names: string[]) => void
+
+    // Trading + gifting (Phase 7) — each side only ever mutates its own
+    // inventory, in response to a message from the other client. There's
+    // no server-arbitrated trade ledger; see cards.js for why that's fine
+    // for flavor-only collectibles.
+    this.onTradeOffer = null;   // (peerId, name, offerCards: {id,count}[]) => void
+    this.onTradeAccept = null;  // (peerId, name, counterCards: {id,count}[]) => void
+    this.onTradeDecline = null; // (peerId, name) => void
+    this.onGift = null;         // (peerId, name, cardId) => void
   }
 
   async join(room) {
@@ -111,6 +120,18 @@ export class Net {
       this.onChat(m.id, m.name, m.text);
     } else if (m.t === "emote" && this.onEmote) {
       this.onEmote(m.id, m.name, m.emoji);
+    } else if (m.t === "trade-offer" && this.onTradeOffer) {
+      if (m.to !== this.id) return;
+      this.onTradeOffer(m.id, m.name, m.cards);
+    } else if (m.t === "trade-accept" && this.onTradeAccept) {
+      if (m.to !== this.id) return;
+      this.onTradeAccept(m.id, m.name, m.cards);
+    } else if (m.t === "trade-decline" && this.onTradeDecline) {
+      if (m.to !== this.id) return;
+      this.onTradeDecline(m.id, m.name);
+    } else if (m.t === "gift" && this.onGift) {
+      if (m.to !== this.id) return;
+      this.onGift(m.id, m.name, m.cardId);
     }
   }
 
@@ -144,6 +165,23 @@ export class Net {
   sendEmote(emoji) {
     if (!this.connected) return;
     this.transport.send({ t: "emote", id: this.id, name: this.name, emoji });
+  }
+
+  sendTradeOffer(toId, cards) {
+    if (!this.connected) return;
+    this.transport.send({ t: "trade-offer", id: this.id, name: this.name, to: toId, cards });
+  }
+  sendTradeAccept(toId, cards) {
+    if (!this.connected) return;
+    this.transport.send({ t: "trade-accept", id: this.id, name: this.name, to: toId, cards });
+  }
+  sendTradeDecline(toId) {
+    if (!this.connected) return;
+    this.transport.send({ t: "trade-decline", id: this.id, name: this.name, to: toId });
+  }
+  sendGift(toId, cardId) {
+    if (!this.connected) return;
+    this.transport.send({ t: "gift", id: this.id, name: this.name, to: toId, cardId });
   }
 
   /* Prune peers that stopped sending updates, and return live ones. */

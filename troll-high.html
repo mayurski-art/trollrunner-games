@@ -138,6 +138,43 @@
       </div>
     </div>
 
+    <!-- Trading + gifting between nearby players (Phase 7). Each client
+         only ever mutates its own inventory, in response to a message
+         from the other player's client — see src/cards.js for why that's
+         fine for flavor-only collectibles. -->
+    <div id="th-trade-overlay" hidden>
+      <div class="th-trade-panel">
+        <button id="th-trade-close" type="button" aria-label="Close">✕</button>
+        <h2 id="th-trade-title">Trade</h2>
+        <div id="th-trade-propose" class="th-trade-step">
+          <div class="th-trade-mode-row">
+            <button id="th-trade-mode-trade" type="button" class="th-trade-mode is-active">🔁 Trade</button>
+            <button id="th-trade-mode-gift" type="button" class="th-trade-mode">🎁 Gift</button>
+          </div>
+          <p id="th-trade-propose-hint">Pick cards to offer:</p>
+          <div id="th-trade-my-cards" class="th-trade-cards"></div>
+          <button id="th-trade-send" type="button" disabled>Send ▶</button>
+        </div>
+        <div id="th-trade-waiting" class="th-trade-step" hidden>
+          <p id="th-trade-waiting-msg">Waiting…</p>
+          <button id="th-trade-cancel" type="button">Cancel</button>
+        </div>
+        <div id="th-trade-incoming" class="th-trade-step" hidden>
+          <p id="th-trade-incoming-msg"></p>
+          <div id="th-trade-incoming-offer" class="th-trade-cards th-trade-cards-readonly"></div>
+          <p>What will you give back?</p>
+          <div id="th-trade-counter-cards" class="th-trade-cards"></div>
+          <div class="th-trade-btn-row">
+            <button id="th-trade-accept" type="button">Accept ▶</button>
+            <button id="th-trade-decline" type="button">Decline</button>
+          </div>
+        </div>
+        <div id="th-trade-done" class="th-trade-step" hidden>
+          <p id="th-trade-done-msg"></p>
+        </div>
+      </div>
+    </div>
+
     <!-- Cafeteria food bar: pick items, then confirm your order by typing
          your own student ID (design doc feedback) -->
     <div id="th-cafeteria-overlay" hidden>
@@ -180,6 +217,9 @@
     <!-- Interaction hint ("E — Look at lockers") -->
     <div id="th-hint" hidden></div>
 
+    <!-- Gift-received toast -->
+    <div id="th-gift-toast" hidden></div>
+
     <!-- Chat: scrolling log + press-Enter-to-type bar -->
     <div id="th-chat-log" hidden aria-live="polite"></div>
     <div id="th-chat-bar" hidden>
@@ -204,6 +244,8 @@
         </div>
         <h3>High scores</h3>
         <ul id="th-profile-scores" class="th-profile-scores"></ul>
+        <h3>Trading cards</h3>
+        <div id="th-profile-cards" class="th-trade-cards th-trade-cards-readonly"></div>
       </div>
     </div>
 

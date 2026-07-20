@@ -453,6 +453,115 @@ html, body {
   background: #000;
 }
 
+/* ----------------------------------------------------- trading/gifting */
+#th-trade-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 29;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 8, 5, 0.72);
+}
+.th-trade-panel {
+  position: relative;
+  width: min(460px, 94vw);
+  max-height: 86vh;
+  overflow-y: auto;
+  background: var(--th-paper);
+  color: var(--th-ink);
+  border-radius: 14px;
+  padding: 20px 20px 16px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
+}
+.th-trade-panel h2 { font-size: 18px; font-weight: 900; margin-bottom: 12px; }
+#th-trade-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(43, 36, 23, 0.1);
+  color: var(--th-ink);
+  font-size: 14px;
+  cursor: pointer;
+}
+.th-trade-mode-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.th-trade-mode {
+  flex: 1;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(43, 36, 23, 0.15);
+  background: rgba(43, 36, 23, 0.04);
+  cursor: pointer;
+  font-size: 13px;
+}
+.th-trade-mode.is-active { border-color: #f5b52e; background: rgba(245, 181, 46, 0.16); font-weight: 700; }
+.th-trade-step p { margin: 0 0 8px; font-size: 13px; }
+.th-trade-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.th-trade-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  border-radius: 10px;
+  border: 1px solid rgba(43, 36, 23, 0.15);
+  background: rgba(43, 36, 23, 0.04);
+  cursor: pointer;
+  font-size: 10px;
+  text-align: center;
+}
+.th-trade-card .icon { font-size: 20px; }
+.th-trade-card .count { opacity: 0.6; }
+.th-trade-card.is-selected { border-color: #f5b52e; background: rgba(245, 181, 46, 0.16); font-weight: 700; }
+.th-trade-cards-readonly .th-trade-card { cursor: default; }
+#th-trade-send, #th-trade-accept {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: 0;
+  background: #2b2417;
+  color: var(--th-paper);
+  font-weight: 700;
+  cursor: pointer;
+}
+#th-trade-send:disabled { opacity: 0.4; cursor: not-allowed; }
+.th-trade-btn-row { display: flex; gap: 8px; }
+.th-trade-btn-row button { flex: 1; }
+#th-trade-decline, #th-trade-cancel {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(43, 36, 23, 0.2);
+  background: transparent;
+  color: var(--th-ink);
+  cursor: pointer;
+}
+
+#th-gift-toast {
+  position: absolute;
+  left: 50%;
+  top: 60px;
+  transform: translateX(-50%);
+  z-index: 40;
+  background: rgba(20, 17, 12, 0.88);
+  color: var(--th-paper);
+  border: 1px solid rgba(245, 181, 46, 0.4);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 13px;
+}
+
 /* -------------------------------------------------------- cafeteria */
 #th-cafeteria-overlay {
   position: absolute;

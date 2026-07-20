@@ -19,6 +19,7 @@ import { drawCampusMap } from "./mapview.js";
 import { genStudentId, renderProfile } from "./profile.js";
 import { MENU as CAFETERIA_MENU, normalizeStudentId } from "./cafeteria.js";
 import { ELECTIVES, buildSchedule, DAILY_TASKS } from "./schedule.js";
+import { CARDS, cardById, maybeAwardCard } from "./cards.js";
 import * as clock from "./clock.js";
 
 const BASE = "assets/games/troll-high";
@@ -157,10 +158,20 @@ async function boot() {
     saveDirty = true;
   }
 
+  // Trading cards (Phase 7) — {cardId: count}. Earned as a side chance on
+  // existing milestones (new memory, new high score), not a separate grind.
+  const cards = savedGame?.cards || {};
+  function addCard(id, n = 1) { cards[id] = (cards[id] || 0) + n; saveDirty = true; }
+  function removeCard(id, n = 1) {
+    cards[id] = Math.max(0, (cards[id] || 0) - n);
+    if (cards[id] === 0) delete cards[id];
+    saveDirty = true;
+  }
+
   function persist() {
     if (!saveDirty) return;
     saveDirty = false;
-    saveGame(session.userId, { zoneId: zone.id, x: player.x, y: player.y, foundKeys: [...found], studentId, enrolledAt, highScores, orientationDone, elective, dailyTasksDay, dailyFlags });
+    saveGame(session.userId, { zoneId: zone.id, x: player.x, y: player.y, foundKeys: [...found], studentId, enrolledAt, highScores, orientationDone, elective, dailyTasksDay, dailyFlags, cards });
   }
   setInterval(persist, 30000);
   document.addEventListener("visibilitychange", () => { if (document.hidden) persist(); });
@@ -223,6 +234,7 @@ async function boot() {
     renderProfile(profileDom, {
       name: identity.name, studentId, enrolledAt, memoriesFound: found.size, highScores, minigameInfo,
     });
+    renderCardPicker($("th-profile-cards"), cards, new Set(), { readonly: true });
     profileOverlay.hidden = false;
   }
   function closeProfile() { profileOverlay.hidden = true; }
@@ -298,7 +310,7 @@ async function boot() {
   addEventListener("keydown", e => {
     if (e.code !== "KeyM" || e.target.tagName === "INPUT") return;
     if (!running) return;
-    if (mapOverlay.hidden) { if (!memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden) openMap(); }
+    if (mapOverlay.hidden) { if (!memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && tradeOverlay.hidden) openMap(); }
     else closeMap();
   });
 
@@ -358,6 +370,188 @@ async function boot() {
   $("th-btn-schedule")?.addEventListener("click", openSchedule);
   $("th-schedule-close")?.addEventListener("click", closeSchedule);
 
+  // ------------------------------------------------- trading + gifting
+  // Each client only ever mutates its own inventory, applied in response
+  // to a message from the other player's client — no server-arbitrated
+  // trade ledger, which is fine for flavor-only collectibles (cards.js).
+  const giftToast = $("th-gift-toast");
+  let giftToastTimer = null;
+  function showToast(text) {
+    giftToast.textContent = text;
+    giftToast.hidden = false;
+    clearTimeout(giftToastTimer);
+    giftToastTimer = setTimeout(() => { giftToast.hidden = true; }, 4000);
+  }
+
+  const tradeOverlay = $("th-trade-overlay");
+  const tradeTitle = $("th-trade-title");
+  const tradeProposeStep = $("th-trade-propose");
+  const tradeWaitingStep = $("th-trade-waiting");
+  const tradeIncomingStep = $("th-trade-incoming");
+  const tradeDoneStep = $("th-trade-done");
+  const tradeMyCardsEl = $("th-trade-my-cards");
+  const tradeSendBtn = $("th-trade-send");
+  const tradeProposeHint = $("th-trade-propose-hint");
+  const tradeModeTradeBtn = $("th-trade-mode-trade");
+  const tradeModeGiftBtn = $("th-trade-mode-gift");
+  const tradeWaitingMsg = $("th-trade-waiting-msg");
+  const tradeCancelBtn = $("th-trade-cancel");
+  const tradeIncomingMsg = $("th-trade-incoming-msg");
+  const tradeIncomingOfferEl = $("th-trade-incoming-offer");
+  const tradeCounterCardsEl = $("th-trade-counter-cards");
+  const tradeAcceptBtn = $("th-trade-accept");
+  const tradeDeclineBtn = $("th-trade-decline");
+  const tradeDoneMsg = $("th-trade-done-msg");
+
+  let tradeMode = "trade"; // "trade" | "gift"
+  let tradeTargetId = null, tradeTargetName = null;
+  let tradeSelected = new Set();     // cards I'm offering (propose step)
+  let tradeCounterSelected = new Set(); // cards I'm offering back (incoming step)
+  let tradePendingOffer = null;      // {peerId, name, cards} while showing an incoming offer
+
+  function renderCardPicker(container, sourceCounts, selectedSet, { readonly = false, single = false } = {}) {
+    container.innerHTML = "";
+    const ids = Object.keys(sourceCounts).filter(id => sourceCounts[id] > 0);
+    if (ids.length === 0) {
+      const p = document.createElement("p");
+      p.textContent = "Nothing here yet.";
+      container.appendChild(p);
+      return;
+    }
+    for (const id of ids) {
+      const card = cardById(id);
+      if (!card) continue;
+      const el = document.createElement(readonly ? "div" : "button");
+      if (!readonly) el.type = "button";
+      el.className = "th-trade-card" + (selectedSet.has(id) ? " is-selected" : "");
+      el.innerHTML = `<span class="icon">${card.icon}</span><span>${card.name}</span><span class="count">x${sourceCounts[id]}</span>`;
+      if (!readonly) {
+        el.addEventListener("click", () => {
+          if (single) { selectedSet.clear(); selectedSet.add(id); }
+          else if (selectedSet.has(id)) selectedSet.delete(id);
+          else selectedSet.add(id);
+          renderCardPicker(container, sourceCounts, selectedSet, { readonly, single });
+          tradeSendBtn.disabled = tradeSelected.size === 0;
+        });
+      }
+      container.appendChild(el);
+    }
+  }
+
+  function showTradeStep(name) {
+    tradeProposeStep.hidden = name !== "propose";
+    tradeWaitingStep.hidden = name !== "waiting";
+    tradeIncomingStep.hidden = name !== "incoming";
+    tradeDoneStep.hidden = name !== "done";
+  }
+  function setTradeMode(mode) {
+    tradeMode = mode;
+    tradeSelected = new Set();
+    tradeModeTradeBtn.classList.toggle("is-active", mode === "trade");
+    tradeModeGiftBtn.classList.toggle("is-active", mode === "gift");
+    tradeTitle.textContent = (mode === "trade" ? "Trade with " : "Gift to ") + tradeTargetName;
+    tradeProposeHint.textContent = mode === "trade" ? "Pick cards to offer:" : "Pick one card to gift:";
+    tradeSendBtn.textContent = mode === "trade" ? "Send Offer ▶" : "Send Gift 🎁";
+    renderCardPicker(tradeMyCardsEl, cards, tradeSelected, { single: mode === "gift" });
+    tradeSendBtn.disabled = true;
+  }
+  function openTrade(peerId, peerName) {
+    tradeTargetId = peerId; tradeTargetName = peerName;
+    setTradeMode("trade");
+    showTradeStep("propose");
+    tradeOverlay.hidden = false;
+  }
+  function closeTrade() {
+    tradeOverlay.hidden = true;
+    tradePendingOffer = null;
+  }
+
+  tradeModeTradeBtn.addEventListener("click", () => setTradeMode("trade"));
+  tradeModeGiftBtn.addEventListener("click", () => setTradeMode("gift"));
+
+  tradeSendBtn.addEventListener("click", () => {
+    const chosen = [...tradeSelected];
+    if (chosen.length === 0) return;
+    if (tradeMode === "gift") {
+      const id = chosen[0];
+      removeCard(id);
+      persist();
+      net.sendGift(tradeTargetId, id);
+      tradeDoneMsg.textContent = `Sent a ${cardById(id).name} to ${tradeTargetName}!`;
+      showTradeStep("done");
+    } else {
+      net.sendTradeOffer(tradeTargetId, chosen.map(id => ({ id, count: 1 })));
+      tradeWaitingMsg.textContent = `Waiting for ${tradeTargetName} to respond…`;
+      showTradeStep("waiting");
+    }
+  });
+  tradeCancelBtn.addEventListener("click", () => {
+    net.sendTradeDecline(tradeTargetId);
+    closeTrade();
+  });
+  tradeAcceptBtn.addEventListener("click", () => {
+    if (!tradePendingOffer) return;
+    const { peerId, name, cards: offerCards } = tradePendingOffer;
+    for (const c of offerCards) addCard(c.id, c.count);
+    for (const id of tradeCounterSelected) removeCard(id, 1);
+    persist();
+    net.sendTradeAccept(peerId, [...tradeCounterSelected].map(id => ({ id, count: 1 })));
+    tradeDoneMsg.textContent = `Trade with ${name} complete!`;
+    tradePendingOffer = null;
+    showTradeStep("done");
+  });
+  tradeDeclineBtn.addEventListener("click", () => {
+    if (tradePendingOffer) net.sendTradeDecline(tradePendingOffer.peerId);
+    tradePendingOffer = null;
+    closeTrade();
+  });
+  $("th-trade-close")?.addEventListener("click", () => {
+    if (!tradeWaitingStep.hidden) net.sendTradeDecline(tradeTargetId);
+    else if (!tradeIncomingStep.hidden && tradePendingOffer) net.sendTradeDecline(tradePendingOffer.peerId);
+    closeTrade();
+  });
+
+  net.onTradeOffer = (peerId, name, offerCards) => {
+    // Already mid-trade with someone else — decline instead of clobbering state.
+    if (!tradeOverlay.hidden && tradeTargetId && tradeTargetId !== peerId) {
+      net.sendTradeDecline(peerId);
+      return;
+    }
+    tradeTargetId = peerId; tradeTargetName = name;
+    tradePendingOffer = { peerId, name, cards: offerCards };
+    tradeCounterSelected = new Set();
+    tradeTitle.textContent = `Trade with ${name}`;
+    tradeIncomingMsg.textContent = `${name} wants to trade! They're offering:`;
+    renderCardPicker(tradeIncomingOfferEl, Object.fromEntries(offerCards.map(c => [c.id, c.count])), new Set(), { readonly: true });
+    renderCardPicker(tradeCounterCardsEl, cards, tradeCounterSelected, {});
+    showTradeStep("incoming");
+    tradeOverlay.hidden = false;
+  };
+  net.onTradeAccept = (peerId, name, counterCards) => {
+    if (peerId !== tradeTargetId || tradeWaitingStep.hidden) return;
+    for (const id of tradeSelected) removeCard(id, 1);
+    for (const c of counterCards) addCard(c.id, c.count);
+    persist();
+    tradeDoneMsg.textContent = `Trade with ${name} complete!`;
+    showTradeStep("done");
+  };
+  net.onTradeDecline = (peerId, name) => {
+    if (peerId !== tradeTargetId) return;
+    if (!tradeWaitingStep.hidden) {
+      tradeDoneMsg.textContent = `${name} declined the trade.`;
+      showTradeStep("done");
+    } else if (!tradeIncomingStep.hidden && tradePendingOffer && tradePendingOffer.peerId === peerId) {
+      tradePendingOffer = null;
+      closeTrade();
+    }
+  };
+  net.onGift = (peerId, name, cardId) => {
+    addCard(cardId, 1);
+    persist();
+    const card = cardById(cardId);
+    showToast(`🎁 ${name} gave you a ${card ? card.name : "card"}!`);
+  };
+
   // ------------------------------------------------------ arcade launcher
   // Computer lab CRTs boot the real arcade games in-world (design doc
   // decision 4) — a same-origin iframe, no CSP change needed. Clearing
@@ -404,7 +598,11 @@ async function boot() {
   function closeMinigame() {
     if (activeMinigame) {
       const { kind, score } = activeMinigame;
-      if (score > (highScores[kind] || 0)) { highScores[kind] = score; saveDirty = true; }
+      if (score > (highScores[kind] || 0)) {
+        highScores[kind] = score; saveDirty = true;
+        const won = maybeAwardCard();
+        if (won) { addCard(won); showToast(`🃏 New high score! Earned a ${cardById(won).name} card.`); }
+      }
       markDailyTask("minigame");
       activeMinigame.stop();
     }
@@ -430,6 +628,8 @@ async function boot() {
     if (isNew) {
       found.add(obj.memKey);
       markDailyTask("memory");
+      const won = maybeAwardCard();
+      if (won) { addCard(won); showToast(`🃏 Found a ${cardById(won).name} card!`); }
       saveDirty = true;
       persist();
       window.TrollLeaderboard?.record?.("troll-high", { memories: found.size });
@@ -534,7 +734,7 @@ async function boot() {
   function escapeHtml(s) { return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
   function openChat() {
-    if (!running || memoryEl || dialogueEl || !lbOverlay.hidden || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden) return;
+    if (!running || memoryEl || dialogueEl || !lbOverlay.hidden || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden || !tradeOverlay.hidden) return;
     chatOpen = true;
     chatBar.hidden = false;
     chatInput.value = "";
@@ -617,6 +817,10 @@ async function boot() {
     get cafeteriaOpen() { return !cafeteriaOverlay.hidden; },
     get orientationOpen() { return !orientationOverlay.hidden; },
     get scheduleOpen() { return !scheduleOverlay.hidden; },
+    get tradeOpen() { return !tradeOverlay.hidden; },
+    openTrade, closeTrade,
+    get cards() { return cards; },
+    addCard, removeCard,
     openSchedule, closeSchedule, finishOrientation,
     get dailyFlags() { return dailyFlags; },
     get elective() { return elective; },
@@ -667,7 +871,7 @@ async function boot() {
       fade = Math.max(0, fade - dt * 4);
     }
 
-    if (!pendingDoor && !memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && mapOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden) {
+    if (!pendingDoor && !memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && mapOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && tradeOverlay.hidden) {
       const axis = input.axis();
       tryPushFromInput(axis);
       player.update(dt, axis, zone);
@@ -699,6 +903,12 @@ async function boot() {
     // card (a per-instance zone-JSON field, not part of the shared def —
     // most computer-desks are flavor-only, a few are real launchers)
     const nearNPC = npcs.find(n => n.distanceTo(player.x, player.y) < 26);
+    let nearPeer = null;
+    if (!nearNPC) {
+      for (const [pid, p] of net.liveGhosts()) {
+        if (Math.hypot(p.x - player.x, p.y - player.y) < 26) { nearPeer = { id: pid, name: p.name || "a student" }; break; }
+      }
+    }
     const face = player.facingTile();
     const obj = zone.objectAt(face.x, face.y);
     const mem = obj && (obj.memory || obj.def.memory);
@@ -707,14 +917,17 @@ async function boot() {
     const arcadeHint = obj && obj.game ? ` Play ${obj.gameName || "a game"}` : null;
     const playHint = play ? ` Play ${obj.playName || obj.def.playName || minigameInfo(play).title}` : null;
     const shopHint = shop ? " Get lunch" : null;
-    setHint((memoryEl || dialogueEl || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (arcadeHint || playHint || shopHint || (mem ? ` ${mem.title}` : null)));
+    const peerHint = nearPeer ? ` Trade with ${nearPeer.name}` : null;
+    setHint((memoryEl || dialogueEl || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden || !tradeOverlay.hidden) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (peerHint || arcadeHint || playHint || shopHint || (mem ? ` ${mem.title}` : null)));
     if (input.interactPressed() && mapOverlay.hidden && profileOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden) {
-      if (!cafeteriaOverlay.hidden) closeCafeteria();
+      if (!tradeOverlay.hidden) closeTrade();
+      else if (!cafeteriaOverlay.hidden) closeCafeteria();
       else if (!minigameOverlay.hidden) closeMinigame();
       else if (!arcadeOverlay.hidden) closeArcade();
       else if (dialogueEl) closeDialogue();
       else if (memoryEl) closeMemory();
       else if (nearNPC) showDialogue(nearNPC);
+      else if (nearPeer) openTrade(nearPeer.id, nearPeer.name);
       else if (obj && obj.game) openArcade(obj);
       else if (play) openMinigame(obj);
       else if (shop) openCafeteria();
