@@ -99,6 +99,16 @@
       "type": "trash-can",
       "x": 90,
       "y": 1
+    },
+    {
+      "type": "door",
+      "x": 94,
+      "y": 0
+    },
+    {
+      "type": "door",
+      "x": 94,
+      "y": 0
     }
   ],
   "doors": [
@@ -181,6 +191,26 @@
       "tx": 7,
       "ty": 3,
       "label": "Restrooms"
+    },
+    {
+      "x": 94,
+      "y": 3,
+      "w": 2,
+      "h": 1,
+      "to": "hallway-b",
+      "tx": 3,
+      "ty": 3,
+      "label": "East Wing"
+    },
+    {
+      "x": 94,
+      "y": 3,
+      "w": 2,
+      "h": 1,
+      "to": "hallway-b",
+      "tx": 3,
+      "ty": 3,
+      "label": "East Wing"
     }
   ],
   "spawn": {

@@ -18,7 +18,11 @@ const BASE = "assets/games/troll-high";
 const ZONE_IDS = [
   "hallway-a", "office", "classroom-3b", "classroom-3c", "classroom-3d",
   "computer-lab", "cafeteria", "library", "bathroom",
+  "hallway-b", "gym", "auditorium", "art-room", "music-room", "science-lab",
+  "nurse", "playground", "sports-field", "bus-loop", "basement", "tunnels", "roof",
 ];
+// open corridors + genuinely outdoor zones get the quieter ambience tone
+const OUTDOOR_ZONES = new Set(["hallway-a", "hallway-b", "playground", "sports-field", "bus-loop", "roof"]);
 
 const $ = id => document.getElementById(id);
 
@@ -115,7 +119,7 @@ async function boot() {
     input.interactPressed(); // swallow the click's queued Enter/Space
     running = true;
     ambience.start();
-    ambience.setIndoor(zone.id !== "hallway-a");
+    ambience.setIndoor(!OUTDOOR_ZONES.has(zone.id));
     net.join(zone.id).catch(() => {});
   });
 
@@ -208,7 +212,7 @@ async function boot() {
     player.placeAtTile(door.tx, door.ty);
     doorArmed = false;
     zoneNameEl.textContent = zone.name;
-    ambience.setIndoor(zone.id !== "hallway-a");
+    ambience.setIndoor(!OUTDOOR_ZONES.has(zone.id));
     ghosts.clear(); // last room's peers no longer apply
     net.join(zone.id).catch(() => {});
   }
@@ -392,7 +396,7 @@ async function boot() {
 
       if (lastPeriod !== null && lastPeriod !== now.period) ambience.ringBell();
       lastPeriod = now.period;
-      ambience.setChatter(clock.isPassingPeriod() ? 1 : 0, zone.id !== "hallway-a");
+      ambience.setChatter(clock.isPassingPeriod() ? 1 : 0, !OUTDOOR_ZONES.has(zone.id));
     }
     if (localBubble && performance.now() > localBubble.until) localBubble = null;
 
