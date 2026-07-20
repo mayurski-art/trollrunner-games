@@ -126,16 +126,53 @@ async function boot() {
     memoryEl.className = "th-popup-card";
     memoryEl.setAttribute("role", "dialog");
     memoryEl.setAttribute("aria-label", mem.title);
-    const isNew = !found.has(obj.type + ":" + obj.x + ":" + obj.y);
+    const isNew = !found.has(obj.memKey);
     memoryEl.innerHTML =
       `<h3>${mem.title}${isNew ? " ✨" : ""}</h3><p>${mem.text}</p>` +
+      (obj.def.screen ? `<canvas class="th-mem-screen" width="120" height="90"></canvas>` : "") +
       `<div class="th-mem-close">E / tap — close</div>`;
     memoryEl.addEventListener("click", closeMemory);
     $("th-root").appendChild(memoryEl);
-    if (isNew) { found.add(obj.type + ":" + obj.x + ":" + obj.y); saveFound(); }
+    if (isNew) { found.add(obj.memKey); saveFound(); }
+    if (obj.def.screen) startScreenAnim(memoryEl.querySelector(".th-mem-screen"));
   }
   function closeMemory() {
+    stopScreenAnim();
     if (memoryEl) { memoryEl.remove(); memoryEl = null; }
+  }
+
+  // "See inside the TV": a small looping animated canvas standing in for
+  // channel static, drawn fresh each time (no video asset, no license
+  // concerns) — colored scanlines drifting over analog noise.
+  let screenAnimId = null;
+  function startScreenAnim(canvas) {
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const w = canvas.width, h = canvas.height;
+    let t = 0;
+    const tick = () => {
+      t += 1;
+      const img = ctx.createImageData(w, h);
+      for (let i = 0; i < w * h; i++) {
+        const v = Math.random() * 255;
+        img.data[i * 4] = v; img.data[i * 4 + 1] = v; img.data[i * 4 + 2] = v; img.data[i * 4 + 3] = 255;
+      }
+      ctx.putImageData(img, 0, 0);
+      // drifting color bars over the static, like an old test pattern
+      const bars = ["#e8862e", "#4dc9ff", "#8ee06a", "#ff5d7a", "#f5d94e"];
+      const barW = w / bars.length;
+      for (let i = 0; i < bars.length; i++) {
+        ctx.globalAlpha = 0.35;
+        ctx.fillStyle = bars[i];
+        ctx.fillRect(((i * barW + t * 0.6) % w), 0, barW * 0.7, h);
+      }
+      ctx.globalAlpha = 1;
+      screenAnimId = requestAnimationFrame(tick);
+    };
+    tick();
+  }
+  function stopScreenAnim() {
+    if (screenAnimId) { cancelAnimationFrame(screenAnimId); screenAnimId = null; }
   }
 
   // NPC dialogue reuses the same reliable DOM card as memories — always
@@ -268,6 +305,24 @@ async function boot() {
     ringBell: () => ambience.ringBell(),
   };
 
+  // -------------------------------------------------------------- pushing
+  // Sokoban-style: walking into a pushable object shunts it one tile in the
+  // same direction, gated by zone.tryPush (walls/other furniture/doors all
+  // block it — a pushed object can never leave its room). Cooldown so
+  // holding the key nudges it step by step rather than teleporting it.
+  let lastPushAt = 0;
+  const PUSH_COOLDOWN_MS = 260;
+  function tryPushFromInput(axis) {
+    if (axis.x === 0 && axis.y === 0) return;
+    if (performance.now() - lastPushAt < PUSH_COOLDOWN_MS) return;
+    const dx = Math.abs(axis.x) > Math.abs(axis.y) ? Math.sign(axis.x) : 0;
+    const dy = dx === 0 ? Math.sign(axis.y) : 0;
+    if (dx === 0 && dy === 0) return;
+    const obj = zone.objectAt(player.tileX + dx, player.tileY + dy);
+    if (!obj || !obj.def.pushable) return;
+    if (zone.tryPush(obj, dx, dy)) lastPushAt = performance.now();
+  }
+
   // ----------------------------------------------------------------- loop
   let last = performance.now();
   let clockAcc = 1;
@@ -288,7 +343,9 @@ async function boot() {
     }
 
     if (!pendingDoor && !memoryEl && !dialogueEl && !chatOpen) {
-      player.update(dt, input.axis(), zone);
+      const axis = input.axis();
+      tryPushFromInput(axis);
+      player.update(dt, axis, zone);
     }
 
     // multiplayer: broadcast our position, sync ghosts from the last-known

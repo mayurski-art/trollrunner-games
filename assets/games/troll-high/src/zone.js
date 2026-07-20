@@ -36,28 +36,31 @@ export class Zone {
     }
 
     // -------- objects with defs attached
+    // memKey is captured once, at load, from the ORIGINAL position — pushable
+    // objects (the TV cart) can move, but their memory/found-state identity
+    // must not, or "isNew" tracking would think a shoved cart is a new object.
     this.objects = (data.objects || []).map(o => ({
       ...o,
       def: OBJECT_DEFS[o.type],
+      memKey: `${o.type}:${o.x}:${o.y}`,
     })).filter(o => o.def);
 
-    // -------- solid grid (cells)
-    this.solid = [];
+    // -------- solid grid (cells): wall-solidity is immutable (from terrain),
+    // object-solidity is recomputed per-cell when an object moves (see
+    // tryPush) so pushing a piece of furniture doesn't corrupt the wall data
+    // it happens to share a cell with.
+    this.wallSolid = [];
     for (let r = 0; r < this.h; r++) {
-      this.solid[r] = [];
+      this.wallSolid[r] = [];
       for (let c = 0; c < this.w; c++) {
         const corners = [this.v[r][c], this.v[r][c + 1], this.v[r + 1][c], this.v[r + 1][c + 1]];
-        this.solid[r][c] = corners.some(x => x !== 0);
+        this.wallSolid[r][c] = corners.some(x => x !== 0);
       }
     }
+    this.solid = this.wallSolid.map(row => row.slice());
     for (const o of this.objects) {
       if (o.def.walkable) continue;
-      const top = o.y + o.def.h - o.def.footRows;
-      for (let r = top; r < o.y + o.def.h; r++) {
-        for (let c = o.x; c < o.x + o.def.w; c++) {
-          if (r >= 0 && r < this.h && c >= 0 && c < this.w) this.solid[r][c] = true;
-        }
-      }
+      for (const [c, r] of this._footprint(o)) this.solid[r][c] = true;
     }
 
     this.floorCanvas = this._prerender();
@@ -85,6 +88,65 @@ export class Zone {
       }
     }
     return cv;
+  }
+
+  /* Solid (footRows) cells of an object's footprint, as [c, r] pairs. */
+  _footprint(o) {
+    const top = o.y + o.def.h - o.def.footRows;
+    const cells = [];
+    for (let r = top; r < o.y + o.def.h; r++) {
+      for (let c = o.x; c < o.x + o.def.w; c++) {
+        if (r >= 0 && r < this.h && c >= 0 && c < this.w) cells.push([c, r]);
+      }
+    }
+    return cells;
+  }
+
+  /* Recomputes this.solid at (c, r) from scratch: wall OR any object's
+     footprint. Cheap — only ever called for a handful of cells at a time. */
+  _recomputeCell(c, r) {
+    this.solid[r][c] = this.wallSolid[r][c] ||
+      this.objects.some(o => !o.def.walkable && this._footprint(o).some(([fc, fr]) => fc === c && fr === r));
+  }
+
+  /* Attempts to push a movable object one tile in (dx, dy) — exactly one of
+     which should be -1/0/1, the other 0. Refuses to leave the zone, cross a
+     wall, overlap another solid object, or land on a door tile (so a pushed
+     object can never end up blocking — or escaping through — a doorway).
+     Returns true and mutates the object's position on success. */
+  tryPush(obj, dx, dy) {
+    const def = obj.def;
+    const nx = obj.x + dx, ny = obj.y + dy;
+    // Same margins every hand-placed object in this project follows (see
+    // docs/TROLL-HIGH.md's room-authoring notes): clear of the thick
+    // double-row top wall band, clear of the wall-adjacent bottom row, and
+    // off the side wall columns. Collision alone isn't enough here — the
+    // object's own solid check only covers its footRows "feet" row (by
+    // design, for walk-behind), so without this a push can shove an
+    // object's TOP visually into the wall band while the feet stay legal.
+    if (nx < 1 || ny < 2 || nx + def.w > this.w - 1 || ny + def.h > this.h - 1) return false;
+
+    const oldFootprint = new Set(this._footprint(obj).map(([c, r]) => `${c},${r}`));
+    const top = ny + def.h - def.footRows;
+    for (let r = ny; r < ny + def.h; r++) {
+      for (let c = nx; c < nx + def.w; c++) {
+        if (this.doorAt(c, r)) return false;
+      }
+    }
+    for (let r = top; r < ny + def.h; r++) {
+      for (let c = nx; c < nx + def.w; c++) {
+        if (oldFootprint.has(`${c},${r}`)) continue; // the object's own current spot
+        if (this.solid[r][c]) return false;
+      }
+    }
+
+    const affected = new Set([...oldFootprint, ...this._footprint({ ...obj, x: nx, y: ny }).map(([c, r]) => `${c},${r}`)]);
+    obj.x = nx; obj.y = ny;
+    for (const key of affected) {
+      const [c, r] = key.split(",").map(Number);
+      this._recomputeCell(c, r);
+    }
+    return true;
   }
 
   solidAt(px, py) {
