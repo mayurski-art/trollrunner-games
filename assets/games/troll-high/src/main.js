@@ -15,6 +15,7 @@ import { NPC, NPC_DEFS } from "./npc.js";
 import { awaitAuth } from "./gate.js";
 import { loadSave, saveGame } from "./save.js";
 import { Minigame, minigameInfo } from "./minigames.js";
+import { drawCampusMap } from "./mapview.js";
 import * as clock from "./clock.js";
 
 const BASE = "assets/games/troll-high";
@@ -177,6 +178,20 @@ async function boot() {
     window.TrollLeaderboard?.refresh?.("troll-high");
   });
   $("th-leaderboard-close")?.addEventListener("click", () => { lbOverlay.hidden = true; });
+
+  // ----------------------------------------------------------------- map
+  const mapOverlay = $("th-map-overlay");
+  const mapCanvas = $("th-map-canvas");
+  function openMap() { mapOverlay.hidden = false; drawCampusMap(mapCanvas, zone.id); }
+  function closeMap() { mapOverlay.hidden = true; }
+  $("th-btn-map")?.addEventListener("click", openMap);
+  $("th-map-close")?.addEventListener("click", closeMap);
+  addEventListener("keydown", e => {
+    if (e.code !== "KeyM" || e.target.tagName === "INPUT") return;
+    if (!running) return;
+    if (mapOverlay.hidden) { if (!memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden) openMap(); }
+    else closeMap();
+  });
 
   // ------------------------------------------------------ arcade launcher
   // Computer lab CRTs boot the real arcade games in-world (design doc
@@ -348,7 +363,7 @@ async function boot() {
   function escapeHtml(s) { return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
   function openChat() {
-    if (!running || memoryEl || dialogueEl || !lbOverlay.hidden || !arcadeOverlay.hidden || !minigameOverlay.hidden) return;
+    if (!running || memoryEl || dialogueEl || !lbOverlay.hidden || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden) return;
     chatOpen = true;
     chatBar.hidden = false;
     chatInput.value = "";
@@ -426,6 +441,8 @@ async function boot() {
     openArcade, closeArcade, openMinigame, closeMinigame,
     get arcadeOpen() { return !arcadeOverlay.hidden; },
     get minigameOpen() { return !minigameOverlay.hidden; },
+    get mapOpen() { return !mapOverlay.hidden; },
+    openMap, closeMap,
     get minigameScore() { return activeMinigame?.score ?? null; },
     get minigameFinished() { return activeMinigame?.finished ?? null; },
     get minigame() { return activeMinigame; },
@@ -468,7 +485,7 @@ async function boot() {
       fade = Math.max(0, fade - dt * 4);
     }
 
-    if (!pendingDoor && !memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden) {
+    if (!pendingDoor && !memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && mapOverlay.hidden) {
       const axis = input.axis();
       tryPushFromInput(axis);
       player.update(dt, axis, zone);
@@ -506,8 +523,8 @@ async function boot() {
     const play = obj && (obj.play || obj.def.play);
     const arcadeHint = obj && obj.game ? ` Play ${obj.gameName || "a game"}` : null;
     const playHint = play ? ` Play ${obj.playName || obj.def.playName || minigameInfo(play).title}` : null;
-    setHint((memoryEl || dialogueEl || !arcadeOverlay.hidden || !minigameOverlay.hidden) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (arcadeHint || playHint || (mem ? ` ${mem.title}` : null)));
-    if (input.interactPressed()) {
+    setHint((memoryEl || dialogueEl || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (arcadeHint || playHint || (mem ? ` ${mem.title}` : null)));
+    if (input.interactPressed() && mapOverlay.hidden) {
       if (!minigameOverlay.hidden) closeMinigame();
       else if (!arcadeOverlay.hidden) closeArcade();
       else if (dialogueEl) closeDialogue();

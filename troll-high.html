@@ -70,6 +70,7 @@
       <span id="th-clock">—</span>
       <span id="th-roster" title="Who's in this room">👥 1</span>
       <button id="th-btn-leaderboard" type="button" title="Weekly ladder">🏆</button>
+      <button id="th-btn-map" type="button" title="Campus map (M)">🗺️</button>
     </div>
 
     <!-- Leaderboard overlay (built by assets/js/troll-leaderboard.js into #lb-root) -->
@@ -78,6 +79,17 @@
         <button id="th-leaderboard-close" type="button" aria-label="Close leaderboard">✕</button>
         <h2>🏆 Weekly Ladder</h2>
         <div id="lb-root" class="lb-root"><p class="lb-foot">Loading leaderboard…</p></div>
+      </div>
+    </div>
+
+    <!-- Campus map overlay — a static schematic, not a live minimap (the
+         world is drawn per-zone with no shared coordinate space, so this
+         is hand-laid-out from the hallway door order in zone JSON). -->
+    <div id="th-map-overlay" hidden>
+      <div class="th-map-panel">
+        <button id="th-map-close" type="button" aria-label="Close map">✕</button>
+        <h2>🗺️ Campus Map</h2>
+        <canvas id="th-map-canvas" width="720" height="440"></canvas>
       </div>
     </div>
 
