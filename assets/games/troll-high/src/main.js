@@ -17,6 +17,7 @@ import { loadSave, saveGame } from "./save.js";
 import { Minigame, minigameInfo } from "./minigames.js";
 import { drawCampusMap } from "./mapview.js";
 import { genStudentId, renderProfile } from "./profile.js";
+import { MENU as CAFETERIA_MENU, normalizeStudentId } from "./cafeteria.js";
 import * as clock from "./clock.js";
 
 const BASE = "assets/games/troll-high";
@@ -211,10 +212,76 @@ async function boot() {
   function closeProfile() { profileOverlay.hidden = true; }
   $("th-btn-profile")?.addEventListener("click", openProfile);
   $("th-profile-close")?.addEventListener("click", closeProfile);
+
+  // ----------------------------------------------------------- cafeteria
+  const cafeteriaOverlay = $("th-cafeteria-overlay");
+  const cafeteriaMenuEl = $("th-cafeteria-menu");
+  const cafeteriaOrderStep = $("th-cafeteria-order-step");
+  const cafeteriaIdStep = $("th-cafeteria-id-step");
+  const cafeteriaDoneStep = $("th-cafeteria-done-step");
+  const cafeteriaCountEl = $("th-cafeteria-count");
+  const cafeteriaCheckoutBtn = $("th-cafeteria-checkout");
+  const cafeteriaIdForm = $("th-cafeteria-id-form");
+  const cafeteriaIdInput = $("th-cafeteria-id-input");
+  const cafeteriaIdStatus = $("th-cafeteria-id-status");
+  const cafeteriaDoneMsg = $("th-cafeteria-done-msg");
+  let cafeteriaSelected = new Set();
+
+  cafeteriaMenuEl.innerHTML = "";
+  for (const item of CAFETERIA_MENU) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "th-cafeteria-item";
+    btn.dataset.id = item.id;
+    btn.innerHTML = `<span class="icon">${item.icon}</span><span>${item.name}</span>`;
+    btn.addEventListener("click", () => {
+      if (cafeteriaSelected.has(item.id)) cafeteriaSelected.delete(item.id);
+      else cafeteriaSelected.add(item.id);
+      btn.classList.toggle("is-selected", cafeteriaSelected.has(item.id));
+      cafeteriaCountEl.textContent = `${cafeteriaSelected.size} item${cafeteriaSelected.size === 1 ? "" : "s"} selected`;
+      cafeteriaCheckoutBtn.disabled = cafeteriaSelected.size === 0;
+    });
+    cafeteriaMenuEl.appendChild(btn);
+  }
+
+  function openCafeteria() {
+    cafeteriaSelected = new Set();
+    cafeteriaMenuEl.querySelectorAll(".th-cafeteria-item").forEach(b => b.classList.remove("is-selected"));
+    cafeteriaCountEl.textContent = "0 items selected";
+    cafeteriaCheckoutBtn.disabled = true;
+    cafeteriaIdInput.value = "";
+    cafeteriaIdStatus.textContent = "";
+    cafeteriaIdStatus.className = "";
+    cafeteriaMenuEl.hidden = false;
+    cafeteriaOrderStep.hidden = false;
+    cafeteriaIdStep.hidden = true;
+    cafeteriaDoneStep.hidden = true;
+    cafeteriaOverlay.hidden = false;
+  }
+  function closeCafeteria() { cafeteriaOverlay.hidden = true; }
+  cafeteriaCheckoutBtn.addEventListener("click", () => {
+    cafeteriaMenuEl.hidden = true;
+    cafeteriaOrderStep.hidden = true;
+    cafeteriaIdStep.hidden = false;
+    cafeteriaIdInput.focus();
+  });
+  cafeteriaIdForm.addEventListener("submit", e => {
+    e.preventDefault();
+    if (normalizeStudentId(cafeteriaIdInput.value) === normalizeStudentId(studentId)) {
+      cafeteriaIdStep.hidden = true;
+      cafeteriaDoneStep.hidden = false;
+      cafeteriaDoneMsg.textContent = `Order placed for ${cafeteriaSelected.size} item${cafeteriaSelected.size === 1 ? "" : "s"} — enjoy your lunch, ${identity.name}!`;
+    } else {
+      cafeteriaIdStatus.textContent = "That doesn't match your student ID. Check your profile and try again.";
+      cafeteriaIdStatus.className = "is-error";
+    }
+  });
+  $("th-cafeteria-close")?.addEventListener("click", closeCafeteria);
+
   addEventListener("keydown", e => {
     if (e.code !== "KeyM" || e.target.tagName === "INPUT") return;
     if (!running) return;
-    if (mapOverlay.hidden) { if (!memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && profileOverlay.hidden) openMap(); }
+    if (mapOverlay.hidden) { if (!memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden) openMap(); }
     else closeMap();
   });
 
@@ -392,7 +459,7 @@ async function boot() {
   function escapeHtml(s) { return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
   function openChat() {
-    if (!running || memoryEl || dialogueEl || !lbOverlay.hidden || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden) return;
+    if (!running || memoryEl || dialogueEl || !lbOverlay.hidden || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden) return;
     chatOpen = true;
     chatBar.hidden = false;
     chatInput.value = "";
@@ -472,6 +539,8 @@ async function boot() {
     get minigameOpen() { return !minigameOverlay.hidden; },
     get mapOpen() { return !mapOverlay.hidden; },
     get profileOpen() { return !profileOverlay.hidden; },
+    get cafeteriaOpen() { return !cafeteriaOverlay.hidden; },
+    openCafeteria, closeCafeteria,
     openProfile, closeProfile,
     get studentId() { return studentId; },
     get highScores() { return highScores; },
@@ -518,7 +587,7 @@ async function boot() {
       fade = Math.max(0, fade - dt * 4);
     }
 
-    if (!pendingDoor && !memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && mapOverlay.hidden && profileOverlay.hidden) {
+    if (!pendingDoor && !memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && mapOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden) {
       const axis = input.axis();
       tryPushFromInput(axis);
       player.update(dt, axis, zone);
@@ -554,17 +623,21 @@ async function boot() {
     const obj = zone.objectAt(face.x, face.y);
     const mem = obj && (obj.memory || obj.def.memory);
     const play = obj && (obj.play || obj.def.play);
+    const shop = obj && (obj.shop || obj.def.shop);
     const arcadeHint = obj && obj.game ? ` Play ${obj.gameName || "a game"}` : null;
     const playHint = play ? ` Play ${obj.playName || obj.def.playName || minigameInfo(play).title}` : null;
-    setHint((memoryEl || dialogueEl || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (arcadeHint || playHint || (mem ? ` ${mem.title}` : null)));
+    const shopHint = shop ? " Get lunch" : null;
+    setHint((memoryEl || dialogueEl || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (arcadeHint || playHint || shopHint || (mem ? ` ${mem.title}` : null)));
     if (input.interactPressed() && mapOverlay.hidden && profileOverlay.hidden) {
-      if (!minigameOverlay.hidden) closeMinigame();
+      if (!cafeteriaOverlay.hidden) closeCafeteria();
+      else if (!minigameOverlay.hidden) closeMinigame();
       else if (!arcadeOverlay.hidden) closeArcade();
       else if (dialogueEl) closeDialogue();
       else if (memoryEl) closeMemory();
       else if (nearNPC) showDialogue(nearNPC);
       else if (obj && obj.game) openArcade(obj);
       else if (play) openMinigame(obj);
+      else if (shop) openCafeteria();
       else if (mem) showMemory(mem, obj);
     }
 

@@ -246,6 +246,13 @@ export const OBJECT_DEFS = {
       text: "A rubber mat worn smooth in the shape of a hundred nervous first kicks.",
     },
   },
+  "food-bar": {
+    sprite: "food-bar", w: 4, h: 2, footRows: 1, shop: true,
+    memory: {
+      title: "The lunch line",
+      text: "Pizza Fridays are a myth spoken of in whispers. Today it's mystery meatloaf, and everyone's pretending they're fine with that.",
+    },
+  },
   "school-bus": {
     sprite: "school-bus", w: 4, h: 6, footRows: 1,
     memory: {
@@ -291,6 +298,7 @@ const FALLBACK_COLORS = {
   "bus-stop-sign": "#e8c22e", pipes: "#8a3a3a", "ac-unit": "#5a5a62",
   "foursquare-court": "#c2b46a", "tetherball-pole": "#6b4a2a",
   "hopscotch-court": "#b8ac82", "kickball-spot": "#a13a3a",
+  "food-bar": "#c2743a",
 };
 
 export class ObjectSprites {

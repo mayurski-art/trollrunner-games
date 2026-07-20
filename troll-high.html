@@ -108,6 +108,31 @@
       </div>
     </div>
 
+    <!-- Cafeteria food bar: pick items, then confirm your order by typing
+         your own student ID (design doc feedback) -->
+    <div id="th-cafeteria-overlay" hidden>
+      <div class="th-cafeteria-panel">
+        <button id="th-cafeteria-close" type="button" aria-label="Close">✕</button>
+        <h2>🍽️ Lunch Line</h2>
+        <div id="th-cafeteria-menu" class="th-cafeteria-menu"></div>
+        <div id="th-cafeteria-order-step" class="th-cafeteria-step">
+          <p id="th-cafeteria-count">0 items selected</p>
+          <button id="th-cafeteria-checkout" type="button" disabled>Checkout ▶</button>
+        </div>
+        <div id="th-cafeteria-id-step" class="th-cafeteria-step" hidden>
+          <p>Enter your student ID to confirm your order:</p>
+          <form id="th-cafeteria-id-form">
+            <input id="th-cafeteria-id-input" type="text" autocomplete="off" placeholder="e.g. AB-123456" maxlength="9">
+            <button type="submit">Confirm</button>
+          </form>
+          <p id="th-cafeteria-id-status" aria-live="polite"></p>
+        </div>
+        <div id="th-cafeteria-done-step" class="th-cafeteria-step" hidden>
+          <p id="th-cafeteria-done-msg"></p>
+        </div>
+      </div>
+    </div>
+
     <!-- Recess minigames v1 (four square, tetherball, hopscotch, kickball) —
          original in-world games, not embeds (design doc §11). -->
     <div id="th-minigame-overlay" hidden>

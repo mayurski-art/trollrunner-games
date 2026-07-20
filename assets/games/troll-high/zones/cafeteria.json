@@ -66,6 +66,11 @@
       "type": "lunch-table",
       "x": 14,
       "y": 11
+    },
+    {
+      "type": "food-bar",
+      "x": 18,
+      "y": 5
     }
   ],
   "doors": [
