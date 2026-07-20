@@ -310,8 +310,8 @@ binder in 2006. Mobile: bottom-sheet versions of the same panels.
 
 | # | Phase | Ships |
 |---|-------|-------|
-| 0 | Proof | Hallway + 1 classroom walkable in-browser: tileset, avatar 8-dir walk, camera, collision, zone transition. Validates the whole art pipeline before mass content. |
-| 1 | Engine core | Zone system + editor tool, touch controls, walk-behind, lighting layer, clock v1 (day/night). |
+| 0 | Proof — **DONE** | Hallway + 1 classroom walkable in-browser: tileset, avatar 8-dir walk, camera, collision, zone transition. Validates the whole art pipeline before mass content. |
+| 1 | Engine core — **in progress** | Zone system done (Phase 0). Editor tool (`tools/troll-high-editor.html`) **done**: paints against the real Wang tilesets, vertex + rect-fill terrain brush, object palette, door rectangles, spawn point, JSON import/export. Touch controls + walk-behind done (Phase 0). Remaining: richer lighting layer (lamp glow, CRT flicker — currently a flat day/night tint), clock v1 polish. |
 | 2 | School wave 1 | 8 core rooms (office, 3 classrooms, computer lab, cafeteria, library, bathrooms) + Memory Engine v1 with ~60 objects + base ambience. |
 | 3 | Multiplayer | Per-zone ghosts, presence roster, chat bubbles, emotes, sit/wave/dance. **The "it's an MMO" moment.** |
 | 4 | School alive | Bell schedule, NPC system + first 8 NPCs on routines, dialogue, period-driven audio layers. |
