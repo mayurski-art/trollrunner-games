@@ -10,12 +10,20 @@ export function genStudentId() {
   return `${letter()}${letter()}-${digit()}${digit()}${digit()}${digit()}${digit()}${digit()}`;
 }
 
-export function renderProfile(dom, { name, studentId, enrolledAt, memoriesFound, highScores, minigameInfo }) {
+export function renderProfile(dom, { name, studentId, enrolledAt, memoriesFound, highScores, minigameInfo, stats }) {
   dom.name.textContent = name;
   dom.id.textContent = `Student ID: ${studentId}`;
   const days = Math.max(0, Math.floor((Date.now() - enrolledAt) / 86400000));
   dom.enrolled.textContent = days === 0 ? "Enrolled today" : `Enrolled ${days} day${days === 1 ? "" : "s"} ago`;
   dom.memories.textContent = String(memoriesFound);
+
+  if (dom.roomsExplored) dom.roomsExplored.textContent = `${stats.roomsExplored} / ${stats.totalRooms}`;
+  if (dom.daysAttended) dom.daysAttended.textContent = String(stats.daysAttended);
+  if (dom.lunchesBought) dom.lunchesBought.textContent = String(stats.lunchesBought);
+  if (dom.tradesCompleted) dom.tradesCompleted.textContent = String(stats.tradesCompleted);
+  if (dom.giftsGiven) dom.giftsGiven.textContent = String(stats.giftsGiven);
+  if (dom.giftsReceived) dom.giftsReceived.textContent = String(stats.giftsReceived);
+  if (dom.cardsCollected) dom.cardsCollected.textContent = `${stats.cardsCollected} / ${stats.totalCards}`;
 
   dom.scores.innerHTML = "";
   const kinds = Object.keys(highScores || {});

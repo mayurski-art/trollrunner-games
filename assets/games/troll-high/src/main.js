@@ -168,10 +168,27 @@ async function boot() {
     saveDirty = true;
   }
 
+  // Life-story profile stats (§21 of the design doc) — progression as
+  // "what did I do at this school," not levels/XP. Extend this object with
+  // more counters as later phases add clubs/dances/events; the profile
+  // card and save payload don't need to change shape, just this list.
+  const visitedZones = new Set(savedGame?.visitedZones || []);
+  const visitDays = new Set(savedGame?.visitDays || []);
+  let lunchesBought = savedGame?.lunchesBought || 0;
+  let tradesCompleted = savedGame?.tradesCompleted || 0;
+  let giftsGiven = savedGame?.giftsGiven || 0;
+  let giftsReceived = savedGame?.giftsReceived || 0;
+  if (!visitedZones.has(zone.id)) { visitedZones.add(zone.id); saveDirty = true; }
+  if (!visitDays.has(today)) { visitDays.add(today); saveDirty = true; }
+
   function persist() {
     if (!saveDirty) return;
     saveDirty = false;
-    saveGame(session.userId, { zoneId: zone.id, x: player.x, y: player.y, foundKeys: [...found], studentId, enrolledAt, highScores, orientationDone, elective, dailyTasksDay, dailyFlags, cards });
+    saveGame(session.userId, {
+      zoneId: zone.id, x: player.x, y: player.y, foundKeys: [...found], studentId, enrolledAt, highScores,
+      orientationDone, elective, dailyTasksDay, dailyFlags, cards,
+      visitedZones: [...visitedZones], visitDays: [...visitDays], lunchesBought, tradesCompleted, giftsGiven, giftsReceived,
+    });
   }
   setInterval(persist, 30000);
   document.addEventListener("visibilitychange", () => { if (document.hidden) persist(); });
@@ -229,10 +246,20 @@ async function boot() {
   const profileDom = {
     name: $("th-profile-name"), id: $("th-profile-id"), enrolled: $("th-profile-enrolled"),
     memories: $("th-profile-memories"), scores: $("th-profile-scores"),
+    roomsExplored: $("th-profile-rooms-explored"), daysAttended: $("th-profile-days-attended"),
+    lunchesBought: $("th-profile-lunches"), tradesCompleted: $("th-profile-trades"),
+    giftsGiven: $("th-profile-gifts-given"), giftsReceived: $("th-profile-gifts-received"),
+    cardsCollected: $("th-profile-cards-collected"),
   };
   function openProfile() {
     renderProfile(profileDom, {
       name: identity.name, studentId, enrolledAt, memoriesFound: found.size, highScores, minigameInfo,
+      stats: {
+        roomsExplored: visitedZones.size, totalRooms: ZONE_IDS.length,
+        daysAttended: visitDays.size,
+        lunchesBought, tradesCompleted, giftsGiven, giftsReceived,
+        cardsCollected: Object.keys(cards).length, totalCards: CARDS.length,
+      },
     });
     renderCardPicker($("th-profile-cards"), cards, new Set(), { readonly: true });
     profileOverlay.hidden = false;
@@ -300,6 +327,7 @@ async function boot() {
       cafeteriaDoneStep.hidden = false;
       cafeteriaDoneMsg.textContent = `Order placed for ${cafeteriaSelected.size} item${cafeteriaSelected.size === 1 ? "" : "s"} — enjoy your lunch, ${identity.name}!`;
       markDailyTask("lunch");
+      lunchesBought++; saveDirty = true;
     } else {
       cafeteriaIdStatus.textContent = "That doesn't match your student ID. Check your profile and try again.";
       cafeteriaIdStatus.className = "is-error";
@@ -475,6 +503,7 @@ async function boot() {
     if (tradeMode === "gift") {
       const id = chosen[0];
       removeCard(id);
+      giftsGiven++; saveDirty = true;
       persist();
       net.sendGift(tradeTargetId, id);
       tradeDoneMsg.textContent = `Sent a ${cardById(id).name} to ${tradeTargetName}!`;
@@ -494,6 +523,7 @@ async function boot() {
     const { peerId, name, cards: offerCards } = tradePendingOffer;
     for (const c of offerCards) addCard(c.id, c.count);
     for (const id of tradeCounterSelected) removeCard(id, 1);
+    tradesCompleted++; saveDirty = true;
     persist();
     net.sendTradeAccept(peerId, [...tradeCounterSelected].map(id => ({ id, count: 1 })));
     tradeDoneMsg.textContent = `Trade with ${name} complete!`;
@@ -531,6 +561,7 @@ async function boot() {
     if (peerId !== tradeTargetId || tradeWaitingStep.hidden) return;
     for (const id of tradeSelected) removeCard(id, 1);
     for (const c of counterCards) addCard(c.id, c.count);
+    tradesCompleted++; saveDirty = true;
     persist();
     tradeDoneMsg.textContent = `Trade with ${name} complete!`;
     showTradeStep("done");
@@ -547,6 +578,7 @@ async function boot() {
   };
   net.onGift = (peerId, name, cardId) => {
     addCard(cardId, 1);
+    giftsReceived++; saveDirty = true;
     persist();
     const card = cardById(cardId);
     showToast(`🎁 ${name} gave you a ${card ? card.name : "card"}!`);
@@ -711,6 +743,7 @@ async function boot() {
     ambience.setIndoor(!OUTDOOR_ZONES.has(zone.id));
     ghosts.clear(); // last room's peers no longer apply
     net.join(zone.id).catch(() => {});
+    visitedZones.add(zone.id);
     saveDirty = true;
     persist(); // checkpoint on room change, not just the interval
   }
@@ -820,6 +853,12 @@ async function boot() {
     get tradeOpen() { return !tradeOverlay.hidden; },
     openTrade, closeTrade,
     get cards() { return cards; },
+    get lifeStats() {
+      return {
+        roomsExplored: visitedZones.size, totalRooms: ZONE_IDS.length,
+        daysAttended: visitDays.size, lunchesBought, tradesCompleted, giftsGiven, giftsReceived,
+      };
+    },
     addCard, removeCard,
     openSchedule, closeSchedule, finishOrientation,
     get dailyFlags() { return dailyFlags; },

@@ -73,10 +73,30 @@ async function newVisitor(browser, name) {
   ]);
   log(connA && connB, `both joined the hallway channel (A connected=${connA}, B connected=${connB})`);
 
-  // Get them next to each other (both spawn near the same tile already,
-  // but nudge to be sure position broadcasts have landed).
-  await Promise.all([hold(a.page, 'ArrowRight', 100), hold(b.page, 'ArrowLeft', 100)]);
-  await new Promise(r => setTimeout(r, 1200));
+  // Both warped to the identical tile, so no movement nudge is needed —
+  // sendPosition() fires periodically regardless of movement (throttled
+  // to 10Hz), and nudging them in opposite directions (as an earlier
+  // version of this test did) pushed them ~29px apart, just over the
+  // 26px trade range, which was the real source of this test's flakiness.
+  // Position sync is still real Supabase Realtime traffic, so poll for it
+  // rather than a single check after a fixed sleep.
+  const NEAR_PEER_FN = `(() => {
+    for (const [, p] of window.__th.net.liveGhosts()) {
+      if (Math.hypot(p.x - window.__th.player.x, p.y - window.__th.player.y) < 26) return true;
+    }
+    return false;
+  })()`;
+  try {
+    await a.page.waitForFunction(NEAR_PEER_FN, { timeout: 8000, polling: 200 });
+  } catch (e) {
+    const diag = await a.page.evaluate(() => ({
+      me: { x: window.__th.player.x, y: window.__th.player.y },
+      ghosts: [...window.__th.net.liveGhosts()].map(([id, p]) => ({ id, x: p.x, y: p.y, name: p.name })),
+      connected: window.__th.net.connected, zoneId: window.__th.zone.id,
+    }));
+    console.log('DIAG (initial near-peer wait):', JSON.stringify(diag));
+    throw e;
+  }
 
   const nearPeerCheck = await a.page.evaluate(() => {
     for (const [, p] of window.__th.net.liveGhosts()) {
@@ -125,9 +145,19 @@ async function newVisitor(browser, name) {
   // --- Decline: Bob offers, Alice declines, nobody's inventory changes ---
   await b.page.evaluate(() => window.__th.warpTo(window.__th.player.tileX, window.__th.player.tileY));
   await hold(b.page, 'ArrowLeft', 60);
-  await new Promise(r => setTimeout(r, 400));
+  await new Promise(r => setTimeout(r, 1000));
   await b.page.keyboard.press('KeyE');
-  await b.page.waitForFunction('window.__th.tradeOpen === true', { timeout: 3000 });
+  try {
+    await b.page.waitForFunction('window.__th.tradeOpen === true', { timeout: 5000 });
+  } catch (e) {
+    const diag = await b.page.evaluate(() => ({
+      bx: window.__th.player.x, by: window.__th.player.y,
+      hint: document.getElementById('th-hint').textContent,
+      ghosts: [...window.__th.net.liveGhosts()].map(([id, p]) => ({ id, x: p.x, y: p.y, name: p.name })),
+    }));
+    console.log('DIAG:', JSON.stringify(diag));
+    throw e;
+  }
   const bobCardBtn = await b.page.$('.th-trade-card');
   if (bobCardBtn) {
     await bobCardBtn.click();
