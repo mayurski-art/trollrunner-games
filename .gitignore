@@ -2,6 +2,12 @@ node_modules/
 tools/shot-*.png
 tools/th-shot-*.png
 tools/the-shot-*.png
+tools/th-p5-shot-*.png
+tools/th-p6-*.png
+tools/th-mp-*.png
+tools/th-npc-*.png
+tools/th-dialogue-*.png
+tools/th-tv-*.png
 tools/pz-*.png
 tools/kombat-online-*.png
 tools/bp-test-out.log
