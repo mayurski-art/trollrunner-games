@@ -18,6 +18,7 @@ import { Minigame, minigameInfo } from "./minigames.js";
 import { drawCampusMap } from "./mapview.js";
 import { genStudentId, renderProfile } from "./profile.js";
 import { MENU as CAFETERIA_MENU, normalizeStudentId } from "./cafeteria.js";
+import { ELECTIVES, buildSchedule, DAILY_TASKS } from "./schedule.js";
 import * as clock from "./clock.js";
 
 const BASE = "assets/games/troll-high";
@@ -142,10 +143,24 @@ async function boot() {
   const highScores = savedGame?.highScores || {};
   if (!savedGame?.studentId) saveDirty = true;
 
+  // Orientation (shown once), elective pick, and daily tasks (reset when
+  // the in-game day, per clock.js, rolls over — 1 real hour = 1 school day).
+  let orientationDone = savedGame?.orientationDone || false;
+  let elective = savedGame?.elective || ELECTIVES[2].id;
+  const today = clock.now().dayIndex;
+  let dailyTasksDay = savedGame?.dailyTasksDay;
+  let dailyFlags = savedGame?.dailyFlags || {};
+  if (dailyTasksDay !== today) { dailyTasksDay = today; dailyFlags = {}; saveDirty = true; }
+  function markDailyTask(id) {
+    if (dailyFlags[id]) return;
+    dailyFlags[id] = true;
+    saveDirty = true;
+  }
+
   function persist() {
     if (!saveDirty) return;
     saveDirty = false;
-    saveGame(session.userId, { zoneId: zone.id, x: player.x, y: player.y, foundKeys: [...found], studentId, enrolledAt, highScores });
+    saveGame(session.userId, { zoneId: zone.id, x: player.x, y: player.y, foundKeys: [...found], studentId, enrolledAt, highScores, orientationDone, elective, dailyTasksDay, dailyFlags });
   }
   setInterval(persist, 30000);
   document.addEventListener("visibilitychange", () => { if (document.hidden) persist(); });
@@ -177,6 +192,7 @@ async function boot() {
     ambience.start();
     ambience.setIndoor(!OUTDOOR_ZONES.has(zone.id));
     net.join(zone.id).catch(() => {});
+    if (!orientationDone) openOrientation();
   };
   bootReady = true;
   if (pendingStart) onStart();
@@ -192,7 +208,7 @@ async function boot() {
   // ----------------------------------------------------------------- map
   const mapOverlay = $("th-map-overlay");
   const mapCanvas = $("th-map-canvas");
-  function openMap() { mapOverlay.hidden = false; drawCampusMap(mapCanvas, zone.id); }
+  function openMap() { mapOverlay.hidden = false; drawCampusMap(mapCanvas, zone.id); markDailyTask("map"); }
   function closeMap() { mapOverlay.hidden = true; }
   $("th-btn-map")?.addEventListener("click", openMap);
   $("th-map-close")?.addEventListener("click", closeMap);
@@ -271,6 +287,7 @@ async function boot() {
       cafeteriaIdStep.hidden = true;
       cafeteriaDoneStep.hidden = false;
       cafeteriaDoneMsg.textContent = `Order placed for ${cafeteriaSelected.size} item${cafeteriaSelected.size === 1 ? "" : "s"} — enjoy your lunch, ${identity.name}!`;
+      markDailyTask("lunch");
     } else {
       cafeteriaIdStatus.textContent = "That doesn't match your student ID. Check your profile and try again.";
       cafeteriaIdStatus.className = "is-error";
@@ -281,9 +298,65 @@ async function boot() {
   addEventListener("keydown", e => {
     if (e.code !== "KeyM" || e.target.tagName === "INPUT") return;
     if (!running) return;
-    if (mapOverlay.hidden) { if (!memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden) openMap(); }
+    if (mapOverlay.hidden) { if (!memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden) openMap(); }
     else closeMap();
   });
+
+  // -------------------------------------------------------- orientation
+  // Shown once per account after the first Start click — not a design-doc
+  // item, added from direct feedback alongside the schedule/tasks below.
+  const orientationOverlay = $("th-orientation-overlay");
+  const orientationElectivesEl = $("th-orientation-electives");
+  let orientationPick = elective;
+  orientationElectivesEl.innerHTML = "";
+  for (const e of ELECTIVES) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "th-orientation-elective" + (e.id === orientationPick ? " is-selected" : "");
+    btn.textContent = e.label;
+    btn.addEventListener("click", () => {
+      orientationPick = e.id;
+      orientationElectivesEl.querySelectorAll(".th-orientation-elective").forEach(b => b.classList.remove("is-selected"));
+      btn.classList.add("is-selected");
+    });
+    orientationElectivesEl.appendChild(btn);
+  }
+  function openOrientation() { orientationOverlay.hidden = false; }
+  function finishOrientation() {
+    elective = orientationPick;
+    orientationDone = true;
+    saveDirty = true;
+    persist();
+    orientationOverlay.hidden = true;
+  }
+  $("th-orientation-start")?.addEventListener("click", finishOrientation);
+
+  // ------------------------------------------------------------ schedule
+  const scheduleOverlay = $("th-schedule-overlay");
+  const scheduleTableBody = $("th-schedule-table").querySelector("tbody");
+  const scheduleTasksEl = $("th-schedule-tasks");
+  function openSchedule() {
+    const nowPeriod = clock.now().period;
+    scheduleTableBody.innerHTML = "";
+    for (const row of buildSchedule(elective)) {
+      const tr = document.createElement("tr");
+      if (row.period === nowPeriod) tr.className = "is-current";
+      tr.innerHTML = `<td>${row.period}</td><td>${row.subject}</td><td>${row.zoneName}</td>`;
+      scheduleTableBody.appendChild(tr);
+    }
+    scheduleTasksEl.innerHTML = "";
+    for (const task of DAILY_TASKS) {
+      const li = document.createElement("li");
+      const done = !!dailyFlags[task.id];
+      if (done) li.classList.add("is-done");
+      li.textContent = (done ? "☑ " : "☐ ") + task.label;
+      scheduleTasksEl.appendChild(li);
+    }
+    scheduleOverlay.hidden = false;
+  }
+  function closeSchedule() { scheduleOverlay.hidden = true; }
+  $("th-btn-schedule")?.addEventListener("click", openSchedule);
+  $("th-schedule-close")?.addEventListener("click", closeSchedule);
 
   // ------------------------------------------------------ arcade launcher
   // Computer lab CRTs boot the real arcade games in-world (design doc
@@ -332,6 +405,7 @@ async function boot() {
     if (activeMinigame) {
       const { kind, score } = activeMinigame;
       if (score > (highScores[kind] || 0)) { highScores[kind] = score; saveDirty = true; }
+      markDailyTask("minigame");
       activeMinigame.stop();
     }
     activeMinigame = null;
@@ -355,6 +429,7 @@ async function boot() {
     $("th-root").appendChild(memoryEl);
     if (isNew) {
       found.add(obj.memKey);
+      markDailyTask("memory");
       saveDirty = true;
       persist();
       window.TrollLeaderboard?.record?.("troll-high", { memories: found.size });
@@ -459,7 +534,7 @@ async function boot() {
   function escapeHtml(s) { return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
   function openChat() {
-    if (!running || memoryEl || dialogueEl || !lbOverlay.hidden || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden) return;
+    if (!running || memoryEl || dialogueEl || !lbOverlay.hidden || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden) return;
     chatOpen = true;
     chatBar.hidden = false;
     chatInput.value = "";
@@ -540,6 +615,11 @@ async function boot() {
     get mapOpen() { return !mapOverlay.hidden; },
     get profileOpen() { return !profileOverlay.hidden; },
     get cafeteriaOpen() { return !cafeteriaOverlay.hidden; },
+    get orientationOpen() { return !orientationOverlay.hidden; },
+    get scheduleOpen() { return !scheduleOverlay.hidden; },
+    openSchedule, closeSchedule, finishOrientation,
+    get dailyFlags() { return dailyFlags; },
+    get elective() { return elective; },
     openCafeteria, closeCafeteria,
     openProfile, closeProfile,
     get studentId() { return studentId; },
@@ -587,7 +667,7 @@ async function boot() {
       fade = Math.max(0, fade - dt * 4);
     }
 
-    if (!pendingDoor && !memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && mapOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden) {
+    if (!pendingDoor && !memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && mapOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden) {
       const axis = input.axis();
       tryPushFromInput(axis);
       player.update(dt, axis, zone);
@@ -627,8 +707,8 @@ async function boot() {
     const arcadeHint = obj && obj.game ? ` Play ${obj.gameName || "a game"}` : null;
     const playHint = play ? ` Play ${obj.playName || obj.def.playName || minigameInfo(play).title}` : null;
     const shopHint = shop ? " Get lunch" : null;
-    setHint((memoryEl || dialogueEl || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (arcadeHint || playHint || shopHint || (mem ? ` ${mem.title}` : null)));
-    if (input.interactPressed() && mapOverlay.hidden && profileOverlay.hidden) {
+    setHint((memoryEl || dialogueEl || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (arcadeHint || playHint || shopHint || (mem ? ` ${mem.title}` : null)));
+    if (input.interactPressed() && mapOverlay.hidden && profileOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden) {
       if (!cafeteriaOverlay.hidden) closeCafeteria();
       else if (!minigameOverlay.hidden) closeMinigame();
       else if (!arcadeOverlay.hidden) closeArcade();

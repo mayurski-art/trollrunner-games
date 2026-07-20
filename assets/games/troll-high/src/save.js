@@ -52,8 +52,8 @@ export async function loadSave(userId) {
 /* Fire-and-forget is fine for periodic autosave; awaited on real exit
    points (visibilitychange) where we still want the local cache written
    synchronously first in case the network write gets killed mid-flight. */
-export async function saveGame(userId, { zoneId, x, y, foundKeys, studentId, enrolledAt, highScores }) {
-  const data = { v: 1, zoneId, x, y, foundKeys, studentId, enrolledAt, highScores, savedAt: Date.now() };
+export async function saveGame(userId, { zoneId, x, y, foundKeys, studentId, enrolledAt, highScores, orientationDone, elective, dailyTasksDay, dailyFlags }) {
+  const data = { v: 1, zoneId, x, y, foundKeys, studentId, enrolledAt, highScores, orientationDone, elective, dailyTasksDay, dailyFlags, savedAt: Date.now() };
   writeLocalCache(userId, data);
   const sb = client();
   if (!sb) return false;

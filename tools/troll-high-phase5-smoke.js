@@ -7,7 +7,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer-core');
-const { stubAuth, isExpectedAuthNoise } = require('./th-test-auth-stub');
+const { stubAuth, isExpectedAuthNoise, dismissOrientation } = require('./th-test-auth-stub');
 
 const ROOT = path.join(__dirname, '..');
 const OUT = __dirname;
@@ -75,6 +75,7 @@ async function enterRoom(page, { doorX, roomId, roomName, memWarp, memTitleRe, l
   await page.waitForFunction('window.__th && !window.__th.running', { timeout: 20000 });
   await page.click('#th-start');
   await page.waitForFunction('window.__th.running === true');
+  await dismissOrientation(page);
 
   // Main Hallway -> East Wing junction (hallway-a door at x=94)
   await page.evaluate(() => window.__th.warpTo(95, 5));

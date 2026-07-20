@@ -15,7 +15,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer-core');
-const { stubAuth, isExpectedAuthNoise } = require('./th-test-auth-stub');
+const { stubAuth, isExpectedAuthNoise, dismissOrientation } = require('./th-test-auth-stub');
 
 const ROOT = path.join(__dirname, '..');
 const PORT = 8953;
@@ -79,6 +79,7 @@ const SPY_JS = `
   await page.waitForFunction('window.__th && !window.__th.running', { timeout: 20000 });
   await page.click('#th-start');
   await page.waitForFunction('window.__th.running === true');
+  await dismissOrientation(page);
 
   // Overlay open/close + movement freeze
   const p0 = await page.evaluate(() => ({ x: window.__th.player.x, y: window.__th.player.y }));

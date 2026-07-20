@@ -61,4 +61,16 @@ function isExpectedAuthNoise(text) {
     || /\[troll-high\] cloud (load|save) (failed|threw)/i.test(text);
 }
 
-module.exports = { stubAuth, isExpectedAuthNoise };
+/* First-ever Start click now shows a one-time orientation overlay
+   (elective pick), which freezes movement until dismissed — call this
+   right after clicking #th-start and waiting for `running`, before any
+   other test steps. A no-op on a returning session (orientationDone
+   already persisted), so it's safe to call unconditionally. */
+async function dismissOrientation(page) {
+  const open = await page.evaluate(() => window.__th.orientationOpen);
+  if (!open) return;
+  await page.click('#th-orientation-start');
+  await page.waitForFunction('window.__th.orientationOpen === false', { timeout: 3000 });
+}
+
+module.exports = { stubAuth, isExpectedAuthNoise, dismissOrientation };

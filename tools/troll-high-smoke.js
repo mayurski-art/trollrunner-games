@@ -8,7 +8,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer-core');
-const { stubAuth, isExpectedAuthNoise } = require('./th-test-auth-stub');
+const { stubAuth, isExpectedAuthNoise, dismissOrientation } = require('./th-test-auth-stub');
 
 const ROOT = path.join(__dirname, '..');
 const OUT = __dirname;
@@ -96,6 +96,7 @@ async function enterRoom(page, { doorX, roomId, roomName, warpX, memWarp, memTit
   // Start
   await page.click('#th-start');
   await page.waitForFunction('window.__th.running === true');
+  await dismissOrientation(page);
   const hudVisible = await page.$eval('#th-hud', (el) => !el.hidden);
   log(hudVisible, 'Start shows HUD, loop running');
   log(await page.$eval('#th-zone-name', el => el.textContent) === 'Main Hallway', 'spawns in Main Hallway');

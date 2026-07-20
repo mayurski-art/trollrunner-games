@@ -11,7 +11,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer-core');
-const { stubAuth, isExpectedAuthNoise } = require('./th-test-auth-stub');
+const { stubAuth, isExpectedAuthNoise, dismissOrientation } = require('./th-test-auth-stub');
 
 const ROOT = path.join(__dirname, '..');
 const PORT = 8956;
@@ -59,6 +59,7 @@ const hold = async (page, key, ms) => { await page.keyboard.down(key); await new
   await page.waitForFunction('window.__th && !window.__th.running', { timeout: 20000 });
   await page.click('#th-start');
   await page.waitForFunction('window.__th.running === true');
+  await dismissOrientation(page);
 
   // Into the Computer Lab
   await page.evaluate(() => window.__th.warpTo(51, 5));

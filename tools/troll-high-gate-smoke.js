@@ -10,6 +10,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer-core');
+const { dismissOrientation } = require('./th-test-auth-stub');
 
 const ROOT = path.join(__dirname, '..');
 const PORT = 8951;
@@ -73,6 +74,7 @@ const hold = async (page, key, ms) => { await page.keyboard.down(key); await new
 
   await page.click('#th-start');
   await page.waitForFunction('window.__th && window.__th.running');
+  await dismissOrientation(page);
   log(await page.evaluate(() => window.__th.identity.name) === username, 'in-game identity uses the real account username, not a guest name');
 
   // Walk to the lockers, find the memory, force a save.

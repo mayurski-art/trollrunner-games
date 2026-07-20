@@ -12,7 +12,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer-core');
-const { stubAuth, isExpectedAuthNoise } = require('./th-test-auth-stub');
+const { stubAuth, isExpectedAuthNoise, dismissOrientation } = require('./th-test-auth-stub');
 
 const ROOT = path.join(__dirname, '..');
 const PORT = 8948;
@@ -52,6 +52,7 @@ const hold = async (page, key, ms) => { await page.keyboard.down(key); await new
   await page.waitForFunction('window.__th', { timeout: 20000 });
   await page.click('#th-start');
   await page.waitForFunction('window.__th.running');
+  await dismissOrientation(page);
 
   await page.evaluate(() => window.__th.warpTo(15, 5));
   await hold(page, 'ArrowUp', 700);
