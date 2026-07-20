@@ -11,6 +11,7 @@ import { Player } from "./player.js";
 import { Ambience } from "./audio.js";
 import { Net, makeGuestIdentity } from "./net.js";
 import { Ghost, drawBubble } from "./ghost.js";
+import { NPC, NPC_DEFS } from "./npc.js";
 import * as clock from "./clock.js";
 
 const BASE = "assets/games/troll-high";
@@ -27,12 +28,20 @@ async function boot() {
   const objectSprites = new ObjectSprites();
   const studentSprites = new CharacterSprites("student");
 
+  const npcSpriteNames = [...new Set(
+    Object.values(NPC_DEFS).flat().map(d => d.sprite)
+  )];
+  const npcSprites = {};
+
   // load everything up front — phase 0 is two small zones
   const tilesets = {};
   const zoneData = {};
   await Promise.all([
     objectSprites.load(`${BASE}/sprites/objects`),
     studentSprites.load(`${BASE}/sprites`),
+    ...npcSpriteNames.map(async name => {
+      npcSprites[name] = await new CharacterSprites(name).load(`${BASE}/sprites`);
+    }),
     ...ZONE_IDS.map(async id => {
       zoneData[id] = await loadJSON(`${BASE}/zones/${id}.json`);
     }),
@@ -50,9 +59,18 @@ async function boot() {
     return zones[id];
   };
 
+  const npcsByZone = {};
+  const getNPCs = zn => {
+    if (!npcsByZone[zn.id]) {
+      npcsByZone[zn.id] = (NPC_DEFS[zn.id] || []).map(def => new NPC(def, zn, npcSprites[def.sprite]));
+    }
+    return npcsByZone[zn.id];
+  };
+
   // ---------------------------------------------------------------- state
   const player = new Player(studentSprites);
   let zone = getZone(ZONE_IDS[0]);
+  let npcs = getNPCs(zone);
   player.placeAtTile(zone.spawn.x, zone.spawn.y);
 
   let fade = 0;               // 0 clear → 1 black
@@ -127,6 +145,7 @@ async function boot() {
 
   function switchZone(door) {
     zone = getZone(door.to);
+    npcs = getNPCs(zone);
     player.placeAtTile(door.tx, door.ty);
     doorArmed = false;
     zoneNameEl.textContent = zone.name;
@@ -223,11 +242,14 @@ async function boot() {
     net, ghosts, identity,
     openChat, closeChat,
     get chatOpen() { return chatOpen; },
+    get npcs() { return npcs; },
+    ringBell: () => ambience.ringBell(),
   };
 
   // ----------------------------------------------------------------- loop
   let last = performance.now();
   let clockAcc = 1;
+  let lastPeriod = null; // set on first clock tick; ringBell() fires on change
 
   function tick(nowMs) {
     requestAnimationFrame(tick);
@@ -259,29 +281,38 @@ async function boot() {
     for (const id of ghosts.keys()) if (!live.has(id)) ghosts.delete(id);
     for (const g of ghosts.values()) g.update(dt);
 
+    for (const n of npcs) n.update(dt);
+
     // doors: arm once the player is off every door tile, then trigger on entry
     const onDoor = zone.doorAt(player.tileX, player.tileY);
     if (!onDoor) doorArmed = true;
     else if (doorArmed && !pendingDoor) { pendingDoor = onDoor; }
 
-    // interactions
+    // interactions — a nearby NPC takes priority over a facing-tile memory object
+    const nearNPC = npcs.find(n => n.distanceTo(player.x, player.y) < 26);
     const face = player.facingTile();
     const obj = zone.objectAt(face.x, face.y);
     const mem = obj && obj.def.memory;
-    setHint(memoryEl ? null : (mem ? ` ${mem.title}` : null));
+    setHint(memoryEl ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (mem ? ` ${mem.title}` : null));
     if (input.interactPressed()) {
       if (memoryEl) closeMemory();
+      else if (nearNPC) nearNPC.speak();
       else if (mem) showMemory(mem, obj);
     }
 
-    // hud clock + roster (1/s is plenty)
+    // hud clock + roster + bell/chatter (1/s is plenty)
     clockAcc += dt;
     if (clockAcc >= 1) {
       clockAcc = 0;
-      clockEl.textContent = clock.now().label;
+      const now = clock.now();
+      clockEl.textContent = now.label;
       const names = [identity.name, ...[...ghosts.values()].map(g => g.name || "?")];
       rosterEl.textContent = `👥 ${names.length}`;
       rosterEl.title = names.join(", ");
+
+      if (lastPeriod !== null && lastPeriod !== now.period) ambience.ringBell();
+      lastPeriod = now.period;
+      ambience.setChatter(clock.isPassingPeriod() ? 1 : 0, zone.id !== "hallway-a");
     }
     if (localBubble && performance.now() > localBubble.until) localBubble = null;
 
@@ -289,6 +320,7 @@ async function boot() {
     // huge y = sorts last = drawn on top, without affecting real world position
     if (localBubble) entities.push({ y: player.y + 1000, draw: ctx => drawBubble(ctx, player.x, player.y, localBubble.text) });
     for (const g of ghosts.values()) { const e = g.entity(); if (e) entities.push(e); }
+    for (const n of npcs) entities.push(n.entity());
 
     renderer.follow(player.x, player.y, zone);
     renderer.frame(zone, entities, fade);

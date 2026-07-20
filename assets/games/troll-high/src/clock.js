@@ -23,16 +23,31 @@ export function now() {
   const hour = Math.floor(minutes / 60);
   const min = minutes % 60;
 
-  let period = PERIODS[0][1];
-  for (const [h, label] of PERIODS) if (hour >= h) period = label;
+  let period = PERIODS[0][1], periodStartHour = PERIODS[0][0];
+  for (const [h, label] of PERIODS) if (hour >= h) { period = label; periodStartHour = h; }
 
   return {
     dayIndex,
     weekday: WEEKDAYS[dayIndex % 7],
     hour, min, frac,
     period,
+    periodStartHour,
     label: `${WEEKDAYS[dayIndex % 7]} · ${String(hour).padStart(2, "0")}:${String(min).padStart(2, "0")} · ${period}`,
   };
+}
+
+/* Real ms elapsed since the current period began — a pure function of
+   wall-clock time, so every client agrees without any network sync. Used
+   to give each new period a brief "passing period" bustle window. */
+export function msSincePeriodStart() {
+  const { hour, min, periodStartHour } = now();
+  const elapsedGameMin = (hour - periodStartHour) * 60 + min;
+  return elapsedGameMin * (DAY_MS / 1440);
+}
+
+const PASSING_PERIOD_MS = 30 * 1000; // first 30 real seconds of a new period
+export function isPassingPeriod() {
+  return msSincePeriodStart() < PASSING_PERIOD_MS;
 }
 
 /* 0 = full day, 1 = deep night. Smooth ramps at dawn (5–7) and dusk (18–21). */

@@ -19,9 +19,13 @@ export class CharacterSprites {
     const dir = `${base}/${this.name}`;
     this.meta = await loadJSON(`${dir}/meta.json`);
     if (this.meta) {
+      // walkFrames <= 1 means no walk strip was generated for this
+      // character (most NPCs, for now) — skip the fetch rather than
+      // 404-ing 8 requests every load just to fall back to idle anyway.
+      const hasWalk = this.meta.walkFrames > 1;
       await Promise.all(DIRS.map(async d => {
         this.idle[d] = await loadImage(`${dir}/idle-${d}.png`);
-        this.walk[d] = await loadImage(`${dir}/walk-${d}.png`);
+        this.walk[d] = hasWalk ? await loadImage(`${dir}/walk-${d}.png`) : null;
       }));
     }
     return this;
