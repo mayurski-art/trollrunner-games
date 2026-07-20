@@ -72,13 +72,14 @@ assets/games/troll-high/
                                        dialogue.json, events.json
   sprites/  tiles/  audio/           ← PixelLab exports + SFX
 tools/troll-high-editor.html         ← in-repo zone editor (see §7)
-docs/troll_high.sql                  ← run-once Supabase schema (see §13)
 ```
 
-Same page scaffolding as Trollrreria: CSP already allows Supabase;
-`supabase-js` + `troll-accounts.js` + `troll-notis.js` + leaderboard engine
-loaded the standard way. New hub card on `index.html` (accent: **school-bus
-gold**, category: `mmo`).
+No dedicated SQL migration — persistence reuses the already-deployed
+`troll_game_saves` table (see §13). Same page scaffolding as Trollrreria:
+CSP already allows Supabase; `supabase-js` + `troll-accounts.js` +
+leaderboard engine loaded the standard way (not `troll-notis.js` — see
+§14). New hub card on `index.html` (accent: **school-bus gold**,
+category: `mmo`), still hidden until Phase 7 per decision 1.
 
 ## 4. Engine
 
@@ -177,8 +178,9 @@ The heart of the game. Fully **data-driven** so content grows without code:
 - **Content targets:** launch with **~200 memory objects** across the school
   (prompt's full list — smelly markers, gel pens, chocolate milk, dial-up
   easter egg, XP startup sound, all of it), growing every phase.
-- Some fire **TrollNotis** toasts on rare finds ("🧌 You found the dial-up
-  modem. Screeeech.").
+- Rare finds get the ✨ sparkle + a leaderboard tick (see §14). TrollNotis
+  was considered for this but turned out to be a social-media cross-post
+  announcer, not an achievement-toast system — see §14.
 
 ## 9. NPCs & cast
 
@@ -234,34 +236,55 @@ collectible drop), **Spirit Week**, **school dance**, **Halloween parade**
 **Field Day**, **Movie Day** (TV cart!), talent show. Each event is a data
 entry + a zone-variant, so new events don't need engine work.
 
-## 13. Persistence (Supabase)
+## 13. Persistence (Supabase) — IMPLEMENTED Phase 6, simpler than planned
 
-New run-once schema `docs/troll_high.sql` (same flow as `troll_accounts.sql`):
+No new schema needed. The original plan called for a dedicated
+`docs/troll_high.sql` with `troll_high_profiles` / `troll_high_unlocks` /
+`troll_high_trades` tables — but `assets/supabase/troll_game_saves.sql`
+(main site repo) already exists, is already deployed, and is already used
+by Trollrreria for exactly this shape of problem: one JSONB blob per
+`(user_id, game_id)`, owner-only RLS, no shared-row complexity. Troll High
+just registers as `game_id: "troll-high"` and stores
+`{ zoneId, x, y, foundKeys, savedAt }` — see `src/save.js`. Simpler,
+reuses a proven path, and needed zero manual Supabase setup from the user.
+Per-item unlock rows (sticker/card/item/secret, for a future inventory) and
+a trade log can still be added later either as more `troll_game_saves`
+JSON shape, or as real tables if querying/joining across players turns out
+to matter — not decided yet, not needed until Phase 7's collectibles exist.
 
-- `troll_high_profiles` — user_id, appearance (outfit layers/colors), last
-  zone + position, created/updated.
-- `troll_high_unlocks` — (user_id, kind, item_id, found_at); kind ∈ memory |
-  sticker | card | item | secret. Covers Memory Book, sticker book, binder.
-- `troll_high_trades` — append-only trade log (both parties, items, ts) so
-  trades are auditable and restorable.
-- RLS: own-row read/write; leaderboard visibility comes from the existing
-  `troll_leaderboard` path, not these tables.
-- **Login required** (decision 3): playing needs a TrollRunner account. The
-  title screen doubles as a friendly login/signup gate (via `troll-accounts.js`);
-  everything — position, Memory Book, inventory, trades, ladder — is cloud-first
-  with localStorage only as an offline cache. The gate ships with Phase 6;
-  pre-launch phases run ungated for development.
+- RLS: owner-only (`auth.uid() = user_id`), already enforced by the shared
+  table's existing policies.
+- **Login required** (decision 3): playing needs a TrollRunner account —
+  implemented as a real gate at the title screen (`src/gate.js`), reusing
+  Troll Casino's `#tc-gate` pattern. SSO-aware: a session from any other
+  *.trollrunner.net game skips the form via `TrollrunnerAccounts`' shared
+  cookie. Position + Memory Book are cloud-first, with a local cache
+  mirror (`src/save.js`) as a synchronous fallback for page-unload timing
+  and as an offline cache.
 
-## 14. Shared arcade systems (mandatory wiring)
+## 14. Shared arcade systems (mandatory wiring) — DONE Phase 6
 
-- **Weekly ladder** (per standing rule, every game gets it): `gameId:
-  "troll-high"`, columns **Memories** / **Secrets** / **Stickers** / **Days
-  attended**, `rankBy: ["memories","secrets","stickers"]`; `record()` fires on
-  each first-discovery. Prizes stay display-only, `live:false`.
-- **TrollNotis** for rare finds, event starts ("📚 The Book Fair is HERE"),
-  and friend-joined pings.
-- **troll-accounts.js** for identity; player display name above avatar comes
-  from the account handle.
+- **Weekly ladder**: `gameId: "troll-high"`, live via the shared
+  `troll-leaderboard.js` engine, shown in an in-game 🏆 overlay panel
+  (no page chrome exists outside the canvas to mount a page-section
+  version in, unlike Troll Kombat). Column is **Memories Found** for now
+  — Secrets/Stickers/Days-attended columns from the original plan need
+  systems (inventory, a real secrets tier) that don't exist yet; adding
+  the columns before the data would just be decoration. `record()` fires
+  on each first-discovery. Prizes stay display-only, `live:false`
+  (enforced by the shared engine itself).
+- **TrollNotis** — evaluated, NOT wired. Its real API
+  (`assets/js/troll-notis.js`) is a specific social-media cross-post
+  announcer (X/Instagram, platform badges, a CTA link out to the post),
+  not a generic achievement-toast system. The "🍕 day complete" call in
+  Papa Troll's Pizzeria's `game.js` references a `.push()` method that
+  doesn't exist on the real object — it's silently swallowed by that
+  code's own `typeof === "function"` guard, so it's already a no-op
+  there too. Memory discoveries use the ✨ sparkle on the popup card +
+  the leaderboard tick as their feedback instead.
+- **troll-accounts.js** for identity; player display name (in chat, over
+  the avatar, everywhere) comes straight from the account's real
+  username, not a made-up guest name.
 
 ## 15. Trollface meta-arc & secrets
 
@@ -316,7 +339,7 @@ binder in 2006. Mobile: bottom-sheet versions of the same panels.
 | 3 | Multiplayer — **DONE (v1)** | Per-zone ghosts (`src/net.js`, `src/ghost.js`) over Supabase Realtime broadcast+presence with the BroadcastChannel same-tab fallback, 10Hz position sync with client-side interpolation, roster pill, chat bubbles + scrolling log, 4 emoji emotes (wave/dance/laugh/heart). **The "it's an MMO" moment — confirmed working across real separate browser contexts.** Guest identity (random name, editable, persisted to localStorage) — real accounts arrive in Phase 6. Deferred: literal sit-on-furniture (needs a seated-pose sprite we haven't generated) and the ~40-avatar soft cap (not yet enforced). |
 | 4 | School alive — **DONE (v1)** | Bell (`Ambience.ringBell()`, fires once per period change — deterministic from the shared clock, zero network traffic like everything else clock-driven). NPC system (`src/npc.js`): real BFS pathfinding over each zone's solid grid, two behaviors (stationary / patrol, ping-ponging deterministically off wall-clock time), proximity dialogue (distance-triggered, cycling line pools, floating bubbles). First 8 NPCs: Ms. Chalke, Mr. Fenwick, Mrs. Petrova (the 3 classroom teachers), Eldon Tusk (computer lab), Lunch Lady Doris (cafeteria), Ms. Quietly (library), Principal Grimface (patrols the office), Janitor Gus (patrols the hallway). Period-driven hall-chatter noise bed, louder during passing periods and in the hallway than indoors. Deferred: walk-cycle sprites for the 2 patrol NPCs (they glide in their idle pose — noted, not hidden), NPC-specific cross-zone routines (all 8 are zone-bound for now). `sprites.js` now skips fetching walk strips entirely when a character's meta declares none exist (`walkFrames <= 1`), so this doesn't cost 64 wasted 404s per page load. |
 | 5 | School wave 2 — **DONE** | Gym, auditorium, art room, music room, science lab, nurse's office, playground, sports field, bus loop — 9 new rooms off a second hallway wing (East Wing / hallway-b), branched off Main Hallway rather than one absurdly long corridor. Secrets tier 1: a hidden basement (unmarked East Wing door) chains into the maintenance tunnels, and an unmarked gym door leads up to the roof — 2 new tilesets (outdoor schoolyard w/ chain-link fence, gravel rooftop w/ parapet), 18 new furniture pieces. 121 memory-bearing instances across all 22 zones. |
-| 6 | Persistence | `troll_high.sql`, accounts sync, inventory + sticker book + Memory Book, **leaderboard + TrollNotis wiring**. |
+| 6 | Persistence — **DONE** | Real account gate at the title screen (login/signup, SSO-aware via `TrollrunnerAccounts` — a session from any other *.trollrunner.net game skips the form). Cloud saves reuse the existing shared `troll_game_saves` table (no new SQL needed — same table Trollrreria already uses; a per-game `troll_high.sql` was in the original plan but turned out unnecessary). Position + every found memory round-trip through a real account across reloads. Weekly leaderboard wired via the shared `troll-leaderboard.js` engine, shown in an in-game overlay panel (🏆 button) since Troll High has no page chrome outside the canvas to mount a page-section leaderboard in, unlike Troll Kombat. **TrollNotis was evaluated and NOT wired** — its real API turned out to be a specific social-media cross-post announcer (X/Instagram, platform badges, CTA links), not a generic achievement toast system; forcing memory discoveries through it would misuse it. Deferred to a later phase: inventory + sticker book (needs Phase 7's collectible systems to exist first). |
 | 7 | Lab & recess | CRT computers launch arcade games; recess minigames v1; trading + gifting. **← v1 LAUNCH: hub card flips live** |
 | 8 | Neighborhood 1 | Streets, cul-de-sacs, arcade, pizza place, convenience store, park, bus stop, ice cream truck. |
 | 9 | Neighborhood 2 | Skate park, lake, forest + trail, tree houses, storm drains, warehouse, caves; secrets tier 2. |

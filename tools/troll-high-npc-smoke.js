@@ -6,6 +6,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer-core');
+const { stubAuth, isExpectedAuthNoise } = require('./th-test-auth-stub');
 
 const ROOT = path.join(__dirname, '..');
 const PORT = 8940;
@@ -37,9 +38,10 @@ const hold = async (page, key, ms) => { await page.keyboard.down(key); await new
   const page = await browser.newPage();
   await page.setViewport({ width: 1024, height: 720 });
   const consoleIssues = [];
-  page.on('console', m => { if (['error', 'warning'].includes(m.type()) && !m.text().includes('frame-ancestors') && !m.text().includes('404')) consoleIssues.push(m.text()); });
+  page.on('console', m => { if (['error', 'warning'].includes(m.type()) && !m.text().includes('frame-ancestors') && !m.text().includes('404') && !isExpectedAuthNoise(m.text())) consoleIssues.push(m.text()); });
   page.on('pageerror', e => consoleIssues.push('pageerror: ' + e.message));
 
+  await stubAuth(page);
   await page.goto(`http://localhost:${PORT}/troll-high.html`, { waitUntil: 'networkidle0' });
   await page.waitForFunction('window.__th && !window.__th.running', { timeout: 20000 });
   await page.click('#th-start');

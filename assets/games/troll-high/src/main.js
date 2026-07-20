@@ -9,9 +9,11 @@ import { CharacterSprites } from "./sprites.js";
 import { Zone } from "./zone.js";
 import { Player } from "./player.js";
 import { Ambience } from "./audio.js";
-import { Net, makeGuestIdentity } from "./net.js";
+import { Net } from "./net.js";
 import { Ghost, drawBubble } from "./ghost.js";
 import { NPC, NPC_DEFS } from "./npc.js";
+import { awaitAuth } from "./gate.js";
+import { loadSave, saveGame } from "./save.js";
 import * as clock from "./clock.js";
 
 const BASE = "assets/games/troll-high";
@@ -27,6 +29,16 @@ const OUTDOOR_ZONES = new Set(["hallway-a", "hallway-b", "playground", "sports-f
 const $ = id => document.getElementById(id);
 
 async function boot() {
+  const authPromise = awaitAuth(); // starts driving the #th-title gate UI right away
+
+  // gate.js can unhide #th-start (once authPromise resolves) before this
+  // function's own async chain below — loadSave() does a real network
+  // round trip — has reached the point of attaching its click handler.
+  // Without this guard a fast click (or a test) lands in that gap and is
+  // silently dropped, since no listener exists yet to catch it.
+  let bootReady = false, pendingStart = false, onStart = () => { pendingStart = true; };
+  $("th-start").addEventListener("click", () => { if (bootReady) onStart(); else pendingStart = true; });
+
   const input = new Input();
   const renderer = new Renderer($("th-canvas"));
   const objectSprites = new ObjectSprites();
@@ -81,22 +93,58 @@ async function boot() {
   let pendingDoor = null;     // door being transitioned through
   let doorArmed = false;      // false until player steps off any door tile
   let memoryEl = null;
-
-  const found = new Set(JSON.parse(localStorage.getItem("th_memories") || "[]"));
-  const saveFound = () => localStorage.setItem("th_memories", JSON.stringify([...found]));
-
-  // ------------------------------------------------------------ multiplayer
-  const identity = makeGuestIdentity();
-  identity.name = localStorage.getItem("th_name") || identity.name;
-  const net = new Net(identity);
-  const ghosts = new Map(); // peer id -> Ghost
+  let found = new Set(); // populated once the account + cloud save resolve, below
 
   // ------------------------------------------------------------------- ui
-  $("th-loading").hidden = true;
+  $("th-loading").hidden = true; // reveals #th-title underneath (gate/loading/welcome, driven by gate.js)
+
+  // login is required (design doc decision 3) — this resolves once a real
+  // account session exists, whether via the form above or SSO from another
+  // *.trollrunner.net game.
+  const session = await authPromise;
+  const identity = { id: session.userId, name: session.username || "troll" };
+
+  // Cloud save (assets/supabase/troll_game_saves.sql, shared with Trollrreria)
+  // — restores last zone/position and every memory already found. One-time
+  // migration of pre-login local progress (this project didn't require an
+  // account until this phase) into the new per-account save.
+  let savedGame = await loadSave(session.userId);
+  if (!savedGame) {
+    try {
+      const legacy = localStorage.getItem("th_memories");
+      if (legacy) {
+        localStorage.removeItem("th_memories");
+        savedGame = { zoneId: zone.id, x: player.x, y: player.y, foundKeys: JSON.parse(legacy) };
+        await saveGame(session.userId, savedGame);
+      }
+    } catch (e) { /* ignore a corrupt legacy key */ }
+  }
+  if (savedGame) {
+    found = new Set(savedGame.foundKeys || []);
+    if (savedGame.zoneId && zoneData[savedGame.zoneId]) {
+      zone = getZone(savedGame.zoneId);
+      npcs = getNPCs(zone);
+    }
+    if (typeof savedGame.x === "number" && typeof savedGame.y === "number") {
+      player.x = savedGame.x; player.y = savedGame.y;
+    }
+  }
+
+  let saveDirty = false;
+  function persist() {
+    if (!saveDirty) return;
+    saveDirty = false;
+    saveGame(session.userId, { zoneId: zone.id, x: player.x, y: player.y, foundKeys: [...found] });
+  }
+  setInterval(persist, 30000);
+  document.addEventListener("visibilitychange", () => { if (document.hidden) persist(); });
+  addEventListener("beforeunload", persist);
+
+  // ------------------------------------------------------------ multiplayer
+  const net = new Net(identity);
+  const ghosts = new Map(); // peer id -> Ghost
   const hud = $("th-hud"), hint = $("th-hint");
   const zoneNameEl = $("th-zone-name"), clockEl = $("th-clock"), rosterEl = $("th-roster");
-  const nameInput = $("th-name");
-  nameInput.value = identity.name;
 
   const coarse = matchMedia("(pointer: coarse)").matches;
   if (coarse) input.attachTouch($("th-stick"), $("th-stick-nub"), $("th-btn-act"));
@@ -107,11 +155,7 @@ async function boot() {
   });
 
   let running = false;
-  $("th-start").addEventListener("click", () => {
-    identity.name = (nameInput.value || identity.name).trim().slice(0, 18) || identity.name;
-    localStorage.setItem("th_name", identity.name);
-    net.name = identity.name;
-
+  onStart = () => {
     $("th-title").hidden = true;
     hud.hidden = false;
     $("th-emotes").hidden = false;
@@ -121,7 +165,17 @@ async function boot() {
     ambience.start();
     ambience.setIndoor(!OUTDOOR_ZONES.has(zone.id));
     net.join(zone.id).catch(() => {});
+  };
+  bootReady = true;
+  if (pendingStart) onStart();
+
+  // ----------------------------------------------------------- leaderboard
+  const lbOverlay = $("th-leaderboard-overlay");
+  $("th-btn-leaderboard")?.addEventListener("click", () => {
+    lbOverlay.hidden = false;
+    window.TrollLeaderboard?.refresh?.("troll-high");
   });
+  $("th-leaderboard-close")?.addEventListener("click", () => { lbOverlay.hidden = true; });
 
   function showMemory(mem, obj) {
     closeMemory();
@@ -137,7 +191,12 @@ async function boot() {
       `<div class="th-mem-close">E / tap — close</div>`;
     memoryEl.addEventListener("click", closeMemory);
     $("th-root").appendChild(memoryEl);
-    if (isNew) { found.add(obj.memKey); saveFound(); }
+    if (isNew) {
+      found.add(obj.memKey);
+      saveDirty = true;
+      persist();
+      window.TrollLeaderboard?.record?.("troll-high", { memories: found.size });
+    }
     if (obj.def.screen) startScreenAnim(memoryEl.querySelector(".th-mem-screen"));
   }
   function closeMemory() {
@@ -215,6 +274,8 @@ async function boot() {
     ambience.setIndoor(!OUTDOOR_ZONES.has(zone.id));
     ghosts.clear(); // last room's peers no longer apply
     net.join(zone.id).catch(() => {});
+    saveDirty = true;
+    persist(); // checkpoint on room change, not just the interval
   }
 
   zoneNameEl.textContent = zone.name;
@@ -236,7 +297,7 @@ async function boot() {
   function escapeHtml(s) { return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
   function openChat() {
-    if (!running || memoryEl || dialogueEl) return;
+    if (!running || memoryEl || dialogueEl || !lbOverlay.hidden) return;
     chatOpen = true;
     chatBar.hidden = false;
     chatInput.value = "";
@@ -302,11 +363,15 @@ async function boot() {
     ),
     spritesReady: studentSprites.ready,
     get ambienceStarted() { return ambience.started; },
-    net, ghosts, identity,
+    net, ghosts, identity, session,
     openChat, closeChat,
     get chatOpen() { return chatOpen; },
     get npcs() { return npcs; },
+    get found() { return found; },
     ringBell: () => ambience.ringBell(),
+    persist: () => { saveDirty = true; persist(); },
+    openLeaderboard: () => { lbOverlay.hidden = false; window.TrollLeaderboard?.refresh?.("troll-high"); },
+    closeLeaderboard: () => { lbOverlay.hidden = true; },
   };
 
   // -------------------------------------------------------------- pushing
@@ -346,7 +411,7 @@ async function boot() {
       fade = Math.max(0, fade - dt * 4);
     }
 
-    if (!pendingDoor && !memoryEl && !dialogueEl && !chatOpen) {
+    if (!pendingDoor && !memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden) {
       const axis = input.axis();
       tryPushFromInput(axis);
       player.update(dt, axis, zone);

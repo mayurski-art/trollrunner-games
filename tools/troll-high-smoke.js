@@ -8,6 +8,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer-core');
+const { stubAuth, isExpectedAuthNoise } = require('./th-test-auth-stub');
 
 const ROOT = path.join(__dirname, '..');
 const OUT = __dirname;
@@ -77,9 +78,10 @@ async function enterRoom(page, { doorX, roomId, roomName, warpX, memWarp, memTit
   });
   const page = await browser.newPage();
   await page.setViewport({ width: 1024, height: 720 });
-  page.on('console', (m) => { if (['error', 'warning'].includes(m.type())) consoleIssues.push(m.type() + ': ' + m.text()); });
+  page.on('console', (m) => { if (['error', 'warning'].includes(m.type()) && !isExpectedAuthNoise(m.text())) consoleIssues.push(m.type() + ': ' + m.text()); });
   page.on('pageerror', (e) => consoleIssues.push('pageerror: ' + e.message));
 
+  const { userId } = await stubAuth(page);
   await page.goto(`http://localhost:${PORT}/troll-high.html`, { waitUntil: 'networkidle0' });
   await page.waitForFunction('window.__th && !window.__th.running', { timeout: 20000 });
   const assets = await page.evaluate(() => ({
@@ -145,8 +147,17 @@ async function enterRoom(page, { doorX, roomId, roomName, warpX, memWarp, memTit
   await page.screenshot({ path: path.join(OUT, 'th-shot-4-cafeteria.png') });
 
   // Memory persistence
-  const foundCount = await page.evaluate(() => JSON.parse(localStorage.getItem('th_memories') || '[]').length);
-  log(foundCount >= 5, `memories persisted to localStorage (${foundCount})`);
+  // Persistence now goes through save.js's cloud save (debounced — writes
+  // on interval/visibilitychange/zone-switch, not synchronously on every
+  // find), with a local cache mirror keyed per account. Force a flush via
+  // the debug hook rather than waiting out the real interval.
+  await page.evaluate(() => window.__th.persist());
+  const foundCount = await page.evaluate(uid => {
+    const raw = localStorage.getItem('th_cloud_cache:' + uid);
+    return raw ? (JSON.parse(raw).foundKeys || []).length : 0;
+  }, userId);
+  log(foundCount >= 5, `memories persisted to the local save cache (${foundCount})`);
+  log(await page.evaluate(() => window.__th.found.size) === foundCount, 'in-memory found set matches the persisted cache count');
 
   const realIssues = consoleIssues.filter(t => !t.includes('frame-ancestors'));
   log(realIssues.length === 0, 'no console errors' + (realIssues.length ? ':\n  ' + realIssues.join('\n  ') : ''));

@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://mayurski-art.github.io https://trollrunner.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://tjsyhfplxjtakdfkpdtg.supabase.co wss://tjsyhfplxjtakdfkpdtg.supabase.co; object-src 'none'; base-uri 'self'; frame-ancestors 'self';">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.3" integrity="sha384-uVefCux0Kf6w34gQVv8+jUPUwvwFUdnrcwI1kOJHs7sfPPXdDDucwcrPrppD6oUe" crossorigin="anonymous" defer></script>
+  <script src="https://mayurski-art.github.io/assets/js/troll-accounts.js" defer></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#14110c">
   <meta name="description" content="Troll High — walk the halls of the internet's most nostalgic school. A 2000s childhood MMO by Troll Runner.">
@@ -12,22 +13,54 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,500;0,700;0,900;1,900&family=DM+Mono:wght@500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/games/troll-high/styles.css?v=th-p0">
+  <link rel="stylesheet" href="assets/css/troll-leaderboard.css?v=lb-engine-v1">
+  <link rel="stylesheet" href="assets/games/troll-high/styles.css?v=th-p6">
 </head>
 <body>
   <div id="th-root">
     <canvas id="th-canvas" aria-label="Troll High school world"></canvas>
 
-    <!-- Title screen (guest nickname for now; becomes the account gate in Phase 6) -->
+    <!-- Title screen: real account gate (login/signup) — Troll High requires
+         an account (design doc decision 3). SSO from other trollrunner.net
+         games often skips this automatically. Built by src/gate.js. -->
     <div id="th-title">
       <div class="th-title-card">
         <div class="th-title-emoji" aria-hidden="true">🏫</div>
         <h1>Troll High</h1>
         <p class="th-tagline">the halls remember you</p>
-        <label class="th-name-label" for="th-name">your name in the halls</label>
-        <input id="th-name" type="text" maxlength="18" autocomplete="off" spellcheck="false">
-        <button id="th-start" type="button">Start School Day ▶</button>
-        <p class="th-build">Phase 2 · school wave 1 · multiplayer (guest)</p>
+        <div id="th-gate-loading" class="th-gate-loading">Checking your account…</div>
+        <div id="th-gate" hidden>
+          <p class="th-gate-note">An account keeps your Memory Book, position, and the weekly ladder in sync. Free, no email required.</p>
+          <div class="th-tab-row">
+            <button type="button" data-tab="login" class="is-active">Log in</button>
+            <button type="button" data-tab="signup">Create account</button>
+          </div>
+          <form id="th-gate-form">
+            <div class="th-field" id="th-gate-username-field" hidden>
+              <label>Username</label>
+              <input type="text" id="th-gate-username" autocomplete="username">
+            </div>
+            <div class="th-field" id="th-gate-id-field">
+              <label id="th-gate-id-label">Username or email</label>
+              <input type="text" id="th-gate-identifier" autocomplete="username">
+            </div>
+            <div class="th-field" id="th-gate-email-field" hidden>
+              <label>Email (optional, for password recovery)</label>
+              <input type="email" id="th-gate-email" autocomplete="email">
+            </div>
+            <div class="th-field">
+              <label>Password</label>
+              <input type="password" id="th-gate-password" autocomplete="current-password">
+            </div>
+            <button type="submit" id="th-gate-submit">Log in</button>
+          </form>
+          <p class="th-gate-status" id="th-gate-status" aria-live="polite"></p>
+        </div>
+        <div id="th-welcome" hidden>
+          <p class="th-welcome-msg">Welcome back, <b id="th-welcome-name">troll</b>.</p>
+          <button id="th-start" type="button">Start School Day ▶</button>
+        </div>
+        <p class="th-build">Phase 6 · accounts + persistence · school wave 1-2</p>
       </div>
     </div>
 
@@ -36,6 +69,16 @@
       <span id="th-zone-name">—</span>
       <span id="th-clock">—</span>
       <span id="th-roster" title="Who's in this room">👥 1</span>
+      <button id="th-btn-leaderboard" type="button" title="Weekly ladder">🏆</button>
+    </div>
+
+    <!-- Leaderboard overlay (built by assets/js/troll-leaderboard.js into #lb-root) -->
+    <div id="th-leaderboard-overlay" hidden>
+      <div class="th-leaderboard-panel">
+        <button id="th-leaderboard-close" type="button" aria-label="Close leaderboard">✕</button>
+        <h2>🏆 Weekly Ladder</h2>
+        <div id="lb-root" class="lb-root"><p class="lb-foot">Loading leaderboard…</p></div>
+      </div>
     </div>
 
     <!-- Interaction hint ("E — Look at lockers") -->
@@ -66,6 +109,8 @@
     <div id="th-loading"><span>🧌 sharpening pencils…</span></div>
   </div>
 
-  <script type="module" src="assets/games/troll-high/src/main.js?v=th-p0"></script>
+  <script src="assets/js/troll-leaderboard.js?v=lb-engine-v1" defer></script>
+  <script src="assets/games/troll-high/leaderboard.js?v=th-p6" defer></script>
+  <script type="module" src="assets/games/troll-high/src/main.js?v=th-p6"></script>
 </body>
 </html>
