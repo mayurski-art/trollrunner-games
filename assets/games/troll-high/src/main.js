@@ -9,6 +9,8 @@ import { CharacterSprites } from "./sprites.js";
 import { Zone } from "./zone.js";
 import { Player } from "./player.js";
 import { Ambience } from "./audio.js";
+import { Net, makeGuestIdentity } from "./net.js";
+import { Ghost, drawBubble } from "./ghost.js";
 import * as clock from "./clock.js";
 
 const BASE = "assets/games/troll-high";
@@ -61,10 +63,18 @@ async function boot() {
   const found = new Set(JSON.parse(localStorage.getItem("th_memories") || "[]"));
   const saveFound = () => localStorage.setItem("th_memories", JSON.stringify([...found]));
 
+  // ------------------------------------------------------------ multiplayer
+  const identity = makeGuestIdentity();
+  identity.name = localStorage.getItem("th_name") || identity.name;
+  const net = new Net(identity);
+  const ghosts = new Map(); // peer id -> Ghost
+
   // ------------------------------------------------------------------- ui
   $("th-loading").hidden = true;
   const hud = $("th-hud"), hint = $("th-hint");
-  const zoneNameEl = $("th-zone-name"), clockEl = $("th-clock");
+  const zoneNameEl = $("th-zone-name"), clockEl = $("th-clock"), rosterEl = $("th-roster");
+  const nameInput = $("th-name");
+  nameInput.value = identity.name;
 
   const coarse = matchMedia("(pointer: coarse)").matches;
   if (coarse) input.attachTouch($("th-stick"), $("th-stick-nub"), $("th-btn-act"));
@@ -76,13 +86,19 @@ async function boot() {
 
   let running = false;
   $("th-start").addEventListener("click", () => {
+    identity.name = (nameInput.value || identity.name).trim().slice(0, 18) || identity.name;
+    localStorage.setItem("th_name", identity.name);
+    net.name = identity.name;
+
     $("th-title").hidden = true;
     hud.hidden = false;
+    $("th-emotes").hidden = false;
     if (coarse) $("th-touch").hidden = false;
     input.interactPressed(); // swallow the click's queued Enter/Space
     running = true;
     ambience.start();
     ambience.setIndoor(zone.id !== "hallway-a");
+    net.join(zone.id).catch(() => {});
   });
 
   function showMemory(mem, obj) {
@@ -115,9 +131,83 @@ async function boot() {
     doorArmed = false;
     zoneNameEl.textContent = zone.name;
     ambience.setIndoor(zone.id !== "hallway-a");
+    ghosts.clear(); // last room's peers no longer apply
+    net.join(zone.id).catch(() => {});
   }
 
   zoneNameEl.textContent = zone.name;
+
+  // ---------------------------------------------------------------- chat
+  const chatLog = $("th-chat-log"), chatBar = $("th-chat-bar"), chatInput = $("th-chat-input");
+  let chatOpen = false;
+  let localBubble = null; // { text, until } — echo of this player's own chat/emote
+
+  function pushLog(name, text) {
+    const line = document.createElement("div");
+    line.className = "th-log-line";
+    line.innerHTML = `<b>${escapeHtml(name)}</b> ${escapeHtml(text)}`;
+    chatLog.hidden = false;
+    chatLog.appendChild(line);
+    while (chatLog.children.length > 5) chatLog.removeChild(chatLog.firstChild);
+    setTimeout(() => { line.remove(); if (!chatLog.children.length) chatLog.hidden = true; }, 6000);
+  }
+  function escapeHtml(s) { return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+  function openChat() {
+    if (!running || memoryEl) return;
+    chatOpen = true;
+    chatBar.hidden = false;
+    chatInput.value = "";
+    chatInput.focus();
+  }
+  function closeChat() {
+    chatOpen = false;
+    chatBar.hidden = true;
+    chatInput.blur();
+  }
+  chatInput.addEventListener("keydown", e => {
+    e.stopPropagation();
+    if (e.key === "Escape") { closeChat(); return; }
+    if (e.key !== "Enter") return;
+    const text = chatInput.value.trim();
+    if (text) {
+      net.sendChat(text);
+      pushLog(identity.name, text);
+      localBubble = { text, until: performance.now() + 3200 };
+    }
+    closeChat();
+  });
+  document.addEventListener("keydown", e => {
+    if (e.code === "Enter" || e.code === "NumpadEnter") {
+      if (!chatOpen) openChat();
+    }
+  });
+  $("th-btn-chat")?.addEventListener("click", () => (chatOpen ? closeChat() : openChat()));
+
+  net.onChat = (peerId, name, text) => {
+    pushLog(name, text);
+    const g = ghosts.get(peerId);
+    if (g) g.say(text);
+  };
+  net.onEmote = (peerId, name, emoji) => {
+    const g = ghosts.get(peerId);
+    if (g) g.say(emoji);
+  };
+
+  document.querySelectorAll("#th-emotes button").forEach((btn, i) => {
+    btn.addEventListener("click", () => fireEmote(btn.dataset.emoji));
+  });
+  const EMOTE_KEYS = { Digit1: "👋", Digit2: "💃", Digit3: "😂", Digit4: "❤️" };
+  document.addEventListener("keydown", e => {
+    if (chatOpen || e.target.tagName === "INPUT") return;
+    const emoji = EMOTE_KEYS[e.code];
+    if (emoji) fireEmote(emoji);
+  });
+  function fireEmote(emoji) {
+    if (!running) return;
+    net.sendEmote(emoji);
+    localBubble = { text: emoji, until: performance.now() + 3200 };
+  }
 
   // debug/testing handle (repo convention, cf. Bridge Patrol's __bp)
   window.__th = {
@@ -130,6 +220,9 @@ async function boot() {
     ),
     spritesReady: studentSprites.ready,
     get ambienceStarted() { return ambience.started; },
+    net, ghosts, identity,
+    openChat, closeChat,
+    get chatOpen() { return chatOpen; },
   };
 
   // ----------------------------------------------------------------- loop
@@ -150,9 +243,21 @@ async function boot() {
       fade = Math.max(0, fade - dt * 4);
     }
 
-    if (!pendingDoor && !memoryEl) {
+    if (!pendingDoor && !memoryEl && !chatOpen) {
       player.update(dt, input.axis(), zone);
     }
+
+    // multiplayer: broadcast our position, sync ghosts from the last-known
+    // peer states, prune any that timed out
+    net.sendPosition(dt, player);
+    const live = net.liveGhosts();
+    for (const [id, p] of live) {
+      let g = ghosts.get(id);
+      if (!g) { g = new Ghost(id, studentSprites); ghosts.set(id, g); }
+      g.applyUpdate(p);
+    }
+    for (const id of ghosts.keys()) if (!live.has(id)) ghosts.delete(id);
+    for (const g of ghosts.values()) g.update(dt);
 
     // doors: arm once the player is off every door tile, then trigger on entry
     const onDoor = zone.doorAt(player.tileX, player.tileY);
@@ -169,12 +274,24 @@ async function boot() {
       else if (mem) showMemory(mem, obj);
     }
 
-    // hud clock (1/s is plenty)
+    // hud clock + roster (1/s is plenty)
     clockAcc += dt;
-    if (clockAcc >= 1) { clockAcc = 0; clockEl.textContent = clock.now().label; }
+    if (clockAcc >= 1) {
+      clockAcc = 0;
+      clockEl.textContent = clock.now().label;
+      const names = [identity.name, ...[...ghosts.values()].map(g => g.name || "?")];
+      rosterEl.textContent = `👥 ${names.length}`;
+      rosterEl.title = names.join(", ");
+    }
+    if (localBubble && performance.now() > localBubble.until) localBubble = null;
+
+    const entities = [player.entity()];
+    // huge y = sorts last = drawn on top, without affecting real world position
+    if (localBubble) entities.push({ y: player.y + 1000, draw: ctx => drawBubble(ctx, player.x, player.y, localBubble.text) });
+    for (const g of ghosts.values()) { const e = g.entity(); if (e) entities.push(e); }
 
     renderer.follow(player.x, player.y, zone);
-    renderer.frame(zone, [player.entity()], fade);
+    renderer.frame(zone, entities, fade);
   }
   requestAnimationFrame(tick);
 }

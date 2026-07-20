@@ -75,6 +75,28 @@ html, body {
   margin: 6px 0 20px;
 }
 
+.th-name-label {
+  display: block;
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+  opacity: 0.6;
+  margin-bottom: 6px;
+}
+
+#th-name {
+  display: block;
+  width: 100%;
+  font: 700 15px "DM Sans", sans-serif;
+  color: var(--th-paper);
+  background: rgba(245, 240, 228, 0.08);
+  border: 1.5px solid rgba(245, 240, 228, 0.25);
+  border-radius: 8px;
+  padding: 9px 12px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+#th-name:focus-visible { outline: 2px solid var(--th-gold); outline-offset: 1px; }
+
 #th-start {
   font: 700 17px "DM Sans", sans-serif;
   color: var(--th-ink);
@@ -141,6 +163,87 @@ html, body {
   border-radius: 5px;
   padding: 1px 7px;
   margin-right: 6px;
+}
+
+#th-roster { cursor: default; }
+
+/* ------------------------------------------------------------- chat */
+#th-chat-log {
+  position: absolute;
+  left: 12px;
+  bottom: max(14px, env(safe-area-inset-bottom));
+  z-index: 20;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 3px;
+  max-width: min(320px, 70vw);
+  pointer-events: none;
+}
+#th-chat-log .th-log-line {
+  font: 700 12px "DM Sans", sans-serif;
+  color: var(--th-paper);
+  background: rgba(20, 17, 12, 0.6);
+  border-radius: 6px;
+  padding: 3px 8px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+#th-chat-log .th-log-line b { color: var(--th-gold); }
+
+#th-chat-bar {
+  position: absolute;
+  left: 50%;
+  bottom: max(14px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 26;
+  width: min(420px, 88vw);
+}
+#th-chat-input {
+  width: 100%;
+  font: 600 14px "DM Sans", sans-serif;
+  color: var(--th-ink);
+  background: var(--th-paper);
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 16px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+#th-chat-input:focus-visible { outline: 2px solid var(--th-gold); }
+
+/* ----------------------------------------------------------- emotes */
+#th-emotes {
+  position: absolute;
+  right: 12px;
+  top: max(52px, calc(env(safe-area-inset-top) + 42px));
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+#th-emotes button {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(245, 240, 228, 0.2);
+  background: rgba(20, 17, 12, 0.55);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+#th-emotes button:hover { background: rgba(20, 17, 12, 0.8); }
+#th-emotes button:active { transform: scale(0.92); }
+
+#th-btn-chat {
+  position: absolute;
+  right: 26px;
+  bottom: max(120px, calc(env(safe-area-inset-bottom) + 116px));
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(245, 240, 228, 0.35);
+  background: rgba(39, 64, 139, 0.85);
+  color: #fff;
+  font-size: 18px;
+  pointer-events: auto;
 }
 
 /* memory popup card (Polaroid-ish) */

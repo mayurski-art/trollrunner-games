@@ -1,6 +1,8 @@
 /* Troll High — keyboard + touch input.
    axis() returns {x, y} in [-1, 1]; interact is edge-triggered. */
 
+const isTyping = el => el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA");
+
 export class Input {
   constructor() {
     this.keys = new Set();
@@ -8,13 +10,14 @@ export class Input {
     this.touch = { active: false, x: 0, y: 0 };
 
     addEventListener("keydown", e => {
+      if (isTyping(e.target)) return; // chat/name inputs handle their own keys
       if (e.repeat) return;
       this.keys.add(e.code);
-      if (e.code === "KeyE" || e.code === "Space" || e.code === "Enter") {
+      if (e.code === "KeyE" || e.code === "Space") {
         this._interactQueued = true;
       }
     });
-    addEventListener("keyup", e => this.keys.delete(e.code));
+    addEventListener("keyup", e => { if (!isTyping(e.target)) this.keys.delete(e.code); });
     addEventListener("blur", () => this.keys.clear());
   }
 

@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://mayurski-art.github.io https://trollrunner.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://tjsyhfplxjtakdfkpdtg.supabase.co wss://tjsyhfplxjtakdfkpdtg.supabase.co; object-src 'none'; base-uri 'self'; frame-ancestors 'self';">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.3" integrity="sha384-uVefCux0Kf6w34gQVv8+jUPUwvwFUdnrcwI1kOJHs7sfPPXdDDucwcrPrppD6oUe" crossorigin="anonymous" defer></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#14110c">
   <meta name="description" content="Troll High — walk the halls of the internet's most nostalgic school. A 2000s childhood MMO by Troll Runner.">
@@ -17,14 +18,16 @@
   <div id="th-root">
     <canvas id="th-canvas" aria-label="Troll High school world"></canvas>
 
-    <!-- Title screen (Phase 0: simple; becomes the account gate in Phase 6) -->
+    <!-- Title screen (guest nickname for now; becomes the account gate in Phase 6) -->
     <div id="th-title">
       <div class="th-title-card">
         <div class="th-title-emoji" aria-hidden="true">🏫</div>
         <h1>Troll High</h1>
         <p class="th-tagline">the halls remember you</p>
+        <label class="th-name-label" for="th-name">your name in the halls</label>
+        <input id="th-name" type="text" maxlength="18" autocomplete="off" spellcheck="false">
         <button id="th-start" type="button">Start School Day ▶</button>
-        <p class="th-build">Phase 0 proof · hallway + room 3B</p>
+        <p class="th-build">Phase 2 · school wave 1 · multiplayer (guest)</p>
       </div>
     </div>
 
@@ -32,15 +35,31 @@
     <div id="th-hud" hidden>
       <span id="th-zone-name">—</span>
       <span id="th-clock">—</span>
+      <span id="th-roster" title="Who's in this room">👥 1</span>
     </div>
 
     <!-- Interaction hint ("E — Look at lockers") -->
     <div id="th-hint" hidden></div>
 
+    <!-- Chat: scrolling log + press-Enter-to-type bar -->
+    <div id="th-chat-log" hidden aria-live="polite"></div>
+    <div id="th-chat-bar" hidden>
+      <input id="th-chat-input" type="text" maxlength="140" autocomplete="off" placeholder="Say something… (Enter to send, Esc to cancel)">
+    </div>
+
+    <!-- Emotes -->
+    <div id="th-emotes" hidden>
+      <button data-emoji="👋" type="button" aria-label="Wave">👋</button>
+      <button data-emoji="💃" type="button" aria-label="Dance">💃</button>
+      <button data-emoji="😂" type="button" aria-label="Laugh">😂</button>
+      <button data-emoji="❤️" type="button" aria-label="Heart">❤️</button>
+    </div>
+
     <!-- Touch controls -->
     <div id="th-touch" hidden>
       <div id="th-stick" aria-label="Move"><div id="th-stick-nub"></div></div>
       <button id="th-btn-act" type="button" aria-label="Interact">E</button>
+      <button id="th-btn-chat" type="button" aria-label="Chat">💬</button>
     </div>
 
     <!-- Loading -->
