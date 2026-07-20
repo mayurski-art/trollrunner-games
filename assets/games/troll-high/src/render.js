@@ -20,8 +20,10 @@ export class Renderer {
     const dpr = Math.min(devicePixelRatio || 1, 2);
     this.canvas.width = Math.round(innerWidth * dpr);
     this.canvas.height = Math.round(innerHeight * dpr);
-    // aim for ~20-28 tiles across; integer scale keeps pixels crisp
-    this.scale = clamp(Math.round(this.canvas.width / (TILE * 22)), 1, 4);
+    // aim for ~26-32 tiles across; integer scale keeps pixels crisp. Most
+    // classrooms are ~20 tiles wide, so this leaves visible margin around
+    // the room instead of the walls nearly touching the viewport edges.
+    this.scale = clamp(Math.round(this.canvas.width / (TILE * 27)), 1, 3);
     this.back.width = Math.ceil(this.canvas.width / this.scale);
     this.back.height = Math.ceil(this.canvas.height / this.scale);
     this.bctx.imageSmoothingEnabled = false;
