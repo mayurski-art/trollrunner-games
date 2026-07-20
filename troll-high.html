@@ -131,6 +131,27 @@
       <input id="th-chat-input" type="text" maxlength="140" autocomplete="off" placeholder="Say something… (Enter to send, Esc to cancel)">
     </div>
 
+    <!-- Student profile — always-visible button, right side of screen -->
+    <button id="th-btn-profile" type="button" title="Student profile" hidden>🧑</button>
+    <div id="th-profile-overlay" hidden>
+      <div class="th-profile-panel">
+        <button id="th-profile-close" type="button" aria-label="Close profile">✕</button>
+        <div class="th-profile-head">
+          <span class="th-profile-avatar">🧌</span>
+          <div>
+            <h2 id="th-profile-name">—</h2>
+            <p id="th-profile-id" class="th-profile-id">—</p>
+          </div>
+        </div>
+        <p id="th-profile-enrolled" class="th-profile-sub">—</p>
+        <div class="th-profile-stats">
+          <div class="th-profile-stat"><span id="th-profile-memories">0</span><label>Memories found</label></div>
+        </div>
+        <h3>High scores</h3>
+        <ul id="th-profile-scores" class="th-profile-scores"></ul>
+      </div>
+    </div>
+
     <!-- Emotes -->
     <div id="th-emotes" hidden>
       <button data-emoji="👋" type="button" aria-label="Wave">👋</button>

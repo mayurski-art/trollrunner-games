@@ -16,6 +16,7 @@ import { awaitAuth } from "./gate.js";
 import { loadSave, saveGame } from "./save.js";
 import { Minigame, minigameInfo } from "./minigames.js";
 import { drawCampusMap } from "./mapview.js";
+import { genStudentId, renderProfile } from "./profile.js";
 import * as clock from "./clock.js";
 
 const BASE = "assets/games/troll-high";
@@ -132,11 +133,18 @@ async function boot() {
     }
   }
 
+  // Cosmetic in-game student ID + high scores — separate from the real
+  // account identity, generated once and carried in the same save row.
   let saveDirty = false;
+  const studentId = savedGame?.studentId || genStudentId();
+  const enrolledAt = savedGame?.enrolledAt || Date.now();
+  const highScores = savedGame?.highScores || {};
+  if (!savedGame?.studentId) saveDirty = true;
+
   function persist() {
     if (!saveDirty) return;
     saveDirty = false;
-    saveGame(session.userId, { zoneId: zone.id, x: player.x, y: player.y, foundKeys: [...found] });
+    saveGame(session.userId, { zoneId: zone.id, x: player.x, y: player.y, foundKeys: [...found], studentId, enrolledAt, highScores });
   }
   setInterval(persist, 30000);
   document.addEventListener("visibilitychange", () => { if (document.hidden) persist(); });
@@ -161,6 +169,7 @@ async function boot() {
     $("th-title").hidden = true;
     hud.hidden = false;
     $("th-emotes").hidden = false;
+    $("th-btn-profile").hidden = false;
     if (coarse) $("th-touch").hidden = false;
     input.interactPressed(); // swallow the click's queued Enter/Space
     running = true;
@@ -186,10 +195,26 @@ async function boot() {
   function closeMap() { mapOverlay.hidden = true; }
   $("th-btn-map")?.addEventListener("click", openMap);
   $("th-map-close")?.addEventListener("click", closeMap);
+
+  // ------------------------------------------------------------- profile
+  const profileOverlay = $("th-profile-overlay");
+  const profileDom = {
+    name: $("th-profile-name"), id: $("th-profile-id"), enrolled: $("th-profile-enrolled"),
+    memories: $("th-profile-memories"), scores: $("th-profile-scores"),
+  };
+  function openProfile() {
+    renderProfile(profileDom, {
+      name: identity.name, studentId, enrolledAt, memoriesFound: found.size, highScores, minigameInfo,
+    });
+    profileOverlay.hidden = false;
+  }
+  function closeProfile() { profileOverlay.hidden = true; }
+  $("th-btn-profile")?.addEventListener("click", openProfile);
+  $("th-profile-close")?.addEventListener("click", closeProfile);
   addEventListener("keydown", e => {
     if (e.code !== "KeyM" || e.target.tagName === "INPUT") return;
     if (!running) return;
-    if (mapOverlay.hidden) { if (!memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden) openMap(); }
+    if (mapOverlay.hidden) { if (!memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && profileOverlay.hidden) openMap(); }
     else closeMap();
   });
 
@@ -237,7 +262,11 @@ async function boot() {
     activeMinigame.start();
   }
   function closeMinigame() {
-    activeMinigame?.stop();
+    if (activeMinigame) {
+      const { kind, score } = activeMinigame;
+      if (score > (highScores[kind] || 0)) { highScores[kind] = score; saveDirty = true; }
+      activeMinigame.stop();
+    }
     activeMinigame = null;
     minigameOverlay.hidden = true;
   }
@@ -363,7 +392,7 @@ async function boot() {
   function escapeHtml(s) { return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
   function openChat() {
-    if (!running || memoryEl || dialogueEl || !lbOverlay.hidden || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden) return;
+    if (!running || memoryEl || dialogueEl || !lbOverlay.hidden || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden) return;
     chatOpen = true;
     chatBar.hidden = false;
     chatInput.value = "";
@@ -442,6 +471,10 @@ async function boot() {
     get arcadeOpen() { return !arcadeOverlay.hidden; },
     get minigameOpen() { return !minigameOverlay.hidden; },
     get mapOpen() { return !mapOverlay.hidden; },
+    get profileOpen() { return !profileOverlay.hidden; },
+    openProfile, closeProfile,
+    get studentId() { return studentId; },
+    get highScores() { return highScores; },
     openMap, closeMap,
     get minigameScore() { return activeMinigame?.score ?? null; },
     get minigameFinished() { return activeMinigame?.finished ?? null; },
@@ -485,7 +518,7 @@ async function boot() {
       fade = Math.max(0, fade - dt * 4);
     }
 
-    if (!pendingDoor && !memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && mapOverlay.hidden) {
+    if (!pendingDoor && !memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && mapOverlay.hidden && profileOverlay.hidden) {
       const axis = input.axis();
       tryPushFromInput(axis);
       player.update(dt, axis, zone);
@@ -523,8 +556,8 @@ async function boot() {
     const play = obj && (obj.play || obj.def.play);
     const arcadeHint = obj && obj.game ? ` Play ${obj.gameName || "a game"}` : null;
     const playHint = play ? ` Play ${obj.playName || obj.def.playName || minigameInfo(play).title}` : null;
-    setHint((memoryEl || dialogueEl || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (arcadeHint || playHint || (mem ? ` ${mem.title}` : null)));
-    if (input.interactPressed() && mapOverlay.hidden) {
+    setHint((memoryEl || dialogueEl || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (arcadeHint || playHint || (mem ? ` ${mem.title}` : null)));
+    if (input.interactPressed() && mapOverlay.hidden && profileOverlay.hidden) {
       if (!minigameOverlay.hidden) closeMinigame();
       else if (!arcadeOverlay.hidden) closeArcade();
       else if (dialogueEl) closeDialogue();
