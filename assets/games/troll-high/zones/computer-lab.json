@@ -20,76 +20,31 @@
     "#####################"
   ],
   "objects": [
+    { "type": "door", "x": 9, "y": 0 },
+    { "type": "teacher-desk", "x": 3, "y": 2 },
+    { "type": "trash-can", "x": 1, "y": 2 },
+
+    { "type": "computer-desk", "x": 3, "y": 5, "game": "bridge-patrol.html", "gameName": "Bridge Patrol" },
+    { "type": "computer-desk", "x": 6, "y": 5, "game": "troll-pizzeria.html", "gameName": "Papa Troll's Pizzeria" },
+    { "type": "computer-desk", "x": 12, "y": 5, "game": "meme-metro.html", "gameName": "Meme Metro" },
+    { "type": "computer-desk", "x": 15, "y": 5, "game": "troll-kombat.html", "gameName": "Troll Kombat" },
+
     {
-      "type": "door",
-      "x": 9,
-      "y": 0
+      "type": "computer-desk", "x": 3, "y": 8,
+      "memory": { "title": "Computer 5", "text": "Blue screen. Has been blue screen since the Clinton administration, allegedly. Someone drew a little face on it in dry-erase marker." }
     },
     {
-      "type": "teacher-desk",
-      "x": 3,
-      "y": 2
+      "type": "computer-desk", "x": 6, "y": 8,
+      "memory": { "title": "Computer 6", "text": "Still booting. It has been booting since you sat down. The XP chime already played twice." }
     },
+    { "type": "computer-desk", "x": 12, "y": 8 },
     {
-      "type": "trash-can",
-      "x": 1,
-      "y": 2
-    },
-    {
-      "type": "computer-desk",
-      "x": 3,
-      "y": 5
-    },
-    {
-      "type": "computer-desk",
-      "x": 6,
-      "y": 5
-    },
-    {
-      "type": "computer-desk",
-      "x": 12,
-      "y": 5
-    },
-    {
-      "type": "computer-desk",
-      "x": 15,
-      "y": 5
-    },
-    {
-      "type": "computer-desk",
-      "x": 3,
-      "y": 8
-    },
-    {
-      "type": "computer-desk",
-      "x": 6,
-      "y": 8
-    },
-    {
-      "type": "computer-desk",
-      "x": 12,
-      "y": 8
-    },
-    {
-      "type": "computer-desk",
-      "x": 15,
-      "y": 8
+      "type": "computer-desk", "x": 15, "y": 8,
+      "memory": { "title": "Computer 8", "text": "The desktop background is a photo nobody remembers setting. Nobody's brave enough to change it." }
     }
   ],
   "doors": [
-    {
-      "x": 9,
-      "y": 3,
-      "w": 2,
-      "h": 1,
-      "to": "hallway-a",
-      "tx": 50,
-      "ty": 3,
-      "label": "Hallway"
-    }
+    { "x": 9, "y": 3, "w": 2, "h": 1, "to": "hallway-a", "tx": 50, "ty": 3, "label": "Hallway" }
   ],
-  "spawn": {
-    "x": 10,
-    "y": 3
-  }
+  "spawn": { "x": 10, "y": 3 }
 }

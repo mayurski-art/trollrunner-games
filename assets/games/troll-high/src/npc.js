@@ -155,7 +155,7 @@ export const NPC_DEFS = {
   }],
   "computer-lab": [{
     id: "eldon-tusk", name: "Eldon Tusk", sprite: "npc-eldon",
-    type: "stationary", x: 15, y: 7, facing: "north",
+    type: "stationary", x: 18, y: 9, facing: "west",
     dialogue: [
       "I'm building a rocket in my garage. It's going great, probably.",
       "This computer runs my crypto side project. Don't tell the teacher.",

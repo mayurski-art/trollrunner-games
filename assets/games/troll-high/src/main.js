@@ -177,6 +177,30 @@ async function boot() {
   });
   $("th-leaderboard-close")?.addEventListener("click", () => { lbOverlay.hidden = true; });
 
+  // ------------------------------------------------------ arcade launcher
+  // Computer lab CRTs boot the real arcade games in-world (design doc
+  // decision 4) — a same-origin iframe, no CSP change needed. Clearing
+  // the src on close (not just hiding) stops the embedded game's loop and
+  // audio rather than leaving it running invisibly behind the overlay.
+  const arcadeOverlay = $("th-arcade-overlay");
+  const arcadeIframe = $("th-arcade-iframe");
+  const arcadeTitle = $("th-crt-title");
+  function openArcade(obj) {
+    arcadeTitle.textContent = obj.gameName || obj.game;
+    arcadeIframe.src = obj.game;
+    arcadeOverlay.hidden = false;
+  }
+  function closeArcade() {
+    arcadeOverlay.hidden = true;
+    arcadeIframe.src = "about:blank";
+    // The embedded game's iframe can steal keyboard focus; without pulling
+    // it back, subsequent keydown events fire on the (now blank) iframe
+    // document instead of bubbling to ours, and movement/interact go dead.
+    document.body.focus();
+    window.focus();
+  }
+  $("th-arcade-close")?.addEventListener("click", closeArcade);
+
   function showMemory(mem, obj) {
     closeMemory();
     memoryEl = document.createElement("div");
@@ -297,7 +321,7 @@ async function boot() {
   function escapeHtml(s) { return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
   function openChat() {
-    if (!running || memoryEl || dialogueEl || !lbOverlay.hidden) return;
+    if (!running || memoryEl || dialogueEl || !lbOverlay.hidden || !arcadeOverlay.hidden) return;
     chatOpen = true;
     chatBar.hidden = false;
     chatInput.value = "";
@@ -372,6 +396,8 @@ async function boot() {
     persist: () => { saveDirty = true; persist(); },
     openLeaderboard: () => { lbOverlay.hidden = false; window.TrollLeaderboard?.refresh?.("troll-high"); },
     closeLeaderboard: () => { lbOverlay.hidden = true; },
+    openArcade, closeArcade,
+    get arcadeOpen() { return !arcadeOverlay.hidden; },
   };
 
   // -------------------------------------------------------------- pushing
@@ -411,7 +437,7 @@ async function boot() {
       fade = Math.max(0, fade - dt * 4);
     }
 
-    if (!pendingDoor && !memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden) {
+    if (!pendingDoor && !memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden) {
       const axis = input.axis();
       tryPushFromInput(axis);
       player.update(dt, axis, zone);
@@ -436,16 +462,22 @@ async function boot() {
     if (!onDoor) doorArmed = true;
     else if (doorArmed && !pendingDoor) { pendingDoor = onDoor; }
 
-    // interactions — a nearby NPC takes priority over a facing-tile memory object
+    // interactions — a nearby NPC takes priority over a facing-tile object;
+    // a "game" computer opens the arcade launcher instead of its memory
+    // card (a per-instance zone-JSON field, not part of the shared def —
+    // most computer-desks are flavor-only, a few are real launchers)
     const nearNPC = npcs.find(n => n.distanceTo(player.x, player.y) < 26);
     const face = player.facingTile();
     const obj = zone.objectAt(face.x, face.y);
-    const mem = obj && obj.def.memory;
-    setHint((memoryEl || dialogueEl) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (mem ? ` ${mem.title}` : null));
+    const mem = obj && (obj.memory || obj.def.memory);
+    const arcadeHint = obj && obj.game ? ` Play ${obj.gameName || "a game"}` : null;
+    setHint((memoryEl || dialogueEl || !arcadeOverlay.hidden) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (arcadeHint || (mem ? ` ${mem.title}` : null)));
     if (input.interactPressed()) {
-      if (dialogueEl) closeDialogue();
+      if (!arcadeOverlay.hidden) closeArcade();
+      else if (dialogueEl) closeDialogue();
       else if (memoryEl) closeMemory();
       else if (nearNPC) showDialogue(nearNPC);
+      else if (obj && obj.game) openArcade(obj);
       else if (mem) showMemory(mem, obj);
     }
 

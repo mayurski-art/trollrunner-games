@@ -81,6 +81,21 @@
       </div>
     </div>
 
+    <!-- Computer lab: working CRTs boot the real arcade games in-world
+         (design doc decision 4), via an iframe of the actual game page —
+         same origin, so no CSP change was needed. -->
+    <div id="th-arcade-overlay" hidden>
+      <div class="th-crt-frame">
+        <div class="th-crt-titlebar">
+          <span id="th-crt-title">—</span>
+          <button id="th-arcade-close" type="button" aria-label="Close">✕</button>
+        </div>
+        <div class="th-crt-screen">
+          <iframe id="th-arcade-iframe" title="Arcade game" allow="autoplay"></iframe>
+        </div>
+      </div>
+    </div>
+
     <!-- Interaction hint ("E — Look at lockers") -->
     <div id="th-hint" hidden></div>
 

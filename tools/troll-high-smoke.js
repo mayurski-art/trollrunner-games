@@ -137,7 +137,9 @@ async function enterRoom(page, { doorX, roomId, roomName, warpX, memWarp, memTit
   });
   await enterRoom(page, {
     doorX: 50, roomId: 'computer-lab', roomName: 'Computer Lab', warpX: 51,
-    memWarp: [3, 7], memTitleRe: /Computer 7/i, label: 'Computer Lab',
+    // (3,8)/(6,8)/(15,8) are now arcade-launcher or flavor-override desks
+    // (Phase 7); (12,8) is the one desk left with the shared generic memory.
+    memWarp: [12, 9], memTitleRe: /Computer 7/i, label: 'Computer Lab',
   });
   await page.screenshot({ path: path.join(OUT, 'th-shot-3-computer-lab.png') });
   await enterRoom(page, {
