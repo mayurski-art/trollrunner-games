@@ -129,6 +129,8 @@ export const NPC_DEFS = {
   "classroom-3b": [{
     id: "ms-chalke", name: "Ms. Chalke", sprite: "npc-teacher-1",
     type: "stationary", x: 4, y: 3, facing: "south",
+    firstLine: "New face. Sit anywhere that isn't Marcus's usual spot.",
+    familiarLine: "You again. I like that. Sit down.",
     dialogue: [
       "Quiz Friday. No excuses.",
       "Have you seen my red pen? I swear it grows legs.",
@@ -138,6 +140,8 @@ export const NPC_DEFS = {
   "classroom-3c": [{
     id: "mr-fenwick", name: "Mr. Fenwick", sprite: "npc-teacher-2",
     type: "stationary", x: 17, y: 5, facing: "west",
+    firstLine: "Oh, a new one. Come meet Gerald.",
+    familiarLine: "Gerald remembers you. Probably.",
     dialogue: [
       "Gerald the fish is doing great, thanks for asking.",
       "Nobody's fed the fish today. Someone's feeding the fish today.",
@@ -147,6 +151,8 @@ export const NPC_DEFS = {
   "classroom-3d": [{
     id: "mrs-petrova", name: "Mrs. Petrova", sprite: "npc-teacher-3",
     type: "stationary", x: 14, y: 9, facing: "south",
+    firstLine: "Welcome. The bean bags are first-come, first-served, by the way.",
+    familiarLine: "Back for the bean bags, I bet.",
     dialogue: [
       "Free reading time is sacred. Guard it with your life.",
       "The bean bags are first-come, first-served. Rules are rules.",
@@ -156,6 +162,8 @@ export const NPC_DEFS = {
   "computer-lab": [{
     id: "eldon-tusk", name: "Eldon Tusk", sprite: "npc-eldon",
     type: "stationary", x: 18, y: 9, facing: "west",
+    firstLine: "New investor? No? Fine, just a kid then.",
+    familiarLine: "You're back. Good. I need a test subject anyway.",
     dialogue: [
       "I'm building a rocket in my garage. It's going great, probably.",
       "This computer runs my crypto side project. Don't tell the teacher.",
@@ -165,6 +173,8 @@ export const NPC_DEFS = {
   cafeteria: [{
     id: "lunch-lady-doris", name: "Lunch Lady Doris", sprite: "npc-doris",
     type: "stationary", x: 9, y: 3, facing: "south",
+    firstLine: "First time through the line? Take the good tray, not the bent one.",
+    familiarLine: "The usual, sweetie?",
     dialogue: [
       "Pizza Friday is this Friday. It's also every Friday. You're welcome.",
       "One scoop each. I see you eyeing a second scoop.",
@@ -174,6 +184,8 @@ export const NPC_DEFS = {
   library: [{
     id: "ms-quietly", name: "Ms. Quietly", sprite: "npc-quietly",
     type: "stationary", x: 5, y: 5, facing: "north",
+    firstLine: "New here? Then you especially need to be quiet.",
+    familiarLine: "You're becoming a regular. Quietly, of course.",
     dialogue: [
       "SHHHH.",
       "This is a library. Act like it.",
@@ -183,6 +195,8 @@ export const NPC_DEFS = {
   "hallway-a": [{
     id: "janitor-gus", name: "Janitor Gus", sprite: "npc-gus",
     type: "patrol", a: { x: 22, y: 8 }, b: { x: 45, y: 8 },
+    firstLine: "Haven't seen you before. Watch where you step, mop's still wet.",
+    familiarLine: "Back again, huh? You're alright, kid.",
     dialogue: [
       "These floors don't mop themselves. Well — actually.",
       "I've got a key for every door in this building. Every one.",
@@ -195,6 +209,8 @@ export const NPC_DEFS = {
   "bus-loop": [{
     id: "pep", name: "Pep", sprite: "npc-pep",
     type: "stationary", x: 10, y: 9, facing: "south",
+    firstLine: "Oh hey, new face. Feels good, man.",
+    familiarLine: "Hey, it's you again. Feels good, man.",
     dialogue: [
       "Bus is always five minutes early or ten minutes late. Never on time. Kind of beautiful, honestly.",
       "You ever just stand here and watch the buses turn around? No? Just me?",
@@ -204,6 +220,8 @@ export const NPC_DEFS = {
   gym: [{
     id: "marcus-vale", name: "Marcus Vale", sprite: "npc-marcus",
     type: "stationary", x: 12, y: 9, facing: "south",
+    firstLine: "New kid? I haven't raced you yet. We should fix that.",
+    familiarLine: "You're back. Ready to lose again?",
     dialogue: [
       "Oh, it's you. I beat your PACER time. Just thought you should know.",
       "Rematch. Anytime. I'm serious.",
@@ -213,6 +231,8 @@ export const NPC_DEFS = {
   office: [{
     id: "principal-grimface", name: "Principal Grimface", sprite: "npc-principal",
     type: "patrol", a: { x: 9, y: 3 }, b: { x: 9, y: 7 },
+    firstLine: "New student. I'll be watching. Closely.",
+    familiarLine: "You again. Still watching.",
     dialogue: [
       "Shouldn't you be in class?",
       "My office door is always open. Please don't test that.",
@@ -221,6 +241,8 @@ export const NPC_DEFS = {
   }, {
     id: "wendell", name: "Wendell", sprite: "npc-wendell",
     type: "stationary", x: 7, y: 8, facing: "north",
+    firstLine: "Oh — hi. Sorry, are you lost too?",
+    familiarLine: "Oh, hey, it's you! I remember you.",
     dialogue: [
       "Is... is this the office? I think I'm lost. Again.",
       "I don't really know anyone here yet. It's fine. It's totally fine.",
@@ -230,6 +252,8 @@ export const NPC_DEFS = {
   "art-room": [{
     id: "priya", name: "Priya", sprite: "npc-priya",
     type: "stationary", x: 8, y: 9, facing: "south",
+    firstLine: "New person! Want to join my club? I still don't know what it is.",
+    familiarLine: "You're back! Still thinking about that club.",
     dialogue: [
       "I'm starting a club. I don't know what kind yet, but it's going to be great.",
       "Sign-up sheet's coming soon. Very soon. Soon-ish.",
@@ -239,6 +263,8 @@ export const NPC_DEFS = {
   roof: [{
     id: "marnie", name: "Marnie", sprite: "npc-marnie",
     type: "stationary", x: 7, y: 9, facing: "north",
+    firstLine: "Huh. Didn't expect anyone up here.",
+    familiarLine: "You found your way back up here. Interesting.",
     dialogue: [
       "You can see the whole school from up here. Some nights it looks... different.",
       "Don't ask about the tunnels. Actually — do. Just not to a teacher.",

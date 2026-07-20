@@ -21,6 +21,7 @@ import { MENU as CAFETERIA_MENU, normalizeStudentId } from "./cafeteria.js";
 import { ELECTIVES, buildSchedule, DAILY_TASKS } from "./schedule.js";
 import { CARDS, cardById, maybeAwardCard } from "./cards.js";
 import { todaysLunch, todaysAnnouncement, todaysEvent } from "./daily.js";
+import { pickDialogueLine } from "./relations.js";
 import * as clock from "./clock.js";
 
 const BASE = "assets/games/troll-high";
@@ -182,6 +183,11 @@ async function boot() {
   if (!visitedZones.has(zone.id)) { visitedZones.add(zone.id); saveDirty = true; }
   if (!visitDays.has(today)) { visitDays.add(today); saveDirty = true; }
 
+  // NPC memory (design doc §21) — each NPC remembers YOU, specifically,
+  // via a relationship record in your own save (see relations.js for why
+  // this needs no shared "NPC brain"). {[npcId]: {timesTalked}}.
+  const npcRelations = savedGame?.npcRelations || {};
+
   function persist() {
     if (!saveDirty) return;
     saveDirty = false;
@@ -189,6 +195,7 @@ async function boot() {
       zoneId: zone.id, x: player.x, y: player.y, foundKeys: [...found], studentId, enrolledAt, highScores,
       orientationDone, elective, dailyTasksDay, dailyFlags, cards,
       visitedZones: [...visitedZones], visitDays: [...visitDays], lunchesBought, tradesCompleted, giftsGiven, giftsReceived,
+      npcRelations,
     });
   }
   setInterval(persist, 30000);
@@ -721,13 +728,18 @@ async function boot() {
   let dialogueEl = null;
   function showDialogue(npc) {
     closeDialogue();
+    const npcId = npc.def.id;
+    const relation = npcRelations[npcId] || (npcRelations[npcId] = { timesTalked: 0 });
+    const line = pickDialogueLine(npc.def, relation) || npc.speak();
+    relation.timesTalked++;
+    saveDirty = true;
     dialogueEl = document.createElement("div");
     dialogueEl.id = "th-dialogue";
     dialogueEl.className = "th-popup-card";
     dialogueEl.setAttribute("role", "dialog");
     dialogueEl.setAttribute("aria-label", npc.name);
     dialogueEl.innerHTML =
-      `<h3>${npc.name}</h3><p>${npc.speak()}</p>` +
+      `<h3>${npc.name}</h3><p>${line}</p>` +
       `<div class="th-mem-close">E / tap — close</div>`;
     dialogueEl.addEventListener("click", closeDialogue);
     $("th-root").appendChild(dialogueEl);
@@ -861,6 +873,7 @@ async function boot() {
     get tradeOpen() { return !tradeOverlay.hidden; },
     openTrade, closeTrade,
     get cards() { return cards; },
+    get npcRelations() { return npcRelations; },
     get lifeStats() {
       return {
         roomsExplored: visitedZones.size, totalRooms: ZONE_IDS.length,
