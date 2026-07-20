@@ -302,6 +302,63 @@ html, body {
   background: #000;
 }
 
+/* -------------------------------------------------- recess minigames */
+#th-minigame-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 29;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 5, 3, 0.85);
+  padding: 16px;
+}
+.th-minigame-frame {
+  width: min(420px, 96vw);
+  background: linear-gradient(160deg, #3a3f4a, #1c1f26);
+  border-radius: 22px;
+  padding: 16px 16px 20px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.65), inset 0 0 0 2px rgba(255, 255, 255, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.th-minigame-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 2px 6px;
+  color: #cfd6e0;
+  font-family: "DM Mono", monospace;
+  font-size: 12px;
+}
+#th-minigame-score { flex: 1; text-align: right; color: #9be89b; }
+.th-minigame-titlebar button {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 0;
+  background: #4a3030;
+  color: #f0d0d0;
+  cursor: pointer;
+}
+#th-minigame-canvas {
+  width: 100%;
+  aspect-ratio: 320 / 220;
+  background: #0c3b16;
+  border-radius: 8px;
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.6);
+}
+#th-minigame-help {
+  margin: 0;
+  padding: 0 4px;
+  text-align: center;
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+  color: #a8b0bc;
+}
+
 /* interaction hint */
 #th-hint {
   position: absolute;

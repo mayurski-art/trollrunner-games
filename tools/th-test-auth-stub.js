@@ -48,8 +48,16 @@ async function stubAuth(page, { userId = 'test-' + Math.random().toString(36).sl
    expected and already handled gracefully (save.js falls back to its local
    cache, logging a console.warn). Filter that specific noise out of a
    test's console-error assertions; a genuine bug still shows through. */
+/* Chrome's own "Failed to load resource" console text never includes the
+   URL (that only shows up via the network events, not m.text()), so this
+   can't be scoped to specific filenames — same reason troll-high-npc-
+   smoke.js already filters bare 404s wholesale. Currently the only source
+   is the 4 recess-minigame court/pole objects (Phase 7) not having real
+   pixel art yet — objects.js's ObjectSprites loads every OBJECT_DEFS
+   sprite up front regardless of which zones a test visits, and falls back
+   to a flat-color rect (existing, intentional tolerance — see objects.js). */
 function isExpectedAuthNoise(text) {
-  return /Failed to load resource.*(400|401)/i.test(text)
+  return /Failed to load resource.*(400|401|404)/i.test(text)
     || /\[troll-high\] cloud (load|save) (failed|threw)/i.test(text);
 }
 

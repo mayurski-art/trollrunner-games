@@ -45,6 +45,11 @@
       "type": "bleachers",
       "x": 10,
       "y": 13
+    },
+    {
+      "type": "kickball-spot",
+      "x": 12,
+      "y": 8
     }
   ],
   "doors": [

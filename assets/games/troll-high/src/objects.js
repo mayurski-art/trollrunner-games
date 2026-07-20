@@ -214,6 +214,38 @@ export const OBJECT_DEFS = {
       text: "The net's got a hole in the top corner exactly where the good shots go. Coincidence? Nobody's sure.",
     },
   },
+  "foursquare-court": {
+    sprite: "foursquare-court", w: 4, h: 4, footRows: 1,
+    play: "foursquare", playName: "Four Square",
+    memory: {
+      title: "The four square court",
+      text: "Faded yellow paint, house rules only, and a king's square nobody can hold for more than two rounds.",
+    },
+  },
+  "tetherball-pole": {
+    sprite: "tetherball-pole", w: 2, h: 3, footRows: 1,
+    play: "tetherball", playName: "Tetherball",
+    memory: {
+      title: "The tetherball pole",
+      text: "The rope's been re-tied so many times it's shorter than it should be. Somebody's always winding up for a wrap-around.",
+    },
+  },
+  "hopscotch-court": {
+    sprite: "hopscotch-court", w: 3, h: 4, footRows: 1,
+    play: "hopscotch", playName: "Hopscotch",
+    memory: {
+      title: "The hopscotch squares",
+      text: "Chalk numbers 1 through 8, redrawn every week whether it rains or not.",
+    },
+  },
+  "kickball-spot": {
+    sprite: "kickball-spot", w: 3, h: 2, footRows: 1,
+    play: "kickball", playName: "Kickball",
+    memory: {
+      title: "Home plate",
+      text: "A rubber mat worn smooth in the shape of a hundred nervous first kicks.",
+    },
+  },
   "school-bus": {
     sprite: "school-bus", w: 4, h: 6, footRows: 1,
     memory: {
@@ -257,6 +289,8 @@ const FALLBACK_COLORS = {
   "nurse-cot": "#c8d4dc", "first-aid-cabinet": "#d8dce0", "swing-set": "#5a6a7a",
   slide: "#e8c22e", "goal-post": "#dfe4e8", "school-bus": "#e8b22e",
   "bus-stop-sign": "#e8c22e", pipes: "#8a3a3a", "ac-unit": "#5a5a62",
+  "foursquare-court": "#c2b46a", "tetherball-pole": "#6b4a2a",
+  "hopscotch-court": "#b8ac82", "kickball-spot": "#a13a3a",
 };
 
 export class ObjectSprites {

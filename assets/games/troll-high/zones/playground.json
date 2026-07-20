@@ -38,6 +38,21 @@
       "type": "slide",
       "x": 17,
       "y": 6
+    },
+    {
+      "type": "foursquare-court",
+      "x": 6,
+      "y": 10
+    },
+    {
+      "type": "tetherball-pole",
+      "x": 15,
+      "y": 11
+    },
+    {
+      "type": "hopscotch-court",
+      "x": 20,
+      "y": 10
     }
   ],
   "doors": [

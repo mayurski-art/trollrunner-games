@@ -14,6 +14,7 @@ import { Ghost, drawBubble } from "./ghost.js";
 import { NPC, NPC_DEFS } from "./npc.js";
 import { awaitAuth } from "./gate.js";
 import { loadSave, saveGame } from "./save.js";
+import { Minigame, minigameInfo } from "./minigames.js";
 import * as clock from "./clock.js";
 
 const BASE = "assets/games/troll-high";
@@ -201,6 +202,32 @@ async function boot() {
   }
   $("th-arcade-close")?.addEventListener("click", closeArcade);
 
+  // ---------------------------------------------------- recess minigames
+  // Original in-world games (design doc §11), not embeds — a small canvas
+  // loop per kind, run by minigames.js.
+  const minigameOverlay = $("th-minigame-overlay");
+  const minigameCanvas = $("th-minigame-canvas");
+  const minigameTitleEl = $("th-minigame-title");
+  const minigameScoreEl = $("th-minigame-score");
+  const minigameHelpEl = $("th-minigame-help");
+  let activeMinigame = null;
+  function openMinigame(obj) {
+    const kind = obj.play || obj.def.play;
+    const info = minigameInfo(kind);
+    minigameTitleEl.textContent = obj.playName || obj.def.playName || info.title;
+    minigameHelpEl.textContent = info.help;
+    minigameScoreEl.textContent = "Score: 0";
+    minigameOverlay.hidden = false;
+    activeMinigame = new Minigame(minigameCanvas, kind);
+    activeMinigame.start();
+  }
+  function closeMinigame() {
+    activeMinigame?.stop();
+    activeMinigame = null;
+    minigameOverlay.hidden = true;
+  }
+  $("th-minigame-close")?.addEventListener("click", closeMinigame);
+
   function showMemory(mem, obj) {
     closeMemory();
     memoryEl = document.createElement("div");
@@ -321,7 +348,7 @@ async function boot() {
   function escapeHtml(s) { return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
   function openChat() {
-    if (!running || memoryEl || dialogueEl || !lbOverlay.hidden || !arcadeOverlay.hidden) return;
+    if (!running || memoryEl || dialogueEl || !lbOverlay.hidden || !arcadeOverlay.hidden || !minigameOverlay.hidden) return;
     chatOpen = true;
     chatBar.hidden = false;
     chatInput.value = "";
@@ -396,8 +423,12 @@ async function boot() {
     persist: () => { saveDirty = true; persist(); },
     openLeaderboard: () => { lbOverlay.hidden = false; window.TrollLeaderboard?.refresh?.("troll-high"); },
     closeLeaderboard: () => { lbOverlay.hidden = true; },
-    openArcade, closeArcade,
+    openArcade, closeArcade, openMinigame, closeMinigame,
     get arcadeOpen() { return !arcadeOverlay.hidden; },
+    get minigameOpen() { return !minigameOverlay.hidden; },
+    get minigameScore() { return activeMinigame?.score ?? null; },
+    get minigameFinished() { return activeMinigame?.finished ?? null; },
+    get minigame() { return activeMinigame; },
   };
 
   // -------------------------------------------------------------- pushing
@@ -437,11 +468,13 @@ async function boot() {
       fade = Math.max(0, fade - dt * 4);
     }
 
-    if (!pendingDoor && !memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden) {
+    if (!pendingDoor && !memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden) {
       const axis = input.axis();
       tryPushFromInput(axis);
       player.update(dt, axis, zone);
     }
+
+    if (activeMinigame) minigameScoreEl.textContent = `Score: ${activeMinigame.score}`;
 
     // multiplayer: broadcast our position, sync ghosts from the last-known
     // peer states, prune any that timed out
@@ -470,14 +503,18 @@ async function boot() {
     const face = player.facingTile();
     const obj = zone.objectAt(face.x, face.y);
     const mem = obj && (obj.memory || obj.def.memory);
+    const play = obj && (obj.play || obj.def.play);
     const arcadeHint = obj && obj.game ? ` Play ${obj.gameName || "a game"}` : null;
-    setHint((memoryEl || dialogueEl || !arcadeOverlay.hidden) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (arcadeHint || (mem ? ` ${mem.title}` : null)));
+    const playHint = play ? ` Play ${obj.playName || obj.def.playName || minigameInfo(play).title}` : null;
+    setHint((memoryEl || dialogueEl || !arcadeOverlay.hidden || !minigameOverlay.hidden) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (arcadeHint || playHint || (mem ? ` ${mem.title}` : null)));
     if (input.interactPressed()) {
-      if (!arcadeOverlay.hidden) closeArcade();
+      if (!minigameOverlay.hidden) closeMinigame();
+      else if (!arcadeOverlay.hidden) closeArcade();
       else if (dialogueEl) closeDialogue();
       else if (memoryEl) closeMemory();
       else if (nearNPC) showDialogue(nearNPC);
       else if (obj && obj.game) openArcade(obj);
+      else if (play) openMinigame(obj);
       else if (mem) showMemory(mem, obj);
     }
 

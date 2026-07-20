@@ -96,6 +96,20 @@
       </div>
     </div>
 
+    <!-- Recess minigames v1 (four square, tetherball, hopscotch, kickball) —
+         original in-world games, not embeds (design doc §11). -->
+    <div id="th-minigame-overlay" hidden>
+      <div class="th-minigame-frame">
+        <div class="th-minigame-titlebar">
+          <span id="th-minigame-title">—</span>
+          <span id="th-minigame-score">Score: 0</span>
+          <button id="th-minigame-close" type="button" aria-label="Close">✕</button>
+        </div>
+        <canvas id="th-minigame-canvas" width="320" height="220"></canvas>
+        <p id="th-minigame-help"></p>
+      </div>
+    </div>
+
     <!-- Interaction hint ("E — Look at lockers") -->
     <div id="th-hint" hidden></div>
 
