@@ -302,6 +302,14 @@ html, body {
 }
 .th-schedule-panel h2 { font-size: 15px; font-weight: 900; margin: 14px 0 8px; }
 .th-schedule-panel h2:first-of-type { margin-top: 0; }
+.th-schedule-flavor {
+  margin: 0 0 6px;
+  font-size: 12px;
+  opacity: 0.75;
+  background: rgba(43, 36, 23, 0.05);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
 #th-schedule-close {
   position: absolute;
   top: 12px;

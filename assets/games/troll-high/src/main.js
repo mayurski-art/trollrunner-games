@@ -20,6 +20,7 @@ import { genStudentId, renderProfile } from "./profile.js";
 import { MENU as CAFETERIA_MENU, normalizeStudentId } from "./cafeteria.js";
 import { ELECTIVES, buildSchedule, DAILY_TASKS } from "./schedule.js";
 import { CARDS, cardById, maybeAwardCard } from "./cards.js";
+import { todaysLunch, todaysAnnouncement, todaysEvent } from "./daily.js";
 import * as clock from "./clock.js";
 
 const BASE = "assets/games/troll-high";
@@ -271,6 +272,7 @@ async function boot() {
   // ----------------------------------------------------------- cafeteria
   const cafeteriaOverlay = $("th-cafeteria-overlay");
   const cafeteriaMenuEl = $("th-cafeteria-menu");
+  const cafeteriaSpecialEl = $("th-cafeteria-special");
   const cafeteriaOrderStep = $("th-cafeteria-order-step");
   const cafeteriaIdStep = $("th-cafeteria-id-step");
   const cafeteriaDoneStep = $("th-cafeteria-done-step");
@@ -300,6 +302,8 @@ async function boot() {
   }
 
   function openCafeteria() {
+    const special = todaysLunch(today);
+    cafeteriaSpecialEl.textContent = `Today's special: ${special.icon} ${special.name} — ${special.flavor}`;
     cafeteriaSelected = new Set();
     cafeteriaMenuEl.querySelectorAll(".th-cafeteria-item").forEach(b => b.classList.remove("is-selected"));
     cafeteriaCountEl.textContent = "0 items selected";
@@ -375,7 +379,11 @@ async function boot() {
   const scheduleOverlay = $("th-schedule-overlay");
   const scheduleTableBody = $("th-schedule-table").querySelector("tbody");
   const scheduleTasksEl = $("th-schedule-tasks");
+  const scheduleEventEl = $("th-schedule-event");
+  const scheduleAnnouncementEl = $("th-schedule-announcement");
   function openSchedule() {
+    scheduleEventEl.textContent = todaysEvent(today);
+    scheduleAnnouncementEl.textContent = `📌 ${todaysAnnouncement(today)}`;
     const nowPeriod = clock.now().period;
     scheduleTableBody.innerHTML = "";
     for (const row of buildSchedule(elective)) {
