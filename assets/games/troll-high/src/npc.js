@@ -180,6 +180,36 @@ export const NPC_DEFS = {
       "The book fair's coming. I can already tell you're excited. Quietly.",
     ],
   }],
+  "hallway-a": [{
+    id: "janitor-gus", name: "Janitor Gus", sprite: "npc-gus",
+    type: "patrol", a: { x: 22, y: 8 }, b: { x: 45, y: 8 },
+    dialogue: [
+      "These floors don't mop themselves. Well — actually.",
+      "I've got a key for every door in this building. Every one.",
+      "Kid, you don't want to know what's down in the tunnels.",
+    ],
+  }],
+  // 5 new peer/kid NPCs (design doc §21) — the original 8 were all staff;
+  // these round out actual "friend" characters. Pep was named in the
+  // original cast list (§9) but never actually built until now.
+  "bus-loop": [{
+    id: "pep", name: "Pep", sprite: "npc-pep",
+    type: "stationary", x: 10, y: 9, facing: "south",
+    dialogue: [
+      "Bus is always five minutes early or ten minutes late. Never on time. Kind of beautiful, honestly.",
+      "You ever just stand here and watch the buses turn around? No? Just me?",
+      "Feels good, man.",
+    ],
+  }],
+  gym: [{
+    id: "marcus-vale", name: "Marcus Vale", sprite: "npc-marcus",
+    type: "stationary", x: 12, y: 9, facing: "south",
+    dialogue: [
+      "Oh, it's you. I beat your PACER time. Just thought you should know.",
+      "Rematch. Anytime. I'm serious.",
+      "I'm not showing off. This is just how I dribble.",
+    ],
+  }],
   office: [{
     id: "principal-grimface", name: "Principal Grimface", sprite: "npc-principal",
     type: "patrol", a: { x: 9, y: 3 }, b: { x: 9, y: 7 },
@@ -188,14 +218,31 @@ export const NPC_DEFS = {
       "My office door is always open. Please don't test that.",
       "I've seen the security footage. I see everything.",
     ],
-  }],
-  "hallway-a": [{
-    id: "janitor-gus", name: "Janitor Gus", sprite: "npc-gus",
-    type: "patrol", a: { x: 22, y: 8 }, b: { x: 45, y: 8 },
+  }, {
+    id: "wendell", name: "Wendell", sprite: "npc-wendell",
+    type: "stationary", x: 7, y: 8, facing: "north",
     dialogue: [
-      "These floors don't mop themselves. Well — actually.",
-      "I've got a key for every door in this building. Every one.",
-      "Kid, you don't want to know what's down in the tunnels.",
+      "Is... is this the office? I think I'm lost. Again.",
+      "I don't really know anyone here yet. It's fine. It's totally fine.",
+      "Do you know where Room 5A is? I've asked like four people today.",
+    ],
+  }],
+  "art-room": [{
+    id: "priya", name: "Priya", sprite: "npc-priya",
+    type: "stationary", x: 8, y: 9, facing: "south",
+    dialogue: [
+      "I'm starting a club. I don't know what kind yet, but it's going to be great.",
+      "Sign-up sheet's coming soon. Very soon. Soon-ish.",
+      "Every great club starts with one person and a folding table. This is that folding table.",
+    ],
+  }],
+  roof: [{
+    id: "marnie", name: "Marnie", sprite: "npc-marnie",
+    type: "stationary", x: 7, y: 9, facing: "north",
+    dialogue: [
+      "You can see the whole school from up here. Some nights it looks... different.",
+      "Don't ask about the tunnels. Actually — do. Just not to a teacher.",
+      "I heard laughing down by the boiler room once. Nobody else heard it.",
     ],
   }],
 };
