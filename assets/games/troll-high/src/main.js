@@ -123,6 +123,7 @@ async function boot() {
     closeMemory();
     memoryEl = document.createElement("div");
     memoryEl.id = "th-memory";
+    memoryEl.className = "th-popup-card";
     memoryEl.setAttribute("role", "dialog");
     memoryEl.setAttribute("aria-label", mem.title);
     const isNew = !found.has(obj.type + ":" + obj.x + ":" + obj.y);
@@ -135,6 +136,27 @@ async function boot() {
   }
   function closeMemory() {
     if (memoryEl) { memoryEl.remove(); memoryEl = null; }
+  }
+
+  // NPC dialogue reuses the same reliable DOM card as memories — always
+  // readable regardless of camera zoom or where the NPC is standing,
+  // unlike a text bubble drawn on the world canvas.
+  let dialogueEl = null;
+  function showDialogue(npc) {
+    closeDialogue();
+    dialogueEl = document.createElement("div");
+    dialogueEl.id = "th-dialogue";
+    dialogueEl.className = "th-popup-card";
+    dialogueEl.setAttribute("role", "dialog");
+    dialogueEl.setAttribute("aria-label", npc.name);
+    dialogueEl.innerHTML =
+      `<h3>${npc.name}</h3><p>${npc.speak()}</p>` +
+      `<div class="th-mem-close">E / tap — close</div>`;
+    dialogueEl.addEventListener("click", closeDialogue);
+    $("th-root").appendChild(dialogueEl);
+  }
+  function closeDialogue() {
+    if (dialogueEl) { dialogueEl.remove(); dialogueEl = null; }
   }
 
   function setHint(text) {
@@ -173,7 +195,7 @@ async function boot() {
   function escapeHtml(s) { return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
   function openChat() {
-    if (!running || memoryEl) return;
+    if (!running || memoryEl || dialogueEl) return;
     chatOpen = true;
     chatBar.hidden = false;
     chatInput.value = "";
@@ -265,7 +287,7 @@ async function boot() {
       fade = Math.max(0, fade - dt * 4);
     }
 
-    if (!pendingDoor && !memoryEl && !chatOpen) {
+    if (!pendingDoor && !memoryEl && !dialogueEl && !chatOpen) {
       player.update(dt, input.axis(), zone);
     }
 
@@ -293,10 +315,11 @@ async function boot() {
     const face = player.facingTile();
     const obj = zone.objectAt(face.x, face.y);
     const mem = obj && obj.def.memory;
-    setHint(memoryEl ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (mem ? ` ${mem.title}` : null));
+    setHint((memoryEl || dialogueEl) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (mem ? ` ${mem.title}` : null));
     if (input.interactPressed()) {
-      if (memoryEl) closeMemory();
-      else if (nearNPC) nearNPC.speak();
+      if (dialogueEl) closeDialogue();
+      else if (memoryEl) closeMemory();
+      else if (nearNPC) showDialogue(nearNPC);
       else if (mem) showMemory(mem, obj);
     }
 

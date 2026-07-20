@@ -52,7 +52,10 @@ const hold = async (page, key, ms) => { await page.keyboard.down(key); await new
     return n && { pathLen: n.path.length, x: n.x, y: n.y };
   });
   log(gus0 && gus0.pathLen > 10, `Janitor Gus has a real BFS path across the hallway (${gus0 && gus0.pathLen} tiles)`);
-  await new Promise(r => setTimeout(r, 2000));
+  // Gus now pauses for PATROL_IDLE_SEC (6s) at each end of his route, so a
+  // short sample can land entirely inside an idle window. 8s is longer
+  // than any idle block, guaranteeing overlap with a moving phase.
+  await new Promise(r => setTimeout(r, 8000));
   const gus1 = await page.evaluate(() => {
     const n = window.__th.npcs.find(n => n.def.id === 'janitor-gus');
     return { x: n.x, y: n.y };
@@ -67,14 +70,24 @@ const hold = async (page, key, ms) => { await page.keyboard.down(key); await new
   await new Promise(r => setTimeout(r, 200));
   const hintText = await page.$eval('#th-hint', el => el.textContent);
   log(/Janitor Gus/i.test(hintText), `hint shows "Talk to Janitor Gus" when nearby: ${JSON.stringify(hintText)}`);
+  // Dialogue now shows in a reliable DOM popup (like memory cards) rather
+  // than an in-world canvas bubble that could get clipped or be unreadable
+  // depending on camera zoom / where the NPC stands. E opens it, E again
+  // closes it (movement is frozen while it's open) — so getting the next
+  // line takes an open/close/open cycle, not just two presses.
   await page.keyboard.press('KeyE');
-  await new Promise(r => setTimeout(r, 100));
-  const line1 = await page.evaluate(() => window.__th.npcs.find(n => n.def.id === 'janitor-gus').bubble?.text);
-  log(!!line1, `first interaction shows a dialogue bubble: ${JSON.stringify(line1)}`);
+  await page.waitForSelector('#th-dialogue', { timeout: 3000 });
+  const dTitle1 = await page.$eval('#th-dialogue h3', el => el.textContent);
+  const line1 = await page.$eval('#th-dialogue p', el => el.textContent);
+  log(dTitle1 === 'Janitor Gus' && !!line1, `dialogue popup shows Janitor Gus's line: ${JSON.stringify(line1)}`);
   await page.keyboard.press('KeyE');
-  await new Promise(r => setTimeout(r, 100));
-  const line2 = await page.evaluate(() => window.__th.npcs.find(n => n.def.id === 'janitor-gus').bubble?.text);
-  log(line1 !== line2, `second interaction cycles to a different line ("${line1}" -> "${line2}")`);
+  await page.waitForFunction('!document.getElementById("th-dialogue")', { timeout: 3000 });
+  await page.keyboard.press('KeyE');
+  await page.waitForSelector('#th-dialogue', { timeout: 3000 });
+  const line2 = await page.$eval('#th-dialogue p', el => el.textContent);
+  log(line1 !== line2, `next interaction cycles to a different line ("${line1}" -> "${line2}")`);
+  await page.keyboard.press('KeyE');
+  await page.waitForFunction('!document.getElementById("th-dialogue")', { timeout: 3000 });
 
   // Stationary NPC in a room: enter Room 3B, confirm Ms. Chalke never moves
   await page.evaluate(() => window.__th.warpTo(15, 5));

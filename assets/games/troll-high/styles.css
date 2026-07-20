@@ -246,8 +246,11 @@ html, body {
   pointer-events: auto;
 }
 
-/* memory popup card (Polaroid-ish) */
-#th-memory {
+/* popup card (Polaroid-ish) — memory cards AND NPC dialogue share this.
+   Reliable DOM text beats trying to fit readable dialogue into a tiny
+   in-world canvas bubble that can end up clipped by the camera or
+   scaled illegibly depending on zoom and where the NPC stands. */
+.th-popup-card {
   position: absolute;
   left: 50%;
   bottom: 12%;
@@ -261,9 +264,9 @@ html, body {
   box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(43, 36, 23, 0.15);
 }
-#th-memory h3 { font-size: 15px; font-weight: 900; margin-bottom: 4px; }
-#th-memory p { font-size: 13px; line-height: 1.45; }
-#th-memory .th-mem-close {
+.th-popup-card h3 { font-size: 15px; font-weight: 900; margin-bottom: 4px; }
+.th-popup-card p { font-size: 13px; line-height: 1.45; }
+.th-popup-card .th-mem-close {
   margin-top: 8px;
   font-family: "DM Mono", monospace;
   font-size: 11px;

@@ -5,9 +5,6 @@
    "stationary" NPCs just stand at a fixed point with occasional idle life. */
 
 import { TILE, dirFromVector } from "./util.js";
-import { drawBubble } from "./ghost.js";
-
-const BUBBLE_MS = 3800;
 
 /* Breadth-first search over the zone's solid grid (uniform cost, so BFS
    is exact — no heuristic needed at these room sizes). Falls back to
@@ -44,7 +41,8 @@ export function findPath(zone, start, end) {
   return path.reverse();
 }
 
-const PATROL_SPEED = 2; // tiles/sec — a calmer pace than the player
+const PATROL_SPEED = 1.2; // tiles/sec — an unhurried pace, well under the player's
+const PATROL_IDLE_SEC = 6; // pause at each end of the route before turning back
 
 export class NPC {
   constructor(def, zone, sprites) {
@@ -55,7 +53,6 @@ export class NPC {
     this.dir = def.facing || "south";
     this.moving = false;
     this.animT = 0;
-    this.bubble = null;
 
     if (def.type === "patrol") {
       this.path = findPath(zone, def.a, def.b);
@@ -78,26 +75,38 @@ export class NPC {
       this.moving = false;
       return;
     }
-    const cycle = (path.length - 1) * 2;
-    const raw = (Date.now() / 1000 * PATROL_SPEED) % cycle;
-    const t = raw <= path.length - 1 ? raw : cycle - raw; // ping-pong
-    const i = Math.min(Math.floor(t), path.length - 2);
-    const frac = t - i;
+    // Cycle: walk to B, pause, walk back to A, pause — so there's always a
+    // real window where the NPC is standing still and easy to approach,
+    // not endlessly pacing. Still a pure function of wall-clock time.
+    const travelSec = (path.length - 1) / PATROL_SPEED;
+    const cycleSec = travelSec * 2 + PATROL_IDLE_SEC * 2;
+    const t = (Date.now() / 1000) % cycleSec;
+    let travelT, moving;
+    if (t < travelSec) { travelT = t * PATROL_SPEED; moving = true; }
+    else if (t < travelSec + PATROL_IDLE_SEC) { travelT = path.length - 1; moving = false; }
+    else if (t < travelSec * 2 + PATROL_IDLE_SEC) { travelT = (path.length - 1) - (t - travelSec - PATROL_IDLE_SEC) * PATROL_SPEED; moving = true; }
+    else { travelT = 0; moving = false; }
+
+    const i = Math.min(Math.floor(travelT), path.length - 2);
+    const frac = travelT - i;
     const a = path[i], b = path[i + 1];
     const ax = (a.x + 0.5) * TILE, ay = (a.y + 1) * TILE;
     const bx = (b.x + 0.5) * TILE, by = (b.y + 1) * TILE;
     this.x = ax + (bx - ax) * frac;
     this.y = ay + (by - ay) * frac;
-    this.moving = frac > 0.02 && frac < 0.98;
+    this.moving = moving;
     if (this.moving) { this.dir = dirFromVector(bx - ax, by - ay); this.animT += dt; }
     else this.animT = 0;
   }
 
+  /* Returns the next line; the caller shows it in a reliable DOM popup
+     (see main.js showDialogue) rather than a tiny in-world canvas bubble,
+     which could end up clipped by the camera or hard to read depending on
+     zoom and where the NPC happens to be standing. */
   speak() {
     const lines = this.def.dialogue;
     const text = lines[this.dialogueIndex % lines.length];
     this.dialogueIndex++;
-    this.bubble = { text, until: performance.now() + BUBBLE_MS };
     return text;
   }
 
@@ -106,13 +115,9 @@ export class NPC {
   }
 
   entity() {
-    if (this.bubble && performance.now() > this.bubble.until) this.bubble = null;
     return {
       y: this.y,
-      draw: ctx => {
-        this.sprites.draw(ctx, this.dir, this.moving, this.animT, this.x, this.y);
-        if (this.bubble) drawBubble(ctx, this.x, this.y, this.bubble.text);
-      },
+      draw: ctx => this.sprites.draw(ctx, this.dir, this.moving, this.animT, this.x, this.y),
     };
   }
 }
@@ -186,7 +191,7 @@ export const NPC_DEFS = {
   }],
   "hallway-a": [{
     id: "janitor-gus", name: "Janitor Gus", sprite: "npc-gus",
-    type: "patrol", a: { x: 15, y: 8 }, b: { x: 55, y: 8 },
+    type: "patrol", a: { x: 22, y: 8 }, b: { x: 45, y: 8 },
     dialogue: [
       "These floors don't mop themselves. Well — actually.",
       "I've got a key for every door in this building. Every one.",

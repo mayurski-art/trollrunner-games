@@ -20,8 +20,8 @@ export class Renderer {
     const dpr = Math.min(devicePixelRatio || 1, 2);
     this.canvas.width = Math.round(innerWidth * dpr);
     this.canvas.height = Math.round(innerHeight * dpr);
-    // aim for ~13-20 tiles across; integer scale keeps pixels crisp
-    this.scale = clamp(Math.round(this.canvas.width / (TILE * 16)), 2, 6);
+    // aim for ~20-28 tiles across; integer scale keeps pixels crisp
+    this.scale = clamp(Math.round(this.canvas.width / (TILE * 22)), 1, 4);
     this.back.width = Math.ceil(this.canvas.width / this.scale);
     this.back.height = Math.ceil(this.canvas.height / this.scale);
     this.bctx.imageSmoothingEnabled = false;
