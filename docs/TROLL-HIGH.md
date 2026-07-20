@@ -340,7 +340,7 @@ binder in 2006. Mobile: bottom-sheet versions of the same panels.
 | 4 | School alive — **DONE (v1)** | Bell (`Ambience.ringBell()`, fires once per period change — deterministic from the shared clock, zero network traffic like everything else clock-driven). NPC system (`src/npc.js`): real BFS pathfinding over each zone's solid grid, two behaviors (stationary / patrol, ping-ponging deterministically off wall-clock time), proximity dialogue (distance-triggered, cycling line pools, floating bubbles). First 8 NPCs: Ms. Chalke, Mr. Fenwick, Mrs. Petrova (the 3 classroom teachers), Eldon Tusk (computer lab), Lunch Lady Doris (cafeteria), Ms. Quietly (library), Principal Grimface (patrols the office), Janitor Gus (patrols the hallway). Period-driven hall-chatter noise bed, louder during passing periods and in the hallway than indoors. Deferred: walk-cycle sprites for the 2 patrol NPCs (they glide in their idle pose — noted, not hidden), NPC-specific cross-zone routines (all 8 are zone-bound for now). `sprites.js` now skips fetching walk strips entirely when a character's meta declares none exist (`walkFrames <= 1`), so this doesn't cost 64 wasted 404s per page load. |
 | 5 | School wave 2 — **DONE** | Gym, auditorium, art room, music room, science lab, nurse's office, playground, sports field, bus loop — 9 new rooms off a second hallway wing (East Wing / hallway-b), branched off Main Hallway rather than one absurdly long corridor. Secrets tier 1: a hidden basement (unmarked East Wing door) chains into the maintenance tunnels, and an unmarked gym door leads up to the roof — 2 new tilesets (outdoor schoolyard w/ chain-link fence, gravel rooftop w/ parapet), 18 new furniture pieces. 121 memory-bearing instances across all 22 zones. |
 | 6 | Persistence — **DONE** | Real account gate at the title screen (login/signup, SSO-aware via `TrollrunnerAccounts` — a session from any other *.trollrunner.net game skips the form). Cloud saves reuse the existing shared `troll_game_saves` table (no new SQL needed — same table Trollrreria already uses; a per-game `troll_high.sql` was in the original plan but turned out unnecessary). Position + every found memory round-trip through a real account across reloads. Weekly leaderboard wired via the shared `troll-leaderboard.js` engine, shown in an in-game overlay panel (🏆 button) since Troll High has no page chrome outside the canvas to mount a page-section leaderboard in, unlike Troll Kombat. **TrollNotis was evaluated and NOT wired** — its real API turned out to be a specific social-media cross-post announcer (X/Instagram, platform badges, CTA links), not a generic achievement toast system; forcing memory discoveries through it would misuse it. Deferred to a later phase: inventory + sticker book (needs Phase 7's collectible systems to exist first). |
-| 7 | Lab & recess | CRT computers launch arcade games; recess minigames v1; trading + gifting. **← v1 LAUNCH: hub card flips live** |
+| 7 | Lab & recess — **DONE** | CRT computers launch the real arcade games in an iframe overlay (`openArcade`/`closeArcade`); 4 original recess minigames (`src/minigames.js`: four square, tetherball, hopscotch, kickball) with high scores tracked on the profile; trading + gifting (`src/cards.js`, `net.js` trade-offer/trade-accept/trade-decline/gift messages) — a 14-card set, earned as a side chance on existing milestones, negotiated live over the existing per-zone broadcast channel with no server-arbitrated ledger. **v1 LAUNCH: hub card flipped live on games.trollrunner.net (new "Social" category).** Also shipped in this window, from direct player feedback rather than the original plan: a full campus map screen (M key, `src/mapview.js`), a student profile panel with a cosmetic student ID (`src/profile.js`), a cafeteria food-bar ordering flow gated on that ID (`src/cafeteria.js`), and first-login orientation + elective pick + a class schedule + auto-checking daily tasks (`src/schedule.js`). See §19 for the larger post-Phase-7 design direction these and Phase 7's card set now feed into. |
 | 8 | Neighborhood 1 | Streets, cul-de-sacs, arcade, pizza place, convenience store, park, bus stop, ice cream truck. |
 | 9 | Neighborhood 2 | Skate park, lake, forest + trail, tree houses, storm drains, warehouse, caves; secrets tier 2. |
 | 10 | Events | Event engine + book fair, pizza friday, spirit week, dance, Halloween, snow day; seasonal art variants. |
@@ -372,3 +372,63 @@ Phases 0–7 are the launch arc; 8–12 are the "world keeps growing" arc.
    (§13). Cloud-first persistence.
 4. **Computer lab: real arcade games.** Working CRTs boot the actual Troll
    Runner Arcade in a CRT-framed in-world window.
+
+## 21. Post-Phase-7 design direction — the Five Layers
+
+Set 2026-07-20, after Phase 7 shipped, from a joint design pass (this
+project's own review + a ChatGPT-authored creative-director brief the
+player brought back). Full source briefs live in chat history, not
+reproduced verbatim here — this is the durable summary to build against.
+
+**Core stance:** not a grind-XP MMO. A "persistent online childhood" —
+every mechanic should answer "does this recreate a real childhood
+memory?", not "what feature can we add?"
+
+**Five layers every future system should reinforce** (best mechanics hit
+several at once):
+1. **Daily Life** — routines players form on their own (check locker,
+   grab lunch, one recess game), not quest-forced. Mostly built already
+   (schedule, daily tasks, cafeteria, recess games).
+2. **Growing Up** — progression as life story, not levels. Profile
+   already has enrolled-since/memories/high scores; extend with
+   clubs-joined, dances-attended, detentions, etc. — same save payload,
+   cheap to add.
+3. **Living MMO** — the shared world creating unscripted social moments
+   (fire drills, lost hamster, food fights) rather than forced
+   grouping. Cheap version: pick a pseudo-random daily event off the
+   same deterministic clock already driving the bell schedule — no new
+   backend.
+4. **Hidden World** — the Trollface mystery (already seeded via the
+   basement/tunnels/roof secrets). Slow-drip only; don't over-invest
+   here until the visible layers have daily-return traffic.
+5. **Nostalgia objects** — content, not systems. Keep feeding the
+   existing object/memory registry (`src/objects.js`) with 2000s-era
+   flavor text; cheapest category to continuously invest in.
+
+**Explicitly deferred, not rejected:** NPC memory of players (needs a
+per-player relationship record per NPC, stored in the save payload —
+real subsystem, not a quick add), full world/crowd simulation (skipped
+for now given low concurrent player counts — NPCs instead just shift
+rooms on period boundaries, reusing the existing clock), yearbook +
+disposable camera (wants image upload/storage — the one idea here that
+needs new infra, specifically a Supabase storage bucket; explicitly
+wanted by the player, just gated on that infra decision).
+
+**5 new NPCs approved** (current roster is 8, all staff — this rounds
+out actual peer/friend characters): Pep (named in the original cast list
+in §9 but never built — bike racks, "feels bad man" rain dialogue), a
+rival/frenemy kid, a shy new-kid (fits a "help a newer student" beat),
+a future club-leader type (seeds Phase 11-ish club content early), and
+one NPC that drops occasional cryptic Trollface-adjacent lines (seeds
+layer 4 without spoiling it).
+
+**Agreed near-term build order** (not strict — player said order doesn't
+matter): trading/gifting (done, closed out Phase 7) → profile life-story
+stats → daily rotating flavor (lunch menu/announcements/random event) →
+the 5 NPCs → NPC memory/relationships → bedroom personal space → then
+re-evaluate against Phases 8–12 and yearbook/cameras.
+
+Note: Phase 7's trading-card set (`src/cards.js`, 14 cards) is the same
+idea §18's Phase 11 called "Troll TCG set" — already exists now, ahead
+of schedule; Phase 11 becomes "expand the existing card set" rather than
+building one from scratch.
