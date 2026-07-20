@@ -1,4 +1,4 @@
-/* Troll High — boot + game loop (Phase 0: hallway + room 3B proof). */
+/* Troll High — boot + game loop. */
 
 import { TILE, loadJSON } from "./util.js";
 import { Input } from "./input.js";
@@ -8,10 +8,14 @@ import { ObjectSprites } from "./objects.js";
 import { CharacterSprites } from "./sprites.js";
 import { Zone } from "./zone.js";
 import { Player } from "./player.js";
+import { Ambience } from "./audio.js";
 import * as clock from "./clock.js";
 
 const BASE = "assets/games/troll-high";
-const ZONE_IDS = ["hallway-a", "classroom-3b"];
+const ZONE_IDS = [
+  "hallway-a", "office", "classroom-3b", "classroom-3c", "classroom-3d",
+  "computer-lab", "cafeteria", "library", "bathroom",
+];
 
 const $ = id => document.getElementById(id);
 
@@ -65,6 +69,11 @@ async function boot() {
   const coarse = matchMedia("(pointer: coarse)").matches;
   if (coarse) input.attachTouch($("th-stick"), $("th-stick-nub"), $("th-btn-act"));
 
+  const ambience = new Ambience();
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) ambience.suspend(); else ambience.resume();
+  });
+
   let running = false;
   $("th-start").addEventListener("click", () => {
     $("th-title").hidden = true;
@@ -72,6 +81,8 @@ async function boot() {
     if (coarse) $("th-touch").hidden = false;
     input.interactPressed(); // swallow the click's queued Enter/Space
     running = true;
+    ambience.start();
+    ambience.setIndoor(zone.id !== "hallway-a");
   });
 
   function showMemory(mem, obj) {
@@ -103,6 +114,7 @@ async function boot() {
     player.placeAtTile(door.tx, door.ty);
     doorArmed = false;
     zoneNameEl.textContent = zone.name;
+    ambience.setIndoor(zone.id !== "hallway-a");
   }
 
   zoneNameEl.textContent = zone.name;
@@ -117,6 +129,7 @@ async function boot() {
       Object.entries(tilesets).map(([n, t]) => [n, t.ready])
     ),
     spritesReady: studentSprites.ready,
+    get ambienceStarted() { return ambience.started; },
   };
 
   // ----------------------------------------------------------------- loop

@@ -311,8 +311,8 @@ binder in 2006. Mobile: bottom-sheet versions of the same panels.
 | # | Phase | Ships |
 |---|-------|-------|
 | 0 | Proof — **DONE** | Hallway + 1 classroom walkable in-browser: tileset, avatar 8-dir walk, camera, collision, zone transition. Validates the whole art pipeline before mass content. |
-| 1 | Engine core — **in progress** | Zone system done (Phase 0). Editor tool (`tools/troll-high-editor.html`) **done**: paints against the real Wang tilesets, vertex + rect-fill terrain brush, object palette, door rectangles, spawn point, JSON import/export. Touch controls + walk-behind done (Phase 0). Remaining: richer lighting layer (lamp glow, CRT flicker — currently a flat day/night tint), clock v1 polish. |
-| 2 | School wave 1 | 8 core rooms (office, 3 classrooms, computer lab, cafeteria, library, bathrooms) + Memory Engine v1 with ~60 objects + base ambience. |
+| 1 | Engine core — **DONE (v1)** | Zone system, editor tool (`tools/troll-high-editor.html`), touch controls, walk-behind, base ambience audio (`src/audio.js`), day/night tint. Deferred to later polish: lamp glow / CRT flicker lighting. |
+| 2 | School wave 1 — **DONE** | 8 rooms live: office, 3 classrooms (3B/5A/7A, each with a distinct prop twist — TV cart / fish tank / reading corner), computer lab, cafeteria, library, restrooms. All wired off a widened Main Hallway (8 doors). 16 object types (8 new this phase), 71 placed memory-bearing instances across all zones. Base ambience hooked to indoor/outdoor. |
 | 3 | Multiplayer | Per-zone ghosts, presence roster, chat bubbles, emotes, sit/wave/dance. **The "it's an MMO" moment.** |
 | 4 | School alive | Bell schedule, NPC system + first 8 NPCs on routines, dialogue, period-driven audio layers. |
 | 5 | School wave 2 | Gym, auditorium, art/music/science, nurse, lockers, playground, sports fields, bus loop + secrets tier 1 (roof, tunnels, basement). ~200 memory objects total. |

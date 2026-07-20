@@ -1,7 +1,9 @@
-/* Troll High smoke test: serves the repo statically and drives Phase 0
-   end-to-end in headless Chrome — boot, title, movement + collision, zone
-   transition through the door, memory interaction. Run from anywhere after
-   `npm i puppeteer-core` (screenshots land next to this script). */
+/* Troll High smoke test: serves the repo statically and drives the game
+   end-to-end in headless Chrome — boot, title, movement + collision, the
+   widened Phase 2 hallway's door network (office / classroom-3b /
+   computer-lab / cafeteria), memory interactions, ambience start, and
+   memory persistence. Run from anywhere after `npm i puppeteer-core`
+   (screenshots land next to this script). */
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -33,6 +35,38 @@ const hold = async (page, key, ms) => {
   await page.keyboard.up(key);
 };
 
+/* Walk from a hallway spot up onto a north-wall door trigger and confirm
+   the target zone loads, then read one memory inside it. */
+async function enterRoom(page, { doorX, roomId, roomName, warpX, memWarp, memTitleRe, label }) {
+  await page.evaluate((x) => window.__th.warpTo(x, 5), warpX);
+  await hold(page, 'ArrowUp', 700);
+  await page.waitForFunction((id) => window.__th.zone.id === id, { timeout: 5000 }, roomId);
+  log(true, `${label}: hallway door (x=${doorX}) enters ${roomId}`);
+  log(await page.$eval('#th-zone-name', el => el.textContent) === roomName, `${label}: zone name reads "${roomName}"`);
+  await new Promise(r => setTimeout(r, 450)); // fade in
+
+  if (memWarp) {
+    await page.evaluate(([x, y]) => window.__th.warpTo(x, y), memWarp);
+    await hold(page, 'ArrowUp', 120);
+    await page.keyboard.press('KeyE');
+    await page.waitForSelector('#th-memory', { timeout: 3000 });
+    const title = await page.$eval('#th-memory h3', el => el.textContent);
+    log(memTitleRe.test(title), `${label}: memory card matches (${JSON.stringify(title)})`);
+    await page.keyboard.press('KeyE');
+    await page.waitForFunction('!document.getElementById("th-memory")');
+  }
+
+  // back to the hallway via that room's own door
+  const back = await page.evaluate((id) => {
+    const d = window.__th.zone.doors[0];
+    return { tx: d.x, ty: d.y };
+  }, roomId);
+  await page.evaluate(([tx, ty]) => window.__th.warpTo(tx, ty + 2), [back.tx, back.ty]);
+  await hold(page, 'ArrowUp', 700);
+  await page.waitForFunction('window.__th.zone.id === "hallway-a"', { timeout: 5000 });
+  log(true, `${label}: door returns to the hallway`);
+}
+
 (async () => {
   await new Promise((r) => server.listen(PORT, r));
   const browser = await puppeteer.launch({
@@ -47,7 +81,7 @@ const hold = async (page, key, ms) => {
   page.on('pageerror', (e) => consoleIssues.push('pageerror: ' + e.message));
 
   await page.goto(`http://localhost:${PORT}/troll-high.html`, { waitUntil: 'networkidle0' });
-  await page.waitForFunction('window.__th && !window.__th.running');
+  await page.waitForFunction('window.__th && !window.__th.running', { timeout: 20000 });
   const assets = await page.evaluate(() => ({
     tilesets: window.__th.tilesetReady,
     sprites: window.__th.spritesReady,
@@ -63,6 +97,7 @@ const hold = async (page, key, ms) => {
   const hudVisible = await page.$eval('#th-hud', (el) => !el.hidden);
   log(hudVisible, 'Start shows HUD, loop running');
   log(await page.$eval('#th-zone-name', el => el.textContent) === 'Main Hallway', 'spawns in Main Hallway');
+  log(await page.evaluate(() => window.__th.ambienceStarted), 'ambience starts on Start click');
 
   // Movement east + collision against the south wall
   const p0 = await page.evaluate(() => ({ x: window.__th.player.x, y: window.__th.player.y }));
@@ -76,8 +111,8 @@ const hold = async (page, key, ms) => {
   log(Math.abs(p3.y - p2.y) < 1 && p2.ty <= 10, `south wall stops the player (rests at tile row ${p2.ty})`);
   await page.screenshot({ path: path.join(OUT, 'th-shot-2-hallway.png') });
 
-  // Interact with the lockers (warp in front of the bank at x=12..15, face north)
-  await page.evaluate(() => window.__th.warpTo(13, 3));
+  // Interact with the lockers (bank at x=6..9)
+  await page.evaluate(() => window.__th.warpTo(7, 3));
   await hold(page, 'ArrowUp', 120);
   await page.keyboard.press('KeyE');
   await page.waitForSelector('#th-memory', { timeout: 3000 });
@@ -87,31 +122,31 @@ const hold = async (page, key, ms) => {
   await page.waitForFunction('!document.getElementById("th-memory")');
   log(true, 'memory card closes');
 
-  // Door: walk into Room 3B
-  await page.evaluate(() => window.__th.warpTo(18, 5));
-  await hold(page, 'ArrowUp', 900);
-  await page.waitForFunction('window.__th.zone.id === "classroom-3b"', { timeout: 5000 });
-  log(true, 'north door teleports into Room 3B');
-  await new Promise(r => setTimeout(r, 500)); // fade in
-  await page.screenshot({ path: path.join(OUT, 'th-shot-3-classroom.png') });
-
-  // TV cart memory in the classroom
-  await page.evaluate(() => window.__th.warpTo(17, 5));
-  await hold(page, 'ArrowUp', 120);
-  await page.keyboard.press('KeyE');
-  await page.waitForSelector('#th-memory', { timeout: 3000 });
-  log(/TV cart/i.test(await page.$eval('#th-memory h3', el => el.textContent)), 'TV cart memory pops');
-  await page.keyboard.press('KeyE');
-
-  // Back through the door to the hallway
-  await page.evaluate(() => window.__th.warpTo(10, 5));
-  await hold(page, 'ArrowUp', 900);
-  await page.waitForFunction('window.__th.zone.id === "hallway-a"', { timeout: 5000 });
-  log(true, 'door returns to the hallway');
+  // Sweep the widened hallway's door network — a representative sample of
+  // the 8 rooms (not exhaustive; door round-trip math is cross-checked
+  // offline by a Node script over all 9 zone JSONs before this ever runs).
+  await enterRoom(page, {
+    doorX: 2, roomId: 'office', roomName: 'Front Office', warpX: 3,
+    memWarp: [2, 5], memTitleRe: /front desk/i, label: 'Office',
+  });
+  await enterRoom(page, {
+    doorX: 14, roomId: 'classroom-3b', roomName: 'Room 3B', warpX: 15,
+    memWarp: [17, 5], memTitleRe: /TV cart/i, label: 'Room 3B',
+  });
+  await enterRoom(page, {
+    doorX: 50, roomId: 'computer-lab', roomName: 'Computer Lab', warpX: 51,
+    memWarp: [3, 7], memTitleRe: /Computer 7/i, label: 'Computer Lab',
+  });
+  await page.screenshot({ path: path.join(OUT, 'th-shot-3-computer-lab.png') });
+  await enterRoom(page, {
+    doorX: 62, roomId: 'cafeteria', roomName: 'Cafeteria', warpX: 63,
+    memWarp: [4, 7], memTitleRe: /Lunch table/i, label: 'Cafeteria',
+  });
+  await page.screenshot({ path: path.join(OUT, 'th-shot-4-cafeteria.png') });
 
   // Memory persistence
   const foundCount = await page.evaluate(() => JSON.parse(localStorage.getItem('th_memories') || '[]').length);
-  log(foundCount >= 2, `memories persisted to localStorage (${foundCount})`);
+  log(foundCount >= 5, `memories persisted to localStorage (${foundCount})`);
 
   const realIssues = consoleIssues.filter(t => !t.includes('frame-ancestors'));
   log(realIssues.length === 0, 'no console errors' + (realIssues.length ? ':\n  ' + realIssues.join('\n  ') : ''));

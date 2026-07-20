@@ -60,12 +60,71 @@ export const OBJECT_DEFS = {
     sprite: "door", w: 2, h: 3, footRows: 0, walkable: true,
     memory: null, // doors teleport instead (zone JSON "to")
   },
+  "filing-cabinet": {
+    sprite: "filing-cabinet", w: 2, h: 3, footRows: 1,
+    memory: {
+      title: "The filing cabinet",
+      text: "Drawer three is labeled \"MISC\" and contains every permission slip since 1998. Nobody has ever opened it on purpose.",
+    },
+  },
+  "reception-counter": {
+    sprite: "reception-counter", w: 4, h: 2, footRows: 1,
+    memory: {
+      title: "The front desk",
+      text: "A little silver bell that says PLEASE RING FOR SERVICE. You always want to ring it twice, and you never do.",
+    },
+  },
+  "computer-desk": {
+    sprite: "computer-desk", w: 2, h: 2, footRows: 1,
+    memory: {
+      title: "Computer 7",
+      text: "The mouse ball needs cleaning again. Someone's Neopet is definitely starving in a tab behind the typing program.",
+    },
+  },
+  "reading-corner": {
+    sprite: "reading-corner", w: 3, h: 2, footRows: 1,
+    memory: {
+      title: "The reading corner",
+      text: "Two bean bags, one slightly deflated. Whoever calls it first during free reading wins the whole period.",
+    },
+  },
+  bookshelf: {
+    sprite: "bookshelf", w: 3, h: 2, footRows: 1,
+    memory: {
+      title: "The bookshelf",
+      text: "The choose-your-own-adventure section is missing page 47 in every copy. Someone did that on purpose.",
+    },
+  },
+  "lunch-table": {
+    sprite: "lunch-table", w: 4, h: 2, footRows: 1,
+    memory: {
+      title: "Lunch table",
+      text: "Someone's initials are carved into the corner next to a very confident, very wrong math equation.",
+    },
+  },
+  "sink-counter": {
+    sprite: "sink-counter", w: 4, h: 2, footRows: 1,
+    memory: {
+      title: "The sink",
+      text: "The soap smells like pink and nothing else. The mirror has a crack shaped like Ohio.",
+    },
+  },
+  "fish-tank": {
+    sprite: "fish-tank", w: 2, h: 3, footRows: 1,
+    memory: {
+      title: "The class fish",
+      text: "Gerald the fish has survived four substitute teachers and one very close call with the radiator.",
+    },
+  },
 };
 
 const FALLBACK_COLORS = {
   lockers: "#27408b", "student-desk": "#a97a4a", "teacher-desk": "#7a5230",
   chalkboard: "#2e5d43", "tv-cart": "#555b66", fountain: "#8fa6b8",
-  "trash-can": "#6b7078", door: "#8a5a2b",
+  "trash-can": "#6b7078", door: "#8a5a2b", "filing-cabinet": "#4b4f57",
+  "reception-counter": "#7a5230", "computer-desk": "#5c6570",
+  "reading-corner": "#a13a3a", bookshelf: "#7a5230", "lunch-table": "#828a92",
+  "sink-counter": "#9fb2c2", "fish-tank": "#3d7fa3",
 };
 
 export class ObjectSprites {

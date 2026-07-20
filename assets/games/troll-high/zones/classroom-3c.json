@@ -1,6 +1,6 @@
 {
-  "id": "classroom-3b",
-  "name": "Room 3B",
+  "id": "classroom-3c",
+  "name": "Room 5A",
   "tileset": "classroom",
   "w": 22,
   "h": 14,
@@ -38,8 +38,8 @@
       "y": 3
     },
     {
-      "type": "tv-cart",
-      "x": 17,
+      "type": "fish-tank",
+      "x": 18,
       "y": 2
     },
     {
@@ -49,7 +49,7 @@
     },
     {
       "type": "student-desk",
-      "x": 4,
+      "x": 3,
       "y": 6
     },
     {
@@ -59,17 +59,12 @@
     },
     {
       "type": "student-desk",
-      "x": 12,
+      "x": 13,
       "y": 6
     },
     {
       "type": "student-desk",
-      "x": 16,
-      "y": 6
-    },
-    {
-      "type": "student-desk",
-      "x": 4,
+      "x": 3,
       "y": 9
     },
     {
@@ -79,12 +74,7 @@
     },
     {
       "type": "student-desk",
-      "x": 12,
-      "y": 9
-    },
-    {
-      "type": "student-desk",
-      "x": 16,
+      "x": 13,
       "y": 9
     }
   ],
@@ -95,7 +85,7 @@
       "w": 2,
       "h": 1,
       "to": "hallway-a",
-      "tx": 14,
+      "tx": 26,
       "ty": 3,
       "label": "Hallway"
     }
