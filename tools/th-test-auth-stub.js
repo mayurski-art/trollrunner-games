@@ -73,4 +73,22 @@ async function dismissOrientation(page) {
   await page.waitForFunction('window.__th.orientationOpen === false', { timeout: 3000 });
 }
 
-module.exports = { stubAuth, isExpectedAuthNoise, dismissOrientation };
+/* Troll High's world clock reads real Date.now() (1 real hour = 1 school
+   day) so every client agrees with zero network sync — but that means
+   which NPCs are on-schedule and present depends on wall-clock time when
+   a test happens to run. Call before page.goto() to shift Date.now() by a
+   fixed offset so clock.now().period always resolves near the middle of
+   the given in-game hour's period, while still flowing normally (patrol
+   NPCs, bell timers etc. that measure elapsed real time keep working). */
+async function lockClockToHour(page, hour) {
+  await page.evaluateOnNewDocument((h) => {
+    const DAY_MS = 60 * 60 * 1000;
+    const targetFrac = (h + 0.5) / 24;
+    const base = Date.now();
+    const offset = Math.round(targetFrac * DAY_MS) - (base % DAY_MS);
+    const realNow = Date.now.bind(Date);
+    Date.now = () => realNow() + offset;
+  }, hour);
+}
+
+module.exports = { stubAuth, isExpectedAuthNoise, dismissOrientation, lockClockToHour };

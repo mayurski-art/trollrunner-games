@@ -186,6 +186,8 @@ export const NPC_DEFS = {
   cafeteria: [{
     id: "lunch-lady-doris", name: "Lunch Lady Doris", sprite: "npc-doris",
     type: "stationary", x: 9, y: 3, facing: "south",
+    // kitchen's only open around lunch — cafeteria reads as empty otherwise.
+    activePeriods: ["Period 4", "Lunch", "Period 5"],
     firstLine: "First time through the line? Take the good tray, not the bent one.",
     familiarLine: "The usual, sweetie?",
     dialogue: [
@@ -193,10 +195,27 @@ export const NPC_DEFS = {
       "One scoop each. I see you eyeing a second scoop.",
       "Chocolate milk's in the back cooler, sweetie.",
     ],
+  }, {
+    // Janitor Gus's after-hours spot — same person, different room, tracked
+    // under the same id so relationship/dialogue progress carries over.
+    id: "janitor-gus", name: "Janitor Gus", sprite: "npc-gus",
+    // open aisle between the two blocks of lunch tables — clear of furniture.
+    type: "stationary", x: 10, y: 10, facing: "south",
+    activePeriods: ["After school", "Evening", "Night"],
+    firstLine: "Haven't seen you before. Watch where you step, mop's still wet.",
+    familiarLine: "Back again, huh? You're alright, kid.",
+    dialogue: [
+      "Trays don't stack themselves after last lunch. Well — actually.",
+      "Quietest the building ever gets is right about now.",
+      "Kid, you don't want to know what's down in the tunnels.",
+    ],
   }],
   library: [{
     id: "ms-quietly", name: "Ms. Quietly", sprite: "npc-quietly",
     type: "stationary", x: 5, y: 5, facing: "north",
+    // gone home outside school hours (design doc "make it feel alive"
+    // Phase 1) — the library should read as quiet/empty at night.
+    activePeriods: ["Homeroom", "Period 1", "Period 2", "Period 3", "Period 4", "Lunch", "Period 5", "Period 6", "After school"],
     firstLine: "New here? Then you especially need to be quiet.",
     familiarLine: "You're becoming a regular. Quietly, of course.",
     dialogue: [
@@ -208,6 +227,8 @@ export const NPC_DEFS = {
   "hallway-a": [{
     id: "janitor-gus", name: "Janitor Gus", sprite: "npc-gus",
     type: "patrol", a: { x: 22, y: 8 }, b: { x: 45, y: 8 },
+    // mops the cafeteria after hours instead — see the second entry below.
+    activePeriods: ["Homeroom", "Period 1", "Period 2", "Period 3", "Period 4", "Lunch", "Period 5", "Period 6"],
     firstLine: "Haven't seen you before. Watch where you step, mop's still wet.",
     familiarLine: "Back again, huh? You're alright, kid.",
     dialogue: [
@@ -222,6 +243,8 @@ export const NPC_DEFS = {
   "bus-loop": [{
     id: "pep", name: "Pep", sprite: "npc-pep",
     type: "stationary", x: 10, y: 9, facing: "south",
+    // only actually waiting for the bus after school lets out.
+    activePeriods: ["After school"],
     firstLine: "Oh hey, new face. Feels good, man.",
     familiarLine: "Hey, it's you again. Feels good, man.",
     dialogue: [
@@ -233,6 +256,8 @@ export const NPC_DEFS = {
   gym: [{
     id: "marcus-vale", name: "Marcus Vale", sprite: "npc-marcus",
     type: "stationary", x: 12, y: 9, facing: "south",
+    // court's his during P.E. and pickup games after school.
+    activePeriods: ["Period 5", "After school"],
     firstLine: "New kid? I haven't raced you yet. We should fix that.",
     familiarLine: "You're back. Ready to lose again?",
     dialogue: [

@@ -94,12 +94,22 @@ async function boot() {
     return zones[id];
   };
 
+  // "make the school feel alive" (design doc) — an NPC def with no
+  // activePeriods is always present (teachers, staff at their desks); one
+  // with activePeriods only shows up during those clock periods, so the
+  // same person (same id, for relationship continuity) can appear in a
+  // different zone's list at a different time of day, e.g. Janitor Gus
+  // mopping the cafeteria after school instead of patrolling hallway-a.
   const npcsByZone = {};
-  const getNPCs = zn => {
+  const allNPCsForZone = zn => {
     if (!npcsByZone[zn.id]) {
       npcsByZone[zn.id] = (NPC_DEFS[zn.id] || []).map(def => new NPC(def, zn, npcSprites[def.sprite]));
     }
     return npcsByZone[zn.id];
+  };
+  const getNPCs = zn => {
+    const period = clock.now().period;
+    return allNPCsForZone(zn).filter(n => !n.def.activePeriods || n.def.activePeriods.includes(period));
   };
 
   // ---------------------------------------------------------------- state
@@ -1160,7 +1170,12 @@ async function boot() {
       rosterEl.textContent = `👥 ${names.length}`;
       rosterEl.title = names.join(", ");
 
-      if (lastPeriod !== null && lastPeriod !== now.period) ambience.ringBell();
+      if (lastPeriod !== null && lastPeriod !== now.period) {
+        ambience.ringBell();
+        // "make the school feel alive" — NPCs with a schedule appear/leave
+        // live as the period changes, even if the player stays in the room.
+        npcs = getNPCs(zone);
+      }
       lastPeriod = now.period;
       ambience.setChatter(clock.isPassingPeriod() ? 1 : 0, !OUTDOOR_ZONES.has(zone.id));
     }

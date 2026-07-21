@@ -6,7 +6,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer-core');
-const { stubAuth, isExpectedAuthNoise, dismissOrientation } = require('./th-test-auth-stub');
+const { stubAuth, isExpectedAuthNoise, dismissOrientation, lockClockToHour } = require('./th-test-auth-stub');
 
 const ROOT = path.join(__dirname, '..');
 const PORT = 8975;
@@ -42,6 +42,10 @@ const hold = async (page, key, ms) => { await page.keyboard.down(key); await new
   page.on('pageerror', e => issues.push('pageerror: ' + e.message));
 
   await stubAuth(page);
+  // Pep (bus loop) and Marcus Vale (gym) are only on-schedule "After school"
+  // (design doc "make it feel alive") — pin the clock so this is
+  // deterministic regardless of wall-clock time when the test runs.
+  await lockClockToHour(page, 15);
   await page.goto(`http://localhost:${PORT}/troll-high.html`, { waitUntil: 'networkidle0' });
   await page.waitForFunction('window.__th && !window.__th.running', { timeout: 20000 });
   await page.click('#th-start');

@@ -472,3 +472,56 @@ any existing zone file, or generate it programmatically (Phase 8's
 zones were fixed this way) rather than hand-typing `#`/`.` strings.
 Double-check with: `terrain.length === h + 1 && terrain.every(r =>
 r.length === w + 1)`.
+
+## 23. Reprioritization 2026-07-20 — "make the school feel alive"
+
+After §21's near-term queue shipped in full (trading, profile stats,
+daily flavor, 5 NPCs, NPC memory, bedroom, yearbook, classes-as-
+minigames) plus Phases 8-12 (neighborhoods, events, Troll meta, dev
+room) and Clubs, the player brought back a second ChatGPT-authored
+creative-director brief that explicitly **reorders** priorities rather
+than adding to the pile. Its governing rule: *"If a feature doesn't
+create a story that someone might tell another player tomorrow, it
+probably isn't a priority."* Explicitly deprioritized: more
+collectibles, more furniture, more minigames.
+
+New priority order (highest first): **1. School Feel Alive** (NPC
+daily schedules, hallway traffic tied to bell timing, ambient
+conversation by time of day) → 2. deepen NPC relationships beyond the
+current 2-tier firstLine/familiarLine system → 3. daily-life habit
+loops (favorite locker/bench/NPC framing) → 4. turn Book Fair/Pizza
+Friday/Picture Day/Spirit Week/PACER Day into real interactive
+happenings, not calendar banners → 5. Town expansion, explicitly not
+rushed → 6. multiplayer memories (shared yearbooks, dances, talent
+shows, elections) → 7. expand (don't resolve) the Trollface mystery.
+
+**Phase 1 shipped 2026-07-20 — NPC daily schedules.** Reuses the
+existing deterministic world clock (`clock.js`), zero new backend, per
+§21's "explicitly deferred" full-world-simulation call — this is the
+cheap version that call anticipated. `npc.js`'s `NPC_DEFS` entries can
+now carry an optional `activePeriods: [...]` array of `clock.js` period
+labels (undefined = always present, fully backward-compatible); the
+*same* NPC `id` can appear in multiple zones' entries, since
+`npcRelations` keys off `id` not zone, so relationship/dialogue
+progress survives an NPC "moving" between locations by period.
+`main.js`'s `getNPCs(zn)` filters the cached per-zone NPC list against
+`clock.now().period`; this re-runs both on zone entry and live inside
+the existing 1s clock-poll block (on every period change), so presence
+updates even if the player stays in one room across a period boundary.
+
+Shipped for v1: **Janitor Gus** patrols hallway-a during school hours,
+mops the cafeteria (same `id`, second `NPC_DEFS` entry) after school/
+evening/night. **Ms. Quietly** is in the library only during school
+hours (empty/quiet at night). **Lunch Lady Doris** is only at the
+cafeteria counter around lunch (periods 4-5 + Lunch). **Pep** is only
+at the bus loop "After school" — the doc's own example ("Pep is by the
+bike racks" after school). **Marcus Vale** is in the gym during Period
+5 (P.E.) and After school. Teachers stayed fixed in v1 (already
+period-appropriate in their own rooms). Test: `tools/troll-high-npc-
+schedule-smoke.js` — covers zone-entry filtering, the live 1s-poll
+re-filter with no zone re-entry, and relationship continuity across an
+NPC's two locations. Existing tests that assumed always-present
+schedule-restricted NPCs (`troll-high-npc-smoke.js`,
+`troll-high-new-npcs-smoke.js`) now pin the clock via
+`th-test-auth-stub.js`'s new `lockClockToHour(page, hour)` helper so
+they're deterministic regardless of wall-clock time when they run.

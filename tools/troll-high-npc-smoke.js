@@ -6,7 +6,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const puppeteer = require('puppeteer-core');
-const { stubAuth, isExpectedAuthNoise, dismissOrientation } = require('./th-test-auth-stub');
+const { stubAuth, isExpectedAuthNoise, dismissOrientation, lockClockToHour } = require('./th-test-auth-stub');
 
 const ROOT = path.join(__dirname, '..');
 const PORT = 8940;
@@ -42,6 +42,11 @@ const hold = async (page, key, ms) => { await page.keyboard.down(key); await new
   page.on('pageerror', e => consoleIssues.push('pageerror: ' + e.message));
 
   await stubAuth(page);
+  // Janitor Gus is only on hallway-a patrol during school-hours periods
+  // (design doc "make it feel alive" — he mops the cafeteria after school
+  // instead); pin the clock to Period 2 so this test is deterministic
+  // regardless of wall-clock time when it happens to run.
+  await lockClockToHour(page, 9);
   await page.goto(`http://localhost:${PORT}/troll-high.html`, { waitUntil: 'networkidle0' });
   await page.waitForFunction('window.__th && !window.__th.running', { timeout: 20000 });
   await page.click('#th-start');
