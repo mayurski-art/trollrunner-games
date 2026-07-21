@@ -203,7 +203,18 @@ export const NPC_DEFS = {
     type: "stationary", x: 10, y: 10, facing: "south",
     activePeriods: ["After school", "Evening", "Night"],
     firstLine: "Haven't seen you before. Watch where you step, mop's still wet.",
+    secondLine: "Back again already? Most kids don't come find me twice.",
     familiarLine: "Back again, huh? You're alright, kid.",
+    closeLine: "You know what, kid — you're basically staff at this point.",
+    memoryLines: [
+      { id: "tunnels", condition: c => c.visitedZones.has("tunnels"),
+        line: "You actually went down in the tunnels, huh? Told you not to. Knew you would anyway." },
+      { id: "caves", condition: c => c.visitedZones.has("caves"),
+        line: "Caves too? Kid, at some point you're gonna find something you can't un-find." },
+      { id: "club", condition: c => c.clubMember,
+        line: "Heard you're in that club now. Don't ask me what it's about. I already know." },
+    ],
+    returningLine: "Haven't seen you in a few days. Floors missed you. I didn't say that.",
     dialogue: [
       "Trays don't stack themselves after last lunch. Well — actually.",
       "Quietest the building ever gets is right about now.",
@@ -217,7 +228,14 @@ export const NPC_DEFS = {
     // Phase 1) — the library should read as quiet/empty at night.
     activePeriods: ["Homeroom", "Period 1", "Period 2", "Period 3", "Period 4", "Lunch", "Period 5", "Period 6", "After school"],
     firstLine: "New here? Then you especially need to be quiet.",
+    secondLine: "You're back. Good. Quietly, though.",
     familiarLine: "You're becoming a regular. Quietly, of course.",
+    closeLine: "You've basically got a reserved seat in here now. Quietly earned.",
+    memoryLines: [
+      { id: "cards", condition: c => c.cardsCollected >= 5,
+        line: "I hear you've been collecting cards. Very on-brand for someone who's always in my library. Quietly noted." },
+    ],
+    returningLine: "Been a few days. The books missed you. I did not say that out loud.",
     dialogue: [
       "SHHHH.",
       "This is a library. Act like it.",
@@ -230,7 +248,20 @@ export const NPC_DEFS = {
     // mops the cafeteria after hours instead — see the second entry below.
     activePeriods: ["Homeroom", "Period 1", "Period 2", "Period 3", "Period 4", "Lunch", "Period 5", "Period 6"],
     firstLine: "Haven't seen you before. Watch where you step, mop's still wet.",
+    secondLine: "Back again already? Most kids don't come find me twice.",
     familiarLine: "Back again, huh? You're alright, kid.",
+    closeLine: "You know what, kid — you're basically staff at this point.",
+    // "deepen relationships" (design doc §23) — one-time callbacks tied to
+    // real shared history, not just interaction count.
+    memoryLines: [
+      { id: "tunnels", condition: c => c.visitedZones.has("tunnels"),
+        line: "You actually went down in the tunnels, huh? Told you not to. Knew you would anyway." },
+      { id: "caves", condition: c => c.visitedZones.has("caves"),
+        line: "Caves too? Kid, at some point you're gonna find something you can't un-find." },
+      { id: "club", condition: c => c.clubMember,
+        line: "Heard you're in that club now. Don't ask me what it's about. I already know." },
+    ],
+    returningLine: "Haven't seen you in a few days. Floors missed you. I didn't say that.",
     dialogue: [
       "These floors don't mop themselves. Well — actually.",
       "I've got a key for every door in this building. Every one.",
@@ -246,7 +277,16 @@ export const NPC_DEFS = {
     // only actually waiting for the bus after school lets out.
     activePeriods: ["After school"],
     firstLine: "Oh hey, new face. Feels good, man.",
+    secondLine: "Oh, hey, you came back. Feels good, man. For real this time.",
     familiarLine: "Hey, it's you again. Feels good, man.",
+    closeLine: "You're basically part of the bike rack crew now. Feels good, man.",
+    memoryLines: [
+      { id: "club", condition: c => c.clubMember,
+        line: "Heard you joined a club. Feels good, man. Very on-brand for you, honestly." },
+      { id: "traded", condition: c => c.tradesCompleted >= 1,
+        line: "You've been trading cards with people. Feels good, man. Very ecosystem of you." },
+    ],
+    returningLine: "Whoa, been a minute. Buses kept running without you. Feels weird, man.",
     dialogue: [
       "Bus is always five minutes early or ten minutes late. Never on time. Kind of beautiful, honestly.",
       "You ever just stand here and watch the buses turn around? No? Just me?",
@@ -259,7 +299,14 @@ export const NPC_DEFS = {
     // court's his during P.E. and pickup games after school.
     activePeriods: ["Period 5", "After school"],
     firstLine: "New kid? I haven't raced you yet. We should fix that.",
+    secondLine: "Back for round two? I like that. Most people give up after one loss.",
     familiarLine: "You're back. Ready to lose again?",
+    closeLine: "Real talk — you're one of the only people who keeps showing up here. Respect.",
+    memoryLines: [
+      { id: "pacer", condition: c => c.highScores?.["pacer-test"] != null,
+        line: "I saw your PACER score. Not bad. Not better than mine. But not bad." },
+    ],
+    returningLine: "Where've you been? The court got boring without someone to beat.",
     dialogue: [
       "Oh, it's you. I beat your PACER time. Just thought you should know.",
       "Rematch. Anytime. I'm serious.",
@@ -317,7 +364,14 @@ export const NPC_DEFS = {
     id: "trollface", name: "Trollface", sprite: "npc-trollface",
     type: "stationary", x: 6, y: 6, facing: "south",
     firstLine: "...you actually found it. Huh. Didn't think anyone would.",
+    secondLine: "You came back down here. Remember when you found the basement door? Same feeling, isn't it.",
     familiarLine: "Back again? Not many people bother coming back down here.",
+    closeLine: "You know this place better than most people who've never left it. That's saying something.",
+    memoryLines: [
+      { id: "club", condition: c => c.clubMember,
+        line: "You signed the charter too, huh. Guess that makes it official. Welcome." },
+    ],
+    returningLine: "It's been a while. Down here, you kind of lose track. Good to see you again, though.",
     dialogue: [
       "Everyone hears the rumors before they ever find the room. That's kind of the point.",
       "The graffiti's not vandalism. It's a trail. You just followed it further than most.",

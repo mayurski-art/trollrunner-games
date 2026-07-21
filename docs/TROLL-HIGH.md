@@ -525,3 +525,29 @@ schedule-restricted NPCs (`troll-high-npc-smoke.js`,
 `troll-high-new-npcs-smoke.js`) now pin the clock via
 `th-test-auth-stub.js`'s new `lockClockToHour(page, hour)` helper so
 they're deterministic regardless of wall-clock time when they run.
+
+**Phase 2 shipped 2026-07-20 — deepen NPC relationships beyond the
+2-tier system.** `relations.js`'s `pickDialogueLine()` grew three new
+tiers on top of the original firstLine/familiarLine: an optional
+`secondLine` (timesTalked===1, an "oh, you're back already" beat),
+`closeLine` (timesTalked===8, a deeper "actual friend" tier for NPCs
+that define one), and — the doc's own example, "Remember when we found
+the basement?" — one-time `memoryLines`: `{id, condition, line}`
+entries checked against a `relationContext()` snapshot (visited zones,
+club membership, cards collected, high scores, trades, gifts, etc.),
+firing once the first interaction after their condition becomes true
+and never repeating (tracked via `relation.seenMemories`). Also a
+time-aware `returningLine`: if real wall-clock time since
+`relation.lastTalkedAt` exceeds 3 real hours (3 in-game days, on the
+same clock as everything else), the next interaction uses it instead
+of normal cycling dialogue — still fully deterministic, just reading
+elapsed `Date.now()`. Shipped on 5 NPCs so far: Janitor Gus (both his
+hallway and cafeteria entries, same memoryLines since it's the same
+person), Pep, Marcus Vale, Ms. Quietly, and Trollface. Relation records
+already lived in the existing `npcRelations` save field (an opaque
+object), so no save-schema or `save.js` changes were needed — the new
+fields (`lastTalkedAt`, `seenMemories`) just ride along. Test:
+`tools/troll-high-relationship-depth-smoke.js`, using Ms. Quietly and
+the `addCard()` debug hook to force her "cards" memoryLine condition
+true mid-test; walks the full tier sequence through closeLine, then
+simulates a 4-real-hour gap to verify returningLine.

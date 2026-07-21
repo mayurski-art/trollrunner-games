@@ -463,6 +463,18 @@ async function boot() {
   const bedroomUnlockedEl = $("th-bedroom-unlocked");
   const bedroomLockedEl = $("th-bedroom-locked");
 
+  // Flags/sets NPC memoryLines' conditions can check (relations.js Phase 2)
+  // — deliberately just a read-only view of state that's already tracked
+  // for other reasons (stats, bedroom, save data), no new grind.
+  function relationContext() {
+    return {
+      visitedZones, clubMember, giftsGiven, giftsReceived, tradesCompleted,
+      lunchesBought, daysAttended: visitDays.size,
+      cardsCollected: Object.keys(cards).length,
+      highScores, npcRelations,
+      metTrollface: !!npcRelations["trollface"],
+    };
+  }
   function bedroomStats() {
     return {
       highScores, cardsCollected: Object.keys(cards).length,
@@ -886,8 +898,9 @@ async function boot() {
     closeDialogue();
     const npcId = npc.def.id;
     const relation = npcRelations[npcId] || (npcRelations[npcId] = { timesTalked: 0 });
-    const line = pickDialogueLine(npc.def, relation) || npc.speak();
+    const line = pickDialogueLine(npc.def, relation, relationContext()) || npc.speak();
     relation.timesTalked++;
+    relation.lastTalkedAt = Date.now();
     saveDirty = true;
     dialogueEl = document.createElement("div");
     dialogueEl.id = "th-dialogue";
