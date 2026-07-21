@@ -432,3 +432,18 @@ Note: Phase 7's trading-card set (`src/cards.js`, 14 cards) is the same
 idea §18's Phase 11 called "Troll TCG set" — already exists now, ahead
 of schedule; Phase 11 becomes "expand the existing card set" rather than
 building one from scratch.
+
+**Status 2026-07-20: the entire near-term queue above is done** — trading/
+gifting, profile life-story stats, daily rotating flavor, the 5 NPCs,
+NPC memory/relationships, bedroom, and yearbook/camera (real Supabase
+Storage bucket, `docs/troll_high_yearbook.sql`, verified end-to-end with
+a real account). Also shipped from the doc's "Classes" section (§9-ish
+mention, "every class should be an enjoyable minigame"): 5 classes-as-
+minigames (Pop Quiz, Mental Math, Word Scramble, Lab Mix, PACER Test),
+reusing Phase 7's Minigame overlay with zero new UI. Also fixed a real
+bug this surfaced: Space had been a second universal interact/close key
+in `input.js` alongside E, which silently closed any minigame using
+Space as its own action key (tetherball, kickball) the instant it was
+pressed — removed, E is now the sole interact key everywhere. Next up:
+Phases 8-12 (neighborhoods, events, Troll meta, polish), plus Clubs
+(flagged as its own phase-sized chunk, not yet scheduled).
