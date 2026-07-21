@@ -32,9 +32,9 @@ export async function capturePhoto(canvas, userId, { zoneId, zoneName }) {
   const path = `${userId}/${Date.now()}.jpg`;
   try {
     const { error } = await sb.storage.from(BUCKET).upload(path, blob, { contentType: "image/jpeg" });
-    if (error) return { ok: false, reason: "Camera roll isn't set up yet." };
+    if (error) return { ok: false, reason: "Couldn't save that photo — try again in a moment." };
   } catch (e) {
-    return { ok: false, reason: "Camera roll isn't set up yet." };
+    return { ok: false, reason: "Couldn't save that photo — try again in a moment." };
   }
 
   const { data } = sb.storage.from(BUCKET).getPublicUrl(path);

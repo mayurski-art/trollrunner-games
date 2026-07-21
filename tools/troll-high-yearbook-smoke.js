@@ -1,13 +1,15 @@
 /* Troll High yearbook / disposable camera smoke test (design doc §21).
-   The troll-high-photos storage bucket (docs/troll_high_yearbook.sql)
-   hasn't been created in the live Supabase project yet — that's a step
-   only the project owner can run (dashboard access, not something this
-   agent has credentials for). So this test verifies everything that's
-   real right now: the overlay UI, that capture actually calls into
-   Supabase Storage (not a stub), and that a failed upload — which is
-   exactly what happens pre-migration — surfaces a graceful, human
-   status message instead of crashing. Once the SQL has been run, this
-   same capture flow starts actually succeeding with no code changes. */
+   The troll_high_yearbook.sql migration has been run — real end-to-end
+   capture was separately verified with a real signed-up account (not
+   the stub this file uses): a genuine JPEG of the actual game view
+   uploaded to the right per-user folder, publicly fetchable, valid
+   image/jpeg. This file uses the fast getCachedProfile stub instead
+   (th-test-auth-stub.js), which has no real Supabase JWT behind it —
+   same as troll_game_saves' RLS, storage RLS also rejects the stub's
+   upload, so this test exercises the *graceful-failure* path (a human
+   status message, not a crash) rather than a real upload. That's
+   intentional, not a sign anything is broken; see troll-high-gate-smoke.js
+   for the pattern this project uses when a test needs a real JWT. */
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -87,7 +89,7 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
     log(gridCount === photoCount, `yearbook grid reflects the captured photo (${gridCount})`);
   } else {
     const statusText = await page.$eval('#th-yearbook-status', el => el.textContent);
-    log(!statusHidden && statusText.length > 0, `capture fails gracefully pre-migration with a human status message, not a crash (${JSON.stringify(statusText)})`);
+    log(!statusHidden && statusText.length > 0, `capture with no real JWT (stub session) fails gracefully with a human status message, not a crash (${JSON.stringify(statusText)})`);
   }
 
   await page.click('#th-yearbook-close');
