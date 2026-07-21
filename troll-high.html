@@ -72,6 +72,22 @@
       <button id="th-btn-leaderboard" type="button" title="Weekly ladder">🏆</button>
       <button id="th-btn-map" type="button" title="Campus map (M)">🗺️</button>
       <button id="th-btn-schedule" type="button" title="Schedule &amp; tasks">📅</button>
+      <button id="th-btn-bedroom" type="button" title="My room">🛏️</button>
+    </div>
+
+    <!-- Personal bedroom: not an explorable zone (no home/town yet — that's
+         a later phase), a decorate-able overlay. Decorations unlock off
+         stats the game already tracks. -->
+    <div id="th-bedroom-overlay" hidden>
+      <div class="th-bedroom-panel">
+        <button id="th-bedroom-close" type="button" aria-label="Close">✕</button>
+        <h2>🛏️ My Room</h2>
+        <div id="th-bedroom-slots" class="th-bedroom-slots"></div>
+        <h3>Unlocked</h3>
+        <div id="th-bedroom-unlocked" class="th-trade-cards"></div>
+        <h3>Locked</h3>
+        <div id="th-bedroom-locked" class="th-bedroom-locked"></div>
+      </div>
     </div>
 
     <!-- First-time orientation: quick controls reference + elective pick.

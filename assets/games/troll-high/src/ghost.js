@@ -58,12 +58,15 @@ export class Ghost {
       y: this.y,
       draw: ctx => {
         this.sprites.draw(ctx, this.dir, this.moving, this.animT, this.x, this.y);
+        // White + "Player" — the NPC equivalent (npc.js entity()) is gold
+        // + "NPC", so a floating name is unambiguous at a glance.
+        const label = `${this.name} · Player`;
         ctx.font = "8px monospace";
         ctx.textAlign = "center";
         ctx.fillStyle = "rgba(0,0,0,0.55)";
-        ctx.fillText(this.name, this.x + 0.5, this.y - 30.5);
+        ctx.fillText(label, this.x + 0.5, this.y - 30.5);
         ctx.fillStyle = "#fff";
-        ctx.fillText(this.name, this.x, this.y - 31);
+        ctx.fillText(label, this.x, this.y - 31);
         if (this.bubble) drawBubble(ctx, this.x, this.y, this.bubble.text);
       },
     };

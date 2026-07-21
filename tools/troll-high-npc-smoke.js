@@ -82,7 +82,7 @@ const hold = async (page, key, ms) => { await page.keyboard.down(key); await new
   await page.waitForSelector('#th-dialogue', { timeout: 3000 });
   const dTitle1 = await page.$eval('#th-dialogue h3', el => el.textContent);
   const line1 = await page.$eval('#th-dialogue p', el => el.textContent);
-  log(dTitle1 === 'Janitor Gus' && !!line1, `dialogue popup shows Janitor Gus's line: ${JSON.stringify(line1)}`);
+  log(dTitle1.includes('Janitor Gus') && dTitle1.includes('NPC') && !!line1, `dialogue popup shows Janitor Gus's line and NPC tag: ${JSON.stringify(dTitle1)} / ${JSON.stringify(line1)}`);
   await page.keyboard.press('KeyE');
   await page.waitForFunction('!document.getElementById("th-dialogue")', { timeout: 3000 });
   await page.keyboard.press('KeyE');

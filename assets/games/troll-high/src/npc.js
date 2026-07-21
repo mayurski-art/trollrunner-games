@@ -114,10 +114,23 @@ export class NPC {
     return Math.hypot(px - this.x, py - this.y);
   }
 
+  /* A gold name tag + "NPC" suffix, same font/outline technique as
+     Ghost's real-player name tag (ghost.js) but visually distinct — so
+     while walking around, a floating name is unambiguous at a glance:
+     white = a real player, gold + "NPC" = scripted. */
   entity() {
     return {
       y: this.y,
-      draw: ctx => this.sprites.draw(ctx, this.dir, this.moving, this.animT, this.x, this.y),
+      draw: ctx => {
+        this.sprites.draw(ctx, this.dir, this.moving, this.animT, this.x, this.y);
+        const label = `${this.name} · NPC`;
+        ctx.font = "8px monospace";
+        ctx.textAlign = "center";
+        ctx.fillStyle = "rgba(0,0,0,0.55)";
+        ctx.fillText(label, this.x + 0.5, this.y - 30.5);
+        ctx.fillStyle = "#ffd23f";
+        ctx.fillText(label, this.x, this.y - 31);
+      },
     };
   }
 }

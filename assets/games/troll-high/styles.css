@@ -235,6 +235,94 @@ html, body {
 }
 #th-btn-schedule:hover { background: rgba(46, 93, 67, 0.28); }
 
+#th-btn-bedroom {
+  pointer-events: auto;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--th-paper);
+  background: rgba(20, 17, 12, 0.72);
+  border: 1px solid rgba(245, 240, 228, 0.18);
+  border-radius: 8px;
+  padding: 5px 10px;
+}
+#th-btn-bedroom:hover { background: rgba(138, 90, 43, 0.28); }
+
+/* ------------------------------------------------------------ bedroom */
+#th-bedroom-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 28;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 8, 5, 0.72);
+}
+.th-bedroom-panel {
+  position: relative;
+  width: min(480px, 94vw);
+  max-height: 86vh;
+  overflow-y: auto;
+  background: var(--th-paper);
+  color: var(--th-ink);
+  border-radius: 14px;
+  padding: 20px 20px 16px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
+}
+.th-bedroom-panel h2 { font-size: 18px; font-weight: 900; margin-bottom: 12px; }
+.th-bedroom-panel h3 { font-size: 13px; font-weight: 900; margin: 14px 0 8px; }
+#th-bedroom-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(43, 36, 23, 0.1);
+  color: var(--th-ink);
+  font-size: 14px;
+  cursor: pointer;
+}
+.th-bedroom-slots {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.th-bedroom-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 4px;
+  border-radius: 10px;
+  border: 1px dashed rgba(43, 36, 23, 0.25);
+  background: rgba(43, 36, 23, 0.04);
+  cursor: pointer;
+  font-size: 10px;
+  text-align: center;
+}
+.th-bedroom-slot .icon { font-size: 24px; }
+.th-bedroom-slot .label { opacity: 0.55; text-transform: uppercase; letter-spacing: 0.04em; font-size: 9px; }
+.th-bedroom-slot.is-filled { border-style: solid; border-color: #f5b52e; background: rgba(245, 181, 46, 0.12); }
+.th-bedroom-locked {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.th-bedroom-locked .item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  border-radius: 10px;
+  background: rgba(43, 36, 23, 0.04);
+  opacity: 0.55;
+  font-size: 10px;
+  text-align: center;
+}
+.th-bedroom-locked .item .icon { font-size: 18px; filter: grayscale(1); }
+
 /* --------------------------------------------------------- orientation */
 #th-orientation-overlay {
   position: absolute;
@@ -921,6 +1009,18 @@ html, body {
   border: 1px solid rgba(43, 36, 23, 0.15);
 }
 .th-popup-card h3 { font-size: 15px; font-weight: 900; margin-bottom: 4px; }
+.th-npc-tag {
+  display: inline-block;
+  vertical-align: middle;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #8a6a10;
+  background: rgba(245, 181, 46, 0.22);
+  border-radius: 5px;
+  padding: 1px 5px;
+  margin-left: 4px;
+}
 .th-popup-card p { font-size: 13px; line-height: 1.45; }
 .th-mem-screen {
   display: block;

@@ -54,11 +54,11 @@ export async function loadSave(userId) {
    synchronously first in case the network write gets killed mid-flight. */
 export async function saveGame(userId, {
   zoneId, x, y, foundKeys, studentId, enrolledAt, highScores, orientationDone, elective, dailyTasksDay, dailyFlags, cards,
-  visitedZones, visitDays, lunchesBought, tradesCompleted, giftsGiven, giftsReceived, npcRelations,
+  visitedZones, visitDays, lunchesBought, tradesCompleted, giftsGiven, giftsReceived, npcRelations, bedroomEquipped,
 }) {
   const data = {
     v: 1, zoneId, x, y, foundKeys, studentId, enrolledAt, highScores, orientationDone, elective, dailyTasksDay, dailyFlags, cards,
-    visitedZones, visitDays, lunchesBought, tradesCompleted, giftsGiven, giftsReceived, npcRelations, savedAt: Date.now(),
+    visitedZones, visitDays, lunchesBought, tradesCompleted, giftsGiven, giftsReceived, npcRelations, bedroomEquipped, savedAt: Date.now(),
   };
   writeLocalCache(userId, data);
   const sb = client();

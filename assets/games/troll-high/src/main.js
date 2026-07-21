@@ -22,6 +22,7 @@ import { ELECTIVES, buildSchedule, DAILY_TASKS } from "./schedule.js";
 import { CARDS, cardById, maybeAwardCard } from "./cards.js";
 import { todaysLunch, todaysAnnouncement, todaysEvent } from "./daily.js";
 import { pickDialogueLine } from "./relations.js";
+import { SLOTS as BEDROOM_SLOTS, DECORATIONS, decorationById } from "./bedroom.js";
 import * as clock from "./clock.js";
 
 const BASE = "assets/games/troll-high";
@@ -188,6 +189,10 @@ async function boot() {
   // this needs no shared "NPC brain"). {[npcId]: {timesTalked}}.
   const npcRelations = savedGame?.npcRelations || {};
 
+  // Personal bedroom (design doc §21) — decorations unlock off stats the
+  // game already tracks, no separate grind. {slot: decorationId | null}
+  const bedroomEquipped = savedGame?.bedroomEquipped || {};
+
   function persist() {
     if (!saveDirty) return;
     saveDirty = false;
@@ -195,7 +200,7 @@ async function boot() {
       zoneId: zone.id, x: player.x, y: player.y, foundKeys: [...found], studentId, enrolledAt, highScores,
       orientationDone, elective, dailyTasksDay, dailyFlags, cards,
       visitedZones: [...visitedZones], visitDays: [...visitDays], lunchesBought, tradesCompleted, giftsGiven, giftsReceived,
-      npcRelations,
+      npcRelations, bedroomEquipped,
     });
   }
   setInterval(persist, 30000);
@@ -349,7 +354,7 @@ async function boot() {
   addEventListener("keydown", e => {
     if (e.code !== "KeyM" || e.target.tagName === "INPUT") return;
     if (!running) return;
-    if (mapOverlay.hidden) { if (!memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && tradeOverlay.hidden) openMap(); }
+    if (mapOverlay.hidden) { if (!memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && tradeOverlay.hidden && bedroomOverlay.hidden) openMap(); }
     else closeMap();
   });
 
@@ -412,6 +417,75 @@ async function boot() {
   function closeSchedule() { scheduleOverlay.hidden = true; }
   $("th-btn-schedule")?.addEventListener("click", openSchedule);
   $("th-schedule-close")?.addEventListener("click", closeSchedule);
+
+  // -------------------------------------------------------- bedroom
+  const bedroomOverlay = $("th-bedroom-overlay");
+  const bedroomSlotsEl = $("th-bedroom-slots");
+  const bedroomUnlockedEl = $("th-bedroom-unlocked");
+  const bedroomLockedEl = $("th-bedroom-locked");
+
+  function bedroomStats() {
+    return {
+      highScores, cardsCollected: Object.keys(cards).length,
+      roomsExplored: visitedZones.size, tradesCompleted, lunchesBought, giftsReceived,
+      daysAttended: visitDays.size,
+      hasFamiliarNPC: Object.values(npcRelations).some(r => r.timesTalked >= 3),
+    };
+  }
+  function renderBedroom() {
+    const stats = bedroomStats();
+    const unlockedIds = new Set(DECORATIONS.filter(d => d.unlocked(stats)).map(d => d.id));
+
+    bedroomSlotsEl.innerHTML = "";
+    for (const slot of BEDROOM_SLOTS) {
+      const decoId = bedroomEquipped[slot];
+      const deco = decoId && decorationById(decoId);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "th-bedroom-slot" + (deco ? " is-filled" : "");
+      btn.innerHTML = `<span class="icon">${deco ? deco.icon : "➕"}</span><span class="label">${slot}</span>`;
+      btn.addEventListener("click", () => {
+        // Cycle: empty -> each unlocked decoration not already equipped
+        // elsewhere -> empty again.
+        const available = [null, ...DECORATIONS.filter(d => unlockedIds.has(d.id) && (bedroomEquipped[slot] === d.id || !Object.values(bedroomEquipped).includes(d.id)))];
+        const curIdx = available.findIndex(d => (d ? d.id : null) === (bedroomEquipped[slot] || null));
+        const next = available[(curIdx + 1) % available.length];
+        bedroomEquipped[slot] = next ? next.id : null;
+        saveDirty = true;
+        persist();
+        renderBedroom();
+      });
+      bedroomSlotsEl.appendChild(btn);
+    }
+
+    bedroomUnlockedEl.innerHTML = "";
+    const unlocked = DECORATIONS.filter(d => unlockedIds.has(d.id));
+    if (unlocked.length === 0) {
+      const p = document.createElement("p");
+      p.textContent = "Nothing unlocked yet — click a slot above once you do.";
+      bedroomUnlockedEl.appendChild(p);
+    } else {
+      for (const d of unlocked) {
+        const equippedSlot = Object.keys(bedroomEquipped).find(s => bedroomEquipped[s] === d.id);
+        const el = document.createElement("div");
+        el.className = "th-trade-card" + (equippedSlot ? " is-selected" : "");
+        el.innerHTML = `<span class="icon">${d.icon}</span><span>${d.name}</span>`;
+        bedroomUnlockedEl.appendChild(el);
+      }
+    }
+
+    bedroomLockedEl.innerHTML = "";
+    for (const d of DECORATIONS.filter(d => !unlockedIds.has(d.id))) {
+      const el = document.createElement("div");
+      el.className = "item";
+      el.innerHTML = `<span class="icon">${d.icon}</span><span>${d.hint}</span>`;
+      bedroomLockedEl.appendChild(el);
+    }
+  }
+  function openBedroom() { renderBedroom(); bedroomOverlay.hidden = false; }
+  function closeBedroom() { bedroomOverlay.hidden = true; }
+  $("th-btn-bedroom")?.addEventListener("click", openBedroom);
+  $("th-bedroom-close")?.addEventListener("click", closeBedroom);
 
   // ------------------------------------------------- trading + gifting
   // Each client only ever mutates its own inventory, applied in response
@@ -739,7 +813,7 @@ async function boot() {
     dialogueEl.setAttribute("role", "dialog");
     dialogueEl.setAttribute("aria-label", npc.name);
     dialogueEl.innerHTML =
-      `<h3>${npc.name}</h3><p>${line}</p>` +
+      `<h3>${npc.name} <span class="th-npc-tag">NPC</span></h3><p>${line}</p>` +
       `<div class="th-mem-close">E / tap — close</div>`;
     dialogueEl.addEventListener("click", closeDialogue);
     $("th-root").appendChild(dialogueEl);
@@ -787,7 +861,7 @@ async function boot() {
   function escapeHtml(s) { return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
   function openChat() {
-    if (!running || memoryEl || dialogueEl || !lbOverlay.hidden || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden || !tradeOverlay.hidden) return;
+    if (!running || memoryEl || dialogueEl || !lbOverlay.hidden || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden || !tradeOverlay.hidden || !bedroomOverlay.hidden) return;
     chatOpen = true;
     chatBar.hidden = false;
     chatInput.value = "";
@@ -871,6 +945,10 @@ async function boot() {
     get orientationOpen() { return !orientationOverlay.hidden; },
     get scheduleOpen() { return !scheduleOverlay.hidden; },
     get tradeOpen() { return !tradeOverlay.hidden; },
+    get bedroomOpen() { return !bedroomOverlay.hidden; },
+    openBedroom, closeBedroom,
+    get bedroomEquipped() { return bedroomEquipped; },
+    get bedroomStats() { return bedroomStats(); },
     openTrade, closeTrade,
     get cards() { return cards; },
     get npcRelations() { return npcRelations; },
@@ -931,7 +1009,7 @@ async function boot() {
       fade = Math.max(0, fade - dt * 4);
     }
 
-    if (!pendingDoor && !memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && mapOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && tradeOverlay.hidden) {
+    if (!pendingDoor && !memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && mapOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && tradeOverlay.hidden && bedroomOverlay.hidden) {
       const axis = input.axis();
       tryPushFromInput(axis);
       player.update(dt, axis, zone);
@@ -978,8 +1056,8 @@ async function boot() {
     const playHint = play ? ` Play ${obj.playName || obj.def.playName || minigameInfo(play).title}` : null;
     const shopHint = shop ? " Get lunch" : null;
     const peerHint = nearPeer ? ` Trade with ${nearPeer.name}` : null;
-    setHint((memoryEl || dialogueEl || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden || !tradeOverlay.hidden) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (peerHint || arcadeHint || playHint || shopHint || (mem ? ` ${mem.title}` : null)));
-    if (input.interactPressed() && mapOverlay.hidden && profileOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden) {
+    setHint((memoryEl || dialogueEl || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden || !tradeOverlay.hidden || !bedroomOverlay.hidden) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (peerHint || arcadeHint || playHint || shopHint || (mem ? ` ${mem.title}` : null)));
+    if (input.interactPressed() && mapOverlay.hidden && profileOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && bedroomOverlay.hidden) {
       if (!tradeOverlay.hidden) closeTrade();
       else if (!cafeteriaOverlay.hidden) closeCafeteria();
       else if (!minigameOverlay.hidden) closeMinigame();
