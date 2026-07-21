@@ -19,6 +19,10 @@ export const CARDS = [
   { id: "detention-slip", name: "Detention Slip", icon: "📄", rarity: "rare" },
   { id: "cd-mix", name: "Burned CD", icon: "💿", rarity: "rare" },
   { id: "yearbook-pen", name: "Yearbook Pen", icon: "🖋️", rarity: "common" },
+  // Phase 11 (Troll meta) additions — the doc's "Troll TCG set" line item
+  // turned out to already exist as of Phase 7; this is that expansion.
+  { id: "golden-statue-card", name: "Golden Statue", icon: "🏆", rarity: "legendary" },
+  { id: "spray-can", name: "Spray Can", icon: "🎨", rarity: "rare" },
 ];
 
 export function cardById(id) {

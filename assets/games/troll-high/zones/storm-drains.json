@@ -32,6 +32,12 @@
       "type": "door",
       "x": 6,
       "y": 7
+    },
+    {
+      "type": "graffiti",
+      "x": 10,
+      "y": 3,
+      "memory": { "title": "Graffiti", "text": "\"YOU'RE GETTING CLOSER\" in dripping paint. It's definitely just paint." }
     }
   ],
   "doors": [

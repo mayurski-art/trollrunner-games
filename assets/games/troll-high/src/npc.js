@@ -284,4 +284,19 @@ export const NPC_DEFS = {
       "I heard laughing down by the boiler room once. Nobody else heard it.",
     ],
   }],
+  // The legendary NPC (design doc §9/§21 layer 4) — almost never seen,
+  // graffiti and rumors first. Finding him at all requires the full
+  // secrets chain (basement -> tunnels AND caves -> storm drains ->
+  // this room), so reaching the underground HQ genuinely is the "event."
+  "underground-hq": [{
+    id: "trollface", name: "Trollface", sprite: "npc-trollface",
+    type: "stationary", x: 6, y: 6, facing: "south",
+    firstLine: "...you actually found it. Huh. Didn't think anyone would.",
+    familiarLine: "Back again? Not many people bother coming back down here.",
+    dialogue: [
+      "Everyone hears the rumors before they ever find the room. That's kind of the point.",
+      "The graffiti's not vandalism. It's a trail. You just followed it further than most.",
+      "Problem?",
+    ],
+  }],
 };

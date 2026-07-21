@@ -30,6 +30,12 @@
       "type": "trash-can",
       "x": 1,
       "y": 6
+    },
+    {
+      "type": "graffiti",
+      "x": 3,
+      "y": 1,
+      "memory": { "title": "Graffiti", "text": "A trollface next to the words \"WAS HERE.\" No date. No name. Just that." }
     }
   ],
   "doors": [

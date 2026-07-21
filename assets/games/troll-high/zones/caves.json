@@ -34,6 +34,17 @@
       "type": "cave-rocks",
       "x": 12,
       "y": 6
+    },
+    {
+      "type": "door",
+      "x": 9,
+      "y": 9
+    },
+    {
+      "type": "graffiti",
+      "x": 13,
+      "y": 1,
+      "memory": { "title": "Graffiti", "text": "The clearest one yet. A trollface, and under it: \"THE CLUB MEETS HERE.\"" }
     }
   ],
   "doors": [
@@ -46,6 +57,16 @@
       "tx": 6,
       "ty": 7,
       "label": "Storm Drains"
+    },
+    {
+      "x": 9,
+      "y": 9,
+      "w": 2,
+      "h": 1,
+      "to": "underground-hq",
+      "tx": 9,
+      "ty": 3,
+      "label": "??? (this doesn't look natural)"
     }
   ],
   "spawn": {

@@ -101,7 +101,8 @@ const hold = async (page, key, ms) => { await page.keyboard.down(key); await new
   const totalRooms = await page.evaluate(() => window.__th.lifeStats.totalRooms);
   log(shownRooms === `3 / ${totalRooms}`, `profile card shows rooms explored (${JSON.stringify(shownRooms)})`);
   log(shownLunches === '1', `profile card shows lunches bought (${JSON.stringify(shownLunches)})`);
-  log(shownCards === '0 / 14', `profile card shows cards collected out of the full set (${JSON.stringify(shownCards)})`);
+  const { CARDS } = await import('../assets/games/troll-high/src/cards.js');
+  log(shownCards === `0 / ${CARDS.length}`, `profile card shows cards collected out of the full set (${JSON.stringify(shownCards)})`);
 
   // Persistence: reload and confirm stats survive
   await page.evaluate(() => window.__th.persist());

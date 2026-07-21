@@ -52,7 +52,8 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
   const emptyUnlocked = await page.$eval('#th-bedroom-unlocked', el => el.textContent);
   log(/Nothing unlocked yet/.test(emptyUnlocked), `starts with nothing unlocked (${JSON.stringify(emptyUnlocked)})`);
   const lockedCount = await page.$$eval('#th-bedroom-locked .item', els => els.length);
-  log(lockedCount === 8, `all 8 decorations show as locked with their hints (${lockedCount})`);
+  const { DECORATIONS } = await import('../assets/games/troll-high/src/bedroom.js');
+  log(lockedCount === DECORATIONS.length, `all ${DECORATIONS.length} decorations show as locked with their hints (${lockedCount})`);
   await page.click('#th-bedroom-close');
   await page.waitForFunction('window.__th.bedroomOpen === false', { timeout: 3000 });
 

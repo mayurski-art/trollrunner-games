@@ -30,6 +30,12 @@
       "type": "pipes",
       "x": 22,
       "y": 1
+    },
+    {
+      "type": "graffiti",
+      "x": 16,
+      "y": 1,
+      "memory": { "title": "Graffiti", "text": "An arrow, spray-painted, pointing further down the tunnel. Someone added a second arrow pointing back, like a warning." }
     }
   ],
   "doors": [

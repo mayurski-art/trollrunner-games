@@ -37,6 +37,8 @@ const ZONE_IDS = [
   "main-street", "arcade", "pizza-place", "convenience-store", "park",
   // Phase 9 — Neighborhood 2
   "forest-trail", "skate-park", "lake", "warehouse", "storm-drains", "caves",
+  // Phase 11 — Troll meta
+  "underground-hq",
 ];
 // open corridors + genuinely outdoor zones get the quieter ambience tone
 const OUTDOOR_ZONES = new Set(["hallway-a", "hallway-b", "playground", "sports-field", "bus-loop", "roof", "main-street", "park", "forest-trail", "skate-park", "lake"]);
@@ -451,6 +453,7 @@ async function boot() {
       roomsExplored: visitedZones.size, tradesCompleted, lunchesBought, giftsReceived,
       daysAttended: visitDays.size,
       hasFamiliarNPC: Object.values(npcRelations).some(r => r.timesTalked >= 3),
+      metTrollface: !!npcRelations["trollface"],
     };
   }
   function renderBedroom() {

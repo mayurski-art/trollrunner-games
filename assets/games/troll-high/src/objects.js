@@ -358,6 +358,27 @@ export const OBJECT_DEFS = {
       text: "Something's been carved into the stone here. It might be a trollface. It might just be a rock.",
     },
   },
+  graffiti: {
+    sprite: "graffiti", w: 3, h: 2, footRows: 0, walkable: true,
+    memory: {
+      title: "Graffiti",
+      text: "A trollface, spray-painted, badly. Under it, in smaller letters: \"he's real.\"",
+    },
+  },
+  "golden-statue": {
+    sprite: "golden-statue", w: 2, h: 3, footRows: 1,
+    memory: {
+      title: "The golden statue",
+      text: "A little troll figure, painted gold, way too heavy to actually be gold. Someone's polished it recently.",
+    },
+  },
+  "club-charter": {
+    sprite: "club-charter", w: 3, h: 2, footRows: 1,
+    memory: {
+      title: "The club charter",
+      text: "A single sheet of notebook paper, taped to the wall, that just says \"THE CLUB\" and lists one member so far.",
+    },
+  },
   pipes: {
     sprite: "pipes", w: 3, h: 4, footRows: 1,
     memory: {
@@ -394,6 +415,7 @@ const FALLBACK_COLORS = {
   "store-counter": "#7a5230", "candy-shelf": "#e05a7a", "park-bench": "#5a6a4a", "park-tree": "#2e5d3a",
   "tree-house": "#8a6a4a", "half-pipe": "#5a5a62", dock: "#7a6248", rowboat: "#a13a3a",
   crates: "#8a6a4a", "cave-rocks": "#5a5a5a",
+  graffiti: "#4a8a3a", "golden-statue": "#e8c22e", "club-charter": "#e8e4d8",
 };
 
 export class ObjectSprites {

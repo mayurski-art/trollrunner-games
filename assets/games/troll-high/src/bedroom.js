@@ -15,6 +15,8 @@ export const DECORATIONS = [
   { id: "lunch-tray-art", icon: "🍕", name: "Lunch Tray Art", hint: "Buy lunch 3 times", unlocked: s => s.lunchesBought >= 3 },
   { id: "gift-box", icon: "🎁", name: "Gift Box", hint: "Receive a gift from someone", unlocked: s => s.giftsReceived >= 1 },
   { id: "streak-poster", icon: "📅", name: "Attendance Poster", hint: "Attend school on 3 different days", unlocked: s => s.daysAttended >= 3 },
+  // Phase 11 — the ultimate "life story" flex: proof you found him.
+  { id: "trollface-autograph", icon: "🧌", name: "Trollface's Autograph", hint: "Find the legendary NPC — good luck", unlocked: s => s.metTrollface },
 ];
 
 export function decorationById(id) {
