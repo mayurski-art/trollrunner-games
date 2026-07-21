@@ -566,7 +566,7 @@ h1, h2, h3, p { margin: 0; }
   .hero-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .roster-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .game-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .cabinet-footer { flex-direction: column; }
+  .cabinet-footer { display: none; }   /* keyboard hints are dead weight once the touch pad is shown */
   .select-footer { flex-direction: column; align-items: stretch; }
   .select-actions { justify-content: space-between; }
 }
@@ -1046,4 +1046,13 @@ button.pc-card:hover, button.pc-card:focus-visible { outline: none; transform: t
   .stage-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .stage-hero { flex-direction: column; align-items: stretch; }
   .stage-hero-meta { width: 100%; }
+  /* scale the match-type/player-count screens down so a full card fits in view */
+  .retro-screen { padding: clamp(12px, 4vw, 18px); }
+  .retro-sub { margin-bottom: 12px; }
+  .mt-grid { gap: 10px; }
+  .mt-card { padding: 12px 14px; gap: 6px; }
+  .mt-vs-icon, .mt-cpu-chip { width: 56px; height: 56px; font-size: 11px; }
+  .pc-grid { gap: 8px; }
+  .pc-card { padding: 12px 10px; }
+  .retro-nav-row { margin-top: 14px; }
 }
