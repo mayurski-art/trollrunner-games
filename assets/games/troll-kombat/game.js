@@ -2363,9 +2363,11 @@
     }
   }
   function pickFighter(id) {
-    if (setup.current < 0) return;
     if (setup.picks.includes(id)) { blip(180, 120); return; }   // locked by another player
-    setup.picks[setup.current] = id;
+    // once every slot is filled, re-picking swaps the last slot instead of
+    // requiring Reset — lets a player change their mind without wiping others.
+    const slot = setup.current >= 0 ? setup.current : humanCount() - 1;
+    setup.picks[slot] = id;
     advanceCurrent();
     blip(720, 940);
     renderFighterSelect();
@@ -2433,6 +2435,16 @@
     if (statusEl) statusEl.textContent =
       def ? "✓  Selected" : (setup.current === slot ? "Selecting…" : "Waiting…");
   }
+  // Clicking your own already-picked panel re-opens that slot for reselection
+  // (useful in multiplayer to swap an earlier player's pick without Reset).
+  [["fsel-p1", 0], ["fsel-p2", 1]].forEach(([panelId, slot]) => {
+    document.getElementById(panelId).addEventListener("click", () => {
+      if (online.active || !setup.picks[slot]) return;
+      setup.current = slot;
+      renderFighterSelect();
+      blip(300, 200);
+    });
+  });
   document.getElementById("fsel-back").addEventListener("click", () =>
     flow.go(setup.mode === "mp" ? "playercount" : "matchtype"));
   document.getElementById("fsel-reset").addEventListener("click", () => {

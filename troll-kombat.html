@@ -13,34 +13,18 @@
   <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=DM+Sans:wght@500;700;900&family=DM+Mono:wght@500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/troll-leaderboard.css?v=lb-engine-v1">
   <link rel="stylesheet" href="assets/css/troll-wallet.css?v=lab-v1">
-  <link rel="stylesheet" href="assets/games/troll-kombat/style.css?v=kombat-v25-wager-popup">
+  <link rel="stylesheet" href="assets/games/troll-kombat/style.css?v=kombat-v26-big-screen">
 </head>
 <body data-game-state="select">
   <div class="crt-overlay" aria-hidden="true"></div>
 
-  <header class="site-header">
-    <a class="brand" href="/" aria-label="Troll Runner Arcade home">
-      <span class="brand-mark">$TROLL</span>
-      <span class="brand-copy">
-        <span>Troll Runner</span>
-        <small>Arcade</small>
-      </span>
-    </a>
-    <nav class="site-nav" aria-label="Primary">
-      <a href="/">Arcade</a>
-    </nav>
-  </header>
+  <a class="arcade-back-link" href="/" aria-label="Back to Troll Runner Arcade">← Arcade</a>
 
   <main class="arcade-shell">
     <section class="fight-hero" aria-label="Troll Kombat">
       <h1 class="sr-only">Troll Kombat</h1>
 
       <section class="fight-cabinet" aria-label="Troll Kombat game cabinet">
-        <div class="cabinet-marquee">
-          <span>TROLL KOMBAT</span>
-          <span class="marquee-blink">VS</span>
-        </div>
-
         <div class="screen-wrap">
           <canvas id="tk-canvas" width="1280" height="600" aria-label="Troll Kombat fighting game"></canvas>
 
@@ -97,7 +81,6 @@
           <div id="tk-matchtype" class="game-overlay flow-overlay is-visible">
             <div class="retro-screen">
               <h2 class="retro-title">Choose Match Type</h2>
-              <p class="retro-sub">Phase 4 &ndash; Match Setup</p>
               <div class="mt-grid">
                 <button type="button" class="mt-card" data-act="mt-cpu" aria-label="CPU Fight">
                   <div class="mt-vs-row">
@@ -106,7 +89,6 @@
                     <span class="mt-cpu-chip">CPU</span>
                   </div>
                   <strong>CPU Fight</strong>
-                  <p class="mt-desc">Fight against the existing CPU opponent system.</p>
                 </button>
                 <button type="button" class="mt-card is-gold" data-act="mt-mp" aria-label="Multiplayer">
                   <div class="mt-vs-row">
@@ -115,10 +97,8 @@
                     <img src="assets/games/troll-kombat/characters/troll-gladiator-portrait.png" alt="" class="mt-vs-icon">
                   </div>
                   <strong>Multiplayer</strong>
-                  <p class="mt-desc">Local multiplayer, choose player count next.</p>
                 </button>
               </div>
-              <p class="retro-footnote">Supports 2 players now &middot; architecture ready for 3+ later</p>
             </div>
           </div>
 
@@ -131,17 +111,14 @@
                 <button type="button" class="diff-btn is-easy"  data-act="diff-easy"   data-diff="0">
                   <span class="diff-icon">😴</span>
                   <strong>Easy</strong>
-                  <p>Slow reactions. Rarely blocks. Mostly punches. Good for learning the game.</p>
                 </button>
                 <button type="button" class="diff-btn is-med"   data-act="diff-med"    data-diff="1">
                   <span class="diff-icon">😤</span>
                   <strong>Medium</strong>
-                  <p>Balanced mix of offense and defense. Blocks sometimes. Uses specials.</p>
                 </button>
                 <button type="button" class="diff-btn is-hard"  data-act="diff-hard"   data-diff="2">
                   <span class="diff-icon">💀</span>
                   <strong>Hard</strong>
-                  <p>Fast reactions. Combos on every opening. Blocks almost everything. Good luck.</p>
                 </button>
               </div>
               <button type="button" class="diff-back" data-act="back-matchtype">← Back</button>
@@ -443,7 +420,7 @@
   <script src="assets/games/troll-kombat/leaderboard.js?v=kombat-lb-v2" defer></script>
   <script src="assets/games/troll-kombat/finisher-sequencer.js?v=phase11b-v1" defer></script>
   <script src="assets/games/troll-kombat/net.js?v=kombat-online-v1" defer></script>
-  <script src="assets/games/troll-kombat/game.js?v=kombat-v31-online-invite" defer></script>
+  <script src="assets/games/troll-kombat/game.js?v=kombat-v32-refighter-swap" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.3" integrity="sha384-uVefCux0Kf6w34gQVv8+jUPUwvwFUdnrcwI1kOJHs7sfPPXdDDucwcrPrppD6oUe" crossorigin="anonymous"></script>
   <script src="https://mayurski-art.github.io/assets/js/troll-accounts.js"></script>
   <script src="assets/js/site-lock.js"></script>
