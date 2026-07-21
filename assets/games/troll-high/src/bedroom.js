@@ -19,6 +19,9 @@ export const DECORATIONS = [
   { id: "trollface-autograph", icon: "🧌", name: "Trollface's Autograph", hint: "Find the legendary NPC — good luck", unlocked: s => s.metTrollface },
   // Clubs — signing the charter in the Underground HQ doubles as joining.
   { id: "club-pin", icon: "📌", name: "Club Pin", hint: "Join the club — it's hidden somewhere", unlocked: s => s.clubMember },
+  // Graduation (design doc §23 Phase 6 capstone) — the front desk hands
+  // it out once you've actually attended enough to earn it.
+  { id: "diploma", icon: "🎓", name: "Diploma", hint: "Graduate at the front office", unlocked: s => s.graduated },
 ];
 
 export function decorationById(id) {

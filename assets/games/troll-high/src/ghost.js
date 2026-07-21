@@ -35,6 +35,7 @@ export class Ghost {
     this.dancing = false; // dances (§23 Phase 6) — currently on the dance floor?
     this.performing = false; // talent show (§23 Phase 6) — currently on stage?
     this.project = null; // science fair (§23 Phase 6) — active project title, or null
+    this.graduated = false; // graduation (§23 Phase 6 capstone) — persisted trait
     this.animT = 0;
     this.bubble = null;             // { text, until }
   }
@@ -47,6 +48,7 @@ export class Ghost {
     this.dancing = !!p.dancing;
     this.performing = !!p.performing;
     this.project = p.project || null;
+    this.graduated = !!p.graduated;
     if (this.x === null) { this.x = p.x; this.y = p.y; } // snap on first sighting
   }
 
@@ -73,8 +75,9 @@ export class Ghost {
         // 🗳/💃/🎤/🧪 suffixes flag a declared election candidate /
         // dance-floor participant / stage performer / science fair
         // presenter (§23 Phase 6) without needing a whole extra label
-        // line per status.
-        const label = `${this.name} · Player${this.running ? " 🗳" : ""}${this.dancing ? " 💃" : ""}${this.performing ? " 🎤" : ""}${this.project ? " 🧪" : ""}`;
+        // line per status; 🎓 is the one persisted trait among them —
+        // it shows every session once earned, not just while toggled.
+        const label = `${this.name} · Player${this.running ? " 🗳" : ""}${this.dancing ? " 💃" : ""}${this.performing ? " 🎤" : ""}${this.project ? " 🧪" : ""}${this.graduated ? " 🎓" : ""}`;
         ctx.font = "8px monospace";
         ctx.textAlign = "center";
         ctx.fillStyle = "rgba(0,0,0,0.55)";

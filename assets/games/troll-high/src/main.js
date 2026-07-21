@@ -228,6 +228,10 @@ async function boot() {
   // with no name — those become an unnamed founded club, not lost.
   let club = savedGame?.club || (savedGame?.clubMember ? { name: "The Club", founded: true } : null);
   let clubMember = !!club;
+  // Graduation (design doc §23 Phase 6 capstone) — the one PERSISTED
+  // trait among the six Multiplayer Memories slices; the other five are
+  // deliberately session-scoped ("a real thing happening right now").
+  let graduatedAt = savedGame?.graduatedAt || null;
   if (!visitedZones.has(zone.id)) { visitedZones.add(zone.id); saveDirty = true; }
   if (!visitDays.has(today)) { visitDays.add(today); saveDirty = true; }
 
@@ -262,7 +266,7 @@ async function boot() {
       zoneId: zone.id, x: player.x, y: player.y, foundKeys: [...found], studentId, enrolledAt, highScores,
       orientationDone, elective, dailyTasksDay, dailyFlags, cards,
       visitedZones: [...visitedZones], visitDays: [...visitDays], lunchesBought, tradesCompleted, giftsGiven, giftsReceived,
-      npcRelations, bedroomEquipped, photos, clubMember, zoneVisitCounts, claimedSpots, club,
+      npcRelations, bedroomEquipped, photos, clubMember, zoneVisitCounts, claimedSpots, club, graduatedAt,
     });
   }
   setInterval(persist, 30000);
@@ -272,6 +276,7 @@ async function boot() {
   // ------------------------------------------------------------ multiplayer
   const net = new Net(identity);
   net.setClub(club?.name || null);
+  net.setGraduated(!!graduatedAt);
   const ghosts = new Map(); // peer id -> Ghost
   const hud = $("th-hud"), hint = $("th-hint");
   const zoneNameEl = $("th-zone-name"), clockEl = $("th-clock"), rosterEl = $("th-roster");
@@ -425,7 +430,7 @@ async function boot() {
   addEventListener("keydown", e => {
     if (e.code !== "KeyM" || e.target.tagName === "INPUT") return;
     if (!running) return;
-    if (mapOverlay.hidden) { if (!memoryEl && !dialogueEl && !electionEl && !scienceFairEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && tradeOverlay.hidden && bedroomOverlay.hidden && yearbookOverlay.hidden) openMap(); }
+    if (mapOverlay.hidden) { if (!memoryEl && !dialogueEl && !electionEl && !scienceFairEl && !graduationEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && tradeOverlay.hidden && bedroomOverlay.hidden && yearbookOverlay.hidden) openMap(); }
     else closeMap();
   });
 
@@ -550,7 +555,7 @@ async function boot() {
       daysAttended: visitDays.size,
       hasFamiliarNPC: Object.values(npcRelations).some(r => r.timesTalked >= 3),
       metTrollface: !!npcRelations["trollface"],
-      clubMember,
+      clubMember, graduated: !!graduatedAt,
     };
   }
   function renderBedroom() {
@@ -1225,6 +1230,78 @@ async function boot() {
     if (scienceFairEl) { scienceFairEl.remove(); scienceFairEl = null; }
   }
 
+  // Graduation (design doc §23 Phase 6 capstone) — unlike the five
+  // session-scoped slices above, this is a real persisted milestone: the
+  // office's reception counter (a per-instance `graduation: true`
+  // override in office.json, not the shared def) either shows a "not
+  // yet" note, a graduate-now summary once you've attended enough real
+  // days, or your diploma recap forever after. Deliberately doesn't lock
+  // the player out of anything — real school doesn't stop existing after
+  // you graduate, and neither does this one.
+  const GRADUATION_DAYS_REQUIRED = 5;
+  let graduationEl = null;
+  function graduationEligible() { return visitDays.size >= GRADUATION_DAYS_REQUIRED; }
+  function graduate() {
+    graduatedAt = Date.now();
+    net.setGraduated(true);
+    net.sendGraduationAnnounce();
+    saveDirty = true;
+    persist();
+    showToast("🎓 Congratulations — you graduated!");
+    renderGraduation();
+  }
+  net.onGraduationAnnounce = (peerId, name) => showToast(`🎓 ${name} just graduated!`);
+
+  function renderGraduation() {
+    if (!graduationEl) return;
+    const stats = bedroomStats();
+    if (graduatedAt) {
+      const when = new Date(graduatedAt).toLocaleDateString();
+      graduationEl.innerHTML =
+        `<h3>🎓 Diploma</h3><p>Graduated ${when}.</p>` +
+        `<div class="th-election-list">` +
+        `<div class="th-election-row"><span>Memories found</span><b>${found.size}</b></div>` +
+        `<div class="th-election-row"><span>Rooms explored</span><b>${visitedZones.size}</b></div>` +
+        `<div class="th-election-row"><span>Days attended</span><b>${stats.daysAttended}</b></div>` +
+        `<div class="th-election-row"><span>Cards collected</span><b>${stats.cardsCollected}</b></div>` +
+        (club ? `<div class="th-election-row"><span>Club</span><b>${club.name}</b></div>` : "") +
+        `</div>` +
+        `<div class="th-mem-close">E / tap — close</div>`;
+    } else if (graduationEligible()) {
+      graduationEl.innerHTML =
+        `<h3>Graduation</h3><p>You've attended enough real days to graduate. It's permanent — but it doesn't end anything, you can keep exploring after.</p>` +
+        `<div class="th-election-list">` +
+        `<div class="th-election-row"><span>Memories found</span><b>${found.size}</b></div>` +
+        `<div class="th-election-row"><span>Rooms explored</span><b>${visitedZones.size}</b></div>` +
+        `<div class="th-election-row"><span>Days attended</span><b>${stats.daysAttended}</b></div>` +
+        (club ? `<div class="th-election-row"><span>Club</span><b>${club.name}</b></div>` : "") +
+        `</div>` +
+        `<button type="button" id="th-graduate-btn">Graduate</button>` +
+        `<div class="th-mem-close">E / tap outside the form — close</div>`;
+      graduationEl.querySelector(".th-election-list").addEventListener("click", e => e.stopPropagation());
+      graduationEl.querySelector("#th-graduate-btn").addEventListener("click", e => { e.stopPropagation(); graduate(); });
+    } else {
+      const remaining = GRADUATION_DAYS_REQUIRED - visitDays.size;
+      graduationEl.innerHTML =
+        `<h3>Front Office</h3><p>"Graduation? You've got ${remaining} more day${remaining === 1 ? "" : "s"} of attendance before we can talk about that."</p>` +
+        `<div class="th-mem-close">E / tap — close</div>`;
+    }
+  }
+  function openGraduation() {
+    closeGraduation();
+    graduationEl = document.createElement("div");
+    graduationEl.id = "th-graduation";
+    graduationEl.className = "th-popup-card";
+    graduationEl.setAttribute("role", "dialog");
+    graduationEl.setAttribute("aria-label", "Graduation");
+    graduationEl.addEventListener("click", closeGraduation);
+    $("th-root").appendChild(graduationEl);
+    renderGraduation();
+  }
+  function closeGraduation() {
+    if (graduationEl) { graduationEl.remove(); graduationEl = null; }
+  }
+
   // "See inside the TV": a small looping animated canvas standing in for
   // channel static, drawn fresh each time (no video asset, no license
   // concerns) — colored scanlines drifting over analog noise.
@@ -1327,7 +1404,7 @@ async function boot() {
   function escapeHtml(s) { return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
   function openChat() {
-    if (!running || memoryEl || dialogueEl || electionEl || scienceFairEl || !lbOverlay.hidden || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden || !tradeOverlay.hidden || !bedroomOverlay.hidden || !yearbookOverlay.hidden) return;
+    if (!running || memoryEl || dialogueEl || electionEl || scienceFairEl || graduationEl || !lbOverlay.hidden || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden || !tradeOverlay.hidden || !bedroomOverlay.hidden || !yearbookOverlay.hidden) return;
     chatOpen = true;
     chatBar.hidden = false;
     chatInput.value = "";
@@ -1429,6 +1506,10 @@ async function boot() {
     toggleDancing, get myDancing() { return myDancing; },
     togglePerforming, get myPerforming() { return myPerforming; },
     get scienceFairOpen() { return !!scienceFairEl; },
+    get graduationOpen() { return !!graduationEl; },
+    openGraduation, closeGraduation, graduate, get graduatedAt() { return graduatedAt; },
+    get graduationEligible() { return graduationEligible(); },
+    visitDays,
     openScienceFair, closeScienceFair, presentProject, withdrawProject,
     get myProject() { return myProject; },
     renderer, // exposed for test/dev inspection of weather + tint rendering
@@ -1495,7 +1576,7 @@ async function boot() {
       fade = Math.max(0, fade - dt * 4);
     }
 
-    if (!pendingDoor && !memoryEl && !dialogueEl && !electionEl && !scienceFairEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && mapOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && tradeOverlay.hidden && bedroomOverlay.hidden && yearbookOverlay.hidden) {
+    if (!pendingDoor && !memoryEl && !dialogueEl && !electionEl && !scienceFairEl && !graduationEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && mapOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && tradeOverlay.hidden && bedroomOverlay.hidden && yearbookOverlay.hidden) {
       const axis = input.axis();
       tryPushFromInput(axis);
       player.update(dt, axis, zone);
@@ -1542,6 +1623,7 @@ async function boot() {
     const dance = obj && (obj.dance || obj.def.dance);
     const perform = obj && (obj.perform || obj.def.perform);
     const scienceFair = obj && (obj.scienceFair || obj.def.scienceFair);
+    const graduation = obj && (obj.graduation || obj.def.graduation);
     const arcadeHint = obj && obj.game ? ` Play ${obj.gameName || "a game"}` : null;
     const playHint = play ? ` Play ${obj.playName || obj.def.playName || minigameInfo(play).title}` : null;
     const shopHint = shop ? " Get lunch" : null;
@@ -1549,8 +1631,9 @@ async function boot() {
     const danceHint = dance ? (myDancing ? " Stop dancing" : " Dance floor") : null;
     const performHint = perform ? (myPerforming ? " Leave the stage" : " Take the stage") : null;
     const scienceFairHint = scienceFair ? " Science fair table" : null;
+    const graduationHint = graduation ? (graduatedAt ? " Diploma" : " Front office") : null;
     const peerHint = nearPeer ? ` Trade with ${nearPeer.name}` : null;
-    setHint((memoryEl || dialogueEl || electionEl || scienceFairEl || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden || !tradeOverlay.hidden || !bedroomOverlay.hidden || !yearbookOverlay.hidden) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (peerHint || arcadeHint || playHint || shopHint || electionHint || danceHint || performHint || scienceFairHint || (mem ? ` ${mem.title}` : null)));
+    setHint((memoryEl || dialogueEl || electionEl || scienceFairEl || graduationEl || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden || !tradeOverlay.hidden || !bedroomOverlay.hidden || !yearbookOverlay.hidden) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (peerHint || arcadeHint || playHint || shopHint || electionHint || danceHint || performHint || scienceFairHint || graduationHint || (mem ? ` ${mem.title}` : null)));
     if (input.interactPressed() && mapOverlay.hidden && profileOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && bedroomOverlay.hidden && yearbookOverlay.hidden) {
       if (!tradeOverlay.hidden) closeTrade();
       else if (!cafeteriaOverlay.hidden) closeCafeteria();
@@ -1560,6 +1643,7 @@ async function boot() {
       else if (memoryEl) closeMemory();
       else if (electionEl) closeElection();
       else if (scienceFairEl) closeScienceFair();
+      else if (graduationEl) closeGraduation();
       else if (nearNPC) showDialogue(nearNPC);
       else if (nearPeer) openTrade(nearPeer.id, nearPeer.name);
       else if (obj && obj.game) openArcade(obj);
@@ -1569,6 +1653,7 @@ async function boot() {
       else if (dance) toggleDancing();
       else if (perform) togglePerforming();
       else if (scienceFair) openScienceFair();
+      else if (graduation) openGraduation();
       else if (mem) showMemory(mem, obj);
     }
 

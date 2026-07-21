@@ -1177,7 +1177,7 @@ html, body {
   cursor: pointer;
 }
 .th-election-vote-btn:disabled { opacity: 0.5; cursor: default; }
-#th-election-run-btn, #th-sciencefair-present-btn, #th-sciencefair-withdraw-btn {
+#th-election-run-btn, #th-sciencefair-present-btn, #th-sciencefair-withdraw-btn, #th-graduate-btn {
   width: 100%;
   margin-top: 10px;
   padding: 8px 12px;

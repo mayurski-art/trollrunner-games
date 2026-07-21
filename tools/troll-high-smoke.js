@@ -132,9 +132,13 @@ async function enterRoom(page, { doorX, roomId, roomName, warpX, memWarp, memTit
   // Sweep the widened hallway's door network — a representative sample of
   // the 8 rooms (not exhaustive; door round-trip math is cross-checked
   // offline by a Node script over all 9 zone JSONs before this ever runs).
+  // The reception counter now triggers the graduation flow (Multiplayer
+  // Memories, design doc §23 Phase 6) instead of its memory card — same
+  // priority pattern as the gym bleachers / auditorium stage curtain.
+  // Check the filing cabinet's memory instead.
   await enterRoom(page, {
     doorX: 2, roomId: 'office', roomName: 'Front Office', warpX: 3,
-    memWarp: [2, 5], memTitleRe: /front desk/i, label: 'Office',
+    memWarp: [1, 9], memTitleRe: /filing cabinet/i, label: 'Office',
   });
   await enterRoom(page, {
     doorX: 14, roomId: 'classroom-3b', roomName: 'Room 3B', warpX: 15,

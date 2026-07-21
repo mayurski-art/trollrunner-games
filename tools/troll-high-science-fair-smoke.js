@@ -127,13 +127,26 @@ async function go(page, doorX, expectZoneId) {
   await b.page.click('#th-yearbook-close');
   // Move Bob away from the table too, for the same reason Alice moved
   // away earlier — otherwise Alice's return trip lands in trade range.
+  // Position sync is real (throttled) network traffic, so give the new
+  // position time to actually propagate before Alice approaches.
   await b.page.evaluate(() => window.__th.warpTo(1, 1));
+  await new Promise(r => setTimeout(r, 1500));
 
   // Alice withdraws her project
   await a.page.evaluate(() => window.__th.warpTo(14, 8));
   await hold(a.page, 'ArrowUp', 60);
   await a.page.keyboard.press('KeyE');
-  await a.page.waitForFunction('window.__th.scienceFairOpen === true', { timeout: 3000 });
+  try {
+    await a.page.waitForFunction('window.__th.scienceFairOpen === true', { timeout: 3000 });
+  } catch (e) {
+    const diag = await a.page.evaluate(() => ({
+      zoneId: window.__th.zone.id, player: { x: window.__th.player.x, y: window.__th.player.y },
+      hint: document.getElementById('th-hint')?.textContent,
+      myProject: window.__th.myProject, issues: [],
+    }));
+    console.log('DIAG (Alice withdraw re-approach):', JSON.stringify(diag), 'consoleIssues:', a.issues);
+    throw e;
+  }
   await a.page.click('#th-sciencefair-withdraw-btn');
   const aProjectAfter = await a.page.evaluate(() => window.__th.myProject);
   log(aProjectAfter === null, 'withdrawing clears myProject back to null');

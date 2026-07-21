@@ -902,8 +902,62 @@ directions this time (Alice moves away for Bob's turn, then Bob moves
 away for Alice's return trip) — nearPeer's trade-range priority is a
 recurring theme across every one of these live-interaction popups.
 
-**Phase 6 is now fully complete** — all six Multiplayer Memories
-slices (clubs, elections, shared Class Yearbook, dances, talent show,
-science fair) built, tested, and shipped. Only graduation (the
-capstone, deliberately last since it can reference the others) remains
-unbuilt from the original Phase 6 list.
+**Phase 6 capstone shipped 2026-07-21 — graduation.** The one
+PERSISTED trait among the seven Multiplayer Memories pieces; the
+other six are all deliberately session-scoped ("a real thing happening
+right now"). Graduation is instead a real, permanent milestone.
+
+- Reuses the office's existing `reception-counter` object via a
+  per-instance `graduation: true` override in `office.json`, same
+  pattern as `perform`/`scienceFair`. Three states depending on
+  `graduatedAt`/`visitDays.size`: not-yet-eligible flavor text, an
+  eligible summary + Graduate button once `visitDays.size >=
+  GRADUATION_DAYS_REQUIRED` (5 real attended days), or the permanent
+  diploma recap forever after — reusing the same
+  `.th-election-list`/`.th-election-row` styling as the election and
+  science fair popups. (`troll-high-smoke.js`'s office room-sweep had
+  been checking the reception counter's own memory card since Phase
+  0 — swapped to the filing cabinet's, same fix pattern as the
+  bleachers/stage-curtain before it.)
+- Deliberately doesn't lock the player out of anything once graduated
+  — real school doesn't stop existing after graduation, and this
+  shouldn't either; `graduate()` just flips a flag, no state reset.
+- `net.js` gained two related-but-distinct pieces: `this.graduated`
+  (persisted, broadcast continuously alongside position like `club` —
+  shows a 🎓 tag on a graduated player every session from then on,
+  joining 🗳/💃/🎤/🧪 on the name label) and a separate one-shot
+  `sendGraduationAnnounce()` broadcast message so anyone nearby AT THE
+  MOMENT you graduate sees a live "🎓 X just graduated!" toast — the
+  live-announcement and the permanent-tag are two different mechanisms
+  serving two different purposes (a moment vs. a lasting trait).
+- `bedroom.js` gained one new decoration, "Diploma" (`unlocked: s =>
+  s.graduated`) — a deliberate, singular exception to this whole
+  Phase's "don't add new collectibles" guidance, justified because
+  it's the capstone milestone the guidance was never really about.
+
+Test: `tools/troll-high-graduation-smoke.js` — two real browser
+contexts. Confirms the not-yet-eligible message and missing Graduate
+button on a fresh save, forces eligibility via a `visitDays` debug
+hook (exposed on `window.__th` specifically for this — actually
+waiting 5 real days isn't practical for a test) rather than faking
+`graduationEligible()` itself, graduates, verifies the diploma recap
+replaces the eligibility form on reopening, and — the actual
+multiplayer proof — Bob receives both the live announcement toast and
+sees the persisted 🎓 tag on Alice's ghost afterward.
+
+**Test-writing note:** hit the same "move away from the shared object
+before the other player approaches" `nearPeer`-priority gotcha as
+every other live-interaction popup test this phase, but this time it
+was genuinely timing-dependent rather than purely positional — Bob's
+`warpTo()` away from the table is a local position change, but
+`nearPeer` on Alice's side reads from Bob's last-synced network
+position, which lags behind by however long the throttled position
+broadcast + Realtime round trip takes. `troll-high-science-fair-smoke.js`
+intermittently failed at the exact same step for this reason; fixed by
+adding an explicit wait after the away-move to let the new position
+actually propagate before the other player's approach, not just after
+the state change fires locally.
+
+**Phase 6 is now fully complete** — all seven Multiplayer Memories
+pieces (clubs, elections, shared Class Yearbook, dances, talent show,
+science fair, graduation) built, tested, and shipped.

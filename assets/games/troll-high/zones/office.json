@@ -26,7 +26,8 @@
     {
       "type": "reception-counter",
       "x": 1,
-      "y": 3
+      "y": 3,
+      "graduation": true
     },
     {
       "type": "filing-cabinet",

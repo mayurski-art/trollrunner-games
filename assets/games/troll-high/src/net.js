@@ -78,6 +78,9 @@ export class Net {
                                  // player currently on stage?
     this.project = null;        // science fair (§23 Phase 6) — this
                                  // player's active project title, or null
+    this.graduated = false;     // graduation (§23 Phase 6 capstone) — a
+                                 // persisted trait (unlike the other four,
+                                 // which are all session-scoped toggles)
     this.transport = null;
     this.room = null;
     this.connected = false;
@@ -102,6 +105,12 @@ export class Net {
     // and votes are a lightweight broadcast message each client tallies
     // itself (no server-arbitrated count, same trust model as trading).
     this.onVote = null;         // (voterId, voterName, forId) => void
+
+    // Graduation (§23 Phase 6 capstone) — a one-shot announcement so
+    // anyone nearby at the moment sees it live, distinct from the
+    // persisted `graduated` presence flag (which just marks a 🎓 tag from
+    // then on, every session).
+    this.onGraduationAnnounce = null; // (peerId, name) => void
   }
 
   async join(room) {
@@ -131,7 +140,7 @@ export class Net {
   _onMessage(m) {
     if (!m || m.id === this.id) return;
     if (m.t === "pos") {
-      this.peers.set(m.id, { x: m.x, y: m.y, dir: m.dir, moving: m.moving, name: m.name, club: m.club || null, running: !!m.running, dancing: !!m.dancing, performing: !!m.performing, project: m.project || null, last: performance.now() });
+      this.peers.set(m.id, { x: m.x, y: m.y, dir: m.dir, moving: m.moving, name: m.name, club: m.club || null, running: !!m.running, dancing: !!m.dancing, performing: !!m.performing, project: m.project || null, graduated: !!m.graduated, last: performance.now() });
     } else if (m.t === "chat" && this.onChat) {
       this.onChat(m.id, m.name, m.text);
     } else if (m.t === "emote" && this.onEmote) {
@@ -150,6 +159,8 @@ export class Net {
       this.onGift(m.id, m.name, m.cardId);
     } else if (m.t === "vote" && this.onVote) {
       this.onVote(m.id, m.name, m.for);
+    } else if (m.t === "graduate" && this.onGraduationAnnounce) {
+      this.onGraduationAnnounce(m.id, m.name);
     }
   }
 
@@ -169,7 +180,7 @@ export class Net {
     if (this._posAcc < 1 / POS_HZ) return;
     this._posAcc = 0;
     this.transport.send({
-      t: "pos", id: this.id, name: this.name, club: this.club, running: this.running, dancing: this.dancing, performing: this.performing, project: this.project,
+      t: "pos", id: this.id, name: this.name, club: this.club, running: this.running, dancing: this.dancing, performing: this.performing, project: this.project, graduated: this.graduated,
       x: Math.round(player.x), y: Math.round(player.y),
       dir: player.dir, moving: player.moving,
     });
@@ -180,6 +191,11 @@ export class Net {
   setDancing(v) { this.dancing = !!v; }
   setPerforming(v) { this.performing = !!v; }
   setProject(name) { this.project = name || null; }
+  setGraduated(v) { this.graduated = !!v; }
+  sendGraduationAnnounce() {
+    if (!this.connected) return;
+    this.transport.send({ t: "graduate", id: this.id, name: this.name });
+  }
   sendVote(forId) {
     if (!this.connected) return;
     this.transport.send({ t: "vote", id: this.id, name: this.name, for: forId });
