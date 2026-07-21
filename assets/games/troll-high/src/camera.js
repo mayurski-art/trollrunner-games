@@ -51,4 +51,50 @@ export function addPhotoToRoll(photos, photo) {
   return next.length > MAX_PHOTOS ? next.slice(next.length - MAX_PHOTOS) : next;
 }
 
+/* The shared Class Yearbook (design doc §23 Phase 6) — every photo any
+   player takes is also indexed here (docs/troll_high_shared_yearbook.sql)
+   so everyone can browse everyone's photos, not just their own roll.
+   Best-effort: the personal roll (addPhotoToRoll, already saved to the
+   player's own row) is the source of truth for THIS player's photos, so a
+   failed insert here just means that one shot doesn't show up in the
+   shared view — never surfaced as an error to the player. */
+export async function sharePhoto(userId, username, photo) {
+  const sb = client();
+  if (!sb) return false;
+  try {
+    const { error } = await sb.from("troll_high_shared_photos").insert({
+      user_id: userId, username,
+      path: photo.path, url: photo.url,
+      zone_id: photo.zoneId, zone_name: photo.zoneName,
+      event_tag: photo.eventTag || null,
+      taken_at: new Date(photo.takenAt).toISOString(),
+    });
+    if (error) { console.warn("[troll-high] shared yearbook insert failed:", error); return false; }
+    return true;
+  } catch (e) {
+    console.warn("[troll-high] shared yearbook insert threw:", e);
+    return false;
+  }
+}
+
+/* Resolves to an array (newest first) or [] on any failure — a missing
+   table (SQL not run yet) or network hiccup both just mean an empty
+   shared yearbook, not a crash. */
+export async function fetchSharedPhotos(limit = 60) {
+  const sb = client();
+  if (!sb) return [];
+  try {
+    const { data, error } = await sb
+      .from("troll_high_shared_photos")
+      .select("username, url, zone_name, event_tag, taken_at")
+      .order("taken_at", { ascending: false })
+      .limit(limit);
+    if (error) { console.warn("[troll-high] shared yearbook fetch failed:", error); return []; }
+    return data || [];
+  } catch (e) {
+    console.warn("[troll-high] shared yearbook fetch threw:", e);
+    return [];
+  }
+}
+
 export { MAX_PHOTOS };

@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,500;0,700;0,900;1,900&family=DM+Mono:wght@500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/troll-leaderboard.css?v=lb-engine-v1">
-  <link rel="stylesheet" href="assets/games/troll-high/styles.css?v=th-p8">
+  <link rel="stylesheet" href="assets/games/troll-high/styles.css?v=th-p9">
 </head>
 <body>
   <div id="th-root">
@@ -92,14 +92,27 @@
     </div>
 
     <!-- Yearbook / disposable camera: capture the real current game view,
-         upload it (docs/troll_high_yearbook.sql), keep a limited "roll." -->
+         upload it (docs/troll_high_yearbook.sql), keep a limited "roll."
+         Every photo also indexes into the shared Class Yearbook
+         (docs/troll_high_shared_yearbook.sql) so everyone can browse
+         everyone's photos, not just their own. -->
     <div id="th-yearbook-overlay" hidden>
       <div class="th-yearbook-panel">
         <button id="th-yearbook-close" type="button" aria-label="Close">✕</button>
         <h2>📸 Yearbook</h2>
-        <button id="th-yearbook-capture" type="button">Take a photo</button>
-        <p id="th-yearbook-status" class="th-schedule-flavor" hidden></p>
-        <div id="th-yearbook-grid" class="th-yearbook-grid"></div>
+        <div class="th-tab-row">
+          <button type="button" id="th-yearbook-tab-mine" data-tab="mine" class="is-active">My Roll</button>
+          <button type="button" id="th-yearbook-tab-class" data-tab="class">Class Yearbook</button>
+        </div>
+        <div id="th-yearbook-mine">
+          <button id="th-yearbook-capture" type="button">Take a photo</button>
+          <p id="th-yearbook-status" class="th-schedule-flavor" hidden></p>
+          <div id="th-yearbook-grid" class="th-yearbook-grid"></div>
+        </div>
+        <div id="th-yearbook-class" hidden>
+          <p id="th-yearbook-class-status" class="th-schedule-flavor" hidden></p>
+          <div id="th-yearbook-class-grid" class="th-yearbook-grid"></div>
+        </div>
       </div>
     </div>
 
@@ -312,7 +325,7 @@
   </div>
 
   <script src="assets/js/troll-leaderboard.js?v=lb-engine-v1" defer></script>
-  <script src="assets/games/troll-high/leaderboard.js?v=th-p8" defer></script>
-  <script type="module" src="assets/games/troll-high/src/main.js?v=th-p8"></script>
+  <script src="assets/games/troll-high/leaderboard.js?v=th-p9" defer></script>
+  <script type="module" src="assets/games/troll-high/src/main.js?v=th-p9"></script>
 </body>
 </html>

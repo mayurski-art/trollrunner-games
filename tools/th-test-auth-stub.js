@@ -58,7 +58,8 @@ async function stubAuth(page, { userId = 'test-' + Math.random().toString(36).sl
    to a flat-color rect (existing, intentional tolerance — see objects.js). */
 function isExpectedAuthNoise(text) {
   return /Failed to load resource.*(400|401|404)/i.test(text)
-    || /\[troll-high\] cloud (load|save) (failed|threw)/i.test(text);
+    || /\[troll-high\] cloud (load|save) (failed|threw)/i.test(text)
+    || /\[troll-high\] shared yearbook (insert|fetch) (failed|threw)/i.test(text);
 }
 
 /* First-ever Start click now shows a one-time orientation overlay

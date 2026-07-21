@@ -324,6 +324,7 @@ html, body {
   font-size: 9px;
   padding: 2px 4px;
 }
+.th-yearbook-loading { opacity: 0.6; font-size: 12px; margin-top: 10px; }
 
 /* ------------------------------------------------------------ bedroom */
 #th-bedroom-overlay {

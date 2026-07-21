@@ -726,3 +726,58 @@ tallies locally on cast (button flips to disabled "Voted"), and —
 the actual cross-client check — Alice's own client independently
 receives Bob's broadcast vote and tallies it without any server
 arbitrating the count.
+
+**Phase 6 (third slice) shipped 2026-07-21 — the shared Class
+Yearbook.** Unlike clubs/elections, this one genuinely needs new
+infra: the personal Yearbook's photo bytes were already public-read in
+Storage (`docs/troll_high_yearbook.sql`), but the LIST of a player's
+own photos lived only in their own owner-only `troll_game_saves` row —
+nothing let another player discover a photo exists at all. New
+**`docs/troll_high_shared_yearbook.sql`** — run once, same as the
+personal yearbook's own migration — adds `troll_high_shared_photos`
+(public-read RLS, own-row insert/delete) as a public index of every
+photo any player has ever taken.
+
+- `camera.js`: `sharePhoto(userId, username, photo)` inserts a row
+  alongside the existing personal-roll save, best-effort (a failed
+  insert never surfaces as a player-facing error — the personal roll
+  is still the source of truth for that player's own photos).
+  `fetchSharedPhotos(limit)` resolves to `[]` on any failure (missing
+  table, network hiccup), same "fails soft" contract as the rest of
+  this codebase's Supabase reads.
+- Yearbook overlay (`troll-high.html`) gained a `.th-tab-row` (reusing
+  the same tab-button pattern as the login gate) — "My Roll" (unchanged)
+  and "Class Yearbook" (new), the latter fetching and rendering on
+  first switch to it, captioned with the photographer's real username.
+  Every photo taken (not just Picture Day ones) is shared automatically.
+- **Bug found and fixed while building the real-signup test for this**
+  (`troll-high-shared-yearbook-smoke.js`, two genuine throwaway
+  accounts, not the fast stub): `onStart`'s real implementation is
+  assigned partway through `main.js`'s setup (`let onStart = () => {
+  pendingStart = true }` as an early placeholder, reassigned to the
+  real thing later, called immediately after via `if (pendingStart)
+  onStart()` if a click arrived during the async asset-loading gap
+  between those two points). `openOrientation()`, called from inside
+  that real `onStart`, referenced `orientationOverlay` — a `const`
+  declared much further down in the same function, still in its
+  temporal-dead-zone at that point in execution. Rare with the fast
+  stub session (tiny gap), far more likely with a real signup's actual
+  network round trip (wide gap) — reproduced consistently once
+  isolated to a minimal repro script. Fixed by hoisting just the
+  `orientationOverlay` DOM lookup up next to the `bootReady`/`onStart`
+  declarations, before anything can call into it.
+
+Tests: `tools/troll-high-yearbook-smoke.js` extended with 3 assertions
+for the new tab (fails-soft empty state under the stub session, tab
+active-state toggling). `tools/troll-high-shared-yearbook-smoke.js`
+(new) signs up two real throwaway accounts, has Alice take a real
+photo, and confirms it shows up captioned with her real username in
+Bob's Class Yearbook tab — the actual cross-account proof the RLS
+policies work, not just that the insert call didn't throw.
+
+**⚠️ Action needed:** run `docs/troll_high_shared_yearbook.sql` in the
+Supabase SQL editor (same project as everything else) before the Class
+Yearbook tab will show anything — without it, `sharePhoto()` fails
+silently (by design) and the tab always reads "No class photos yet."
+`troll-high-shared-yearbook-smoke.js` will fail until this is run;
+that's expected and exactly what it's there to catch.

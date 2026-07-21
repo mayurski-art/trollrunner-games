@@ -92,6 +92,24 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
     log(!statusHidden && statusText.length > 0, `capture with no real JWT (stub session) fails gracefully with a human status message, not a crash (${JSON.stringify(statusText)})`);
   }
 
+  // Shared Class Yearbook tab (design doc §23 Phase 6) — under the stub
+  // session (no real JWT), fetchSharedPhotos() fails gracefully to an
+  // empty array, same "fails soft, never crashes" contract as the rest
+  // of this file. Real end-to-end sharing is covered by
+  // troll-high-shared-yearbook-smoke.js with a genuine account.
+  await page.click('#th-yearbook-tab-class');
+  await page.waitForFunction(
+    '!document.getElementById("th-yearbook-class-status").hidden',
+    { timeout: 5000 }
+  );
+  const classStatusText = await page.$eval('#th-yearbook-class-status', el => el.textContent);
+  log(/No class photos yet/i.test(classStatusText), `Class Yearbook tab fails soft to an empty state under the stub session (${JSON.stringify(classStatusText)})`);
+  const classTabActive = await page.evaluate(() => document.getElementById('th-yearbook-tab-class').classList.contains('is-active'));
+  log(classTabActive, 'Class Yearbook tab shows as active after switching to it');
+  await page.click('#th-yearbook-tab-mine');
+  const mineTabActive = await page.evaluate(() => document.getElementById('th-yearbook-tab-mine').classList.contains('is-active'));
+  log(mineTabActive, 'switching back to My Roll re-activates that tab');
+
   await page.click('#th-yearbook-close');
   await page.waitForFunction('window.__th.yearbookOpen === false', { timeout: 3000 });
 

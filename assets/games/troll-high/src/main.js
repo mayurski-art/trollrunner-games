@@ -24,7 +24,7 @@ import { todaysLunch, todaysAnnouncement, todaysEvent, PIZZA_FRIDAY_SPECIAL } fr
 import { pickDialogueLine } from "./relations.js";
 import { sanitizeClubName } from "./club.js";
 import { SLOTS as BEDROOM_SLOTS, DECORATIONS, decorationById } from "./bedroom.js";
-import { capturePhoto, addPhotoToRoll, MAX_PHOTOS } from "./camera.js";
+import { capturePhoto, addPhotoToRoll, MAX_PHOTOS, sharePhoto, fetchSharedPhotos } from "./camera.js";
 import * as clock from "./clock.js";
 import { activeEvent, eventInfo } from "./events.js";
 
@@ -58,6 +58,17 @@ async function boot() {
   // silently dropped, since no listener exists yet to catch it.
   let bootReady = false, pendingStart = false, onStart = () => { pendingStart = true; };
   $("th-start").addEventListener("click", () => { if (bootReady) onStart(); else pendingStart = true; });
+
+  // Declared here (not down by the rest of the orientation block below) —
+  // onStart() can fire synchronously from `if (pendingStart) onStart()`
+  // moments after bootReady flips true, which is BEFORE execution reaches
+  // the orientation block's own section of this function. A `const`
+  // declared there would still be in its temporal dead zone at that point
+  // (real bug, found via troll-high-shared-yearbook-smoke.js: a slow
+  // real-signup network round trip widens the window for a click to land
+  // mid-boot and get queued as pendingStart, then replayed through this
+  // exact path).
+  const orientationOverlay = $("th-orientation-overlay");
 
   const input = new Input();
   const renderer = new Renderer($("th-canvas"));
@@ -420,7 +431,8 @@ async function boot() {
   // -------------------------------------------------------- orientation
   // Shown once per account after the first Start click — not a design-doc
   // item, added from direct feedback alongside the schedule/tasks below.
-  const orientationOverlay = $("th-orientation-overlay");
+  // (orientationOverlay itself is declared much earlier — see the comment
+  // by bootReady above for why.)
   const orientationElectivesEl = $("th-orientation-electives");
   let orientationPick = elective;
   orientationElectivesEl.innerHTML = "";
@@ -600,6 +612,16 @@ async function boot() {
   const yearbookCaptureBtn = $("th-yearbook-capture");
   const yearbookStatusEl = $("th-yearbook-status");
   const yearbookGridEl = $("th-yearbook-grid");
+  // Shared Class Yearbook (design doc §23 Phase 6) — every photo any
+  // player takes also indexes into troll_high_shared_photos
+  // (docs/troll_high_shared_yearbook.sql), so this tab shows everyone's
+  // photos, not just this player's own roll.
+  const yearbookTabMine = $("th-yearbook-tab-mine");
+  const yearbookTabClass = $("th-yearbook-tab-class");
+  const yearbookPaneMine = $("th-yearbook-mine");
+  const yearbookPaneClass = $("th-yearbook-class");
+  const yearbookClassStatusEl = $("th-yearbook-class-status");
+  const yearbookClassGridEl = $("th-yearbook-class-grid");
 
   function renderYearbook() {
     yearbookGridEl.innerHTML = "";
@@ -614,7 +636,37 @@ async function boot() {
     yearbookCaptureBtn.disabled = photos.length >= MAX_PHOTOS;
     yearbookCaptureBtn.textContent = photos.length >= MAX_PHOTOS ? "Roll is full" : "Take a photo";
   }
-  function openYearbook() { yearbookStatusEl.hidden = true; renderYearbook(); yearbookOverlay.hidden = false; }
+  async function renderClassYearbook() {
+    yearbookClassStatusEl.hidden = true;
+    yearbookClassGridEl.innerHTML = `<p class="th-yearbook-loading">Loading...</p>`;
+    const shared = await fetchSharedPhotos();
+    yearbookClassGridEl.innerHTML = "";
+    if (shared.length === 0) {
+      yearbookClassStatusEl.hidden = false;
+      yearbookClassStatusEl.textContent = "No class photos yet — be the first to take one.";
+      return;
+    }
+    for (const p of shared) {
+      const el = document.createElement("div");
+      el.className = "th-yearbook-photo";
+      const when = new Date(p.taken_at).toLocaleDateString();
+      const tag = p.event_tag ? ` · ${p.event_tag}` : "";
+      el.innerHTML = `<img src="${p.url}" alt="${p.zone_name || "a photo"}"><span class="cap">${p.username} · ${p.zone_name || "?"} · ${when}${tag}</span>`;
+      yearbookClassGridEl.appendChild(el);
+    }
+  }
+  function switchYearbookTab(tab) {
+    const onClass = tab === "class";
+    yearbookTabMine.classList.toggle("is-active", !onClass);
+    yearbookTabClass.classList.toggle("is-active", onClass);
+    yearbookPaneMine.hidden = onClass;
+    yearbookPaneClass.hidden = !onClass;
+    if (onClass) renderClassYearbook();
+  }
+  yearbookTabMine.addEventListener("click", () => switchYearbookTab("mine"));
+  yearbookTabClass.addEventListener("click", () => switchYearbookTab("class"));
+
+  function openYearbook() { yearbookStatusEl.hidden = true; switchYearbookTab("mine"); renderYearbook(); yearbookOverlay.hidden = false; }
   function closeYearbook() { yearbookOverlay.hidden = true; }
   $("th-btn-yearbook")?.addEventListener("click", openYearbook);
   $("th-yearbook-close")?.addEventListener("click", closeYearbook);
@@ -631,6 +683,7 @@ async function boot() {
       saveDirty = true;
       persist();
       renderYearbook();
+      sharePhoto(session.userId, identity.name, result.photo); // best-effort, no await needed
       if (todaysEventId === "picture-day") showToast("📸 That one's going in the yearbook — it's Picture Day.");
     } else {
       yearbookStatusEl.hidden = false;
@@ -1236,7 +1289,7 @@ async function boot() {
     get tradeOpen() { return !tradeOverlay.hidden; },
     get bedroomOpen() { return !bedroomOverlay.hidden; },
     get yearbookOpen() { return !yearbookOverlay.hidden; },
-    openYearbook, closeYearbook,
+    openYearbook, closeYearbook, switchYearbookTab,
     get photos() { return photos; },
     openBedroom, closeBedroom,
     get bedroomEquipped() { return bedroomEquipped; },
