@@ -73,6 +73,7 @@
       <button id="th-btn-map" type="button" title="Campus map (M)">🗺️</button>
       <button id="th-btn-schedule" type="button" title="Schedule &amp; tasks">📅</button>
       <button id="th-btn-bedroom" type="button" title="My room">🛏️</button>
+      <button id="th-btn-yearbook" type="button" title="Yearbook &amp; camera">📸</button>
     </div>
 
     <!-- Personal bedroom: not an explorable zone (no home/town yet — that's
@@ -87,6 +88,18 @@
         <div id="th-bedroom-unlocked" class="th-trade-cards"></div>
         <h3>Locked</h3>
         <div id="th-bedroom-locked" class="th-bedroom-locked"></div>
+      </div>
+    </div>
+
+    <!-- Yearbook / disposable camera: capture the real current game view,
+         upload it (docs/troll_high_yearbook.sql), keep a limited "roll." -->
+    <div id="th-yearbook-overlay" hidden>
+      <div class="th-yearbook-panel">
+        <button id="th-yearbook-close" type="button" aria-label="Close">✕</button>
+        <h2>📸 Yearbook</h2>
+        <button id="th-yearbook-capture" type="button">Take a photo</button>
+        <p id="th-yearbook-status" class="th-schedule-flavor" hidden></p>
+        <div id="th-yearbook-grid" class="th-yearbook-grid"></div>
       </div>
     </div>
 

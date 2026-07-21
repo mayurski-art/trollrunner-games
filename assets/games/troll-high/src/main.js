@@ -23,6 +23,7 @@ import { CARDS, cardById, maybeAwardCard } from "./cards.js";
 import { todaysLunch, todaysAnnouncement, todaysEvent } from "./daily.js";
 import { pickDialogueLine } from "./relations.js";
 import { SLOTS as BEDROOM_SLOTS, DECORATIONS, decorationById } from "./bedroom.js";
+import { capturePhoto, addPhotoToRoll, MAX_PHOTOS } from "./camera.js";
 import * as clock from "./clock.js";
 
 const BASE = "assets/games/troll-high";
@@ -193,6 +194,11 @@ async function boot() {
   // game already tracks, no separate grind. {slot: decorationId | null}
   const bedroomEquipped = savedGame?.bedroomEquipped || {};
 
+  // Yearbook / disposable camera (design doc §21) — a limited photo roll,
+  // real captures of the current game view uploaded to Supabase Storage
+  // (docs/troll_high_yearbook.sql). Just the list lives in this save row.
+  let photos = savedGame?.photos || [];
+
   function persist() {
     if (!saveDirty) return;
     saveDirty = false;
@@ -200,7 +206,7 @@ async function boot() {
       zoneId: zone.id, x: player.x, y: player.y, foundKeys: [...found], studentId, enrolledAt, highScores,
       orientationDone, elective, dailyTasksDay, dailyFlags, cards,
       visitedZones: [...visitedZones], visitDays: [...visitDays], lunchesBought, tradesCompleted, giftsGiven, giftsReceived,
-      npcRelations, bedroomEquipped,
+      npcRelations, bedroomEquipped, photos,
     });
   }
   setInterval(persist, 30000);
@@ -354,7 +360,7 @@ async function boot() {
   addEventListener("keydown", e => {
     if (e.code !== "KeyM" || e.target.tagName === "INPUT") return;
     if (!running) return;
-    if (mapOverlay.hidden) { if (!memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && tradeOverlay.hidden && bedroomOverlay.hidden) openMap(); }
+    if (mapOverlay.hidden) { if (!memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && tradeOverlay.hidden && bedroomOverlay.hidden && yearbookOverlay.hidden) openMap(); }
     else closeMap();
   });
 
@@ -486,6 +492,44 @@ async function boot() {
   function closeBedroom() { bedroomOverlay.hidden = true; }
   $("th-btn-bedroom")?.addEventListener("click", openBedroom);
   $("th-bedroom-close")?.addEventListener("click", closeBedroom);
+
+  // ------------------------------------------------------- yearbook
+  const yearbookOverlay = $("th-yearbook-overlay");
+  const yearbookCaptureBtn = $("th-yearbook-capture");
+  const yearbookStatusEl = $("th-yearbook-status");
+  const yearbookGridEl = $("th-yearbook-grid");
+
+  function renderYearbook() {
+    yearbookGridEl.innerHTML = "";
+    for (const p of photos) {
+      const el = document.createElement("div");
+      el.className = "th-yearbook-photo";
+      const when = new Date(p.takenAt).toLocaleDateString();
+      el.innerHTML = `<img src="${p.url}" alt="${p.zoneName || "a photo"}"><span class="cap">${p.zoneName || "?"} · ${when}</span>`;
+      yearbookGridEl.appendChild(el);
+    }
+    yearbookCaptureBtn.disabled = photos.length >= MAX_PHOTOS;
+    yearbookCaptureBtn.textContent = photos.length >= MAX_PHOTOS ? "Roll is full" : "Take a photo";
+  }
+  function openYearbook() { yearbookStatusEl.hidden = true; renderYearbook(); yearbookOverlay.hidden = false; }
+  function closeYearbook() { yearbookOverlay.hidden = true; }
+  $("th-btn-yearbook")?.addEventListener("click", openYearbook);
+  $("th-yearbook-close")?.addEventListener("click", closeYearbook);
+  yearbookCaptureBtn.addEventListener("click", async () => {
+    yearbookCaptureBtn.disabled = true;
+    yearbookStatusEl.hidden = true;
+    const result = await capturePhoto(renderer.canvas, session.userId, { zoneId: zone.id, zoneName: zone.name });
+    if (result.ok) {
+      photos = addPhotoToRoll(photos, result.photo);
+      saveDirty = true;
+      persist();
+      renderYearbook();
+    } else {
+      yearbookStatusEl.hidden = false;
+      yearbookStatusEl.textContent = result.reason;
+      yearbookCaptureBtn.disabled = photos.length >= MAX_PHOTOS;
+    }
+  });
 
   // ------------------------------------------------- trading + gifting
   // Each client only ever mutates its own inventory, applied in response
@@ -861,7 +905,7 @@ async function boot() {
   function escapeHtml(s) { return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
   function openChat() {
-    if (!running || memoryEl || dialogueEl || !lbOverlay.hidden || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden || !tradeOverlay.hidden || !bedroomOverlay.hidden) return;
+    if (!running || memoryEl || dialogueEl || !lbOverlay.hidden || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden || !tradeOverlay.hidden || !bedroomOverlay.hidden || !yearbookOverlay.hidden) return;
     chatOpen = true;
     chatBar.hidden = false;
     chatInput.value = "";
@@ -946,6 +990,9 @@ async function boot() {
     get scheduleOpen() { return !scheduleOverlay.hidden; },
     get tradeOpen() { return !tradeOverlay.hidden; },
     get bedroomOpen() { return !bedroomOverlay.hidden; },
+    get yearbookOpen() { return !yearbookOverlay.hidden; },
+    openYearbook, closeYearbook,
+    get photos() { return photos; },
     openBedroom, closeBedroom,
     get bedroomEquipped() { return bedroomEquipped; },
     get bedroomStats() { return bedroomStats(); },
@@ -1009,7 +1056,7 @@ async function boot() {
       fade = Math.max(0, fade - dt * 4);
     }
 
-    if (!pendingDoor && !memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && mapOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && tradeOverlay.hidden && bedroomOverlay.hidden) {
+    if (!pendingDoor && !memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && mapOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && tradeOverlay.hidden && bedroomOverlay.hidden && yearbookOverlay.hidden) {
       const axis = input.axis();
       tryPushFromInput(axis);
       player.update(dt, axis, zone);
@@ -1056,8 +1103,8 @@ async function boot() {
     const playHint = play ? ` Play ${obj.playName || obj.def.playName || minigameInfo(play).title}` : null;
     const shopHint = shop ? " Get lunch" : null;
     const peerHint = nearPeer ? ` Trade with ${nearPeer.name}` : null;
-    setHint((memoryEl || dialogueEl || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden || !tradeOverlay.hidden || !bedroomOverlay.hidden) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (peerHint || arcadeHint || playHint || shopHint || (mem ? ` ${mem.title}` : null)));
-    if (input.interactPressed() && mapOverlay.hidden && profileOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && bedroomOverlay.hidden) {
+    setHint((memoryEl || dialogueEl || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden || !tradeOverlay.hidden || !bedroomOverlay.hidden || !yearbookOverlay.hidden) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (peerHint || arcadeHint || playHint || shopHint || (mem ? ` ${mem.title}` : null)));
+    if (input.interactPressed() && mapOverlay.hidden && profileOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && bedroomOverlay.hidden && yearbookOverlay.hidden) {
       if (!tradeOverlay.hidden) closeTrade();
       else if (!cafeteriaOverlay.hidden) closeCafeteria();
       else if (!minigameOverlay.hidden) closeMinigame();
