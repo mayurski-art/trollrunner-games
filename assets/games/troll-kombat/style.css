@@ -66,37 +66,25 @@ h1, h2, h3, p { margin: 0; }
   background: rgba(154, 92, 255, 0.12); outline: none;
 }
 
-.arcade-shell { width: min(1440px, 100%); margin: 0 auto; padding: clamp(12px, 2.2vw, 28px); }
+.arcade-shell { width: min(1440px, 100%); margin: 0 auto; padding: clamp(8px, 1.4vw, 20px); }
 
 /* ---- Hero copy --------------------------------------------------------- */
 /* Stacked layout so the arena can span the full device width (MK-style). */
 .fight-hero {
-  display: flex; flex-direction: column; gap: clamp(10px, 1.6vw, 18px);
-  padding-bottom: clamp(14px, 2vw, 24px);
-}
-.game-copy {
-  min-width: 0; display: grid; gap: 12px; align-content: center;
-  width: min(1100px, 100%); margin: 0 auto; text-align: center; justify-items: center;
+  display: flex; flex-direction: column;
+  padding-bottom: clamp(6px, 1vw, 12px);
 }
 .hero-stats, .stat-chips { justify-content: center; }
 .eyebrow {
   color: var(--green); font-family: var(--mono); font-size: 12px; font-weight: 900;
   text-transform: uppercase; text-shadow: 0 0 16px rgba(77, 255, 115, 0.56);
 }
-h1 {
-  max-width: 9ch; font-size: clamp(42px, 5.7vw, 82px); line-height: 0.88; text-transform: uppercase;
-  text-shadow: 4px 0 0 rgba(255, 49, 79, 0.54), -4px 0 0 rgba(77, 238, 255, 0.38), 0 0 30px rgba(154, 92, 255, 0.42);
-}
-/* Fighting-game title — Mortal-Kombat-style extruded gold lettering */
-#game-title {
-  font-family: "Black Ops One", var(--font); font-weight: 400;
-  max-width: 8ch; font-size: clamp(54px, 8.5vw, 116px); line-height: 0.92; letter-spacing: 0.01em;
-  color: #ffd24a;
-  text-shadow:
-    2px 2px 0 #6e0a16,
-    4px 4px 0 #4a0610,
-    0 0 26px rgba(255, 49, 79, 0.55),
-    0 0 12px rgba(255, 159, 69, 0.5);
+/* Visible page heading removed — the marquee bar already carries the
+   "TROLL KOMBAT" title, and duplicating it as a full hero title was most
+   of what pushed the cabinet below the fold. Kept off-screen for a11y/SEO. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
 }
 .tagline { max-width: 30ch; color: rgba(247, 255, 248, 0.86); font-size: clamp(17px, 1.8vw, 24px); font-weight: 900; line-height: 1.18; }
 .copy-note { max-width: 42ch; color: var(--muted); font-size: 14px; line-height: 1.5; }
@@ -125,7 +113,7 @@ h1 {
 }
 .cabinet-marquee {
   position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 15px 18px; border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+  padding: 9px 18px; border-bottom: 1px solid rgba(255, 255, 255, 0.16);
   background: linear-gradient(90deg, rgba(255, 49, 79, 0.2), rgba(154, 92, 255, 0.16), rgba(77, 255, 115, 0.14)), rgba(0, 0, 0, 0.26);
   font-family: var(--mono); font-size: 14px; font-weight: 900; text-transform: uppercase;
 }
@@ -245,10 +233,17 @@ h1 {
 .icon-btn.is-on .sfx-off { display: none; } .icon-btn.is-on .sfx-on { display: inline; }
 
 /* ---- Screen + canvas --------------------------------------------------- */
+/* --screenH is sized from what's actually left in the viewport after the
+   header, marquee and footer/touch rows (~200px on desktop), instead of a
+   flat 84svh that ignored those and forced a scroll to reach the pre-match
+   overlays (choose match type / fighter / stage). Floor keeps it usable on
+   very short viewports; .game-overlay's own overflow:auto is the fallback
+   if a screen still can't fit its content at that size. */
+.fight-cabinet { --screenH: clamp(260px, calc(100svh - 200px), 900px); }
 .screen-wrap {
   position: relative; z-index: 1;
-  width: min(calc(100vw - 8px), calc(min(84svh, 900px) * 1280 / 600));
-  margin: 0 auto; overflow: hidden; aspect-ratio: 1280 / 600; max-height: min(84svh, 900px);
+  width: min(calc(100vw - 8px), calc(var(--screenH) * 1280 / 600));
+  margin: 0 auto; overflow: hidden; aspect-ratio: 1280 / 600; height: var(--screenH); max-height: var(--screenH);
   border: 1px solid rgba(255, 49, 79, 0.34); background: #050008;
   box-shadow: inset 0 0 40px rgba(255, 49, 79, 0.14);
   touch-action: none; user-select: none; -webkit-user-select: none;
@@ -592,7 +587,7 @@ h1 {
   .fight-cabinet { order: -1; }
   .game-copy { order: 1; }
   .touch-controls { display: flex; }   /* show on-screen pad on touch layouts */
-  .screen-wrap { width: 100%; max-height: 46svh; }
+  .screen-wrap { width: 100%; height: auto; max-height: 46svh; }
   .hero-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .roster-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .game-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -678,7 +673,7 @@ h1 {
 .stage-pick.is-active .stage-pick-name { color: var(--accent); }
 
 /* Full-bleed cabinet: align controls to the play screen, bolder MK HUD. */
-.fight-cabinet { --screenW: min(calc(100vw - 8px), calc(min(84svh, 900px) * 1280 / 600)); }
+.fight-cabinet { --screenW: min(calc(100vw - 8px), calc(var(--screenH) * 1280 / 600)); }
 .cabinet-footer, .touch-controls {
   width: var(--screenW); margin-left: auto; margin-right: auto;
 }
