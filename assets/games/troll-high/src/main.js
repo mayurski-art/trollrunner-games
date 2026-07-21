@@ -20,11 +20,12 @@ import { genStudentId, renderProfile } from "./profile.js";
 import { MENU as CAFETERIA_MENU, normalizeStudentId } from "./cafeteria.js";
 import { ELECTIVES, buildSchedule, DAILY_TASKS } from "./schedule.js";
 import { CARDS, cardById, maybeAwardCard } from "./cards.js";
-import { todaysLunch, todaysAnnouncement, todaysEvent } from "./daily.js";
+import { todaysLunch, todaysAnnouncement, todaysEvent, PIZZA_FRIDAY_SPECIAL } from "./daily.js";
 import { pickDialogueLine } from "./relations.js";
 import { SLOTS as BEDROOM_SLOTS, DECORATIONS, decorationById } from "./bedroom.js";
 import { capturePhoto, addPhotoToRoll, MAX_PHOTOS } from "./camera.js";
 import * as clock from "./clock.js";
+import { activeEvent, eventInfo } from "./events.js";
 
 const BASE = "assets/games/troll-high";
 const ZONE_IDS = [
@@ -157,6 +158,11 @@ async function boot() {
   let orientationDone = savedGame?.orientationDone || false;
   let elective = savedGame?.elective || ELECTIVES[2].id;
   const today = clock.now().dayIndex;
+  // Event engine (design doc §12/§21 Phase 10) — deterministic from the
+  // REAL calendar date, not the in-game day, so it's tied to the actual
+  // world; computed once at boot since it only changes once a real day.
+  const todaysEventId = activeEvent();
+  const todaysEventInfo = eventInfo(todaysEventId);
   let dailyTasksDay = savedGame?.dailyTasksDay;
   let dailyFlags = savedGame?.dailyFlags || {};
   if (dailyTasksDay !== today) { dailyTasksDay = today; dailyFlags = {}; saveDirty = true; }
@@ -324,7 +330,7 @@ async function boot() {
   }
 
   function openCafeteria() {
-    const special = todaysLunch(today);
+    const special = todaysEventId === "pizza-friday" ? PIZZA_FRIDAY_SPECIAL : todaysLunch(today);
     cafeteriaSpecialEl.textContent = `Today's special: ${special.icon} ${special.name} — ${special.flavor}`;
     cafeteriaSelected = new Set();
     cafeteriaMenuEl.querySelectorAll(".th-cafeteria-item").forEach(b => b.classList.remove("is-selected"));
@@ -403,6 +409,11 @@ async function boot() {
   const scheduleTasksEl = $("th-schedule-tasks");
   const scheduleEventEl = $("th-schedule-event");
   const scheduleAnnouncementEl = $("th-schedule-announcement");
+  const scheduleSpecialEventEl = $("th-schedule-special-event");
+  if (todaysEventInfo) {
+    scheduleSpecialEventEl.hidden = false;
+    scheduleSpecialEventEl.textContent = `${todaysEventInfo.icon} ${todaysEventInfo.name} today!`;
+  }
   function openSchedule() {
     scheduleEventEl.textContent = todaysEvent(today);
     scheduleAnnouncementEl.textContent = `📌 ${todaysAnnouncement(today)}`;
@@ -1000,6 +1011,7 @@ async function boot() {
     openBedroom, closeBedroom,
     get bedroomEquipped() { return bedroomEquipped; },
     get bedroomStats() { return bedroomStats(); },
+    get todaysEventId() { return todaysEventId; },
     openTrade, closeTrade,
     get cards() { return cards; },
     get npcRelations() { return npcRelations; },
@@ -1050,7 +1062,7 @@ async function boot() {
     requestAnimationFrame(tick);
     const dt = Math.min((nowMs - last) / 1000, 0.05);
     last = nowMs;
-    if (!running) { renderer.frame(zone, [player.entity()], 0); return; }
+    if (!running) { renderer.frame(zone, [player.entity()], 0, todaysEventInfo?.tint); return; }
 
     // fade-driven zone transition
     if (pendingDoor) {
@@ -1146,7 +1158,7 @@ async function boot() {
     for (const n of npcs) entities.push(n.entity());
 
     renderer.follow(player.x, player.y, zone);
-    renderer.frame(zone, entities, fade);
+    renderer.frame(zone, entities, fade, todaysEventInfo?.tint);
   }
   requestAnimationFrame(tick);
 }

@@ -38,7 +38,7 @@ export class Renderer {
     this.camY = wh <= vh ? (wh - vh) / 2 : clamp(y - vh / 2, 0, wh - vh);
   }
 
-  frame(zone, entities, fade) {
+  frame(zone, entities, fade, eventTint) {
     const b = this.bctx;
     b.fillStyle = "#14110c";
     b.fillRect(0, 0, this.back.width, this.back.height);
@@ -52,6 +52,13 @@ export class Renderer {
     const night = nightAmount();
     if (night > 0) {
       b.fillStyle = `rgba(18, 22, 54, ${0.42 * night})`;
+      b.fillRect(0, 0, this.back.width, this.back.height);
+    }
+
+    // seasonal event tint (Halloween/Snow Day — events.js), same technique
+    // as the day/night tint, layered on top of it
+    if (eventTint) {
+      b.fillStyle = eventTint;
       b.fillRect(0, 0, this.back.width, this.back.height);
     }
 

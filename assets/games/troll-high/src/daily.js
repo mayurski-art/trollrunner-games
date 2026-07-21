@@ -57,6 +57,12 @@ function pickForDay(pool, dayIndex, salt) {
   return pool[h % pool.length];
 }
 
+// Exported separately so events.js's real-calendar "pizza-friday" event
+// (every real Friday) can force this exact special regardless of the
+// in-game day's own rotation — the two systems are deterministic from
+// different clocks (real date vs. in-game day index) and can disagree.
+export const PIZZA_FRIDAY_SPECIAL = LUNCH_SPECIALS[0];
+
 export function todaysLunch(dayIndex) { return pickForDay(LUNCH_SPECIALS, dayIndex, 0); }
 export function todaysAnnouncement(dayIndex) { return pickForDay(ANNOUNCEMENTS, dayIndex, 17); }
 export function todaysEvent(dayIndex) { return pickForDay(DAILY_EVENTS, dayIndex, 41); }
