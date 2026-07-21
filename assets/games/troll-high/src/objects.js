@@ -144,6 +144,13 @@ export const OBJECT_DEFS = {
       text: "One of them squeaks if you so much as look at it. Everyone knows which one. Nobody sits in it.",
     },
   },
+  // Student elections (design doc §23 Phase 6) — a live, session-scoped
+  // poll (net.js broadcast, not a persisted ballot); `election: true`
+  // routes the interaction to openElection() instead of a memory card,
+  // same pattern as `shop`/`play`/`game`.
+  "ballot-box": {
+    sprite: "ballot-box", w: 2, h: 2, footRows: 1, election: true,
+  },
   easel: {
     sprite: "easel", w: 2, h: 3, footRows: 1,
     memory: {
@@ -417,7 +424,7 @@ const FALLBACK_COLORS = {
   "reading-corner": "#a13a3a", bookshelf: "#7a5230", "lunch-table": "#828a92",
   "sink-counter": "#9fb2c2", "fish-tank": "#3d7fa3", bleachers: "#8a6a4a",
   "basketball-hoop": "#c2743a", "stage-curtain": "#8a1f2b",
-  "auditorium-seats": "#7a2530", easel: "#8a6a4a", "art-shelf": "#7a5230",
+  "auditorium-seats": "#7a2530", "ballot-box": "#2b5a8a", easel: "#8a6a4a", "art-shelf": "#7a5230",
   "drum-set": "#a13a3a", "music-stand": "#3a3a3a", "lab-table": "#3a3a3a",
   "nurse-cot": "#c8d4dc", "first-aid-cabinet": "#d8dce0", "swing-set": "#5a6a7a",
   slide: "#e8c22e", "goal-post": "#dfe4e8", "school-bus": "#e8b22e",

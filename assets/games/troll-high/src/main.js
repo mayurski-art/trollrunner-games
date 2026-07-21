@@ -413,7 +413,7 @@ async function boot() {
   addEventListener("keydown", e => {
     if (e.code !== "KeyM" || e.target.tagName === "INPUT") return;
     if (!running) return;
-    if (mapOverlay.hidden) { if (!memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && tradeOverlay.hidden && bedroomOverlay.hidden && yearbookOverlay.hidden) openMap(); }
+    if (mapOverlay.hidden) { if (!memoryEl && !dialogueEl && !electionEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && tradeOverlay.hidden && bedroomOverlay.hidden && yearbookOverlay.hidden) openMap(); }
     else closeMap();
   });
 
@@ -977,6 +977,78 @@ async function boot() {
     closeMemory();
   }
 
+  // Student elections (design doc §23 Phase 6) — a live, session-scoped
+  // poll at the auditorium's ballot box: no persisted ballot, no new
+  // backend. Candidacy broadcasts over presence (net.setRunning, same
+  // mechanism as club); votes are a lightweight broadcast message
+  // (net.sendVote) each connected client tallies for itself into
+  // votesReceived (voterId -> candidateId, so changing your vote just
+  // overwrites your own entry — re-tallied fresh on every render, not
+  // accumulated). Resets each session; this is "a real thing happening
+  // right now," not a historical record.
+  let myRunning = false;
+  const votesReceived = new Map(); // voterId -> candidateId
+  let electionEl = null;
+
+  function electionCandidates() {
+    const list = [...ghosts.values()].filter(g => g.running).map(g => ({ id: g.id, name: g.name }));
+    if (myRunning) list.unshift({ id: net.id, name: identity.name + " (you)" });
+    return list;
+  }
+  function voteTally(candidateId) {
+    let n = 0;
+    for (const forId of votesReceived.values()) if (forId === candidateId) n++;
+    return n;
+  }
+  function castVote(candidateId) {
+    votesReceived.set(net.id, candidateId); // count your own vote locally — broadcast is self:false
+    net.sendVote(candidateId);
+    renderElection();
+  }
+  function runForOffice() {
+    myRunning = true;
+    net.setRunning(true);
+    showToast("🗳 You're running for Student Council.");
+    renderElection();
+  }
+  net.onVote = (voterId, voterName, forId) => { votesReceived.set(voterId, forId); renderElection(); };
+
+  function renderElection() {
+    if (!electionEl) return;
+    const candidates = electionCandidates();
+    const myVote = votesReceived.get(net.id);
+    electionEl.innerHTML =
+      `<h3>Student Council Election</h3>` +
+      `<p>Whoever's declared candidacy right now, and whoever's here to vote — all live, nothing saved after today.</p>` +
+      `<div class="th-election-list">` +
+      (candidates.length
+        ? candidates.map(c => `<div class="th-election-row"><span>${c.name}</span><b>${voteTally(c.id)} vote${voteTally(c.id) === 1 ? "" : "s"}</b>` +
+            `<button type="button" class="th-election-vote-btn" data-id="${c.id}" ${myVote === c.id ? "disabled" : ""}>${myVote === c.id ? "Voted" : "Vote"}</button></div>`).join("")
+        : `<p><i>No declared candidates here right now.</i></p>`) +
+      `</div>` +
+      (myRunning ? "" : `<button type="button" id="th-election-run-btn">Run for Student Council</button>`) +
+      `<div class="th-mem-close">E / tap outside the form — close</div>`;
+    electionEl.querySelector(".th-election-list").addEventListener("click", e => e.stopPropagation());
+    electionEl.querySelectorAll(".th-election-vote-btn").forEach(btn => {
+      btn.addEventListener("click", e => { e.stopPropagation(); castVote(btn.dataset.id); });
+    });
+    electionEl.querySelector("#th-election-run-btn")?.addEventListener("click", e => { e.stopPropagation(); runForOffice(); });
+  }
+  function openElection() {
+    closeElection();
+    electionEl = document.createElement("div");
+    electionEl.id = "th-election";
+    electionEl.className = "th-popup-card";
+    electionEl.setAttribute("role", "dialog");
+    electionEl.setAttribute("aria-label", "Student Council Election");
+    electionEl.addEventListener("click", closeElection);
+    $("th-root").appendChild(electionEl);
+    renderElection();
+  }
+  function closeElection() {
+    if (electionEl) { electionEl.remove(); electionEl = null; }
+  }
+
   // "See inside the TV": a small looping animated canvas standing in for
   // channel static, drawn fresh each time (no video asset, no license
   // concerns) — colored scanlines drifting over analog noise.
@@ -1078,7 +1150,7 @@ async function boot() {
   function escapeHtml(s) { return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
   function openChat() {
-    if (!running || memoryEl || dialogueEl || !lbOverlay.hidden || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden || !tradeOverlay.hidden || !bedroomOverlay.hidden || !yearbookOverlay.hidden) return;
+    if (!running || memoryEl || dialogueEl || electionEl || !lbOverlay.hidden || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden || !tradeOverlay.hidden || !bedroomOverlay.hidden || !yearbookOverlay.hidden) return;
     chatOpen = true;
     chatBar.hidden = false;
     chatInput.value = "";
@@ -1173,6 +1245,9 @@ async function boot() {
     get clubMember() { return clubMember; },
     get club() { return club; },
     get netClub() { return net.club; },
+    get electionOpen() { return !!electionEl; },
+    openElection, closeElection, runForOffice, castVote, voteTally,
+    get myRunning() { return myRunning; },
     renderer, // exposed for test/dev inspection of weather + tint rendering
     openTrade, closeTrade,
     get cards() { return cards; },
@@ -1237,7 +1312,7 @@ async function boot() {
       fade = Math.max(0, fade - dt * 4);
     }
 
-    if (!pendingDoor && !memoryEl && !dialogueEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && mapOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && tradeOverlay.hidden && bedroomOverlay.hidden && yearbookOverlay.hidden) {
+    if (!pendingDoor && !memoryEl && !dialogueEl && !electionEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && mapOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && tradeOverlay.hidden && bedroomOverlay.hidden && yearbookOverlay.hidden) {
       const axis = input.axis();
       tryPushFromInput(axis);
       player.update(dt, axis, zone);
@@ -1280,11 +1355,13 @@ async function boot() {
     const mem = obj && personalizeMemory(obj, obj.memory || obj.def.memory);
     const play = obj && (obj.play || obj.def.play);
     const shop = obj && (obj.shop || obj.def.shop);
+    const election = obj && (obj.election || obj.def.election);
     const arcadeHint = obj && obj.game ? ` Play ${obj.gameName || "a game"}` : null;
     const playHint = play ? ` Play ${obj.playName || obj.def.playName || minigameInfo(play).title}` : null;
     const shopHint = shop ? " Get lunch" : null;
+    const electionHint = election ? " Ballot box" : null;
     const peerHint = nearPeer ? ` Trade with ${nearPeer.name}` : null;
-    setHint((memoryEl || dialogueEl || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden || !tradeOverlay.hidden || !bedroomOverlay.hidden || !yearbookOverlay.hidden) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (peerHint || arcadeHint || playHint || shopHint || (mem ? ` ${mem.title}` : null)));
+    setHint((memoryEl || dialogueEl || electionEl || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden || !tradeOverlay.hidden || !bedroomOverlay.hidden || !yearbookOverlay.hidden) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (peerHint || arcadeHint || playHint || shopHint || electionHint || (mem ? ` ${mem.title}` : null)));
     if (input.interactPressed() && mapOverlay.hidden && profileOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && bedroomOverlay.hidden && yearbookOverlay.hidden) {
       if (!tradeOverlay.hidden) closeTrade();
       else if (!cafeteriaOverlay.hidden) closeCafeteria();
@@ -1292,11 +1369,13 @@ async function boot() {
       else if (!arcadeOverlay.hidden) closeArcade();
       else if (dialogueEl) closeDialogue();
       else if (memoryEl) closeMemory();
+      else if (electionEl) closeElection();
       else if (nearNPC) showDialogue(nearNPC);
       else if (nearPeer) openTrade(nearPeer.id, nearPeer.name);
       else if (obj && obj.game) openArcade(obj);
       else if (play) openMinigame(obj);
       else if (shop) openCafeteria();
+      else if (election) openElection();
       else if (mem) showMemory(mem, obj);
     }
 

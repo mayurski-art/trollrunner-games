@@ -1154,6 +1154,41 @@ html, body {
 }
 #th-club-found-btn { width: 100%; }
 
+/* Student elections (§23 Phase 6) — the ballot-box popup form. */
+.th-election-list { margin-top: 6px; }
+.th-election-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(43, 36, 23, 0.12);
+  font-size: 13px;
+}
+.th-election-row span { flex: 1; }
+.th-election-vote-btn {
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(43, 36, 23, 0.25);
+  background: var(--th-paper);
+  font-family: "DM Sans", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.th-election-vote-btn:disabled { opacity: 0.5; cursor: default; }
+#th-election-run-btn {
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(43, 36, 23, 0.25);
+  background: var(--th-paper);
+  font-family: "DM Sans", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 /* ------------------------------------------------------------ touch */
 #th-touch { position: absolute; inset: 0; z-index: 15; pointer-events: none; }
 

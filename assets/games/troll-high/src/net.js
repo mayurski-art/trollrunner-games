@@ -70,6 +70,8 @@ export class Net {
     this.name = name;
     this.club = null;           // real multi-club system (§23 Phase 6) — this
                                  // player's club name, or null if unaffiliated
+    this.running = false;       // student elections (§23 Phase 6) — is this
+                                 // player currently a declared candidate?
     this.transport = null;
     this.room = null;
     this.connected = false;
@@ -88,6 +90,12 @@ export class Net {
     this.onTradeAccept = null;  // (peerId, name, counterCards: {id,count}[]) => void
     this.onTradeDecline = null; // (peerId, name) => void
     this.onGift = null;         // (peerId, name, cardId) => void
+
+    // Student elections (§23 Phase 6) — a live, session-scoped poll, not a
+    // persisted ballot: candidacy broadcasts over presence like club does,
+    // and votes are a lightweight broadcast message each client tallies
+    // itself (no server-arbitrated count, same trust model as trading).
+    this.onVote = null;         // (voterId, voterName, forId) => void
   }
 
   async join(room) {
@@ -117,7 +125,7 @@ export class Net {
   _onMessage(m) {
     if (!m || m.id === this.id) return;
     if (m.t === "pos") {
-      this.peers.set(m.id, { x: m.x, y: m.y, dir: m.dir, moving: m.moving, name: m.name, club: m.club || null, last: performance.now() });
+      this.peers.set(m.id, { x: m.x, y: m.y, dir: m.dir, moving: m.moving, name: m.name, club: m.club || null, running: !!m.running, last: performance.now() });
     } else if (m.t === "chat" && this.onChat) {
       this.onChat(m.id, m.name, m.text);
     } else if (m.t === "emote" && this.onEmote) {
@@ -134,6 +142,8 @@ export class Net {
     } else if (m.t === "gift" && this.onGift) {
       if (m.to !== this.id) return;
       this.onGift(m.id, m.name, m.cardId);
+    } else if (m.t === "vote" && this.onVote) {
+      this.onVote(m.id, m.name, m.for);
     }
   }
 
@@ -153,13 +163,18 @@ export class Net {
     if (this._posAcc < 1 / POS_HZ) return;
     this._posAcc = 0;
     this.transport.send({
-      t: "pos", id: this.id, name: this.name, club: this.club,
+      t: "pos", id: this.id, name: this.name, club: this.club, running: this.running,
       x: Math.round(player.x), y: Math.round(player.y),
       dir: player.dir, moving: player.moving,
     });
   }
 
   setClub(name) { this.club = name || null; }
+  setRunning(v) { this.running = !!v; }
+  sendVote(forId) {
+    if (!this.connected) return;
+    this.transport.send({ t: "vote", id: this.id, name: this.name, for: forId });
+  }
 
   sendChat(text) {
     if (!this.connected) return;

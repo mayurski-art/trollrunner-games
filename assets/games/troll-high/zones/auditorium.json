@@ -63,6 +63,11 @@
       "type": "auditorium-seats",
       "x": 19,
       "y": 11
+    },
+    {
+      "type": "ballot-box",
+      "x": 11,
+      "y": 13
     }
   ],
   "doors": [

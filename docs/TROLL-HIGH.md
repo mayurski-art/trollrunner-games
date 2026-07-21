@@ -684,3 +684,45 @@ writing it: landing back near Alice's still-parked position put Bob
 within trade range, and `nearPeer` outranks the facing-tile memory
 interaction in the same priority chain as everything else — Alice
 has to step away from the charter tile before Bob can read it.)
+
+**Phase 6 (second slice) shipped 2026-07-21 — student elections.**
+Same "no new backend" constraint as the club system, applied to a
+different real happening: a ballot box in the Auditorium (new
+`ballot-box` object, `election: true` def field routes its interaction
+to `openElection()` instead of a memory card, same pattern as
+`shop`/`play`/`game`). Deliberately session-scoped rather than
+persisted — "a real thing happening right now," not a historical
+record, so nothing new needed saving.
+
+- `net.js`: `Net` gained `this.running` (bool) + `setRunning(v)`,
+  broadcast alongside position like `club`; a new `sendVote(forId)`
+  broadcast message and `onVote(voterId, voterName, forId)` handler.
+- `ghost.js`: tracks `running`; a declared candidate gets a compact 🗳
+  suffix folded into their existing name tag (not a whole extra line —
+  the club tag already added one, and stacking a second felt like too
+  much floating text over one sprite).
+- `main.js`: `votesReceived` is a `Map<voterId, candidateId>` — casting
+  a vote just overwrites your own entry rather than accumulating, so
+  changing your mind changes the tally instead of double-counting; the
+  actual count for a candidate is recomputed fresh on every render by
+  scanning the map. Casting updates your own local tally immediately
+  (broadcast is `self:false`, same as chat/gifts, so you don't hear
+  your own message) and also fires `net.sendVote()` for everyone else.
+  Running for office adds yourself to the candidate list (labeled "(you)")
+  without waiting on a broadcast round-trip. The popup reuses the same
+  `.th-popup-card` + inline-form + `stopPropagation()` technique as the
+  club charter form.
+- Wired into all the existing "something's open" gates (`openMap`'s
+  guard, `openChat`'s guard, and the movement-freeze check) the same
+  way `memoryEl`/`dialogueEl` already were — `electionEl` needed adding
+  to all three, easy to miss since it's a fourth thing of the same
+  shape rather than an `overlay.hidden` toggle.
+
+Test: `tools/troll-high-elections-smoke.js` — two real browser
+contexts again. Confirms the ballot box shows "no candidates" before
+anyone's run, Alice running broadcasts `net.running=true`, Bob's ghost
+view of her reflects it, Bob's ballot lists her by name, his own vote
+tallies locally on cast (button flips to disabled "Voted"), and —
+the actual cross-client check — Alice's own client independently
+receives Bob's broadcast vote and tallies it without any server
+arbitrating the count.
