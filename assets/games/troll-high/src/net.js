@@ -68,10 +68,12 @@ export class Net {
   constructor({ id, name }) {
     this.id = id;
     this.name = name;
+    this.club = null;           // real multi-club system (§23 Phase 6) — this
+                                 // player's club name, or null if unaffiliated
     this.transport = null;
     this.room = null;
     this.connected = false;
-    this.peers = new Map();     // id -> { x, y, dir, moving, name, last }
+    this.peers = new Map();     // id -> { x, y, dir, moving, name, club, last }
     this._posAcc = 0;
 
     this.onChat = null;         // (peerId, name, text) => void
@@ -115,7 +117,7 @@ export class Net {
   _onMessage(m) {
     if (!m || m.id === this.id) return;
     if (m.t === "pos") {
-      this.peers.set(m.id, { x: m.x, y: m.y, dir: m.dir, moving: m.moving, name: m.name, last: performance.now() });
+      this.peers.set(m.id, { x: m.x, y: m.y, dir: m.dir, moving: m.moving, name: m.name, club: m.club || null, last: performance.now() });
     } else if (m.t === "chat" && this.onChat) {
       this.onChat(m.id, m.name, m.text);
     } else if (m.t === "emote" && this.onEmote) {
@@ -151,11 +153,13 @@ export class Net {
     if (this._posAcc < 1 / POS_HZ) return;
     this._posAcc = 0;
     this.transport.send({
-      t: "pos", id: this.id, name: this.name,
+      t: "pos", id: this.id, name: this.name, club: this.club,
       x: Math.round(player.x), y: Math.round(player.y),
       dir: player.dir, moving: player.moving,
     });
   }
+
+  setClub(name) { this.club = name || null; }
 
   sendChat(text) {
     if (!this.connected) return;

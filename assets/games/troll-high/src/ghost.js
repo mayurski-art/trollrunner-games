@@ -30,6 +30,7 @@ export class Ghost {
     this.dir = "south";
     this.moving = false;
     this.name = "";
+    this.club = null; // real multi-club system (§23 Phase 6)
     this.animT = 0;
     this.bubble = null;             // { text, until }
   }
@@ -37,6 +38,7 @@ export class Ghost {
   applyUpdate(p) {
     this.targetX = p.x; this.targetY = p.y;
     this.dir = p.dir; this.moving = p.moving; this.name = p.name || this.name;
+    this.club = p.club || null;
     if (this.x === null) { this.x = p.x; this.y = p.y; } // snap on first sighting
   }
 
@@ -67,6 +69,17 @@ export class Ghost {
         ctx.fillText(label, this.x + 0.5, this.y - 30.5);
         ctx.fillStyle = "#fff";
         ctx.fillText(label, this.x, this.y - 31);
+        // Real multi-club system (§23 Phase 6) — a second small line so
+        // another player's club affiliation is visible at a glance, same
+        // spirit as the name tag above it.
+        if (this.club) {
+          const clubLabel = `🏷 ${this.club}`;
+          ctx.font = "7px monospace";
+          ctx.fillStyle = "rgba(0,0,0,0.55)";
+          ctx.fillText(clubLabel, this.x + 0.5, this.y - 21.5);
+          ctx.fillStyle = "#ffd23f";
+          ctx.fillText(clubLabel, this.x, this.y - 22);
+        }
         if (this.bubble) drawBubble(ctx, this.x, this.y, this.bubble.text);
       },
     };

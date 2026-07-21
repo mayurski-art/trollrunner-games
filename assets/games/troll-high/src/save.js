@@ -55,12 +55,12 @@ export async function loadSave(userId) {
 export async function saveGame(userId, {
   zoneId, x, y, foundKeys, studentId, enrolledAt, highScores, orientationDone, elective, dailyTasksDay, dailyFlags, cards,
   visitedZones, visitDays, lunchesBought, tradesCompleted, giftsGiven, giftsReceived, npcRelations, bedroomEquipped, photos, clubMember,
-  zoneVisitCounts, claimedSpots,
+  zoneVisitCounts, claimedSpots, club,
 }) {
   const data = {
     v: 1, zoneId, x, y, foundKeys, studentId, enrolledAt, highScores, orientationDone, elective, dailyTasksDay, dailyFlags, cards,
     visitedZones, visitDays, lunchesBought, tradesCompleted, giftsGiven, giftsReceived, npcRelations, bedroomEquipped, photos, clubMember,
-    zoneVisitCounts, claimedSpots, savedAt: Date.now(),
+    zoneVisitCounts, claimedSpots, club, savedAt: Date.now(),
   };
   writeLocalCache(userId, data);
   const sb = client();

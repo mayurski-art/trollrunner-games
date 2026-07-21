@@ -22,6 +22,7 @@ import { ELECTIVES, buildSchedule, DAILY_TASKS } from "./schedule.js";
 import { CARDS, cardById, maybeAwardCard } from "./cards.js";
 import { todaysLunch, todaysAnnouncement, todaysEvent, PIZZA_FRIDAY_SPECIAL } from "./daily.js";
 import { pickDialogueLine } from "./relations.js";
+import { sanitizeClubName } from "./club.js";
 import { SLOTS as BEDROOM_SLOTS, DECORATIONS, decorationById } from "./bedroom.js";
 import { capturePhoto, addPhotoToRoll, MAX_PHOTOS } from "./camera.js";
 import * as clock from "./clock.js";
@@ -206,10 +207,16 @@ async function boot() {
   let tradesCompleted = savedGame?.tradesCompleted || 0;
   let giftsGiven = savedGame?.giftsGiven || 0;
   let giftsReceived = savedGame?.giftsReceived || 0;
-  // Clubs (design doc §21 near-term queue, final item) — reading the club
+  // Real multi-club system (design doc §23 Phase 6) — reading the club
   // charter in the Underground HQ (finding it at all is gated behind the
-  // full secrets chain, same as meeting Trollface) doubles as signing it.
-  let clubMember = savedGame?.clubMember || false;
+  // full secrets chain, same as meeting Trollface) either founds a new,
+  // named club or joins one you've actually seen a live player represent.
+  // `club` is the source of truth; `clubMember` stays as a plain derived
+  // boolean since bedroom.js/relations.js/relationContext() already key
+  // off it. Old saves from before this system only had `clubMember: true`
+  // with no name — those become an unnamed founded club, not lost.
+  let club = savedGame?.club || (savedGame?.clubMember ? { name: "The Club", founded: true } : null);
+  let clubMember = !!club;
   if (!visitedZones.has(zone.id)) { visitedZones.add(zone.id); saveDirty = true; }
   if (!visitDays.has(today)) { visitDays.add(today); saveDirty = true; }
 
@@ -244,7 +251,7 @@ async function boot() {
       zoneId: zone.id, x: player.x, y: player.y, foundKeys: [...found], studentId, enrolledAt, highScores,
       orientationDone, elective, dailyTasksDay, dailyFlags, cards,
       visitedZones: [...visitedZones], visitDays: [...visitDays], lunchesBought, tradesCompleted, giftsGiven, giftsReceived,
-      npcRelations, bedroomEquipped, photos, clubMember, zoneVisitCounts, claimedSpots,
+      npcRelations, bedroomEquipped, photos, clubMember, zoneVisitCounts, claimedSpots, club,
     });
   }
   setInterval(persist, 30000);
@@ -253,6 +260,7 @@ async function boot() {
 
   // ------------------------------------------------------------ multiplayer
   const net = new Net(identity);
+  net.setClub(club?.name || null);
   const ghosts = new Map(); // peer id -> Ghost
   const hud = $("th-hud"), hint = $("th-hint");
   const zoneNameEl = $("th-zone-name"), clockEl = $("th-clock"), rosterEl = $("th-roster");
@@ -322,6 +330,7 @@ async function boot() {
         favoriteZone: favoriteZoneName(),
         hasLocker: !!claimedSpots.lockers,
         hasBench: !!claimedSpots["park-bench"],
+        club,
       },
     });
     renderCardPicker($("th-profile-cards"), cards, new Set(), { readonly: true });
@@ -514,7 +523,7 @@ async function boot() {
   // for other reasons (stats, bedroom, save data), no new grind.
   function relationContext() {
     return {
-      visitedZones, clubMember, giftsGiven, giftsReceived, tradesCompleted,
+      visitedZones, clubMember, club, giftsGiven, giftsReceived, tradesCompleted,
       lunchesBought, daysAttended: visitDays.size,
       cardsCollected: Object.keys(cards).length,
       highScores, npcRelations,
@@ -900,18 +909,47 @@ async function boot() {
     memoryEl.setAttribute("role", "dialog");
     memoryEl.setAttribute("aria-label", mem.title);
     const isNew = !found.has(obj.memKey);
-    const joiningClub = isNew && obj.type === "club-charter" && !clubMember;
-    memoryEl.innerHTML =
-      `<h3>${mem.title}${isNew ? " ✨" : ""}</h3><p>${mem.text}</p>` +
-      (joiningClub ? `<p><b>You sign your name under the one other member. You're in the club now.</b></p>` : "") +
-      (obj.def.screen ? `<canvas class="th-mem-screen" width="120" height="90"></canvas>` : "") +
-      `<div class="th-mem-close">E / tap — close</div>`;
+    // Not gated on isNew — someone who closed the charter without founding
+    // or joining a club last time should still get the prompt again next
+    // visit, not just once ever.
+    const joiningClub = obj.type === "club-charter" && !clubMember;
+    if (joiningClub) {
+      // Real multi-club system (§23 Phase 6) — "which clubs exist" is
+      // genuinely whatever names other live players nearby are currently
+      // broadcasting (net.js presence), not a persisted roster.
+      const otherClubs = [...new Set([...ghosts.values()].map(g => g.club).filter(Boolean))];
+      memoryEl.innerHTML =
+        `<h3>${mem.title}${isNew ? " ✨" : ""}</h3><p>${mem.text}</p>` +
+        `<div class="th-club-form">` +
+        (otherClubs.length
+          ? `<p><b>Clubs represented here right now:</b></p><div class="th-club-join-list">` +
+            otherClubs.map(n => `<button type="button" class="th-club-join-btn" data-name="${n.replace(/"/g, "&quot;")}">Join "${n}"</button>`).join("") +
+            `</div>`
+          : "") +
+        `<p><b>Or found your own:</b></p>` +
+        `<input type="text" id="th-club-name-input" maxlength="24" placeholder="Name your club">` +
+        `<button type="button" id="th-club-found-btn">Found this club</button>` +
+        `</div>` +
+        `<div class="th-mem-close">E / tap outside the form — close</div>`;
+      memoryEl.querySelector(".th-club-form").addEventListener("click", e => e.stopPropagation());
+      memoryEl.querySelectorAll(".th-club-join-btn").forEach(btn => {
+        btn.addEventListener("click", () => joinClub(btn.dataset.name));
+      });
+      memoryEl.querySelector("#th-club-found-btn").addEventListener("click", () => {
+        const input = memoryEl.querySelector("#th-club-name-input");
+        joinClub(sanitizeClubName(input.value), true);
+      });
+    } else {
+      memoryEl.innerHTML =
+        `<h3>${mem.title}${isNew ? " ✨" : ""}</h3><p>${mem.text}</p>` +
+        (obj.def.screen ? `<canvas class="th-mem-screen" width="120" height="90"></canvas>` : "") +
+        `<div class="th-mem-close">E / tap — close</div>`;
+    }
     memoryEl.addEventListener("click", closeMemory);
     $("th-root").appendChild(memoryEl);
     if (isNew) {
       found.add(obj.memKey);
       markDailyTask("memory");
-      if (joiningClub) { clubMember = true; showToast("📝 You're a member of the club now."); }
       const won = maybeAwardCard();
       if (won) { addCard(won); showToast(`🃏 Found a ${cardById(won).name} card!`); }
       saveDirty = true;
@@ -923,6 +961,20 @@ async function boot() {
   function closeMemory() {
     stopScreenAnim();
     if (memoryEl) { memoryEl.remove(); memoryEl = null; }
+  }
+
+  // Real multi-club system (§23 Phase 6) — founding names a brand new
+  // club; joining adopts a name actually seen represented by a live
+  // player nearby. Either way it's broadcast over presence (net.js) so
+  // other players can see/join it too, with zero new backend.
+  function joinClub(name, founded = false) {
+    club = { name, founded };
+    clubMember = true;
+    net.setClub(name);
+    saveDirty = true;
+    persist();
+    showToast(founded ? `📝 You founded "${name}."` : `📝 You joined "${name}."`);
+    closeMemory();
   }
 
   // "See inside the TV": a small looping animated canvas standing in for
@@ -1119,6 +1171,8 @@ async function boot() {
     get bedroomStats() { return bedroomStats(); },
     get todaysEventId() { return todaysEventId; },
     get clubMember() { return clubMember; },
+    get club() { return club; },
+    get netClub() { return net.club; },
     renderer, // exposed for test/dev inspection of weather + tint rendering
     openTrade, closeTrade,
     get cards() { return cards; },

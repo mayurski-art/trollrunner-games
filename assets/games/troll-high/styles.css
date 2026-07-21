@@ -1128,6 +1128,32 @@ html, body {
   opacity: 0.55;
 }
 
+/* Real multi-club system (§23 Phase 6) — the club-charter founding/joining
+   form, embedded inline in the memory-card popup. */
+.th-club-form { margin-top: 8px; }
+.th-club-form p { margin: 6px 0 4px; }
+.th-club-join-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.th-club-join-btn, #th-club-found-btn {
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(43, 36, 23, 0.25);
+  background: var(--th-paper);
+  font-family: "DM Sans", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+#th-club-name-input {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(43, 36, 23, 0.25);
+  font-family: "DM Sans", sans-serif;
+  margin-bottom: 6px;
+  box-sizing: border-box;
+}
+#th-club-found-btn { width: 100%; }
+
 /* ------------------------------------------------------------ touch */
 #th-touch { position: absolute; inset: 0; z-index: 15; pointer-events: none; }
 

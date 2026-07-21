@@ -22,6 +22,7 @@ export function renderProfile(dom, { name, studentId, enrolledAt, memoriesFound,
     if (dailyLife.favoriteZone) bits.push(`Usually found in: ${dailyLife.favoriteZone}`);
     if (dailyLife.hasLocker) bits.push("Has a locker");
     if (dailyLife.hasBench) bits.push("Has a bench");
+    if (dailyLife.club) bits.push(`Club: ${dailyLife.club.name}${dailyLife.club.founded ? " (founder)" : ""}`);
     dom.dailyLife.textContent = bits.join(" · ");
   }
 

@@ -40,7 +40,10 @@ export function pickDialogueLine(def, relation, context = {}) {
     for (const m of def.memoryLines) {
       if (!seen.includes(m.id) && m.condition(context)) {
         seen.push(m.id);
-        return m.line;
+        // `line` can be a plain string or, for callbacks that need to
+        // reference real state (e.g. the player's own club name), a
+        // function of the same context.
+        return typeof m.line === "function" ? m.line(context) : m.line;
       }
     }
   }

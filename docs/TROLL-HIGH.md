@@ -626,3 +626,61 @@ since nothing in the render loop reads `Date`. Verifies each NPC's
 eventLine actually fires (accounting for Phase 2 milestone tiers
 consuming the first 1-2 interactions first), the Picture Day photo tag
 + yearbook caption, and the PACER Day toast.
+
+**Phase 6 (first slice) shipped 2026-07-21 — the real multi-club
+system.** "Multiplayer Memories" is a big phase (shared yearbooks,
+class photos, dances, talent shows, science fairs, graduation, clubs,
+elections); asked which slice to build first, chose clubs specifically
+because it needs **no new Supabase table** — "which clubs exist" is
+genuinely just whichever names other live players are currently
+broadcasting over the existing zone presence channel (`net.js`), the
+same ephemeral mechanism that already shows real players' names. That
+also makes it honestly multiplayer-native rather than a fake shared
+list: a club is "real" exactly as long as someone's around
+representing it.
+
+- `net.js`: `Net` gained `this.club` + `setClub(name)`; `sendPosition()`
+  now broadcasts `club` alongside `name`, and incoming `"pos"` messages
+  populate `club` on the peer record.
+- `ghost.js`: `Ghost.applyUpdate()` stores `club`; `entity()` draws a
+  second small gold line (`🏷 ClubName`) under a nearby real player's
+  name tag when they have one — same visual language as the existing
+  NPC/Player tag.
+- `club.js` (new file): just `sanitizeClubName()` — trim/length-cap,
+  default to "The Club" if empty. No moderation; out of scope.
+- Reading the club charter in the Underground HQ (`main.js`'s
+  `showMemory()`) no longer auto-joins. If `!clubMember`, it renders a
+  real form inline in the memory card: a "Join" button for every
+  distinct club name currently visible among live `ghosts` in the zone
+  (sourced straight from their `.club`, i.e. real players actually
+  representing that club right now), plus a name input + "Found this
+  club" button. The form's own click handler calls `stopPropagation()`
+  so interacting with it doesn't trigger the card's existing
+  click-anywhere-to-close behavior; `KeyE` still closes without
+  choosing (gated on `!clubMember`, not `isNew`, so it re-prompts next
+  visit rather than only once ever). Founding sets
+  `club = {name, founded: true}`; joining sets `{name, founded: false}`.
+  Either way: `clubMember` (still a plain derived boolean — bedroom.js/
+  relations.js/relationContext() already keyed off it) flips true,
+  `net.setClub(name)` broadcasts it, and it's persisted.
+- `save.js`/`main.js`: new `club` save field. Old saves that only had
+  `clubMember: true` (pre-Phase-6) synthesize `{name: "The Club",
+  founded: true}` on load rather than losing membership.
+- Priya's (art-room) whole existing arc was "I'm starting a club, don't
+  know what kind yet" — now has a `memoryLines` callback (relations.js's
+  `line` field can be a function of context, not just a string, added
+  for exactly this) that reacts to the player's own real club name once
+  they have one: `` `Wait, "${c.club.name}"? ...` ``.
+- Profile card shows `Club: Name (founder)` or `Club: Name`.
+
+Test: `tools/troll-high-clubs-smoke.js` — two real isolated browser
+contexts (same pattern as trading-smoke), both run the full secrets
+chain into the Underground HQ. Alice founds "Chess Club"; verifies it's
+broadcasting over presence by reading Bob's live `ghosts` map directly.
+Bob's own charter form is asserted to actually offer "Join Chess Club"
+sourced from that presence data, joins it, and both profile cards +
+Priya's reactive line are checked. (One navigation gotcha hit while
+writing it: landing back near Alice's still-parked position put Bob
+within trade range, and `nearPeer` outranks the facing-tile memory
+interaction in the same priority chain as everything else — Alice
+has to step away from the charter tile before Bob can read it.)

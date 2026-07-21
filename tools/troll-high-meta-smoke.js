@@ -103,9 +103,22 @@ async function checkMemory(page, warp, titleRe, label, holdMs = 120) {
   const zoneName = await page.$eval('#th-zone-name', el => el.textContent);
   log(zoneName === 'The Underground HQ', `zone name reads "The Underground HQ" (${JSON.stringify(zoneName)})`);
 
-  await checkMemory(page, [3, 4], /club charter/i, 'Club charter');
+  // The real multi-club system (design doc §23 Phase 6) replaced the old
+  // auto-join with a real founding/joining form — see
+  // troll-high-clubs-smoke.js for full multiplayer coverage of that
+  // system; here it's just "does reading the charter still lead to
+  // clubMember being true," via founding one.
+  await page.evaluate(() => window.__th.warpTo(3, 4));
+  await hold(page, 'ArrowUp', 120);
+  await page.keyboard.press('KeyE');
+  await page.waitForSelector('#th-memory', { timeout: 3000 });
+  const title = await page.$eval('#th-memory h3', el => el.textContent);
+  log(/club charter/i.test(title), `Club charter memory matches (${JSON.stringify(title)})`);
+  await page.type('#th-club-name-input', 'The Underground Club');
+  await page.click('#th-club-found-btn');
+  await page.waitForFunction('!document.getElementById("th-memory")', { timeout: 3000 });
   const clubMember = await page.evaluate(() => window.__th.clubMember);
-  log(clubMember === true, `reading the club charter for the first time joins the club (clubMember=${clubMember})`);
+  log(clubMember === true, `founding a club from the charter sets clubMember=true (clubMember=${clubMember})`);
   await checkMemory(page, [11, 6], /golden statue/i, 'Golden statue');
 
   // Meet Trollface

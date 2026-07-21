@@ -390,6 +390,13 @@ export const NPC_DEFS = {
         "This is basically a week-long excuse for banners. I love banners.",
       ],
     },
+    // Real multi-club system (§23 Phase 6) — Priya's whole arc was "I'm
+    // starting a club, don't know what kind yet"; once the player's
+    // actually founded or joined a real one, she reacts to it by name.
+    memoryLines: [
+      { id: "player-club", condition: c => !!c.club,
+        line: c => `Wait, "${c.club.name}"? That's so much better than whatever I was going to call mine. Can I join?` },
+    ],
     dialogue: [
       "I'm starting a club. I don't know what kind yet, but it's going to be great.",
       "Sign-up sheet's coming soon. Very soon. Soon-ish.",
