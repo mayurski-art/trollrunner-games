@@ -158,6 +158,7 @@ h1 {
 .hud-icon-img {
   width: 100%; height: 100%; object-fit: cover; object-position: center top;
   transform: skewX(9deg) scale(1.18); transform-origin: center;
+  image-rendering: pixelated;
   filter: drop-shadow(0 2px 4px rgba(0,0,0,0.6));
 }
 .hud-tab {
@@ -849,248 +850,233 @@ h1 {
   box-shadow: 0 0 40px 7px rgba(255, 210, 70, 0.62), inset 0 0 30px rgba(255, 210, 70, 0.34);
 }
 
-/* --- stage select live overlay (sits on the mockup art) ------------------- */
-.stage-live { position: absolute; left: 5.5%; top: 14.5%; width: 89%; height: 42.5%; border-radius: 8px; overflow: hidden; }
-.stage-live img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.stage-live-cap {
-  position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 14px 12px; text-align: center;
-  background: linear-gradient(to top, rgba(2, 6, 3, 0.94), rgba(2, 6, 3, 0.45) 62%, transparent);
-}
-.stage-live-cap strong {
-  display: block; font-family: var(--mono); font-weight: 900; letter-spacing: 0.09em;
-  text-transform: uppercase; font-size: clamp(14px, 2vw, 22px); color: var(--green);
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.85);
-}
-.stage-live-cap span { display: block; margin-top: 3px; font-size: clamp(10px, 1.2vw, 13px); color: rgba(255, 255, 255, 0.84); }
-
-.stage-thumb {
-  position: absolute; padding: 0; margin: 0; border: none; background: transparent;
-  cursor: pointer; border-radius: 10px; -webkit-tap-highlight-color: transparent;
-  outline: none; transition: box-shadow 150ms ease;
-}
-/* selected: inset ring + outer glow */
-.stage-thumb.is-sel { box-shadow: 0 0 0 3px var(--green), 0 0 26px 4px rgba(77,255,115,0.5); }
-/* focus-visible: same as selected ring so keyboard nav is clear */
-.stage-thumb:focus-visible { box-shadow: 0 0 0 3px rgba(77,255,115,0.8), 0 0 22px 4px rgba(77,255,115,0.4); }
-
-/* random-map toggle — opaque pills sit exactly over the baked OFF/ON so the
-   live state (not the baked art) is the source of truth. OFF = warm, ON = green. */
-.stage-rand { position: absolute; left: 19.4%; top: 90.8%; width: 13.4%; height: 5.8%; display: flex; gap: 4px; }
-.rand-opt {
-  flex: 1; border: 1px solid rgba(255, 255, 255, 0.18); background: #15100c;
-  color: var(--muted); font-family: var(--mono); font-weight: 700; font-size: clamp(10px, 1.1vw, 13px);
-  border-radius: 999px; cursor: pointer; transition: all 140ms ease;
-}
-.rand-opt:hover { border-color: rgba(255, 255, 255, 0.4); }
-.rand-opt[data-rand="off"].is-active {
-  background: linear-gradient(180deg, #ff8a3d, #df451c); color: #190a04;
-  border-color: #ff8a3d; box-shadow: 0 0 16px rgba(255, 110, 50, 0.55);
-}
-.rand-opt[data-rand="on"].is-active {
-  background: var(--green); color: #04130a; border-color: var(--green); box-shadow: 0 0 16px rgba(77, 255, 115, 0.5);
-}
-
-.stage-btn {
-  position: absolute; border: 0; border-radius: 9px; cursor: pointer;
-  font-family: var(--mono); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
-}
-.stage-btn.is-back { right: 21%; bottom: 2.6%; padding: 9px 18px; font-size: 13px;
-  background: rgba(255, 255, 255, 0.08); color: var(--ink); border: 1px solid rgba(255, 255, 255, 0.25); }
-.stage-btn.is-back:hover { background: rgba(255, 255, 255, 0.16); }
-.stage-btn.is-fight { right: 3%; bottom: 2.2%; padding: 11px 26px; font-size: 16px; color: #fff;
-  background: linear-gradient(180deg, #ff6a3d, #d61f1f); box-shadow: 0 0 26px rgba(255, 90, 50, 0.6); }
-.stage-btn.is-fight:hover { box-shadow: 0 0 38px rgba(255, 110, 60, 0.85); }
-
-/* --- match type cards --- */
-.mt-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 18px; }
-.mt-card {
-  --accent: var(--green);
-  display: grid; justify-items: center; gap: 8px; padding: 24px 18px; cursor: pointer; color: var(--ink);
-  border: 1px solid var(--line); border-radius: 14px; background: rgba(255, 255, 255, 0.04);
-  transition: transform 140ms ease, border-color 140ms ease, box-shadow 160ms ease, background 140ms ease;
-}
-.mt-card.is-gold { --accent: var(--gold); }
-.mt-card:hover, .mt-card:focus-visible, .mt-card.is-active {
-  transform: translateY(-3px); border-color: var(--accent); outline: none;
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-  box-shadow: 0 0 30px color-mix(in srgb, var(--accent) 36%, transparent);
-}
-.mt-icon { font-size: 40px; line-height: 1; }
-.mt-card strong { font-size: clamp(20px, 2.6vw, 30px); text-transform: uppercase; color: var(--accent); }
-.mt-desc { color: var(--muted); font-size: 13px; max-width: 26ch; }
-
-/* --- player count cards --- */
-.pc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
-.pc-card {
-  --accent: var(--green);
-  display: grid; justify-items: center; gap: 10px; padding: 22px 12px; cursor: pointer; color: var(--ink);
-  border: 1px solid var(--line); border-radius: 14px; background: rgba(255, 255, 255, 0.04);
-  transition: transform 140ms ease, border-color 140ms ease, box-shadow 160ms ease;
-}
-.pc-card strong { font-size: clamp(18px, 2.2vw, 26px); text-transform: uppercase; }
-.pc-card:not(.is-locked):hover, .pc-card:not(.is-locked):focus-visible, .pc-card.is-active {
-  transform: translateY(-3px); border-color: var(--accent); outline: none;
-  box-shadow: 0 0 28px color-mix(in srgb, var(--accent) 36%, transparent);
-}
-.pc-card.is-active { background: color-mix(in srgb, var(--accent) 16%, transparent); }
-.pc-card.is-locked { opacity: 0.5; cursor: not-allowed; }
-.pc-slots { display: inline-flex; gap: 7px; }
-.pc-slots i { width: 16px; height: 16px; border-radius: 50%; border: 2px solid currentColor; opacity: 0.7; }
-.pc-card.is-active .pc-slots i { background: var(--accent); border-color: var(--accent); opacity: 1; }
-.pc-state { font-family: var(--mono); font-size: 11px; text-transform: uppercase; color: var(--muted); }
-
-/* --- fighter select --- */
-/* =========================================================================
-   FIGHTER SELECT  —  screen-fighter.png mockup IS the screen.
-   Live overlays sit on top only where content changes (picked fighter,
-   roster selection rings, tip text). Everything else is the baked PNG.
-   ========================================================================= */
-
-.fsel-mock { font-family: var(--mono); }
-
-/* ---- P1 / P2 cover panels: opaque, cleanly hide the baked fighter so any
-   pick shows through. The baked neon frame (green/gold) stays around them. */
-.fsel-mock .fsel-panel {
-  --slot: var(--green); --slot-rgb: 61,255,94;
-  position: absolute; display: flex; flex-direction: column; align-items: center;
-  border-radius: 8px; overflow: hidden; z-index: 2;
-  /* fully opaque so no baked art bleeds through */
-  background:
-    radial-gradient(ellipse 86% 64% at 50% 46%, rgba(var(--slot-rgb),0.20) 0%, transparent 68%),
-    linear-gradient(180deg, #0a0d0b 0%, #070908 60%, #050606 100%);
-  box-shadow: inset 0 0 60px rgba(var(--slot-rgb),0.08);
-}
-.fsel-mock .fsel-panel.is-p2 { --slot: var(--gold); --slot-rgb: 255,184,0; }
-.fsel-mock .fsel-panel.is-current {
-  box-shadow: inset 0 0 90px rgba(var(--slot-rgb),0.16), 0 0 24px rgba(var(--slot-rgb),0.25);
-}
-
-.fsel-mock .fsel-portrait {
-  flex: 1; width: 100%; min-height: 0; overflow: hidden;
-  display: flex; align-items: flex-end; justify-content: center;
-  padding: 8% 6% 0;
-}
-.fsel-mock .fighter-splash {
-  width: 100%; max-height: 100%; object-fit: contain; object-position: center bottom;
-  filter: drop-shadow(0 8px 18px rgba(0,0,0,0.85));
-}
-
-.fsel-mock .fsel-panel-foot {
-  width: 100%; padding: 6% 8% 9%; text-align: center;
-  background: linear-gradient(0deg, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.35) 62%, transparent 100%);
-}
-.fsel-mock .fsel-panel strong {
-  display: block; font-family: var(--font);
-  font-size: clamp(18px,2.6vw,34px); font-weight: 900; line-height: 1;
-  text-transform: uppercase; letter-spacing: 0.05em; color: #fff;
-  text-shadow: 0 2px 0 rgba(0,0,0,0.7);
-}
-.fsel-mock .fsel-tag {
-  display: block; margin: 3px 0 5px;
-  font-size: clamp(9px,1vw,13px); text-transform: uppercase; letter-spacing: 0.14em;
-  color: var(--slot); text-shadow: 0 0 10px rgba(var(--slot-rgb),0.6);
-}
-.fsel-mock .fsel-status {
-  display: block; font-size: clamp(8px,0.85vw,11px);
-  text-transform: uppercase; letter-spacing: 0.1em; color: var(--slot);
-}
-
-/* ---- roster: transparent hotspots over the baked thumbnails ---- */
-.fsel-mock .fsel-grid { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
-.fsel-mock .fsel-cell {
-  position: absolute; pointer-events: auto;
-  border: 2px solid transparent; border-radius: 9px; background: transparent;
-  cursor: pointer; outline: none; -webkit-tap-highlight-color: transparent;
-  transition: box-shadow 150ms ease, border-color 150ms ease;
-}
-/* positions wrap the 3 baked thumbs exactly (Pepe · Doge · Troll), so the hover
-   ring sits right on each thumbnail's border — no left-offset. Per-fighter glow:
-   Pepe green, Doge yellow, Troll white. */
-.fsel-mock .fsel-cell:nth-child(1) { left: 31.0%; top: 56.3%; width: 11.2%; height: 27.8%; --ring: 61,255,94; }   /* Pepe  — green  */
-.fsel-mock .fsel-cell:nth-child(2) { left: 43.8%; top: 56.3%; width: 11.2%; height: 27.8%; --ring: 255,184,0; }  /* Doge  — yellow */
-.fsel-mock .fsel-cell:nth-child(3) { left: 56.6%; top: 56.3%; width: 11.2%; height: 27.8%; --ring: 245,248,255; } /* Troll — white  */
-.fsel-mock .fsel-cell:hover:not(.is-locked),
-.fsel-mock .fsel-cell:focus-visible:not(.is-locked) {
-  border-color: rgb(var(--ring));
-  box-shadow: 0 0 18px 2px rgba(var(--ring),0.55), 0 0 34px 8px rgba(var(--ring),0.30), inset 0 0 14px rgba(var(--ring),0.18);
-}
-.fsel-mock .fsel-cell.taken-1 { border-color: var(--green); box-shadow: 0 0 22px 3px rgba(61,255,94,0.5); }
-.fsel-mock .fsel-cell.taken-2 { border-color: var(--gold);  box-shadow: 0 0 22px 3px rgba(255,184,0,0.5); }
-.fsel-mock .fsel-cell.is-locked { cursor: not-allowed; }
-.fsel-mock .fsel-cell.is-locked::after {
-  content: attr(data-by); position: absolute; top: 4px; left: 50%; transform: translateX(-50%);
-  padding: 1px 8px; border-radius: 4px; background: rgba(3,4,6,0.85);
-  font-family: var(--mono); font-weight: 900; font-size: clamp(8px,0.8vw,11px); color: #fff;
-}
-
-/* ---- footer overlays (replace baked placeholders) ---- */
-.fsel-mock .fsel-chip {
-  position: absolute; z-index: 4; bottom: 2.2%;
-  padding: 5px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.18);
-  background: #0a0d11; color: var(--muted);
-  font-family: var(--mono); font-size: clamp(9px,1vw,12px); font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.06em; cursor: pointer;
-  transition: border-color 120ms, color 120ms;
-}
-.fsel-mock .fsel-chip:hover { border-color: rgba(255,255,255,0.45); color: var(--ink); }
-.fsel-mock .fsel-back  { left: 2.4%; }
-.fsel-mock .fsel-reset { left: 11.5%; }
-.fsel-mock .fsel-center-chip {
-  position: absolute; z-index: 4; bottom: 1.8%; left: 50%; transform: translateX(-50%);
-  display: flex; align-items: center; gap: 12px; max-width: 46%;
-  padding: 6px 18px; border-radius: 7px;
-  background: #0a0d11; border: 1px solid rgba(255,255,255,0.1);
-}
-.fsel-mock .fsel-tip {
-  font-family: var(--mono); font-size: clamp(9px,0.95vw,12px);
-  color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.fsel-mock .fsel-go {
-  flex: 0 0 auto; padding: 5px 16px; border-radius: 6px;
-  border: 1px solid rgba(61,255,94,0.6); background: rgba(61,255,94,0.1); color: var(--green);
-  font-family: var(--mono); font-size: clamp(9px,1vw,12px); font-weight: 900;
-  text-transform: uppercase; letter-spacing: 0.06em; cursor: pointer;
-  transition: box-shadow 130ms, background 130ms;
-}
-.fsel-mock .fsel-go:not(:disabled):hover { box-shadow: 0 0 20px rgba(61,255,94,0.4); background: rgba(61,255,94,0.18); }
-.fsel-mock .fsel-go:disabled { opacity: 0.3; cursor: not-allowed; }
-
-/* --- stage select --- */
+/* --- stage select (flat retro pixel-screen chrome) ------------------------
+   Real DOM/CSS: live hero preview + a row of real stage thumbnails. Replaces
+   the old baked screen-stage.png background — same copy/flow, new register. */
+.stage-retro { max-width: 980px; }
 .stage-hero {
-  display: flex; gap: 14px; align-items: flex-end; text-align: left;
-  margin-top: 16px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: rgba(0, 0, 0, 0.3);
+  display: flex; gap: 14px; align-items: stretch; text-align: left;
+  border: 2px solid var(--line); border-radius: 8px; background: #0a0d0b; padding: 12px; margin: 4px 0 16px;
 }
 .stage-hero-img {
-  flex: 1; height: clamp(120px, 22vh, 220px); border-radius: 10px; background-size: cover; background-position: center;
-  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.4);
+  flex: 1; min-height: clamp(140px, 24vh, 220px); border-radius: 6px; overflow: hidden;
+  border: 2px solid #000; background: #050608;
 }
-.stage-hero-meta { width: 200px; flex-shrink: 0; }
-.stage-hero-meta strong { font-size: clamp(18px, 2.4vw, 26px); text-transform: uppercase; color: var(--green); }
-.stage-hero-meta span { display: block; margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.4; }
-.stage-row { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
-.stage-tile {
-  --accent: var(--green); cursor: pointer; padding: 0; overflow: hidden;
-  border: 2px solid var(--line); border-radius: 10px; background: #0a0510;
-  transition: transform 140ms ease, border-color 140ms ease, box-shadow 160ms ease;
+.stage-hero-img img { width: 100%; height: 100%; object-fit: cover; display: block; image-rendering: pixelated; }
+.stage-hero-meta { width: 220px; flex-shrink: 0; display: flex; flex-direction: column; justify-content: center; gap: 6px; }
+.stage-hero-meta strong {
+  display: block; font-family: var(--mono); font-weight: 900; font-size: clamp(16px, 2.2vw, 22px);
+  text-transform: uppercase; letter-spacing: 0.04em;
 }
-.stage-tile span { display: block; height: 64px; background-size: cover; background-position: center; }
-.stage-tile small { display: block; padding: 5px 4px; font-family: var(--mono); font-size: 9px; text-transform: uppercase; color: var(--muted); }
-.stage-tile:hover, .stage-tile:focus-visible { transform: translateY(-3px); border-color: var(--accent); outline: none; }
-.stage-tile.is-active { border-color: var(--accent); box-shadow: 0 0 24px color-mix(in srgb, var(--accent) 44%, transparent); }
-.stage-tile.is-active small { color: var(--accent); }
-.stage-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; margin-top: 16px; }
-.stage-foot .flow-actions { margin-top: 0; }
-.rand-toggle { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; font-family: var(--mono); font-size: 12px; text-transform: uppercase; color: var(--muted); }
-.rand-toggle input { position: absolute; opacity: 0; pointer-events: none; }
-.rand-pill { width: 44px; height: 24px; border-radius: 999px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.5); position: relative; transition: background 160ms ease; }
-.rand-pill i { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--muted); transition: transform 160ms ease, background 160ms ease; }
-.rand-toggle input:checked + .rand-pill { background: color-mix(in srgb, var(--green) 40%, transparent); border-color: var(--green); }
-.rand-toggle input:checked + .rand-pill i { transform: translateX(20px); background: var(--green); }
+.stage-hero-meta span { display: block; color: var(--muted); font-size: 13px; line-height: 1.4; }
+
+.stage-row { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin-bottom: 4px; }
+.stage-thumb {
+  --accent: var(--green); display: flex; flex-direction: column; align-items: stretch;
+  cursor: pointer; padding: 0; overflow: hidden; height: auto;
+  border: 2px solid var(--line); border-radius: 8px; background: #050608;
+  transition: transform 140ms ease, border-color 140ms ease;
+}
+.stage-thumb img { display: block; flex: 0 0 58px; width: 100%; height: 58px; object-fit: cover; image-rendering: pixelated; }
+.stage-thumb span {
+  flex: 0 0 auto; display: block; padding: 4px 4px; font-family: var(--mono); font-size: 9px;
+  text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); background: #0a0d0b;
+}
+.stage-thumb:hover, .stage-thumb:focus-visible { outline: none; transform: translateY(-2px); border-color: var(--accent); }
+.stage-thumb.is-sel { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.stage-thumb.is-sel span { color: var(--accent); }
+
+/* random-map toggle — flat pills, live state is the only source of truth */
+.stage-rand { display: inline-flex; align-items: center; gap: 6px; }
+.stage-rand-label { font-family: var(--mono); font-size: 10px; text-transform: uppercase; color: var(--muted); letter-spacing: 0.05em; margin-right: 2px; }
+.rand-opt {
+  border: 2px solid rgba(255, 255, 255, 0.18); background: #050608; color: var(--muted);
+  font-family: var(--mono); font-weight: 700; font-size: 11px; letter-spacing: 0.04em;
+  border-radius: 5px; padding: 6px 12px; cursor: pointer; transition: border-color 140ms ease, color 140ms ease;
+}
+.rand-opt:hover { border-color: rgba(255, 255, 255, 0.4); }
+.rand-opt[data-rand="off"].is-active { background: rgba(255, 138, 61, 0.14); border-color: #ff8a3d; color: #ff8a3d; }
+.rand-opt[data-rand="on"].is-active { background: rgba(61, 255, 94, 0.14); border-color: var(--green); color: var(--green); }
+
+.retro-confirm.is-fight { background: rgba(255, 90, 50, 0.14); border-color: #ff6a3d; color: #ff8a5c; }
+.retro-confirm.is-fight:hover { background: rgba(255, 90, 50, 0.24); }
+
+/* --- retro flat-chrome screens (match type / player count) ---------------
+   Nostalgic pixel-screen treatment: hard 2px edges, flat fills, no glow or
+   glass blur, monospace chrome. Replaces the old baked-mockup-PNG approach
+   for these two screens — same copy/flow, new rendering register. */
+.retro-screen {
+  width: min(880px, 100%); max-height: 100%; overflow: auto;
+  padding: clamp(16px, 2.6vw, 28px);
+  border: 3px solid #000; border-radius: 8px;
+  box-shadow: 0 0 0 2px #3a2f3a, 0 0 0 6px #000, 0 18px 60px rgba(0, 0, 0, 0.6);
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.025) 0 2px, transparent 2px 4px),
+    #0d0b12;
+  text-align: center;
+}
+.retro-title {
+  font-family: var(--mono); font-size: clamp(22px, 3.6vw, 34px); font-weight: 700;
+  letter-spacing: 0.04em; text-transform: uppercase; margin: 4px 0 4px; color: var(--ink);
+  text-shadow: 2px 0 0 #000, -2px 0 0 #000, 0 2px 0 #000, 0 -2px 0 #000, 3px 3px 0 rgba(255, 184, 0, 0.5);
+}
+.retro-sub {
+  font-family: var(--mono); font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--gold); margin: 0 0 20px;
+}
+.retro-sub::before, .retro-sub::after { content: "\25C6"; margin: 0 8px; color: var(--red); }
+.retro-footnote {
+  margin-top: 18px; font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: 0.04em;
+}
+.retro-nav-row { display: flex; justify-content: space-between; align-items: center; margin-top: 22px; gap: 12px; }
+.retro-back, .retro-confirm {
+  font-family: var(--mono); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  border-radius: 6px; cursor: pointer; padding: 10px 20px; font-size: 13px; transition: background 140ms ease;
+}
+.retro-back { background: rgba(255, 255, 255, 0.06); border: 2px solid rgba(255, 255, 255, 0.25); color: var(--ink); }
+.retro-back:hover { background: rgba(255, 255, 255, 0.12); }
+.retro-confirm { background: rgba(61, 255, 94, 0.14); border: 2px solid var(--green); color: var(--green); }
+.retro-confirm:hover { background: rgba(61, 255, 94, 0.24); }
+.retro-confirm:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* --- match type cards --- */
+.mt-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 4px; }
+.mt-card {
+  --accent: var(--green);
+  display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center;
+  padding: 20px 16px; cursor: pointer; color: var(--ink);
+  border: 2px solid var(--accent); border-radius: 8px; background: #0a0d0b;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.06);
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+.mt-card.is-gold { --accent: var(--gold); }
+.mt-card:hover, .mt-card:focus-visible {
+  outline: none; transform: translateY(-2px);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.06), 0 0 0 3px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.mt-vs-row { display: flex; align-items: flex-end; gap: 12px; }
+.mt-vs-icon {
+  width: 84px; height: 84px; object-fit: contain; image-rendering: pixelated;
+  background: #050608; border: 2px solid #000; border-radius: 6px; padding: 4px;
+}
+.mt-vs-word { font-family: var(--mono); font-weight: 900; font-size: 14px; color: var(--red); }
+.mt-cpu-chip {
+  display: grid; place-items: center; width: 84px; height: 84px;
+  font-family: var(--mono); font-weight: 900; font-size: 14px; letter-spacing: 0.05em;
+  color: var(--green); background: #050608; border: 2px solid var(--green); border-radius: 6px;
+}
+.mt-card strong { font-family: var(--mono); font-size: clamp(18px, 2.4vw, 26px); text-transform: uppercase; color: var(--accent); }
+.mt-desc { color: var(--muted); font-size: 12px; max-width: 26ch; margin: 0; }
+
+/* --- player count cards --- */
+.pc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 4px; }
+.pc-card {
+  --accent: var(--green);
+  display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center;
+  padding: 18px 10px; color: var(--ink);
+  border: 2px solid var(--line); border-radius: 8px; background: #0a0d0b;
+}
+button.pc-card { cursor: pointer; transition: transform 140ms ease, border-color 140ms ease; }
+button.pc-card:hover, button.pc-card:focus-visible { outline: none; transform: translateY(-2px); border-color: var(--accent); }
+.pc-card.is-active {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.06), 0 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.pc-card.is-locked { opacity: 0.45; }
+.pc-card strong { font-family: var(--mono); font-size: clamp(16px, 2vw, 22px); text-transform: uppercase; }
+.pc-card .pc-slots { display: inline-flex; gap: 6px; }
+.pc-card .pc-slots i { width: 14px; height: 14px; border: 2px solid currentColor; border-radius: 2px; opacity: 0.7; }
+.pc-card.is-active .pc-slots i { background: var(--accent); border-color: var(--accent); opacity: 1; }
+.pc-card .pc-state { font-family: var(--mono); font-size: 10px; text-transform: uppercase; color: var(--muted); letter-spacing: 0.05em; }
+
+/* --- fighter select (flat retro pixel-screen chrome) ----------------------
+   Real DOM/CSS: P1/P2 big pixel-bust portraits + a live roster grid. Replaces
+   the old baked screen-fighter.png background — same copy/flow, new register. */
+.fsel-retro { max-width: 980px; }
+.fsel-body {
+  display: grid; grid-template-columns: 1fr 1.35fr 1fr; gap: 14px; align-items: stretch;
+  margin: 4px 0 18px; min-height: clamp(260px, 40vh, 400px);
+}
+.fsel-panel {
+  --slot: var(--green);
+  position: relative; display: flex; flex-direction: column; align-items: center;
+  border: 2px solid var(--slot); border-radius: 8px; background: #0a0d0b; padding: 16px 8px 0;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.05);
+}
+.fsel-panel.is-p2 { --slot: var(--gold); }
+.fsel-panel.is-current {
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.05), 0 0 0 3px color-mix(in srgb, var(--slot) 45%, transparent);
+}
+.fsel-ptag {
+  position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+  padding: 2px 10px; border-radius: 4px; background: var(--slot); color: #062b0d;
+  font-family: var(--mono); font-size: 11px; font-weight: 900; letter-spacing: 0.08em;
+}
+.fsel-panel.is-p2 .fsel-ptag { color: #2b1e00; }
+.fsel-portrait {
+  flex: 1; width: 100%; min-height: 0; overflow: hidden;
+  display: flex; align-items: flex-end; justify-content: center; padding-top: 6px;
+}
+.fighter-splash {
+  width: auto; height: 100%; max-width: 100%; object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.85));
+}
+.fsel-panel-foot { width: 100%; padding: 8px 6px 14px; text-align: center; }
+.fsel-panel strong {
+  display: block; font-family: var(--mono); font-size: clamp(16px, 2vw, 22px); font-weight: 900;
+  text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink);
+}
+.fsel-tag {
+  display: block; margin: 3px 0 4px; font-family: var(--mono);
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--slot);
+}
+.fsel-status {
+  display: block; font-family: var(--mono); font-size: 10px; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--muted);
+}
+
+.fsel-center {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  border: 2px solid var(--line); border-radius: 8px; background: #0a0d0b; padding: 14px 10px;
+}
+.fsel-roster-label {
+  margin: 0; font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--gold);
+}
+.fsel-roster-label::before, .fsel-roster-label::after { content: "\25C6"; margin: 0 8px; color: var(--red); }
+.fsel-grid { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.fsel-cell {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  width: 82px; padding: 6px 4px 8px; border: 2px solid var(--ring-c, var(--line)); border-radius: 8px;
+  background: #050608; cursor: pointer; outline: none; -webkit-tap-highlight-color: transparent;
+  transition: border-color 140ms ease, transform 140ms ease;
+}
+.fsel-cell:nth-child(1) { --ring-c: #3dff5e; }  /* Pepe  — green  */
+.fsel-cell:nth-child(2) { --ring-c: #ffb800; }  /* Doge  — gold   */
+.fsel-cell:nth-child(3) { --ring-c: #dfe6ef; }  /* Troll — white  */
+.fsel-cell-img { width: 100%; height: 56px; object-fit: contain; image-rendering: pixelated; }
+.fsel-cell-name { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink); }
+.fsel-cell:hover:not(.is-locked), .fsel-cell:focus-visible:not(.is-locked) {
+  outline: none; transform: translateY(-2px); box-shadow: 0 0 0 2px var(--ring-c);
+}
+.fsel-cell.taken-1 { border-color: var(--green); box-shadow: 0 0 0 2px var(--green); }
+.fsel-cell.taken-2 { border-color: var(--gold);  box-shadow: 0 0 0 2px var(--gold); }
+.fsel-cell.is-locked { cursor: not-allowed; opacity: 0.55; }
+.fsel-cell.is-locked::after {
+  content: attr(data-by); position: absolute; top: -9px; left: 50%; transform: translateX(-50%);
+  padding: 1px 6px; border-radius: 4px; background: #000;
+  font-family: var(--mono); font-weight: 900; font-size: 9px; color: #fff;
+}
+.fsel-tip {
+  margin: 0; font-family: var(--mono); font-size: 11px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.05em; text-align: center;
+}
+.retro-nav-left { display: flex; gap: 10px; }
 
 @media (max-width: 760px) {
   .mt-grid, .pc-grid { grid-template-columns: 1fr; }
-  .fsel-stage { grid-template-columns: 1fr; }
+  .fsel-body { grid-template-columns: 1fr; }
   .fsel-grid { grid-auto-flow: column; }
   .stage-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .stage-hero { flex-direction: column; align-items: stretch; }

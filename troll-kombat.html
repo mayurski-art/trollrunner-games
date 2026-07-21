@@ -95,11 +95,32 @@
           <div id="tk-announce" class="tk-announce" aria-live="assertive"></div>
 
           <!-- ============ PRE-MATCH FLOW ============ -->
-          <!-- 1 · Match type: CPU vs Multiplayer (approved mockup art + hotspots) -->
+          <!-- 1 · Match type: CPU vs Multiplayer (flat retro pixel-screen chrome) -->
           <div id="tk-matchtype" class="game-overlay flow-overlay is-visible">
-            <div class="mockup-screen" style="background-image:url('assets/games/troll-kombat/ui/screen-matchtype.png?v=kombat-v8')">
-              <button type="button" class="hot" data-act="mt-cpu" style="left:4.5%;top:21%;width:43%;height:62%" aria-label="CPU Fight"></button>
-              <button type="button" class="hot" data-act="mt-mp" style="left:52.5%;top:21%;width:43%;height:62%" aria-label="Multiplayer"></button>
+            <div class="retro-screen">
+              <h2 class="retro-title">Choose Match Type</h2>
+              <p class="retro-sub">Phase 4 &ndash; Match Setup</p>
+              <div class="mt-grid">
+                <button type="button" class="mt-card" data-act="mt-cpu" aria-label="CPU Fight">
+                  <div class="mt-vs-row">
+                    <img src="assets/games/troll-kombat/characters/pepe-samurai-portrait.png" alt="" class="mt-vs-icon">
+                    <span class="mt-vs-word">VS</span>
+                    <span class="mt-cpu-chip">CPU</span>
+                  </div>
+                  <strong>CPU Fight</strong>
+                  <p class="mt-desc">Fight against the existing CPU opponent system.</p>
+                </button>
+                <button type="button" class="mt-card is-gold" data-act="mt-mp" aria-label="Multiplayer">
+                  <div class="mt-vs-row">
+                    <img src="assets/games/troll-kombat/characters/doge-drip-portrait.png" alt="" class="mt-vs-icon">
+                    <span class="mt-vs-word">VS</span>
+                    <img src="assets/games/troll-kombat/characters/troll-gladiator-portrait.png" alt="" class="mt-vs-icon">
+                  </div>
+                  <strong>Multiplayer</strong>
+                  <p class="mt-desc">Local multiplayer, choose player count next.</p>
+                </button>
+              </div>
+              <p class="retro-footnote">Supports 2 players now &middot; architecture ready for 3+ later</p>
             </div>
           </div>
 
@@ -181,82 +202,131 @@
             </div>
           </div>
 
-          <!-- 2 · Player count (mockup art + hotspots; 2 active, 4 future) -->
+          <!-- 2 · Player count (flat retro pixel-screen chrome; 2 active, 3/4 future) -->
           <div id="tk-playercount" class="game-overlay flow-overlay">
-            <div class="mockup-screen" style="background-image:url('assets/games/troll-kombat/ui/screen-playercount.png?v=kombat-v7')">
-              <button type="button" class="hot" data-act="pc-2" style="left:5%;top:16%;width:31%;height:58%" aria-label="2 Players"></button>
-              <button type="button" class="hot" data-act="pc-confirm" style="left:84%;top:91%;width:15%;height:8%" aria-label="Confirm"></button>
-              <button type="button" class="hot" data-act="back-matchtype" style="left:0.5%;top:91%;width:13%;height:8%" aria-label="Back"></button>
+            <div class="retro-screen">
+              <h2 class="retro-title">Player Count</h2>
+              <p class="retro-sub">Local Multiplayer</p>
+              <div class="pc-grid">
+                <button type="button" class="pc-card is-active" data-act="pc-2" aria-label="2 Players">
+                  <span class="pc-slots"><i></i><i></i></span>
+                  <strong>2 Players</strong>
+                  <span class="pc-state">Ready now</span>
+                </button>
+                <div class="pc-card is-locked" aria-hidden="true">
+                  <span class="pc-slots"><i></i><i></i><i></i></span>
+                  <strong>3 Players</strong>
+                  <span class="pc-state">Expansion ready</span>
+                </div>
+                <div class="pc-card is-locked" aria-hidden="true">
+                  <span class="pc-slots"><i></i><i></i><i></i><i></i></span>
+                  <strong>4 Players</strong>
+                  <span class="pc-state">Future ready</span>
+                </div>
+              </div>
+              <div class="retro-nav-row">
+                <button type="button" class="retro-back" data-act="back-matchtype">&larr; Back</button>
+                <button type="button" class="retro-confirm" data-act="pc-confirm">Confirm &rarr;</button>
+              </div>
             </div>
           </div>
 
-          <!-- 3 · Fighter select — screen-fighter.png mockup as background, live overlays only where content changes -->
+          <!-- 3 · Fighter select (flat retro pixel-screen chrome) -->
           <div id="tk-fighter" class="game-overlay">
-            <div class="mockup-screen fsel-mock" style="background-image:url('assets/games/troll-kombat/ui/screen-fighter.png?v=kombat-v16')">
+            <div class="retro-screen fsel-retro">
+              <h2 class="retro-title">Choose Your Fighter</h2>
+              <p class="retro-sub" id="fsel-kicker">Select your fighter</p>
 
-              <!-- hidden kicker (JS writes match-type text here) -->
-              <span id="fsel-kicker" hidden></span>
+              <div class="fsel-body">
+                <!-- P1 panel -->
+                <div class="fsel-panel is-p1" id="fsel-p1">
+                  <span class="fsel-ptag">P1</span>
+                  <div class="fsel-portrait"></div>
+                  <div class="fsel-panel-foot">
+                    <strong>—</strong>
+                    <span class="fsel-tag"></span>
+                    <span class="fsel-status" id="fsel-p1-status">Selecting…</span>
+                  </div>
+                </div>
 
-              <!-- P1 cover panel — opaque, sits inside the baked green frame -->
-              <div class="fsel-panel is-p1" id="fsel-p1" style="left:5.5%;top:14.2%;width:20.7%;height:69%">
-                <div class="fsel-portrait"></div>
-                <div class="fsel-panel-foot">
-                  <strong>—</strong>
-                  <span class="fsel-tag"></span>
-                  <span class="fsel-status" id="fsel-p1-status">Selecting…</span>
+                <!-- roster grid -->
+                <div class="fsel-center">
+                  <p class="fsel-roster-label">Select Your Fighter</p>
+                  <div id="fsel-grid" class="fsel-grid" role="listbox" aria-label="Fighter roster"></div>
+                  <p class="fsel-tip" id="fsel-hint">Pick your fighter</p>
+                </div>
+
+                <!-- P2 panel -->
+                <div class="fsel-panel is-p2" id="fsel-p2" hidden>
+                  <span class="fsel-ptag">P2</span>
+                  <div class="fsel-portrait"></div>
+                  <div class="fsel-panel-foot">
+                    <strong>—</strong>
+                    <span class="fsel-tag"></span>
+                    <span class="fsel-status" id="fsel-p2-status">Waiting…</span>
+                  </div>
                 </div>
               </div>
 
-              <!-- P2 cover panel — opaque, sits inside the baked gold frame -->
-              <div class="fsel-panel is-p2" id="fsel-p2" style="left:73.8%;top:14.2%;width:20.7%;height:69%" hidden>
-                <div class="fsel-portrait"></div>
-                <div class="fsel-panel-foot">
-                  <strong>—</strong>
-                  <span class="fsel-tag"></span>
-                  <span class="fsel-status" id="fsel-p2-status">Waiting…</span>
+              <div class="retro-nav-row">
+                <div class="retro-nav-left">
+                  <button type="button" class="retro-back" id="fsel-back">← Back</button>
+                  <button type="button" class="retro-back" id="fsel-reset">↺ Reset</button>
                 </div>
+                <button type="button" class="retro-confirm" id="fsel-continue" disabled>Choose Stage →</button>
               </div>
-
-              <!-- roster: transparent hotspots over the 3 baked thumbnails -->
-              <div id="fsel-grid" class="fsel-grid" role="listbox" aria-label="Fighter roster"></div>
-
-              <!-- footer overlays — replace the baked placeholders -->
-              <button type="button" class="fsel-chip fsel-back" id="fsel-back">← Back</button>
-              <button type="button" class="fsel-chip fsel-reset" id="fsel-reset">↺ Reset</button>
-              <div class="fsel-center-chip">
-                <span class="fsel-tip" id="fsel-hint">Pick your fighter</span>
-                <button type="button" class="fsel-go" id="fsel-continue" disabled>Choose Stage →</button>
-              </div>
-
             </div>
           </div>
 
-          <!-- 4 · Stage select (mockup art + live hero preview overlay) -->
+          <!-- 4 · Stage select (flat retro pixel-screen chrome) -->
           <div id="tk-stage" class="game-overlay flow-overlay">
-            <div class="mockup-screen" style="background-image:url('assets/games/troll-kombat/ui/screen-stage.png?v=kombat-v8')">
-              <!-- live preview covering the baked panorama + name strip -->
-              <div class="stage-live">
-                <img id="stage-hero-live" alt="Selected stage preview">
-                <div class="stage-live-cap">
+            <div class="retro-screen stage-retro">
+              <h2 class="retro-title">Choose Your Stage</h2>
+
+              <div class="stage-hero">
+                <div class="stage-hero-img"><img id="stage-hero-live" alt="Selected stage preview"></div>
+                <div class="stage-hero-meta">
                   <strong id="stage-name-live">Troll Hills</strong>
                   <span id="stage-desc-live">Peaceful hills watched over by ancient memes.</span>
                 </div>
               </div>
-              <!-- 6 thumbnail hotspots over the baked thumbnails -->
-              <button type="button" class="stage-thumb is-sel" data-stage="0" style="left:5.0%;top:60.5%;width:14.5%;height:25.2%" aria-label="Troll Hills"></button>
-              <button type="button" class="stage-thumb" data-stage="1" style="left:20.1%;top:60.5%;width:14.5%;height:25.2%" aria-label="Floating Market"></button>
-              <button type="button" class="stage-thumb" data-stage="2" style="left:35.2%;top:60.5%;width:14.5%;height:25.2%" aria-label="Lakeside Town"></button>
-              <button type="button" class="stage-thumb" data-stage="3" style="left:50.3%;top:60.5%;width:14.5%;height:25.2%" aria-label="Meme Palace"></button>
-              <button type="button" class="stage-thumb" data-stage="4" style="left:65.4%;top:60.5%;width:14.5%;height:25.2%" aria-label="Sunset Ruins"></button>
-              <button type="button" class="stage-thumb" data-stage="5" style="left:80.5%;top:60.5%;width:14.5%;height:25.2%" aria-label="Cyber Rain City"></button>
-              <!-- random map toggle over the baked OFF/ON pills -->
-              <div class="stage-rand">
-                <button type="button" class="rand-opt is-active" data-rand="off">OFF</button>
-                <button type="button" class="rand-opt" data-rand="on">ON</button>
+
+              <div class="stage-row">
+                <button type="button" class="stage-thumb is-sel" data-stage="0" aria-label="Troll Hills">
+                  <img src="assets/games/troll-kombat/stages/zone-1.png" alt="" loading="lazy">
+                  <span>Troll Hills</span>
+                </button>
+                <button type="button" class="stage-thumb" data-stage="1" aria-label="Floating Market">
+                  <img src="assets/games/troll-kombat/stages/zone-2.png" alt="" loading="lazy">
+                  <span>Floating Market</span>
+                </button>
+                <button type="button" class="stage-thumb" data-stage="2" aria-label="Lakeside Town">
+                  <img src="assets/games/troll-kombat/stages/zone-3.png" alt="" loading="lazy">
+                  <span>Lakeside Town</span>
+                </button>
+                <button type="button" class="stage-thumb" data-stage="3" aria-label="Meme Palace">
+                  <img src="assets/games/troll-kombat/stages/zone-4.png" alt="" loading="lazy">
+                  <span>Meme Palace</span>
+                </button>
+                <button type="button" class="stage-thumb" data-stage="4" aria-label="Sunset Ruins">
+                  <img src="assets/games/troll-kombat/stages/zone-5.png" alt="" loading="lazy">
+                  <span>Sunset Ruins</span>
+                </button>
+                <button type="button" class="stage-thumb" data-stage="5" aria-label="Cyber Rain City">
+                  <img src="assets/games/troll-kombat/stages/zone-6.png" alt="" loading="lazy">
+                  <span>Cyber Rain City</span>
+                </button>
               </div>
-              <!-- back + fight (no painted equivalents — visible neon buttons) -->
-              <button type="button" class="stage-btn is-back" data-act="stage-back">← Back</button>
-              <button type="button" class="stage-btn is-fight" data-act="stage-fight">▶ Fight</button>
+
+              <div class="retro-nav-row">
+                <button type="button" class="retro-back" data-act="stage-back">← Back</button>
+                <div class="stage-rand">
+                  <span class="stage-rand-label">Random map</span>
+                  <button type="button" class="rand-opt is-active" data-rand="off">OFF</button>
+                  <button type="button" class="rand-opt" data-rand="on">ON</button>
+                </div>
+                <button type="button" class="retro-confirm is-fight" data-act="stage-fight">▶ Fight</button>
+              </div>
             </div>
           </div>
 

@@ -118,7 +118,7 @@
       drawHead: drawPepeHead,   // portrait/pre-load fallback only
       moves: { punch: "Cope Jab", kick: "Green Candle Kick", block: "Diamond Hands Guard", special: "Katana Cope Slash", finisher: "Feels Bad, Man" },
       portraitSrc: "pepe-rig/anims/portrait.png",
-      splashSrc: "pepe-samurai-splash.png",   // glossy ChatGPT render for select screens
+      splashSrc: "pepe-samurai-portrait.png",   // big pixel-bust portrait for select screens (same rig as in-fight sprite)
       // PixelLab pixel rig — east-facing animation strips, mirrored by facing.
       anims: {
         dir: "pepe-rig/anims/", cell: 92, scale: 3.6, footFrac: 0.978,
@@ -143,7 +143,7 @@
       pal: { base: "#e3ad4f", dark: "#a9762a", light: "#f7d98a", ink: "#3a2406", face: "#e8b85a", accent: "#ff6fd0", accent2: "#ffd84d" },
       drawHead: drawDogeHead,   // portrait/pre-load fallback only
       portraitSrc: "doge-rig/portrait.png",
-      splashSrc: "doge-drip-splash.png",   // glossy ChatGPT render for select screens
+      splashSrc: "doge-drip-portrait.png",   // big pixel-bust portrait for select screens (same rig as in-fight sprite)
       moves: { punch: "Much Punch", kick: "Such Kick", block: "Mink Coat Guard", special: "Deal-With-It Dash", finisher: "Very Rekt. Much Wow." },
       // PixelLab pixel rig — east-facing animation strips, mirrored by facing.
       // 180px cells; feet measured at y156 → footFrac 0.872; scale matches Pepe height.
@@ -170,7 +170,7 @@
       pal: { base: "#e9e9ee", dark: "#9aa0ad", light: "#ffffff", ink: "#15151c", face: "#f2f2f5", accent: "#d23b3b", accent2: "#c8962a" },
       drawHead: drawTrollHead,   // fallback only — used until the anim strips finish loading
       portraitSrc: "gladiator/portrait.png",
-      splashSrc: "troll-splash.png",   // glossy ChatGPT render for select screens
+      splashSrc: "troll-gladiator-portrait.png",   // big pixel-bust portrait for select screens (same rig as in-fight sprite)
       // Frame-based PixelLab animation set (east-facing; mirrored by facing).
       anims: {
         dir: "gladiator/anims/", cell: 136, scale: 2.5, footFrac: 0.99,
@@ -2229,9 +2229,9 @@
     return c;
   }
 
-  // Glossy splash render (ChatGPT art) used on the pre-match SELECT screens only
-  // — deliberately fancier than the in-game pixel sprite. Falls back to the
-  // pixel portrait if a fighter has no splash yet.
+  // Big pixel-bust portrait (PixelLab, same rig as the in-fight sprite) used on
+  // the pre-match SELECT screens only. Falls back to the pixel portrait if a
+  // fighter has no splash yet.
   function splashEl(def, cls) {
     if (!def.splashSrc) return portraitEl(def, cls === "is-thumb" ? 72 : 130);
     const im = document.createElement("img");
@@ -2295,12 +2295,10 @@
   };
   const blip = (f, to) => { audio.ensure(); audio.blip(f, 0.08, "square", 0.08, to); };
 
-  /* --- 1 & 2 · MATCH TYPE + PLAYER COUNT (mockup screens w/ click hotspots) --
-     These two screens use the approved ChatGPT mockup art as a full-bleed
-     background; transparent `.hot` buttons sit over the painted controls and
-     dispatch on data-act. CPU difficulty defaults to Normal (the mockup has no
-     selector) — `diffSel` is read when present. */
-  document.querySelectorAll(".flow-overlay .hot, #tk-difficulty .diff-btn, #tk-difficulty .diff-back, #tk-mpmode .diff-btn, #tk-mpmode .diff-back").forEach(el => {
+  /* --- 1 & 2 · MATCH TYPE + PLAYER COUNT (flat retro pixel-screen chrome) ---
+     Real DOM/CSS cards dispatch on data-act. CPU difficulty defaults to Normal
+     (this screen has no selector) — `diffSel` is read when present. */
+  document.querySelectorAll(".flow-overlay .hot, .flow-overlay .mt-card, .flow-overlay .pc-card[data-act], .flow-overlay .retro-back, .flow-overlay .retro-confirm, #tk-difficulty .diff-btn, #tk-difficulty .diff-back, #tk-mpmode .diff-btn, #tk-mpmode .diff-back").forEach(el => {
     el.addEventListener("click", () => {
       const act = el.dataset.act;
       blip(660, 880);
@@ -2328,13 +2326,20 @@
 
   /* --- 3 · FIGHTER SELECT (synced locking in multiplayer) ------------------- */
   // roster = transparent hotspots over the baked mockup thumbnails (Pepe·Doge·Troll).
-  // The PNG already paints the art + names; these just add hover/selected/locked rings.
+  // Each cell carries its own thumbnail image + name (flat retro chrome — no
+  // baked art to rely on) plus hover/selected/locked rings.
   const fselGrid = document.getElementById("fsel-grid");
   ROSTER.forEach(def => {
     const cell = document.createElement("button");
     cell.type = "button"; cell.className = "fsel-cell"; cell.dataset.id = def.id;
     cell.setAttribute("role", "option");
     cell.setAttribute("aria-label", def.name);
+    const thumb = document.createElement("img");
+    thumb.className = "fsel-cell-img"; thumb.alt = "";
+    thumb.src = SHEET_DIR + (def.splashSrc || def.portraitSrc);
+    const label = document.createElement("span");
+    label.className = "fsel-cell-name"; label.textContent = def.name.split(" ")[0];
+    cell.append(thumb, label);
     cell.addEventListener("click", () => { online.active ? pickFighterOnline(def.id) : pickFighter(def.id); });
     fselGrid.appendChild(cell);
   });
