@@ -103,8 +103,13 @@ export class NPC {
      (see main.js showDialogue) rather than a tiny in-world canvas bubble,
      which could end up clipped by the camera or hard to read depending on
      zoom and where the NPC happens to be standing. */
-  speak() {
-    const lines = this.def.dialogue;
+  /* Real School Events (design doc §23 Phase 4) — on a day one of this
+     NPC's eventLines applies, cycle through that set instead of the
+     normal dialogue, same index/modulo mechanics either way. Falls
+     straight back to normal dialogue on an ordinary day or for NPCs
+     that don't react to that particular event. */
+  speak(eventId) {
+    const lines = (eventId && this.def.eventLines && this.def.eventLines[eventId]) || this.def.dialogue;
     const text = lines[this.dialogueIndex % lines.length];
     this.dialogueIndex++;
     return text;
@@ -190,6 +195,16 @@ export const NPC_DEFS = {
     activePeriods: ["Period 4", "Lunch", "Period 5"],
     firstLine: "First time through the line? Take the good tray, not the bent one.",
     familiarLine: "The usual, sweetie?",
+    // Real School Events (design doc §23 Phase 4) — Pizza Friday already
+    // swaps the actual cafeteria special (see PIZZA_FRIDAY_SPECIAL in
+    // main.js); this is the dialogue half of the same real happening.
+    eventLines: {
+      "pizza-friday": [
+        "It's Pizza Friday, sweetie. The good pizza, not the Tuesday pizza.",
+        "I make extra on Fridays. People notice when I don't.",
+        "Chocolate milk AND pizza today. Don't tell the other lunch ladies I let you have both.",
+      ],
+    },
     dialogue: [
       "Pizza Friday is this Friday. It's also every Friday. You're welcome.",
       "One scoop each. I see you eyeing a second scoop.",
@@ -236,6 +251,13 @@ export const NPC_DEFS = {
         line: "I hear you've been collecting cards. Very on-brand for someone who's always in my library. Quietly noted." },
     ],
     returningLine: "Been a few days. The books missed you. I did not say that out loud.",
+    eventLines: {
+      "book-fair": [
+        "The book fair's set up in the corner. Browsing is allowed. Enthusiasm is allowed. Volume is not.",
+        "Careful with the fair copies — those aren't library property, they're for sale. Quietly consider your budget.",
+        "Best week of my year, if I'm honest. Don't tell anyone I said that either.",
+      ],
+    },
     dialogue: [
       "SHHHH.",
       "This is a library. Act like it.",
@@ -287,6 +309,12 @@ export const NPC_DEFS = {
         line: "You've been trading cards with people. Feels good, man. Very ecosystem of you." },
     ],
     returningLine: "Whoa, been a minute. Buses kept running without you. Feels weird, man.",
+    eventLines: {
+      "spirit-week": [
+        "Spirit Week, man. I'm not wearing the colors but I'm feeling the colors. That's participation.",
+        "Bus driver's got spirit ribbons on the mirror. Whole vibe shifted this week.",
+      ],
+    },
     dialogue: [
       "Bus is always five minutes early or ten minutes late. Never on time. Kind of beautiful, honestly.",
       "You ever just stand here and watch the buses turn around? No? Just me?",
@@ -307,6 +335,13 @@ export const NPC_DEFS = {
         line: "I saw your PACER score. Not bad. Not better than mine. But not bad." },
     ],
     returningLine: "Where've you been? The court got boring without someone to beat.",
+    eventLines: {
+      "pacer-day": [
+        "Today's the real one. Official PACER Day. Don't choke.",
+        "Everyone's PR is on the line today. Including mine. Especially mine.",
+        "Whatever your best is — beat it today and I'll actually admit it in front of people.",
+      ],
+    },
     dialogue: [
       "Oh, it's you. I beat your PACER time. Just thought you should know.",
       "Rematch. Anytime. I'm serious.",
@@ -328,6 +363,16 @@ export const NPC_DEFS = {
     type: "stationary", x: 7, y: 8, facing: "north",
     firstLine: "Oh — hi. Sorry, are you lost too?",
     familiarLine: "Oh, hey, it's you! I remember you.",
+    eventLines: {
+      "spirit-week": [
+        "I wore the wrong color today. I wear the wrong color every day of Spirit Week. It's a pattern now.",
+        "Someone told me today's theme and I already forgot. Is it too late to ask again?",
+      ],
+      "picture-day": [
+        "Picture Day. I've already sneezed twice and it's not even Period 2.",
+        "Do I look okay? Don't answer that. Actually — answer that.",
+      ],
+    },
     dialogue: [
       "Is... is this the office? I think I'm lost. Again.",
       "I don't really know anyone here yet. It's fine. It's totally fine.",
@@ -339,6 +384,12 @@ export const NPC_DEFS = {
     type: "stationary", x: 8, y: 9, facing: "south",
     firstLine: "New person! Want to join my club? I still don't know what it is.",
     familiarLine: "You're back! Still thinking about that club.",
+    eventLines: {
+      "spirit-week": [
+        "I painted my face for Spirit Week and now I can't get it off before art. Worth it.",
+        "This is basically a week-long excuse for banners. I love banners.",
+      ],
+    },
     dialogue: [
       "I'm starting a club. I don't know what kind yet, but it's going to be great.",
       "Sign-up sheet's coming soon. Very soon. Soon-ish.",
@@ -350,6 +401,12 @@ export const NPC_DEFS = {
     type: "stationary", x: 7, y: 9, facing: "north",
     firstLine: "Huh. Didn't expect anyone up here.",
     familiarLine: "You found your way back up here. Interesting.",
+    eventLines: {
+      "picture-day": [
+        "Everyone's lined up by the gym in their nicest shirt. I can see the whole line from up here. Nobody can see me.",
+        "I'm skipping mine. They'll just use last year's. Nobody checks.",
+      ],
+    },
     dialogue: [
       "You can see the whole school from up here. Some nights it looks... different.",
       "Don't ask about the tunnels. Actually — do. Just not to a teacher.",

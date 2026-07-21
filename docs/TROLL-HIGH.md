@@ -579,3 +579,50 @@ field, no migration needed. Test: `tools/troll-high-daily-life-smoke.js`
 repeat visits, that a second locker/bench of the same type stays
 generic, the favorite-zone tie-break via a Forest Trail bounce, and the
 profile readout string.
+
+**Phase 4 shipped 2026-07-21 — Real School Events.** Turns Book Fair/
+Pizza Friday/Picture Day/Spirit Week/PACER Day into actual interactive
+happenings instead of just a schedule-overlay banner. Deliberately
+reuses existing systems rather than adding new collectibles (the doc's
+own "don't prioritize hundreds of collectibles" guidance) — no new
+decorations or cards, just behavior/dialogue that changes on the day:
+
+- Two new events added to `events.js`: **Picture Day** (day 15 of any
+  month) and **PACER Day** (day 20) — both previously missing from
+  `EVENTS`/`activeEvent()` entirely, unambiguous against every other
+  window (spirit-week 1-5, book-fair 8-12, dance's last-Friday-22-28).
+- `NPC.speak(eventId)` (`npc.js`) now takes the event id and, if the
+  NPC's `def.eventLines[eventId]` exists, cycles through that array
+  instead of normal `dialogue` — same index/modulo mechanics either
+  way. `showDialogue()` in `main.js` passes `todaysEventId` through;
+  Phase 2's milestone tiers (firstLine/secondLine/familiarLine/
+  closeLine/memoryLines/returningLine) still take priority, so
+  eventLines only surface on an NPC's ordinary cycling turns.
+  Wired up: Lunch Lady Doris (pizza-friday — the cafeteria's real
+  `PIZZA_FRIDAY_SPECIAL` swap already existed from Phase 1/daily.js,
+  this is the dialogue half), Ms. Quietly (book-fair), Marcus Vale
+  (pacer-day), Wendell (spirit-week + picture-day), Priya
+  (spirit-week), Pep (spirit-week), Marnie (picture-day).
+- Picture Day + yearbook: capturing a photo on Picture Day tags
+  `photo.eventTag = "Picture Day"` (camera.js's photo object already
+  had room for extra fields) and shows a toast; the yearbook grid
+  renders the tag in each photo's caption.
+- PACER Day: beating your own `pacer-test` high score specifically
+  while `todaysEventId === "pacer-day"` gets its own toast, taking
+  priority over the ordinary (chance-based, `maybeAwardCard()`) card
+  toast so the two don't race — the card is still silently awarded
+  either way, just not announced that turn.
+
+Test: `tools/troll-high-real-events-smoke.js` — finds real calendar
+dates for all 4 non-Halloween/Snow-Day/Dance events via the same
+`findDate()` scan as the original events smoke test, then freezes the
+browser's `Date` (both `new Date()` and `Date.now()`, via a `FakeDate`
+subclass installed through `evaluateOnNewDocument`) to noon on the
+target day plus an offset landing in a school-hours period — clock.js's
+period math is pure time-of-day-within-the-hour and totally
+independent of calendar date, so freezing `Date` doesn't disturb NPC
+scheduling, and `performance.now()`-driven animation is untouched
+since nothing in the render loop reads `Date`. Verifies each NPC's
+eventLine actually fires (accounting for Phase 2 milestone tiers
+consuming the first 1-2 interactions first), the Picture Day photo tag
++ yearbook caption, and the PACER Day toast.

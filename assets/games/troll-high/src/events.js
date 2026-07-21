@@ -14,6 +14,8 @@ export const EVENTS = {
   dance: { icon: "🪩", name: "School Dance", tint: null },
   "spirit-week": { icon: "📣", name: "Spirit Week", tint: null },
   "book-fair": { icon: "📚", name: "Book Fair", tint: null },
+  "picture-day": { icon: "📸", name: "Picture Day", tint: null },
+  "pacer-day": { icon: "🏃", name: "PACER Day", tint: null },
   "pizza-friday": { icon: "🍕", name: "Pizza Friday", tint: null },
 };
 
@@ -35,6 +37,8 @@ export function activeEvent(date = new Date()) {
   if (day >= 22 && day <= 28 && weekday === 5) return "dance"; // last Friday of the month
   if (day >= 1 && day <= 5) return "spirit-week";
   if (day >= 8 && day <= 12) return "book-fair";
+  if (day === 15) return "picture-day";
+  if (day === 20) return "pacer-day";
   if (weekday === 5) return "pizza-friday";
   return null;
 }

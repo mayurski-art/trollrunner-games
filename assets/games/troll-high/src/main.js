@@ -598,7 +598,8 @@ async function boot() {
       const el = document.createElement("div");
       el.className = "th-yearbook-photo";
       const when = new Date(p.takenAt).toLocaleDateString();
-      el.innerHTML = `<img src="${p.url}" alt="${p.zoneName || "a photo"}"><span class="cap">${p.zoneName || "?"} · ${when}</span>`;
+      const tag = p.eventTag ? ` · ${p.eventTag}` : "";
+      el.innerHTML = `<img src="${p.url}" alt="${p.zoneName || "a photo"}"><span class="cap">${p.zoneName || "?"} · ${when}${tag}</span>`;
       yearbookGridEl.appendChild(el);
     }
     yearbookCaptureBtn.disabled = photos.length >= MAX_PHOTOS;
@@ -613,10 +614,15 @@ async function boot() {
     yearbookStatusEl.hidden = true;
     const result = await capturePhoto(renderer.canvas, session.userId, { zoneId: zone.id, zoneName: zone.name });
     if (result.ok) {
+      // Real School Events (design doc §23 Phase 4) — Picture Day tags
+      // whatever you shoot that real day as an actual yearbook entry,
+      // not just another disposable-camera exposure.
+      if (todaysEventId === "picture-day") result.photo.eventTag = "Picture Day";
       photos = addPhotoToRoll(photos, result.photo);
       saveDirty = true;
       persist();
       renderYearbook();
+      if (todaysEventId === "picture-day") showToast("📸 That one's going in the yearbook — it's Picture Day.");
     } else {
       yearbookStatusEl.hidden = false;
       yearbookStatusEl.textContent = result.reason;
@@ -859,7 +865,17 @@ async function boot() {
       if (score > (highScores[kind] || 0)) {
         highScores[kind] = score; saveDirty = true;
         const won = maybeAwardCard();
-        if (won) { addCard(won); showToast(`🃏 New high score! Earned a ${cardById(won).name} card.`); }
+        if (won) addCard(won);
+        // Real School Events (design doc §23 Phase 4) — a PACER Test PR set
+        // ON the official PACER Day gets its own callout, taking priority
+        // over the (independent, chance-based) card-drop toast so the two
+        // don't race — the card is still awarded either way, just not
+        // announced this once.
+        if (kind === "pacer-test" && todaysEventId === "pacer-day") {
+          showToast("🏅 New PACER record — and it's PACER Day. Nice.");
+        } else if (won) {
+          showToast(`🃏 New high score! Earned a ${cardById(won).name} card.`);
+        }
       }
       markDailyTask("minigame");
       activeMinigame.stop();
@@ -951,7 +967,7 @@ async function boot() {
     closeDialogue();
     const npcId = npc.def.id;
     const relation = npcRelations[npcId] || (npcRelations[npcId] = { timesTalked: 0 });
-    const line = pickDialogueLine(npc.def, relation, relationContext()) || npc.speak();
+    const line = pickDialogueLine(npc.def, relation, relationContext()) || npc.speak(todaysEventId);
     relation.timesTalked++;
     relation.lastTalkedAt = Date.now();
     saveDirty = true;
