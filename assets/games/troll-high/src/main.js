@@ -321,10 +321,40 @@ async function boot() {
   // ----------------------------------------------------------------- map
   const mapOverlay = $("th-map-overlay");
   const mapCanvas = $("th-map-canvas");
-  function openMap() { mapOverlay.hidden = false; drawCampusMap(mapCanvas, zone.id); markDailyTask("map"); }
+  let mapRects = [];
+  // school building is "open" on weekdays outside the Night period; the
+  // corridors/fields/downtown/woods rows never lock (see mapview.js indoor
+  // flag) since those are hangout spots, not class time.
+  function campusOpen() {
+    const t = clock.now();
+    return t.weekday !== "Sat" && t.weekday !== "Sun" && t.period !== "Night";
+  }
+  function openMap() {
+    mapOverlay.hidden = false;
+    mapRects = drawCampusMap(mapCanvas, zone.id, campusOpen());
+    markDailyTask("map");
+  }
   function closeMap() { mapOverlay.hidden = true; }
+  function mapRoomAt(evt) {
+    const r = mapCanvas.getBoundingClientRect();
+    const x = (evt.clientX - r.left) * (mapCanvas.width / r.width);
+    const y = (evt.clientY - r.top) * (mapCanvas.height / r.height);
+    return mapRects.find(room => x >= room.x && x <= room.x + room.w && y >= room.y && y <= room.y + room.h);
+  }
   $("th-btn-map")?.addEventListener("click", openMap);
   $("th-map-close")?.addEventListener("click", closeMap);
+  mapCanvas.addEventListener("mousemove", evt => {
+    const room = mapRoomAt(evt);
+    mapCanvas.style.cursor = room && !room.locked ? "pointer" : "default";
+  });
+  mapCanvas.addEventListener("click", evt => {
+    const room = mapRoomAt(evt);
+    if (!room) return;
+    if (room.locked) { showToast("🔒 Locked until campus opens again"); return; }
+    if (room.id === zone.id) { closeMap(); return; }
+    closeMap();
+    travelToZone(room.id);
+  });
 
   // ------------------------------------------------------------- profile
   const profileOverlay = $("th-profile-overlay");
@@ -1396,10 +1426,9 @@ async function boot() {
     hint.hidden = false;
   }
 
-  function switchZone(door) {
-    zone = getZone(door.to);
+  function settleInZone(tx, ty) {
     npcs = getNPCs(zone);
-    player.placeAtTile(door.tx, door.ty);
+    player.placeAtTile(tx, ty);
     doorArmed = false;
     zoneNameEl.textContent = zone.name;
     ambience.setIndoor(!OUTDOOR_ZONES.has(zone.id));
@@ -1410,6 +1439,18 @@ async function boot() {
     zoneVisitCounts[zone.id] = (zoneVisitCounts[zone.id] || 0) + 1;
     saveDirty = true;
     persist(); // checkpoint on room change, not just the interval
+  }
+
+  function switchZone(door) {
+    zone = getZone(door.to);
+    settleInZone(door.tx, door.ty);
+  }
+
+  // click-to-travel from the campus map — same landing logic as walking
+  // through a door, just skipping the walk.
+  function travelToZone(id) {
+    zone = getZone(id);
+    settleInZone(zone.spawn.x, zone.spawn.y);
   }
 
   zoneNameEl.textContent = zone.name;

@@ -180,5 +180,29 @@ export class Zone {
     })).concat(extraEntities);
     sprites.sort((a, b) => a.y - b.y);
     for (const s of sprites) s.draw(ctx);
+    this._drawDoorLabels(ctx);
+  }
+
+  /* A little floating sign over each door naming where it leads — so many
+     look-alike doors down a hallway were otherwise unlabeled until you
+     stepped through one and found out the hard way. Drawn last (on top of
+     everything, unsorted) since it's a UI readout, not a world object. */
+  _drawDoorLabels(ctx) {
+    ctx.save();
+    ctx.font = "7px monospace";
+    ctx.textAlign = "center";
+    for (const d of this.doors) {
+      if (!d.label) continue;
+      const cx = (d.x + (d.w || 1) / 2) * TILE;
+      const topY = d.y * TILE;
+      const textW = ctx.measureText(d.label).width;
+      const boxW = textW + 6, boxH = 9;
+      const boxX = cx - boxW / 2, boxY = topY - boxH - 3;
+      ctx.fillStyle = "rgba(10, 8, 5, 0.72)";
+      ctx.fillRect(boxX, boxY, boxW, boxH);
+      ctx.fillStyle = "#ffe9a8";
+      ctx.fillText(d.label, cx, boxY + boxH - 2.5);
+    }
+    ctx.restore();
   }
 }
