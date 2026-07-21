@@ -1009,3 +1009,84 @@ still held. Fixed by releasing the key the moment the zone actually
 changes (poll-then-release) instead of a fixed hold span — worth
 remembering for any future door pair where the landing spot sits
 adjacent to another door in the new zone.
+
+## 24. Living MMO — unscripted daily moments (§21 layer 3, revisited)
+
+Shipped 2026-07-21, after the reprioritization doc's own roadmap (§23,
+Phases 1-7) ran out. §21's "Living MMO" layer had named three concrete
+examples — fire drills, a lost hamster, a food fight — as the *cheap*
+version of world simulation ("pick a pseudo-random daily event off the
+same deterministic clock already driving the bell schedule — no new
+backend"). Only the flavor-text stubs of these existed before now (a
+daily-announcement line in `daily.js`, a "Class Hamster" legendary
+trading card with no way to earn it deterministically) — this is the
+real, interactive version.
+
+- `events.js`: three new event ids, each a rare (~1-in-30) deterministic
+  daily hash roll, checked after the calendar-anchored events
+  (Halloween..PACER Day) and before the Pizza Friday fallback — so on a
+  rare day even an ordinary Friday becomes one of these instead.
+  **Real bug found while adding them**: the first attempt used a small
+  ad-hoc multiplier (`40503`) for the hash, which turned out to have
+  severe periodicity — `Math.imul(daySeed, 40503) % 30` never once
+  landed on the target residue across a 3000-day scan (verified by
+  dumping the actual output distribution, not just eyeballing the
+  formula). Fixed by using two more MurmurHash3-finalizer-style odd
+  constants (`2246822519`, `3266489917`) alongside the existing
+  Snow-Day constant — always verify a new deterministic-hash event's
+  distribution empirically rather than assuming any odd multiplier
+  works.
+- **Fire Drill**: `audio.js` gained `setFireDrill(on)`, a synthesized
+  two-tone alarm klaxon (same self-scheduling `setTimeout`-chain
+  pattern as `setDancing`). Deliberately NOT sounding all day —
+  `todaysEventId` stays `"fire-drill"` for the whole real day the same
+  way every other event does, but `main.js`'s clock-poll only actually
+  triggers the alarm during a brief real-time window (first 90 seconds
+  of "Period 2" that day), matching how `clock.isPassingPeriod()`
+  already windows hallway chatter to the start of each period. Principal
+  Grimface gets a matching `eventLines` reaction.
+- **Lost Hamster**: no new zone content — the EXISTING `reading-corner`
+  object in Mrs. Petrova's room (classroom-3d) becomes a one-time-per-
+  day special interaction when `todaysEventId === "lost-hamster"`,
+  checked ahead of its own ordinary memory card in the interaction
+  chain (same priority pattern as `election`/`dance`/etc. overriding
+  `mem`). Finding it awards the "Class Hamster" trading card directly
+  (previously only obtainable via the random `maybeAwardCard()` chance)
+  and sets `dailyFlags.hamsterFound` — reusing the existing
+  already-resets-every-real-day `dailyFlags` object rather than adding
+  a new save field. Mrs. Petrova gets a matching `eventLines` reaction.
+- **Food Fight**: same pattern, on the cafeteria's `food-bar` object.
+  Genuinely social per the doc's own framing ("unscripted SOCIAL
+  moments") — `net.js` gained a one-shot `sendFoodFightAnnounce()` /
+  `onFoodFightAnnounce` broadcast (mirroring graduation's live
+  announcement, minus the persisted trait afterward), so anyone else in
+  the cafeteria at that moment sees "🍕 X just started a food fight!"
+  live. Lunch Lady Doris gets a matching `eventLines` reaction.
+- Hint-priority bug caught by the test, not by inspection: the new
+  `hamsterHint`/`foodFightHint` were appended at the END of the hint
+  fallback chain, after `shopHint` — since the food-bar object also has
+  `shop: true`, its hint always won first, silently hiding the food-
+  fight prompt entirely. Fixed by moving both ahead of `shopHint`
+  (matching where their actual click-priority already sat in the
+  `interactPressed` branch — the hint order and the click-priority
+  order need to agree, and they'd drifted apart).
+
+Test: `tools/troll-high-living-mmo-smoke.js` — three real calendar
+dates found via `findDate()`, one per event. Confirms the alarm's real
+windowed behavior (on, inside the window), the hamster's one-time card
+award + no-repeat + NPC line, and the food fight's live cross-player
+toast + NPC line. **Test-writing note**: stationary-NPC approach math
+was wrong three times in a row before landing on the right formula —
+`NPC.update()` places a stationary NPC's feet at `((defX+0.5)*TILE,
+(defY+1)*TILE)`, and `Player.placeAtTile()` places the player at
+`((tx+0.5)*TILE, (ty+1)*TILE-2)` — so warping to `(defX, defY)`
+directly (solved backward from the NPC's own live pixel position:
+`round(x/16-0.5), round(y/16-1)`) lands within a couple pixels of the
+NPC, comfortably inside the 26px `nearNPC` radius regardless of
+facing — no `hold()`-to-walk-closer needed at all for stationary NPCs,
+unlike doors/patrol NPCs. Also hit a subtler bug in the test itself:
+interacting with the hamster a second time (once the daily flag is
+already set) silently falls through to the reading-corner's own
+ordinary memory card instead of doing nothing — the test wasn't
+closing that card, which meant the next `KeyE` press closed it instead
+of opening Mrs. Petrova's dialogue as intended.

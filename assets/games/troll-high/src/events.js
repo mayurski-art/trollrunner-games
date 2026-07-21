@@ -17,6 +17,14 @@ export const EVENTS = {
   "picture-day": { icon: "📸", name: "Picture Day", tint: null },
   "pacer-day": { icon: "🏃", name: "PACER Day", tint: null },
   "pizza-friday": { icon: "🍕", name: "Pizza Friday", tint: null },
+  // "Living MMO" layer (design doc §21/§23) — unscripted, calendar-
+  // independent moments, the cheap version of world simulation the doc
+  // anticipated: a pseudo-random daily roll off the same deterministic
+  // clock as everything else, no new backend. Deliberately rare (~1 day
+  // in 30 each) and deliberately NOT tied to a real holiday/date.
+  "fire-drill": { icon: "🚨", name: "Fire Drill", tint: null },
+  "lost-hamster": { icon: "🐹", name: "Lost Hamster", tint: null },
+  "food-fight": { icon: "🍕", name: "Food Fight", tint: null },
 };
 
 /* date: a real Date (defaults to now — parameterized for tests). Returns
@@ -39,6 +47,20 @@ export function activeEvent(date = new Date()) {
   if (day >= 8 && day <= 12) return "book-fair";
   if (day === 15) return "picture-day";
   if (day === 20) return "pacer-day";
+  // Unscripted "Living MMO" moments — same deterministic-hash trick as
+  // Snow Day, three independent salts so they don't correlate with each
+  // other or with Snow Day's own roll. Checked before Pizza Friday, so
+  // on rare days an ordinary Friday becomes one of these instead — real
+  // school life doesn't reliably deliver pizza either.
+  const daySeed = date.getFullYear() * 372 + month * 31 + day;
+  // Three distinct MurmurHash3-finalizer-style odd multipliers for a
+  // clean avalanche (a poorly-chosen small multiplier, tried initially,
+  // produced a hash with period-3 structure that never landed on the
+  // target residue at all — verified by dumping the actual distribution
+  // rather than assuming any odd number works).
+  if ((Math.imul(daySeed, 2654435761) >>> 0) % 30 === 1) return "fire-drill";
+  if ((Math.imul(daySeed, 2246822519) >>> 0) % 30 === 1) return "lost-hamster";
+  if ((Math.imul(daySeed, 3266489917) >>> 0) % 30 === 1) return "food-fight";
   if (weekday === 5) return "pizza-friday";
   return null;
 }

@@ -156,4 +156,38 @@ export class Ambience {
       this._danceTimer = null;
     }
   }
+
+  /* Fire drills (design doc §21/§23 "Living MMO" — unscripted daily
+     moments) — a synthesized two-tone alarm klaxon, same self-scheduling
+     setTimeout-chain pattern as setDancing so it can't drift or stack.
+     School-wide for the whole real day it's active, not zone-gated —
+     matches a real fire alarm being audible throughout the building. */
+  setFireDrill(on) {
+    if (!this.ctx) return;
+    if (on) {
+      if (this._drillTimer) return;
+      const toneMs = 500;
+      let high = true;
+      const scheduleTone = () => {
+        const t0 = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        osc.type = "square";
+        osc.frequency.value = high ? 960 : 720;
+        const g = this.ctx.createGain();
+        g.gain.setValueAtTime(0.05, t0);
+        g.gain.setValueAtTime(0.05, t0 + toneMs / 1000 - 0.03);
+        g.gain.linearRampToValueAtTime(0.0001, t0 + toneMs / 1000);
+        osc.connect(g);
+        g.connect(this.ctx.destination);
+        osc.start(t0);
+        osc.stop(t0 + toneMs / 1000);
+        high = !high;
+        this._drillTimer = setTimeout(scheduleTone, toneMs);
+      };
+      scheduleTone();
+    } else if (this._drillTimer) {
+      clearTimeout(this._drillTimer);
+      this._drillTimer = null;
+    }
+  }
 }

@@ -1305,6 +1305,30 @@ async function boot() {
     if (graduationEl) { graduationEl.remove(); graduationEl = null; }
   }
 
+  // "Living MMO" unscripted moments (design doc §21/§23) — the cheap
+  // version of world simulation the doc anticipated: a rare
+  // deterministic daily roll (events.js) turns one specific existing
+  // object into a one-time-per-day special interaction, no new zone
+  // content needed. Reuses `dailyFlags` (already resets each real day)
+  // rather than a new save field.
+  function findHamster() {
+    if (dailyFlags.hamsterFound) return;
+    dailyFlags.hamsterFound = true;
+    addCard("hamster");
+    saveDirty = true;
+    persist();
+    showToast(`🐹 You found the class hamster hiding in the bean bags! Got the ${cardById("hamster").name} card.`);
+  }
+  function joinFoodFight() {
+    if (dailyFlags.foodFight) return;
+    dailyFlags.foodFight = true;
+    saveDirty = true;
+    persist();
+    showToast("🍕 You dive into the food fight. A tater tot casualty lands directly on your shoulder.");
+    net.sendFoodFightAnnounce();
+  }
+  net.onFoodFightAnnounce = (peerId, name) => showToast(`🍕 ${name} just started a food fight!`);
+
   // "See inside the TV": a small looping animated canvas standing in for
   // channel static, drawn fresh each time (no video asset, no license
   // concerns) — colored scanlines drifting over analog noise.
@@ -1627,6 +1651,8 @@ async function boot() {
     const perform = obj && (obj.perform || obj.def.perform);
     const scienceFair = obj && (obj.scienceFair || obj.def.scienceFair);
     const graduation = obj && (obj.graduation || obj.def.graduation);
+    const hamsterHere = todaysEventId === "lost-hamster" && zone.id === "classroom-3d" && obj?.type === "reading-corner" && !dailyFlags.hamsterFound;
+    const foodFightHere = todaysEventId === "food-fight" && zone.id === "cafeteria" && obj?.type === "food-bar" && !dailyFlags.foodFight;
     const arcadeHint = obj && obj.game ? ` Play ${obj.gameName || "a game"}` : null;
     const playHint = play ? ` Play ${obj.playName || obj.def.playName || minigameInfo(play).title}` : null;
     const shopHint = shop ? " Get lunch" : null;
@@ -1635,8 +1661,10 @@ async function boot() {
     const performHint = perform ? (myPerforming ? " Leave the stage" : " Take the stage") : null;
     const scienceFairHint = scienceFair ? " Science fair table" : null;
     const graduationHint = graduation ? (graduatedAt ? " Diploma" : " Front office") : null;
+    const hamsterHint = hamsterHere ? " Something's rustling in here" : null;
+    const foodFightHint = foodFightHere ? " Join the food fight" : null;
     const peerHint = nearPeer ? ` Trade with ${nearPeer.name}` : null;
-    setHint((memoryEl || dialogueEl || electionEl || scienceFairEl || graduationEl || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden || !tradeOverlay.hidden || !bedroomOverlay.hidden || !yearbookOverlay.hidden) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (peerHint || arcadeHint || playHint || shopHint || electionHint || danceHint || performHint || scienceFairHint || graduationHint || (mem ? ` ${mem.title}` : null)));
+    setHint((memoryEl || dialogueEl || electionEl || scienceFairEl || graduationEl || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden || !tradeOverlay.hidden || !bedroomOverlay.hidden || !yearbookOverlay.hidden) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (peerHint || arcadeHint || playHint || hamsterHint || foodFightHint || shopHint || electionHint || danceHint || performHint || scienceFairHint || graduationHint || (mem ? ` ${mem.title}` : null)));
     if (input.interactPressed() && mapOverlay.hidden && profileOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && bedroomOverlay.hidden && yearbookOverlay.hidden) {
       if (!tradeOverlay.hidden) closeTrade();
       else if (!cafeteriaOverlay.hidden) closeCafeteria();
@@ -1651,6 +1679,8 @@ async function boot() {
       else if (nearPeer) openTrade(nearPeer.id, nearPeer.name);
       else if (obj && obj.game) openArcade(obj);
       else if (play) openMinigame(obj);
+      else if (hamsterHere) findHamster();
+      else if (foodFightHere) joinFoodFight();
       else if (shop) openCafeteria();
       else if (election) openElection();
       else if (dance) toggleDancing();
@@ -1678,6 +1708,15 @@ async function boot() {
       }
       lastPeriod = now.period;
       ambience.setChatter(clock.isPassingPeriod() ? 1 : 0, !OUTDOOR_ZONES.has(zone.id));
+      // Fire Drill (design doc §21/§23 "Living MMO") — the alarm is a
+      // brief real moment (first 90 real seconds of Period 2 that day),
+      // not an all-day siren; todaysEventId stays "fire-drill" for the
+      // whole day the same way every other event does, but the actual
+      // sound is windowed the same way clock.isPassingPeriod() windows
+      // hallway chatter to the start of each period.
+      if (todaysEventId === "fire-drill") {
+        ambience.setFireDrill(now.period === "Period 2" && clock.msSincePeriodStart() < 90000);
+      }
     }
     if (localBubble && performance.now() > localBubble.until) localBubble = null;
 

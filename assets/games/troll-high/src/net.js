@@ -111,6 +111,11 @@ export class Net {
     // persisted `graduated` presence flag (which just marks a 🎓 tag from
     // then on, every session).
     this.onGraduationAnnounce = null; // (peerId, name) => void
+
+    // "Living MMO" unscripted moments (§21/§23) — a food fight is
+    // inherently social, so it gets the same one-shot live-announcement
+    // treatment as graduation, just with no persisted flag afterward.
+    this.onFoodFightAnnounce = null; // (peerId, name) => void
   }
 
   async join(room) {
@@ -161,6 +166,8 @@ export class Net {
       this.onVote(m.id, m.name, m.for);
     } else if (m.t === "graduate" && this.onGraduationAnnounce) {
       this.onGraduationAnnounce(m.id, m.name);
+    } else if (m.t === "food-fight" && this.onFoodFightAnnounce) {
+      this.onFoodFightAnnounce(m.id, m.name);
     }
   }
 
@@ -195,6 +202,10 @@ export class Net {
   sendGraduationAnnounce() {
     if (!this.connected) return;
     this.transport.send({ t: "graduate", id: this.id, name: this.name });
+  }
+  sendFoodFightAnnounce() {
+    if (!this.connected) return;
+    this.transport.send({ t: "food-fight", id: this.id, name: this.name });
   }
   sendVote(forId) {
     if (!this.connected) return;

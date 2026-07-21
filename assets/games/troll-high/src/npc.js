@@ -171,6 +171,14 @@ export const NPC_DEFS = {
     type: "stationary", x: 14, y: 9, facing: "south",
     firstLine: "Welcome. The bean bags are first-come, first-served, by the way.",
     familiarLine: "Back for the bean bags, I bet.",
+    // "Living MMO" unscripted moments (§21/§23) — the hamster escaped
+    // into HER room's bean bags, so she gets the reaction line.
+    eventLines: {
+      "lost-hamster": [
+        "If you find that hamster before I do, I did not see anything. Good luck.",
+        "Someone's checking the bean bags every five minutes today. Wonder why.",
+      ],
+    },
     dialogue: [
       "Free reading time is sacred. Guard it with your life.",
       "The bean bags are first-come, first-served. Rules are rules.",
@@ -203,6 +211,12 @@ export const NPC_DEFS = {
         "It's Pizza Friday, sweetie. The good pizza, not the Tuesday pizza.",
         "I make extra on Fridays. People notice when I don't.",
         "Chocolate milk AND pizza today. Don't tell the other lunch ladies I let you have both.",
+      ],
+      // "Living MMO" unscripted moments (§21/§23) — the food fight
+      // happens on her turf.
+      "food-fight": [
+        "I saw who started it. I'm not saying. I'm also not that upset about it.",
+        "Cleanup's on you kids today, sweetie. All of you.",
       ],
     },
     dialogue: [
@@ -359,6 +373,14 @@ export const NPC_DEFS = {
     type: "patrol", a: { x: 9, y: 3 }, b: { x: 9, y: 7 },
     firstLine: "New student. I'll be watching. Closely.",
     familiarLine: "You again. Still watching.",
+    // "Living MMO" unscripted moments (§21/§23) — he's the one who
+    // actually knows if it's a drill or the real thing.
+    eventLines: {
+      "fire-drill": [
+        "It's a drill. Probably. Walk, don't run.",
+        "Every single time, someone thinks this is optional. It is not optional.",
+      ],
+    },
     dialogue: [
       "Shouldn't you be in class?",
       "My office door is always open. Please don't test that.",
