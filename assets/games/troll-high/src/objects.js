@@ -316,6 +316,48 @@ export const OBJECT_DEFS = {
       text: "Someone's carved a trollface into the pole. Been there for years. Nobody's ever seen who did it.",
     },
   },
+  "tree-house": {
+    sprite: "tree-house", w: 4, h: 4, footRows: 1,
+    memory: {
+      title: "The tree house",
+      text: "A rope ladder, a hand-painted \"NO GIRLS\" sign someone crossed out and rewrote as \"NO ADULTS,\" and a surprisingly good view.",
+    },
+  },
+  "half-pipe": {
+    sprite: "half-pipe", w: 5, h: 3, footRows: 1,
+    memory: {
+      title: "The half-pipe",
+      text: "Every board has a chunk missing from the same exact spot. Nobody's landed the big trick. Everybody's tried.",
+    },
+  },
+  dock: {
+    sprite: "dock", w: 5, h: 2, footRows: 1,
+    memory: {
+      title: "The dock",
+      text: "The wood's soft in one spot everybody knows to avoid. The water's colder than it looks.",
+    },
+  },
+  rowboat: {
+    sprite: "rowboat", w: 3, h: 2, footRows: 1,
+    memory: {
+      title: "The rowboat",
+      text: "Tied up, half-full of rainwater, definitely not going anywhere. Still, everyone checks if the oars are inside.",
+    },
+  },
+  crates: {
+    sprite: "crates", w: 3, h: 3, footRows: 1,
+    memory: {
+      title: "Stacked crates",
+      text: "Stenciled letters on the side, mostly faded. Nobody knows what used to be in here.",
+    },
+  },
+  "cave-rocks": {
+    sprite: "cave-rocks", w: 4, h: 3, footRows: 1,
+    memory: {
+      title: "Cave rocks",
+      text: "Something's been carved into the stone here. It might be a trollface. It might just be a rock.",
+    },
+  },
   pipes: {
     sprite: "pipes", w: 3, h: 4, footRows: 1,
     memory: {
@@ -350,6 +392,8 @@ const FALLBACK_COLORS = {
   "food-bar": "#c2743a",
   "ice-cream-truck": "#e8e4d8", "arcade-cabinet": "#3a2f5a", "pizza-oven": "#8a3a2a",
   "store-counter": "#7a5230", "candy-shelf": "#e05a7a", "park-bench": "#5a6a4a", "park-tree": "#2e5d3a",
+  "tree-house": "#8a6a4a", "half-pipe": "#5a5a62", dock: "#7a6248", rowboat: "#a13a3a",
+  crates: "#8a6a4a", "cave-rocks": "#5a5a5a",
 };
 
 export class ObjectSprites {
