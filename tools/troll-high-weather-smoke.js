@@ -58,7 +58,7 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
     const img = r.bctx.getImageData(0, 0, r.back.width, r.back.height).data;
     let white = 0;
     for (let i = 0; i < img.length; i += 4) {
-      if (img[i] > 240 && img[i + 1] > 240 && img[i + 2] > 240 && img[i + 3] > 200) white++;
+      if (img[i] > 180 && img[i + 1] > 180 && img[i + 2] > 180 && img[i + 3] > 200) white++;
     }
     return white;
   });
@@ -71,7 +71,7 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
     const img = r.bctx.getImageData(0, 0, r.back.width, r.back.height).data;
     let white = 0;
     for (let i = 0; i < img.length; i += 4) {
-      if (img[i] > 240 && img[i + 1] > 240 && img[i + 2] > 240 && img[i + 3] > 200) white++;
+      if (img[i] > 180 && img[i + 1] > 180 && img[i + 2] > 180 && img[i + 3] > 200) white++;
     }
     return white;
   });

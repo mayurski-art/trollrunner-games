@@ -104,6 +104,8 @@ async function checkMemory(page, warp, titleRe, label, holdMs = 120) {
   log(zoneName === 'The Underground HQ', `zone name reads "The Underground HQ" (${JSON.stringify(zoneName)})`);
 
   await checkMemory(page, [3, 4], /club charter/i, 'Club charter');
+  const clubMember = await page.evaluate(() => window.__th.clubMember);
+  log(clubMember === true, `reading the club charter for the first time joins the club (clubMember=${clubMember})`);
   await checkMemory(page, [11, 6], /golden statue/i, 'Golden statue');
 
   // Meet Trollface
@@ -138,6 +140,7 @@ async function checkMemory(page, warp, titleRe, label, holdMs = 120) {
   await page.waitForFunction('window.__th.bedroomOpen === true', { timeout: 3000 });
   const unlockedText = await page.$eval('#th-bedroom-unlocked', el => el.textContent);
   log(/Trollface's Autograph/.test(unlockedText), `meeting Trollface unlocks the matching bedroom decoration (${JSON.stringify(unlockedText)})`);
+  log(/Club Pin/.test(unlockedText), `joining the club unlocks the Club Pin decoration (${JSON.stringify(unlockedText)})`);
   await page.click('#th-bedroom-close');
 
   log(issues.length === 0, 'no console errors' + (issues.length ? ':\n  ' + issues.join('\n  ') : ''));

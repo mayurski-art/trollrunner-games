@@ -196,6 +196,10 @@ async function boot() {
   let tradesCompleted = savedGame?.tradesCompleted || 0;
   let giftsGiven = savedGame?.giftsGiven || 0;
   let giftsReceived = savedGame?.giftsReceived || 0;
+  // Clubs (design doc §21 near-term queue, final item) — reading the club
+  // charter in the Underground HQ (finding it at all is gated behind the
+  // full secrets chain, same as meeting Trollface) doubles as signing it.
+  let clubMember = savedGame?.clubMember || false;
   if (!visitedZones.has(zone.id)) { visitedZones.add(zone.id); saveDirty = true; }
   if (!visitDays.has(today)) { visitDays.add(today); saveDirty = true; }
 
@@ -220,7 +224,7 @@ async function boot() {
       zoneId: zone.id, x: player.x, y: player.y, foundKeys: [...found], studentId, enrolledAt, highScores,
       orientationDone, elective, dailyTasksDay, dailyFlags, cards,
       visitedZones: [...visitedZones], visitDays: [...visitDays], lunchesBought, tradesCompleted, giftsGiven, giftsReceived,
-      npcRelations, bedroomEquipped, photos,
+      npcRelations, bedroomEquipped, photos, clubMember,
     });
   }
   setInterval(persist, 30000);
@@ -456,6 +460,7 @@ async function boot() {
       daysAttended: visitDays.size,
       hasFamiliarNPC: Object.values(npcRelations).some(r => r.timesTalked >= 3),
       metTrollface: !!npcRelations["trollface"],
+      clubMember,
     };
   }
   function renderBedroom() {
@@ -804,8 +809,10 @@ async function boot() {
     memoryEl.setAttribute("role", "dialog");
     memoryEl.setAttribute("aria-label", mem.title);
     const isNew = !found.has(obj.memKey);
+    const joiningClub = isNew && obj.type === "club-charter" && !clubMember;
     memoryEl.innerHTML =
       `<h3>${mem.title}${isNew ? " ✨" : ""}</h3><p>${mem.text}</p>` +
+      (joiningClub ? `<p><b>You sign your name under the one other member. You're in the club now.</b></p>` : "") +
       (obj.def.screen ? `<canvas class="th-mem-screen" width="120" height="90"></canvas>` : "") +
       `<div class="th-mem-close">E / tap — close</div>`;
     memoryEl.addEventListener("click", closeMemory);
@@ -813,6 +820,7 @@ async function boot() {
     if (isNew) {
       found.add(obj.memKey);
       markDailyTask("memory");
+      if (joiningClub) { clubMember = true; showToast("📝 You're a member of the club now."); }
       const won = maybeAwardCard();
       if (won) { addCard(won); showToast(`🃏 Found a ${cardById(won).name} card!`); }
       saveDirty = true;
@@ -1017,6 +1025,7 @@ async function boot() {
     get bedroomEquipped() { return bedroomEquipped; },
     get bedroomStats() { return bedroomStats(); },
     get todaysEventId() { return todaysEventId; },
+    get clubMember() { return clubMember; },
     renderer, // exposed for test/dev inspection of weather + tint rendering
     openTrade, closeTrade,
     get cards() { return cards; },

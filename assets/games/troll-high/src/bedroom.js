@@ -17,6 +17,8 @@ export const DECORATIONS = [
   { id: "streak-poster", icon: "📅", name: "Attendance Poster", hint: "Attend school on 3 different days", unlocked: s => s.daysAttended >= 3 },
   // Phase 11 — the ultimate "life story" flex: proof you found him.
   { id: "trollface-autograph", icon: "🧌", name: "Trollface's Autograph", hint: "Find the legendary NPC — good luck", unlocked: s => s.metTrollface },
+  // Clubs — signing the charter in the Underground HQ doubles as joining.
+  { id: "club-pin", icon: "📌", name: "Club Pin", hint: "Join the club — it's hidden somewhere", unlocked: s => s.clubMember },
 ];
 
 export function decorationById(id) {
