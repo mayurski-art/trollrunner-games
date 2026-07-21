@@ -379,6 +379,20 @@ export const OBJECT_DEFS = {
       text: "A single sheet of notebook paper, taped to the wall, that just says \"THE CLUB\" and lists one member so far.",
     },
   },
+  "dev-desk": {
+    sprite: "dev-desk", w: 3, h: 2, footRows: 1,
+    memory: {
+      title: "A messy desk",
+      text: "A sticky note on the monitor reads \"ship phase 12, then sleep.\" It's been there a while.",
+    },
+  },
+  "coffee-mug": {
+    sprite: "coffee-mug", w: 1, h: 1, footRows: 1,
+    memory: {
+      title: "A cold coffee mug",
+      text: "It says WORLD'S OKAYEST DEVELOPER. Someone should really finish it before it goes fully cold.",
+    },
+  },
   pipes: {
     sprite: "pipes", w: 3, h: 4, footRows: 1,
     memory: {
@@ -416,6 +430,7 @@ const FALLBACK_COLORS = {
   "tree-house": "#8a6a4a", "half-pipe": "#5a5a62", dock: "#7a6248", rowboat: "#a13a3a",
   crates: "#8a6a4a", "cave-rocks": "#5a5a5a",
   graffiti: "#4a8a3a", "golden-statue": "#e8c22e", "club-charter": "#e8e4d8",
+  "dev-desk": "#5c6570", "coffee-mug": "#8a5a2b",
 };
 
 export class ObjectSprites {

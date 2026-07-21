@@ -39,6 +39,8 @@ const ZONE_IDS = [
   "forest-trail", "skate-park", "lake", "warehouse", "storm-drains", "caves",
   // Phase 11 — Troll meta
   "underground-hq",
+  // Phase 12 — Polish: developer room easter egg
+  "dev-room",
 ];
 // open corridors + genuinely outdoor zones get the quieter ambience tone
 const OUTDOOR_ZONES = new Set(["hallway-a", "hallway-b", "playground", "sports-field", "bus-loop", "roof", "main-street", "park", "forest-trail", "skate-park", "lake"]);
@@ -1015,6 +1017,7 @@ async function boot() {
     get bedroomEquipped() { return bedroomEquipped; },
     get bedroomStats() { return bedroomStats(); },
     get todaysEventId() { return todaysEventId; },
+    renderer, // exposed for test/dev inspection of weather + tint rendering
     openTrade, closeTrade,
     get cards() { return cards; },
     get npcRelations() { return npcRelations; },
@@ -1065,7 +1068,7 @@ async function boot() {
     requestAnimationFrame(tick);
     const dt = Math.min((nowMs - last) / 1000, 0.05);
     last = nowMs;
-    if (!running) { renderer.frame(zone, [player.entity()], 0, todaysEventInfo?.tint); return; }
+    if (!running) { renderer.frame(zone, [player.entity()], 0, todaysEventInfo?.tint, todaysEventId); return; }
 
     // fade-driven zone transition
     if (pendingDoor) {
@@ -1161,7 +1164,7 @@ async function boot() {
     for (const n of npcs) entities.push(n.entity());
 
     renderer.follow(player.x, player.y, zone);
-    renderer.frame(zone, entities, fade, todaysEventInfo?.tint);
+    renderer.frame(zone, entities, fade, todaysEventInfo?.tint, todaysEventId);
   }
   requestAnimationFrame(tick);
 }

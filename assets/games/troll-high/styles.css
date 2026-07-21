@@ -183,7 +183,9 @@ html, body {
   position: absolute;
   top: max(10px, env(safe-area-inset-top));
   left: 12px;
+  right: 12px;
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   z-index: 20;
   pointer-events: none;

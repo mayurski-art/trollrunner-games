@@ -38,7 +38,34 @@ export class Renderer {
     this.camY = wh <= vh ? (wh - vh) / 2 : clamp(y - vh / 2, 0, wh - vh);
   }
 
-  frame(zone, entities, fade, eventTint) {
+  /* Weather particles (design doc Phase 12 "weather/particles pass") —
+     only wired up for Snow Day so far (events.js), since that's the one
+     event with enough visual weight to justify it for v1. Self-tracks
+     dt so frame()'s signature doesn't need to change for callers that
+     don't care about weather. */
+  _updateSnow() {
+    const now = performance.now();
+    const dt = this._snowLastT ? Math.min(0.05, (now - this._snowLastT) / 1000) : 0;
+    this._snowLastT = now;
+    if (!this._snow) {
+      this._snow = Array.from({ length: 50 }, () => ({
+        x: Math.random() * this.back.width, y: Math.random() * this.back.height,
+        speed: 14 + Math.random() * 18, drift: (Math.random() - 0.5) * 10, size: 1 + Math.random() * 1.5,
+      }));
+    }
+    for (const p of this._snow) {
+      p.y += p.speed * dt; p.x += p.drift * dt;
+      if (p.y > this.back.height) { p.y = -4; p.x = Math.random() * this.back.width; }
+      if (p.x > this.back.width) p.x = 0; else if (p.x < 0) p.x = this.back.width;
+    }
+  }
+  _drawSnow(b) {
+    this._updateSnow();
+    b.fillStyle = "rgba(255, 255, 255, 0.85)";
+    for (const p of this._snow) { b.beginPath(); b.arc(p.x, p.y, p.size, 0, Math.PI * 2); b.fill(); }
+  }
+
+  frame(zone, entities, fade, eventTint, weather) {
     const b = this.bctx;
     b.fillStyle = "#14110c";
     b.fillRect(0, 0, this.back.width, this.back.height);
@@ -61,6 +88,8 @@ export class Renderer {
       b.fillStyle = eventTint;
       b.fillRect(0, 0, this.back.width, this.back.height);
     }
+
+    if (weather === "snow-day") this._drawSnow(b);
 
     // zone-transition fade
     if (fade > 0) {

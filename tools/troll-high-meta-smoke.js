@@ -123,6 +123,16 @@ async function checkMemory(page, warp, titleRe, label, holdMs = 120) {
   const metTrollface = await page.evaluate(() => !!window.__th.npcRelations['trollface']);
   log(metTrollface, 'npcRelations records meeting Trollface');
 
+  // Developer room easter egg — a second unmarked door in the Underground
+  // HQ itself, "meta on top of meta"
+  await page.evaluate(() => window.__th.warpTo(3, 6));
+  await hold(page, 'ArrowDown', 700);
+  await page.waitForFunction('window.__th.zone.id === "dev-room"', { timeout: 5000 });
+  log(true, 'the second unmarked door in the Underground HQ reaches the dev room');
+  await new Promise(r => setTimeout(r, 300));
+  await checkMemory(page, [5, 5], /messy desk/i, 'Dev desk');
+  await checkMemory(page, [8, 5], /cold coffee mug/i, 'Coffee mug');
+
   // Bedroom decoration unlock
   await page.click('#th-btn-bedroom');
   await page.waitForFunction('window.__th.bedroomOpen === true', { timeout: 3000 });

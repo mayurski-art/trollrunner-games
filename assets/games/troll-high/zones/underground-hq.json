@@ -34,6 +34,11 @@
       "type": "golden-statue",
       "x": 11,
       "y": 3
+    },
+    {
+      "type": "door",
+      "x": 3,
+      "y": 8
     }
   ],
   "doors": [
@@ -46,6 +51,16 @@
       "tx": 9,
       "ty": 9,
       "label": "Caves"
+    },
+    {
+      "x": 3,
+      "y": 8,
+      "w": 2,
+      "h": 1,
+      "to": "dev-room",
+      "tx": 5,
+      "ty": 3,
+      "label": "??? (this really shouldn't be here)"
     }
   ],
   "spawn": {
