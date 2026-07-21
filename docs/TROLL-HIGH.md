@@ -551,3 +551,31 @@ fields (`lastTalkedAt`, `seenMemories`) just ride along. Test:
 the `addCard()` debug hook to force her "cards" memoryLine condition
 true mid-test; walks the full tier sequence through closeLine, then
 simulates a 4-real-hour gap to verify returningLine.
+
+**Phase 3 shipped 2026-07-21 — daily-life habits.** "The game reflects
+your own routine back at you," not new stats to grind. Two pieces:
+
+1. `zoneVisitCounts` (new save field, `{zoneId: count}`) increments on
+   every zone entry — `visitedZones` was already tracked but only as
+   presence, not frequency. `favoriteZoneName()` reads the highest
+   count, excluding `hallway-a`/`hallway-b` (everyone passes through
+   those constantly; that's not a "favorite," just the way through),
+   and surfaces as "Usually found in: X" on the profile card.
+2. `claimedSpots` (new save field, `{lockers: key|null, "park-bench":
+   key|null}`) — the very first locker or park bench you ever interact
+   with is claimed as yours immediately (`showMemory()` in `main.js`),
+   keyed by `${zone.id}:${obj.memKey}` so it's one specific instance,
+   not every locker in the school. From then on that exact object's
+   memory card shows personalized title/text ("Your locker" / "Your
+   bench") every time, via a shared `personalizeMemory()` helper used
+   both for the hint text and the memory-card popup; every other
+   locker/bench of the same type stays generic. Profile shows "Has a
+   locker" / "Has a bench" once claimed.
+
+Both fields are plain new keys on the existing save row — `save.js`
+now threads `zoneVisitCounts`/`claimedSpots` through same as any other
+field, no migration needed. Test: `tools/troll-high-daily-life-smoke.js`
+— covers immediate-claim-on-first-interaction, persistence across
+repeat visits, that a second locker/bench of the same type stays
+generic, the favorite-zone tie-break via a Forest Trail bounce, and the
+profile readout string.

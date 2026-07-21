@@ -10,12 +10,20 @@ export function genStudentId() {
   return `${letter()}${letter()}-${digit()}${digit()}${digit()}${digit()}${digit()}${digit()}`;
 }
 
-export function renderProfile(dom, { name, studentId, enrolledAt, memoriesFound, highScores, minigameInfo, stats }) {
+export function renderProfile(dom, { name, studentId, enrolledAt, memoriesFound, highScores, minigameInfo, stats, dailyLife }) {
   dom.name.textContent = name;
   dom.id.textContent = `Student ID: ${studentId}`;
   const days = Math.max(0, Math.floor((Date.now() - enrolledAt) / 86400000));
   dom.enrolled.textContent = days === 0 ? "Enrolled today" : `Enrolled ${days} day${days === 1 ? "" : "s"} ago`;
   dom.memories.textContent = String(memoriesFound);
+
+  if (dom.dailyLife && dailyLife) {
+    const bits = [];
+    if (dailyLife.favoriteZone) bits.push(`Usually found in: ${dailyLife.favoriteZone}`);
+    if (dailyLife.hasLocker) bits.push("Has a locker");
+    if (dailyLife.hasBench) bits.push("Has a bench");
+    dom.dailyLife.textContent = bits.join(" · ");
+  }
 
   if (dom.roomsExplored) dom.roomsExplored.textContent = `${stats.roomsExplored} / ${stats.totalRooms}`;
   if (dom.daysAttended) dom.daysAttended.textContent = String(stats.daysAttended);

@@ -120,7 +120,11 @@ async function enterRoom(page, { doorX, roomId, roomName, warpX, memWarp, memTit
   await page.keyboard.press('KeyE');
   await page.waitForSelector('#th-memory', { timeout: 3000 });
   const memTitle = await page.$eval('#th-memory h3', el => el.textContent);
-  log(/lockers/i.test(memTitle), 'locker memory card opens: ' + JSON.stringify(memTitle));
+  // Phase 3 "daily-life habits" claims the first-ever locker you interact
+  // with as "yours" immediately (see troll-high-daily-life-smoke.js for
+  // full coverage of that system) — this is just a smoke check that SOME
+  // locker memory card opens at all, not the claiming behavior itself.
+  log(/lockers|your locker/i.test(memTitle), 'locker memory card opens: ' + JSON.stringify(memTitle));
   await page.keyboard.press('KeyE');
   await page.waitForFunction('!document.getElementById("th-memory")');
   log(true, 'memory card closes');

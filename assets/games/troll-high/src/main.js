@@ -227,6 +227,16 @@ async function boot() {
   // (docs/troll_high_yearbook.sql). Just the list lives in this save row.
   let photos = savedGame?.photos || [];
 
+  // Daily-life habits (design doc §23 Phase 3) — "the game reflects your
+  // own routine back at you," not new stats to grind. zoneVisitCounts
+  // tracks how many times each room's been entered (visitedZones is only
+  // presence, not frequency) so a "usually found in" favorite spot can be
+  // read off it; claimedSpots remembers the first locker/bench you ever
+  // interacted with — "yours" from then on, purely a naming/flavor thing.
+  const zoneVisitCounts = savedGame?.zoneVisitCounts || {};
+  const claimedSpots = savedGame?.claimedSpots || {};
+  zoneVisitCounts[zone.id] = (zoneVisitCounts[zone.id] || 0) + 1;
+
   function persist() {
     if (!saveDirty) return;
     saveDirty = false;
@@ -234,7 +244,7 @@ async function boot() {
       zoneId: zone.id, x: player.x, y: player.y, foundKeys: [...found], studentId, enrolledAt, highScores,
       orientationDone, elective, dailyTasksDay, dailyFlags, cards,
       visitedZones: [...visitedZones], visitDays: [...visitDays], lunchesBought, tradesCompleted, giftsGiven, giftsReceived,
-      npcRelations, bedroomEquipped, photos, clubMember,
+      npcRelations, bedroomEquipped, photos, clubMember, zoneVisitCounts, claimedSpots,
     });
   }
   setInterval(persist, 30000);
@@ -297,6 +307,7 @@ async function boot() {
     lunchesBought: $("th-profile-lunches"), tradesCompleted: $("th-profile-trades"),
     giftsGiven: $("th-profile-gifts-given"), giftsReceived: $("th-profile-gifts-received"),
     cardsCollected: $("th-profile-cards-collected"),
+    dailyLife: $("th-profile-daily-life"),
   };
   function openProfile() {
     renderProfile(profileDom, {
@@ -306,6 +317,11 @@ async function boot() {
         daysAttended: visitDays.size,
         lunchesBought, tradesCompleted, giftsGiven, giftsReceived,
         cardsCollected: Object.keys(cards).length, totalCards: CARDS.length,
+      },
+      dailyLife: {
+        favoriteZone: favoriteZoneName(),
+        hasLocker: !!claimedSpots.lockers,
+        hasBench: !!claimedSpots["park-bench"],
       },
     });
     renderCardPicker($("th-profile-cards"), cards, new Set(), { readonly: true });
@@ -462,6 +478,36 @@ async function boot() {
   const bedroomSlotsEl = $("th-bedroom-slots");
   const bedroomUnlockedEl = $("th-bedroom-unlocked");
   const bedroomLockedEl = $("th-bedroom-locked");
+
+  // Daily-life "claimed spot" flavor (design doc §23 Phase 3) — the first
+  // locker or park bench you ever interact with becomes "yours"; every
+  // other one of that type stays as generic flavor text. Purely cosmetic,
+  // reusing the existing memory-card UI rather than a new system.
+  const CLAIMABLE_SPOTS = {
+    lockers: { title: "Your locker", text: "Locker's yours now. You could find it blindfolded by week two.", toast: "🔒 That's your locker now." },
+    "park-bench": { title: "Your bench", text: "Your spot. You always end up back here, one way or another.", toast: "🪑 That's your bench now." },
+  };
+  function personalizeMemory(obj, mem) {
+    const claimable = CLAIMABLE_SPOTS[obj.type];
+    if (!claimable || !mem) return mem;
+    const key = `${zone.id}:${obj.memKey}`;
+    if (claimedSpots[obj.type] === key) return { title: claimable.title, text: claimable.text };
+    return mem;
+  }
+
+  // "Usually found in" (design doc §23 Phase 3) — the most-entered room,
+  // reading zoneVisitCounts back as a habit rather than a new stat to
+  // grind. Hallways are excluded since everyone passes through those
+  // constantly; that's not a "favorite spot," just the way through.
+  const FAVORITE_ZONE_EXCLUDE = new Set(["hallway-a", "hallway-b"]);
+  function favoriteZoneName() {
+    let bestId = null, bestCount = 0;
+    for (const [id, count] of Object.entries(zoneVisitCounts)) {
+      if (FAVORITE_ZONE_EXCLUDE.has(id) || count <= bestCount) continue;
+      bestId = id; bestCount = count;
+    }
+    return bestId ? getZone(bestId).name : null;
+  }
 
   // Flags/sets NPC memoryLines' conditions can check (relations.js Phase 2)
   // — deliberately just a read-only view of state that's already tracked
@@ -825,6 +871,13 @@ async function boot() {
 
   function showMemory(mem, obj) {
     closeMemory();
+    const claimable = CLAIMABLE_SPOTS[obj.type];
+    if (claimable && !claimedSpots[obj.type]) {
+      claimedSpots[obj.type] = `${zone.id}:${obj.memKey}`;
+      mem = { title: claimable.title, text: claimable.text };
+      saveDirty = true;
+      showToast(claimable.toast);
+    }
     memoryEl = document.createElement("div");
     memoryEl.id = "th-memory";
     memoryEl.className = "th-popup-card";
@@ -933,6 +986,7 @@ async function boot() {
     ghosts.clear(); // last room's peers no longer apply
     net.join(zone.id).catch(() => {});
     visitedZones.add(zone.id);
+    zoneVisitCounts[zone.id] = (zoneVisitCounts[zone.id] || 0) + 1;
     saveDirty = true;
     persist(); // checkpoint on room change, not just the interval
   }
@@ -1053,6 +1107,9 @@ async function boot() {
     openTrade, closeTrade,
     get cards() { return cards; },
     get npcRelations() { return npcRelations; },
+    get zoneVisitCounts() { return zoneVisitCounts; },
+    get claimedSpots() { return claimedSpots; },
+    favoriteZoneName,
     get lifeStats() {
       return {
         roomsExplored: visitedZones.size, totalRooms: ZONE_IDS.length,
@@ -1150,7 +1207,7 @@ async function boot() {
     }
     const face = player.facingTile();
     const obj = zone.objectAt(face.x, face.y);
-    const mem = obj && (obj.memory || obj.def.memory);
+    const mem = obj && personalizeMemory(obj, obj.memory || obj.def.memory);
     const play = obj && (obj.play || obj.def.play);
     const shop = obj && (obj.shop || obj.def.shop);
     const arcadeHint = obj && obj.game ? ` Play ${obj.gameName || "a game"}` : null;
