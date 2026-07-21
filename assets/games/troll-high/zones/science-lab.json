@@ -33,7 +33,9 @@
     {
       "type": "lab-table",
       "x": 3,
-      "y": 6
+      "y": 6,
+      "play": "lab-mix",
+      "playName": "Lab Mix"
     },
     {
       "type": "lab-table",

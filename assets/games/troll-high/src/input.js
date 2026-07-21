@@ -13,7 +13,12 @@ export class Input {
       if (isTyping(e.target)) return; // chat/name inputs handle their own keys
       if (e.repeat) return;
       this.keys.add(e.code);
-      if (e.code === "KeyE" || e.code === "Space") {
+      // KeyE only — every overlay's hint/help text says "E" (never
+      // "Space"), and Space needs to stay free for minigames that use it
+      // as their own action key (tetherball, kickball, PACER test); it
+      // used to double as interact too, which silently closed those
+      // minigames on their own Space presses.
+      if (e.code === "KeyE") {
         this._interactQueued = true;
       }
     });

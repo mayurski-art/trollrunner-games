@@ -1,9 +1,11 @@
-/* Troll High — recess minigames v1 (design doc §11): four square,
-   tetherball, hopscotch, kickball. Original in-world games, not embeds —
-   each is a small self-contained canvas loop with its own keyboard
-   handling (arrow keys / digits / space), independent of the main game's
-   Input class. Movement is frozen by main.js while one is open, same as
-   the arcade overlay. */
+/* Troll High — recess minigames (design doc §11) plus classes-as-
+   minigames (design doc §21, "every class should be an enjoyable
+   minigame"): four square, tetherball, hopscotch, kickball, pop quiz,
+   mental math, word scramble, lab mix, PACER test. Original in-world
+   games, not embeds — each is a small self-contained canvas loop with
+   its own keyboard handling (arrow keys / digits / space), independent
+   of the main game's Input class. Movement is frozen by main.js while
+   one is open, same as the arcade overlay. */
 
 const W = 320, H = 220;
 
@@ -12,6 +14,11 @@ const KINDS = {
   tetherball: { title: "Tetherball", help: "Press SPACE when the ball crosses the glow. 15 seconds." },
   hopscotch: { title: "Hopscotch", help: "Repeat the sequence with the arrow keys." },
   kickball: { title: "Kickball", help: "Press SPACE to stop each bar. 3 kicks." },
+  "pop-quiz": { title: "Pop Quiz", help: "Press the number for the right answer before time's up." },
+  "mental-math": { title: "Mental Math", help: "Press the number matching the answer. Gets faster." },
+  "word-scramble": { title: "Word Scramble", help: "Press the numbered letters in order to spell the word." },
+  "lab-mix": { title: "Lab Mix", help: "Press two reagents that combine into the target color." },
+  "pacer-test": { title: "PACER Test", help: "Press SPACE right on each beep. It speeds up every lap." },
 };
 
 export function minigameInfo(kind) {
@@ -52,11 +59,12 @@ export class Minigame {
   }
 
   _onKey(e) {
-    if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space", "Digit1", "Digit2", "Digit3", "Digit4"].includes(e.code)) {
+    if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space",
+      "Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6"].includes(e.code)) {
       e.preventDefault();
     }
     if (this.finished) return;
-    const fn = this[`_key_${this.kind}`];
+    const fn = this[`_key_${methodKind(this.kind)}`];
     if (fn) fn.call(this, e.code);
   }
 
@@ -70,6 +78,18 @@ export class Minigame {
         return { seq: [rnd4()], showIdx: 0, showT: 0, phase: "show", inputIdx: 0 };
       case "kickball":
         return { phase: "power", bar: 0, dir: 1, power: 0, accuracy: 0, kicks: 0, total: 0 };
+      case "pop-quiz":
+        return { round: 0, misses: 0, qi: rndQuestion(-1), timer: 5, timeLimit: 5 };
+      case "mental-math":
+        return { round: 0, misses: 0, timeLimit: 4, timer: 4, ...genMathQuestion() };
+      case "word-scramble": {
+        const wi = Math.floor(Math.random() * WORDS.length);
+        return { wi, ...scrambleWord(WORDS[wi]), round: 0, misses: 0 };
+      }
+      case "lab-mix":
+        return { round: 0, misses: 0, timer: 6, timeLimit: 6, first: -1, ...pickMixTarget() };
+      case "pacer-test":
+        return { lap: 0, interval: 1.5, beepAt: 1.5, windowOpen: false, hitWindowStart: 0 };
       default:
         return {};
     }
@@ -241,17 +261,305 @@ export class Minigame {
     if (this.finished) drawEnd(ctx, this.score);
   }
 
+  // -------------------------------------------------------- pop quiz
+  _key_pop_quiz(code) {
+    const digit = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3 }[code];
+    if (digit === undefined) return;
+    const s = this._state, q = QUIZ[s.qi];
+    if (digit === q.correct) this.score += 10;
+    else s.misses++;
+    if (s.misses >= 3 || s.round >= 5) { this.finished = true; return; }
+    s.round++;
+    s.qi = rndQuestion(s.qi);
+    s.timer = s.timeLimit;
+  }
+  _update_pop_quiz(dt) {
+    const s = this._state;
+    s.timer -= dt;
+    if (s.timer <= 0) {
+      s.misses++;
+      if (s.misses >= 3 || s.round >= 5) { this.finished = true; return; }
+      s.round++;
+      s.qi = rndQuestion(s.qi);
+      s.timer = s.timeLimit;
+    }
+  }
+  _draw_pop_quiz() {
+    const ctx = this.ctx, s = this._state, q = QUIZ[s.qi];
+    ctx.fillStyle = "#0c3b16"; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#cfd6e0"; ctx.font = "11px DM Mono, monospace";
+    ctx.fillText(`Round ${s.round + 1}/5 — misses ${s.misses}/3`, 10, 16);
+    ctx.fillStyle = "#ffd23f"; ctx.font = "bold 13px DM Mono, monospace";
+    wrapText(ctx, q.q, 10, 40, W - 20, 16);
+    q.choices.forEach((c, i) => {
+      const y = 100 + i * 26;
+      ctx.fillStyle = "#e9e2c8"; ctx.font = "12px DM Mono, monospace";
+      ctx.fillText(`${i + 1}. ${c}`, 16, y);
+    });
+    const barW = ((W - 20) * Math.max(0, s.timer)) / s.timeLimit;
+    ctx.fillStyle = "#4dc9ff"; ctx.fillRect(10, H - 14, barW, 6);
+    if (this.finished) drawEnd(ctx, this.score);
+  }
+
+  // ----------------------------------------------------- mental math
+  _key_mental_math(code) {
+    const digit = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3 }[code];
+    if (digit === undefined) return;
+    const s = this._state;
+    if (digit === s.correctIdx) { this.score += 10; s.timeLimit = Math.max(1.5, s.timeLimit - 0.15); }
+    else s.misses++;
+    s.round++;
+    if (s.misses >= 3 || s.round >= 10) { this.finished = true; return; }
+    Object.assign(s, genMathQuestion());
+    s.timer = s.timeLimit;
+  }
+  _update_mental_math(dt) {
+    const s = this._state;
+    s.timer -= dt;
+    if (s.timer <= 0) {
+      s.misses++; s.round++;
+      if (s.misses >= 3 || s.round >= 10) { this.finished = true; return; }
+      Object.assign(s, genMathQuestion());
+      s.timer = s.timeLimit;
+    }
+  }
+  _draw_mental_math() {
+    const ctx = this.ctx, s = this._state;
+    ctx.fillStyle = "#0c3b16"; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#cfd6e0"; ctx.font = "11px DM Mono, monospace";
+    ctx.fillText(`Round ${s.round + 1}/10 — misses ${s.misses}/3`, 10, 16);
+    ctx.fillStyle = "#ffd23f"; ctx.font = "bold 22px DM Mono, monospace"; ctx.textAlign = "center";
+    ctx.fillText(`${s.a} ${s.op} ${s.b} = ?`, W / 2, 60);
+    ctx.textAlign = "left";
+    s.choices.forEach((c, i) => {
+      const x = 30 + (i % 2) * 150, y = 110 + Math.floor(i / 2) * 40;
+      ctx.fillStyle = "#e9e2c8"; ctx.font = "14px DM Mono, monospace";
+      ctx.fillText(`${i + 1}. ${c}`, x, y);
+    });
+    const barW = ((W - 20) * Math.max(0, s.timer)) / s.timeLimit;
+    ctx.fillStyle = "#4dc9ff"; ctx.fillRect(10, H - 14, barW, 6);
+    if (this.finished) drawEnd(ctx, this.score);
+  }
+
+  // -------------------------------------------------- word scramble
+  _key_word_scramble(code) {
+    const digit = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Digit5: 4, Digit6: 5 }[code];
+    if (digit === undefined) return;
+    const s = this._state;
+    if (digit >= s.order.length || s.picked.includes(digit)) return;
+    const expectedLetterIdx = s.order[digit];
+    const nextCorrectIdx = s.picked.length;
+    if (s.letters[expectedLetterIdx] === s.word[nextCorrectIdx]) {
+      s.picked.push(digit);
+      if (s.picked.length === s.letters.length) {
+        this.score += 10;
+        s.round++;
+        if (s.round >= 5) { this.finished = true; return; }
+        s.wi = (s.wi + 1) % WORDS.length;
+        Object.assign(s, scrambleWord(WORDS[s.wi]), { round: s.round });
+      }
+    } else {
+      s.misses++;
+      if (s.misses >= 3) { this.finished = true; return; }
+      s.picked = [];
+    }
+  }
+  _draw_word_scramble() {
+    const ctx = this.ctx, s = this._state;
+    ctx.fillStyle = "#0c3b16"; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#cfd6e0"; ctx.font = "11px DM Mono, monospace";
+    ctx.fillText(`Word ${s.round + 1}/5 — misses ${s.misses}/3`, 10, 16);
+    const cell = 40, gap = 6, total = s.order.length * (cell + gap) - gap;
+    const ox = (W - total) / 2, oy = 90;
+    s.order.forEach((letterIdx, tileIdx) => {
+      const x = ox + tileIdx * (cell + gap);
+      const picked = s.picked.includes(tileIdx);
+      ctx.fillStyle = picked ? "#1f5c2c" : "#ffd23f";
+      ctx.fillRect(x, oy, cell, cell);
+      ctx.fillStyle = picked ? "#7a8a7a" : "#0c3b16";
+      ctx.font = "bold 18px DM Mono, monospace"; ctx.textAlign = "center";
+      ctx.fillText(s.letters[letterIdx], x + cell / 2, oy + 26);
+      ctx.font = "9px DM Mono, monospace";
+      ctx.fillText(String(tileIdx + 1), x + cell / 2, oy + cell + 12);
+    });
+    ctx.textAlign = "center"; ctx.fillStyle = "#e9e2c8"; ctx.font = "13px DM Mono, monospace";
+    ctx.fillText(s.word.split("").map((_, i) => (i < s.picked.length ? s.word[i] : "_")).join(" "), W / 2, 60);
+    ctx.textAlign = "left";
+    if (this.finished) drawEnd(ctx, this.score);
+  }
+
+  // ------------------------------------------------------------ lab mix
+  _key_lab_mix(code) {
+    const digit = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3 }[code];
+    if (digit === undefined) return;
+    const s = this._state;
+    if (s.first === -1) { s.first = digit; return; }
+    const pair = [s.first, digit].sort();
+    const match = pair[0] === s.target.pair[0] && pair[1] === s.target.pair[1];
+    if (match) this.score += 10;
+    else s.misses++;
+    s.first = -1;
+    s.round++;
+    if (s.misses >= 3 || s.round >= 6) { this.finished = true; return; }
+    Object.assign(s, pickMixTarget());
+    s.timer = s.timeLimit;
+  }
+  _update_lab_mix(dt) {
+    const s = this._state;
+    s.timer -= dt;
+    if (s.timer <= 0) {
+      s.misses++; s.first = -1; s.round++;
+      if (s.misses >= 3 || s.round >= 6) { this.finished = true; return; }
+      Object.assign(s, pickMixTarget());
+      s.timer = s.timeLimit;
+    }
+  }
+  _draw_lab_mix() {
+    const ctx = this.ctx, s = this._state;
+    ctx.fillStyle = "#0c3b16"; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#cfd6e0"; ctx.font = "11px DM Mono, monospace";
+    ctx.fillText(`Mix ${s.round + 1}/6 — misses ${s.misses}/3`, 10, 16);
+    ctx.fillStyle = "#e9e2c8"; ctx.font = "13px DM Mono, monospace";
+    ctx.fillText("Make:", 10, 44);
+    ctx.fillStyle = s.target.color; ctx.fillRect(70, 32, 60, 16);
+    ctx.fillStyle = "#e9e2c8"; ctx.fillText(s.target.name, 140, 44);
+    REAGENTS.forEach((r, i) => {
+      const x = 30 + i * 70, y = 90;
+      const selected = s.first === i;
+      ctx.fillStyle = r.color; ctx.fillRect(x, y, 50, 50);
+      ctx.strokeStyle = selected ? "#ffd23f" : "rgba(255,255,255,0.4)";
+      ctx.lineWidth = selected ? 3 : 1;
+      ctx.strokeRect(x, y, 50, 50);
+      ctx.lineWidth = 1;
+      ctx.fillStyle = "#0c3b16"; ctx.font = "10px DM Mono, monospace"; ctx.textAlign = "center";
+      ctx.fillText(String(i + 1), x + 25, y + 64);
+      ctx.textAlign = "left";
+    });
+    const barW = ((W - 20) * Math.max(0, s.timer)) / s.timeLimit;
+    ctx.fillStyle = "#4dc9ff"; ctx.fillRect(10, H - 14, barW, 6);
+    if (this.finished) drawEnd(ctx, this.score);
+  }
+
+  // -------------------------------------------------------- PACER test
+  _key_pacer_test(code) {
+    if (code !== "Space") return;
+    const s = this._state;
+    const dt = this.t - s.beepAt;
+    if (dt < -0.15) return; // pressed too early, before the window even opens
+    if (Math.abs(dt) <= 0.35) {
+      this.score = s.lap + 1;
+      s.lap++;
+      s.interval = Math.max(0.6, s.interval - 0.05);
+      s.beepAt = this.t + s.interval;
+    } else {
+      this.finished = true;
+    }
+  }
+  _update_pacer_test() {
+    const s = this._state;
+    if (this.t - s.beepAt > 0.35) this.finished = true; // missed the beep entirely
+  }
+  _draw_pacer_test() {
+    const ctx = this.ctx, s = this._state;
+    ctx.fillStyle = "#0c3b16"; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = "#cfd6e0"; ctx.font = "12px DM Mono, monospace";
+    ctx.fillText(`Lap ${s.lap}`, 10, 18);
+    const untilBeep = s.beepAt - this.t;
+    const pulse = Math.abs(untilBeep) < 0.35;
+    ctx.fillStyle = pulse ? "#ffd23f" : "#1f5c2c";
+    ctx.beginPath(); ctx.arc(W / 2, H / 2, pulse ? 60 : 46, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#0c3b16"; ctx.font = "bold 13px DM Mono, monospace"; ctx.textAlign = "center";
+    ctx.fillText(pulse ? "SPACE!" : "…", W / 2, H / 2 + 5);
+    ctx.textAlign = "left";
+    if (this.finished) drawEnd(ctx, this.score);
+  }
+
   _update(dt) {
-    const fn = this[`_update_${this.kind}`];
+    const fn = this[`_update_${methodKind(this.kind)}`];
     if (fn) fn.call(this, dt);
   }
   _draw() {
-    const fn = this[`_draw_${this.kind}`];
+    const fn = this[`_draw_${methodKind(this.kind)}`];
     if (fn) fn.call(this);
   }
 }
 
 function rnd4() { return Math.floor(Math.random() * 4); }
+// Kind ids like "pop-quiz" aren't valid JS method-name fragments, so the
+// dispatcher looks up "_key_pop_quiz" etc. — this is the only place that
+// needs to know about the substitution.
+function methodKind(kind) { return kind.replace(/-/g, "_"); }
+
+// -------------------------------------------------------------- pop quiz
+const QUIZ = [
+  { q: "What does P.E. stand for?", choices: ["Physical Education", "Pizza Enthusiasts", "Please Excuse", "Public Events"], correct: 0 },
+  { q: "Which of these is NOT a real school subject?", choices: ["Math", "Interpretive Lunch", "Science", "English"], correct: 1 },
+  { q: "Who patrols the hallway with a mop?", choices: ["Principal Grimface", "Janitor Gus", "Ms. Quietly", "Eldon Tusk"], correct: 1 },
+  { q: "Where would you find Gerald the fish?", choices: ["The library", "Room 5A", "The gym", "The cafeteria"], correct: 1 },
+  { q: "What's the forbidden classroom snack?", choices: ["Gum", "Water", "Pencils", "Erasers"], correct: 0 },
+  { q: "Which kid is starting a mystery club?", choices: ["Marcus Vale", "Wendell", "Priya", "Marnie"], correct: 2 },
+  { q: "What do you need to buy lunch?", choices: ["A hall pass", "Your student ID", "A permission slip", "A library card"], correct: 1 },
+  { q: "Who hangs out by the bike racks?", choices: ["Pep", "Wendell", "Ms. Quietly", "Marcus Vale"], correct: 0 },
+];
+function rndQuestion(excludeIdx) {
+  let i = Math.floor(Math.random() * QUIZ.length);
+  if (QUIZ.length > 1) while (i === excludeIdx) i = Math.floor(Math.random() * QUIZ.length);
+  return i;
+}
+
+// ----------------------------------------------------------- mental math
+function genMathQuestion() {
+  const ops = ["+", "-", "×"];
+  const op = ops[Math.floor(Math.random() * ops.length)];
+  let a = 1 + Math.floor(Math.random() * 12), b = 1 + Math.floor(Math.random() * 12);
+  if (op === "-" && b > a) [a, b] = [b, a];
+  const answer = op === "+" ? a + b : op === "-" ? a - b : a * b;
+  const choices = new Set([answer]);
+  while (choices.size < 4) choices.add(Math.max(0, answer + (Math.floor(Math.random() * 9) - 4)));
+  const arr = [...choices].sort(() => Math.random() - 0.5);
+  return { a, b, op, answer, choices: arr, correctIdx: arr.indexOf(answer) };
+}
+
+// -------------------------------------------------------- word scramble
+const WORDS = ["LOCKER", "PIZZA", "RECESS", "PENCIL", "SCHOOL", "HOMEWORK", "CHALK", "BUS"];
+function scrambleWord(word) {
+  const letters = word.split("");
+  let order;
+  do { order = letters.map((_, i) => i).sort(() => Math.random() - 0.5); }
+  while (order.every((v, i) => v === i) && letters.length > 1);
+  return { letters, order, picked: [], word };
+}
+
+// ------------------------------------------------------------- lab mix
+const REAGENTS = [
+  { name: "Red", color: "#e14b4b" },
+  { name: "Yellow", color: "#e8d23f" },
+  { name: "Blue", color: "#4d8fe8" },
+  { name: "White", color: "#e8e8e8" },
+];
+const MIXES = [
+  { pair: [0, 1], name: "Orange", color: "#e8862e" },
+  { pair: [1, 2], name: "Green", color: "#4bb85c" },
+  { pair: [0, 2], name: "Purple", color: "#9a4be0" },
+  { pair: [0, 3], name: "Pink", color: "#e88ec9" },
+];
+function pickMixTarget() {
+  const mix = MIXES[Math.floor(Math.random() * MIXES.length)];
+  return { target: mix };
+}
+
+function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+  const words = text.split(" ");
+  let line = "", ly = y;
+  for (const w of words) {
+    const test = line ? `${line} ${w}` : w;
+    if (ctx.measureText(test).width > maxWidth && line) {
+      ctx.fillText(line, x, ly);
+      line = w; ly += lineHeight;
+    } else line = test;
+  }
+  if (line) ctx.fillText(line, x, ly);
+}
 
 function drawEnd(ctx, score) {
   ctx.fillStyle = "rgba(0,0,0,0.55)"; ctx.fillRect(0, 0, W, H);

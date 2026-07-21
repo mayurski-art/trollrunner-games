@@ -25,7 +25,9 @@
     {
       "type": "chalkboard",
       "x": 6,
-      "y": 1
+      "y": 1,
+      "play": "mental-math",
+      "playName": "Mental Math"
     },
     {
       "type": "door",

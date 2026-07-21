@@ -84,7 +84,11 @@ async function enterRoom(page, { doorX, roomId, roomName, memWarp, memTitleRe, l
   log(true, 'Main Hallway connects into the East Wing (hallway-b)');
   await page.screenshot({ path: path.join(OUT, 'th-p5-shot-1-eastwing.png') });
 
-  await enterRoom(page, { doorX: 14, roomId: 'gym', roomName: 'Gym', memWarp: [3, 5], memTitleRe: /bleachers/i, label: 'Gym' });
+  // Bleachers now trigger the PACER Test minigame (classes-as-minigames,
+  // design doc §21) instead of their memory card — same "play" priority
+  // as computer-desk did for the arcade launcher in Phase 7. Check the
+  // basketball hoop's memory instead.
+  await enterRoom(page, { doorX: 14, roomId: 'gym', roomName: 'Gym', memWarp: [6, 14], memTitleRe: /the hoop/i, label: 'Gym' });
   await enterRoom(page, { doorX: 26, roomId: 'auditorium', roomName: 'Auditorium', memWarp: [10, 5], memTitleRe: /stage curtain/i, label: 'Auditorium' });
   await enterRoom(page, { doorX: 110, roomId: 'bus-loop', roomName: 'Bus Loop', memWarp: [4, 7], memTitleRe: /bus 12/i, label: 'Bus Loop' });
   await page.screenshot({ path: path.join(OUT, 'th-p5-shot-2-busloop.png') });

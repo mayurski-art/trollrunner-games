@@ -32,7 +32,9 @@
     {
       "type": "bleachers",
       "x": 1,
-      "y": 3
+      "y": 3,
+      "play": "pacer-test",
+      "playName": "PACER Test"
     },
     {
       "type": "bleachers",
