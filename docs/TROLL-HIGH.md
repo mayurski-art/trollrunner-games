@@ -341,7 +341,7 @@ binder in 2006. Mobile: bottom-sheet versions of the same panels.
 | 5 | School wave 2 — **DONE** | Gym, auditorium, art room, music room, science lab, nurse's office, playground, sports field, bus loop — 9 new rooms off a second hallway wing (East Wing / hallway-b), branched off Main Hallway rather than one absurdly long corridor. Secrets tier 1: a hidden basement (unmarked East Wing door) chains into the maintenance tunnels, and an unmarked gym door leads up to the roof — 2 new tilesets (outdoor schoolyard w/ chain-link fence, gravel rooftop w/ parapet), 18 new furniture pieces. 121 memory-bearing instances across all 22 zones. |
 | 6 | Persistence — **DONE** | Real account gate at the title screen (login/signup, SSO-aware via `TrollrunnerAccounts` — a session from any other *.trollrunner.net game skips the form). Cloud saves reuse the existing shared `troll_game_saves` table (no new SQL needed — same table Trollrreria already uses; a per-game `troll_high.sql` was in the original plan but turned out unnecessary). Position + every found memory round-trip through a real account across reloads. Weekly leaderboard wired via the shared `troll-leaderboard.js` engine, shown in an in-game overlay panel (🏆 button) since Troll High has no page chrome outside the canvas to mount a page-section leaderboard in, unlike Troll Kombat. **TrollNotis was evaluated and NOT wired** — its real API turned out to be a specific social-media cross-post announcer (X/Instagram, platform badges, CTA links), not a generic achievement toast system; forcing memory discoveries through it would misuse it. Deferred to a later phase: inventory + sticker book (needs Phase 7's collectible systems to exist first). |
 | 7 | Lab & recess — **DONE** | CRT computers launch the real arcade games in an iframe overlay (`openArcade`/`closeArcade`); 4 original recess minigames (`src/minigames.js`: four square, tetherball, hopscotch, kickball) with high scores tracked on the profile; trading + gifting (`src/cards.js`, `net.js` trade-offer/trade-accept/trade-decline/gift messages) — a 14-card set, earned as a side chance on existing milestones, negotiated live over the existing per-zone broadcast channel with no server-arbitrated ledger. **v1 LAUNCH: hub card flipped live on games.trollrunner.net (new "Social" category).** Also shipped in this window, from direct player feedback rather than the original plan: a full campus map screen (M key, `src/mapview.js`), a student profile panel with a cosmetic student ID (`src/profile.js`), a cafeteria food-bar ordering flow gated on that ID (`src/cafeteria.js`), and first-login orientation + elective pick + a class schedule + auto-checking daily tasks (`src/schedule.js`). See §19 for the larger post-Phase-7 design direction these and Phase 7's card set now feed into. |
-| 8 | Neighborhood 1 | Streets, cul-de-sacs, arcade, pizza place, convenience store, park, bus stop, ice cream truck. |
+| 8 | Neighborhood 1 — **DONE (v1)** | Main Street (reached via the Bus Loop), Arcade, Pizza Place, Corner Store, Park — 5 new zones. Arcade and Pizza Place have real working cabinets (`arcade-cabinet` objects reusing Phase 7's `openArcade` launcher verbatim): Troll Kombat, Meme Metro, Troll Casino downtown; Papa Troll's Pizzeria at the pizza place. Bus stop and ice cream truck folded in as Main Street flavor objects rather than their own zones; cul-de-sacs not built. Campus map (M) gained a "Downtown" row. Found and fixed a real bug while building this: zone terrain must be a (h+1)×(w+1) vertex grid, not h×w — see §22. |
 | 9 | Neighborhood 2 | Skate park, lake, forest + trail, tree houses, storm drains, warehouse, caves; secrets tier 2. |
 | 10 | Events | Event engine + book fair, pizza friday, spirit week, dance, Halloween, snow day; seasonal art variants. |
 | 11 | Troll meta | Graffiti hunt, Troll TCG set, secret club, underground HQ, legendary NPC, golden statues. |
@@ -447,3 +447,28 @@ Space as its own action key (tetherball, kickball) the instant it was
 pressed — removed, E is now the sole interact key everywhere. Next up:
 Phases 8-12 (neighborhoods, events, Troll meta, polish), plus Clubs
 (flagged as its own phase-sized chunk, not yet scheduled).
+
+## 22. Zone authoring gotcha: terrain is a vertex grid, not a cell grid
+
+Every existing zone file already gets this right, but it's easy to get
+wrong writing a new one from scratch (as Phase 8 did, the first time),
+and the failure mode is nasty: **`terrain` must be `(h+1)` rows of
+`(w+1)` characters**, not `h` rows of `w` characters, even though `w`/
+`h` are declared as the room size in *cells*. `zone.js`'s `this.v` is a
+vertex grid (`h+1` rows × `w+1` cols) used for wall-face autotiling —
+undersizing it doesn't throw at load time (the `Zone` constructor
+doesn't validate), it throws lazily the first time that zone is actually
+switched into (`this.v[r-1][c]` goes out of bounds inside the
+`for`-loop at the bottom of the constructor). Because `switchZone()`
+doesn't clear `pendingDoor` until *after* the throwing line, the
+exception recurs every single frame — the fade-out visually completes
+and then nothing happens, forever, with no error surfaced anywhere a
+player would see it (only in the console, buried in a print loop).
+
+The fix is mechanical: for a room of `w`×`h` cells, `terrain` needs a
+1-or-2-row top wall band + floor rows + a 1-row bottom wall band,
+totaling `h+1` rows, each exactly `w+1` characters (`#`/`.`) wide. See
+any existing zone file, or generate it programmatically (Phase 8's
+zones were fixed this way) rather than hand-typing `#`/`.` strings.
+Double-check with: `terrain.length === h + 1 && terrain.every(r =>
+r.length === w + 1)`.
