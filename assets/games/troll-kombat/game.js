@@ -2350,7 +2350,6 @@
     document.getElementById("fsel-p2").hidden = humanCount() < 2;
     if (!online.active) {
       document.getElementById("fsel-back").hidden = false;
-      document.getElementById("fsel-reset").hidden = false;
     }
     renderFighterSelect();
     flow.go("fighter");
@@ -2447,9 +2446,6 @@
   });
   document.getElementById("fsel-back").addEventListener("click", () =>
     flow.go(setup.mode === "mp" ? "playercount" : "matchtype"));
-  document.getElementById("fsel-reset").addEventListener("click", () => {
-    setup.picks = []; setup.current = 0; renderFighterSelect(); blip(300, 200);
-  });
   document.getElementById("fsel-continue").addEventListener("click", () => {
     if (online.active) {
       if (!online.isHost) return;   // guest's button is disabled; belt & suspenders
@@ -2747,7 +2743,6 @@
       this._sendAcc = 0; this._snapAcc = 0; this._lastSnap = null; this._resultShown = false;
       document.getElementById("fsel-p2").hidden = false;
       document.getElementById("fsel-back").hidden = true;
-      document.getElementById("fsel-reset").hidden = true;
       renderFighterSelect();
       flow.go("fighter");
     },
