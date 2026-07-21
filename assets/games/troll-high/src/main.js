@@ -42,6 +42,9 @@ const ZONE_IDS = [
   "underground-hq",
   // Phase 12 — Polish: developer room easter egg
   "dev-room",
+  // §23 Phase 7 — The Hidden World, expanded further (deliberately not
+  // resolved): a third unmarked door out of the Underground HQ.
+  "flooded-passage",
 ];
 // open corridors + genuinely outdoor zones get the quieter ambience tone
 const OUTDOOR_ZONES = new Set(["hallway-a", "hallway-b", "playground", "sports-field", "bus-loop", "roof", "main-street", "park", "forest-trail", "skate-park", "lake"]);

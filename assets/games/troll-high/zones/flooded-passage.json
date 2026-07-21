@@ -1,0 +1,79 @@
+{
+  "id": "flooded-passage",
+  "name": "???",
+  "tileset": "hallway",
+  "w": 14,
+  "h": 10,
+  "terrain": [
+    "###############",
+    "###############",
+    "#.............#",
+    "#.............#",
+    "#.............#",
+    "#.............#",
+    "#.............#",
+    "#.............#",
+    "#.............#",
+    "#.............#",
+    "###############"
+  ],
+  "objects": [
+    {
+      "type": "door",
+      "x": 6,
+      "y": 0
+    },
+    {
+      "type": "graffiti",
+      "x": 2,
+      "y": 3,
+      "memory": {
+        "title": "Graffiti",
+        "text": "Someone counted the doors before this one. There were supposed to be only two."
+      }
+    },
+    {
+      "type": "cave-rocks",
+      "x": 9,
+      "y": 3,
+      "memory": {
+        "title": "The rocks",
+        "text": "They're warmer than they should be, this far down."
+      }
+    },
+    {
+      "type": "crates",
+      "x": 5,
+      "y": 6,
+      "memory": {
+        "title": "A nailed-shut crate",
+        "text": "Nailed shut from the inside. Nobody has explained that part."
+      }
+    },
+    {
+      "type": "graffiti",
+      "x": 9,
+      "y": 6,
+      "memory": {
+        "title": "Graffiti",
+        "text": "If you can read this, you already know more than the teachers do."
+      }
+    }
+  ],
+  "doors": [
+    {
+      "x": 6,
+      "y": 3,
+      "w": 2,
+      "h": 1,
+      "to": "underground-hq",
+      "tx": 13,
+      "ty": 9,
+      "label": "??? (back up, if you want)"
+    }
+  ],
+  "spawn": {
+    "x": 7,
+    "y": 5
+  }
+}

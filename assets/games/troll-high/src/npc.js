@@ -234,6 +234,7 @@ export const NPC_DEFS = {
       "Trays don't stack themselves after last lunch. Well — actually.",
       "Quietest the building ever gets is right about now.",
       "Kid, you don't want to know what's down in the tunnels.",
+      "Even I don't know where that third door under the school goes. And I've got a key for everything.",
     ],
   }],
   library: [{
@@ -288,6 +289,7 @@ export const NPC_DEFS = {
       "These floors don't mop themselves. Well — actually.",
       "I've got a key for every door in this building. Every one.",
       "Kid, you don't want to know what's down in the tunnels.",
+      "Even I don't know where that third door under the school goes. And I've got a key for everything.",
     ],
   }],
   // 5 new peer/kid NPCs (design doc §21) — the original 8 were all staff;
@@ -381,6 +383,7 @@ export const NPC_DEFS = {
       "Is... is this the office? I think I'm lost. Again.",
       "I don't really know anyone here yet. It's fine. It's totally fine.",
       "Do you know where Room 5A is? I've asked like four people today.",
+      "Someone told me there's a door under this school that leads to another door. I didn't ask what's past that one.",
     ],
   }],
   "art-room": [{
@@ -426,6 +429,7 @@ export const NPC_DEFS = {
       "You can see the whole school from up here. Some nights it looks... different.",
       "Don't ask about the tunnels. Actually — do. Just not to a teacher.",
       "I heard laughing down by the boiler room once. Nobody else heard it.",
+      "There's a room past the room everyone whispers about. I don't believe it. I definitely don't believe it.",
     ],
   }],
   // The legendary NPC (design doc §9/§21 layer 4) — almost never seen,
@@ -442,6 +446,10 @@ export const NPC_DEFS = {
     memoryLines: [
       { id: "club", condition: c => c.clubMember,
         line: "You signed the charter too, huh. Guess that makes it official. Welcome." },
+      // §23 Phase 7 — the mystery goes one door deeper than even
+      // Trollface himself will explain. Deliberately no resolution here.
+      { id: "flooded-passage", condition: c => c.visitedZones.has("flooded-passage"),
+        line: "You went past my room. I don't go in there. I'm not going to tell you why." },
     ],
     returningLine: "It's been a while. Down here, you kind of lose track. Good to see you again, though.",
     dialogue: [

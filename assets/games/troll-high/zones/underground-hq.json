@@ -39,6 +39,11 @@
       "type": "door",
       "x": 3,
       "y": 8
+    },
+    {
+      "type": "door",
+      "x": 13,
+      "y": 8
     }
   ],
   "doors": [
@@ -61,6 +66,16 @@
       "tx": 5,
       "ty": 3,
       "label": "??? (this really shouldn't be here)"
+    },
+    {
+      "x": 13,
+      "y": 8,
+      "w": 2,
+      "h": 1,
+      "to": "flooded-passage",
+      "tx": 7,
+      "ty": 5,
+      "label": "??? (you can hear water)"
     }
   ],
   "spawn": {

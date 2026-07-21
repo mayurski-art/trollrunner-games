@@ -961,3 +961,51 @@ the state change fires locally.
 **Phase 6 is now fully complete** — all seven Multiplayer Memories
 pieces (clubs, elections, shared Class Yearbook, dances, talent show,
 science fair, graduation) built, tested, and shipped.
+
+**Phase 7 shipped 2026-07-21 — The Hidden World, expanded further.**
+The design doc's own instruction here is explicit: expand the mystery,
+don't resolve it. This is the last phase in the current
+reprioritization doc — there's no Phase 8 defined; once a first slice
+of this shipped, the roadmap runs out and the next step is either
+picking something from the original (pre-reprioritization) ChatGPT
+doc's deprioritized items, or new direction.
+
+- New zone `flooded-passage` (id, `???` as its display name — matching
+  `dev-room`'s convention for secret-zone naming) reachable via a
+  **third** unmarked door out of the Underground HQ (alongside the
+  existing Caves and dev-room doors). A genuine dead end: exactly one
+  door, back the way you came — no NPC, no resolution, just four
+  mystery props (2 graffiti + cave-rocks + a nailed-shut crate) with
+  unique per-instance `memory` overrides that raise new questions
+  rather than answer old ones ("There were supposed to be only two
+  doors," "Nailed shut from the inside — nobody's explained that
+  part").
+- Three above-ground NPCs (Janitor Gus — both his hallway-a and
+  cafeteria entries, since it's the same person — Wendell, Marnie)
+  each got one new line appended to their normal cycling `dialogue`
+  array: cryptic rumors about "a door under a door" that never confirm
+  anything, planting the mystery for players who haven't found the
+  Underground HQ at all yet.
+- Trollface got one more `memoryLines` callback (relations.js's Phase
+  2 system), conditioned on `visitedZones.has("flooded-passage")` —
+  "You went past my room. I don't go in there. I'm not going to tell
+  you why." Even the NPC who explains everything else declines to
+  explain this one, by design.
+
+Test: `tools/troll-high-hidden-world-smoke.js` — checks Wendell's
+dialogue cycle includes the new rumor line (had to work out the exact
+`pickDialogueLine` tier-consumption sequence: firstLine, then two
+cycling lines, then `familiarLine` at `FAMILIAR_AT` intercepts without
+advancing `dialogueIndex`, so the new 5th-appended line only surfaces
+on the *sixth* interaction overall), walks the real chain into the
+Underground HQ, through the new third door, checks all four mystery
+props' memory text, confirms exactly one door (the dead-end), and
+Trollface's new line. **Real bug found and fixed while writing the
+return-trip navigation**: `flooded-passage`'s own door lands the
+player one tile short of Underground HQ's third door's own trigger —
+holding a movement key for a fixed duration risked walking straight
+back through it the instant the zone switched, since the key was
+still held. Fixed by releasing the key the moment the zone actually
+changes (poll-then-release) instead of a fixed hold span — worth
+remembering for any future door pair where the landing spot sits
+adjacent to another door in the new zone.
