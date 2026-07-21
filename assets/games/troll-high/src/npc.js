@@ -314,6 +314,10 @@ export const NPC_DEFS = {
         "Spirit Week, man. I'm not wearing the colors but I'm feeling the colors. That's participation.",
         "Bus driver's got spirit ribbons on the mirror. Whole vibe shifted this week.",
       ],
+      dance: [
+        "Bus after the dance is a whole different energy, man. Everyone's still buzzing.",
+        "I'm not going in, I just like watching people show up dressed different than usual. Feels good, man.",
+      ],
     },
     dialogue: [
       "Bus is always five minutes early or ten minutes late. Never on time. Kind of beautiful, honestly.",
@@ -388,6 +392,10 @@ export const NPC_DEFS = {
       "spirit-week": [
         "I painted my face for Spirit Week and now I can't get it off before art. Worth it.",
         "This is basically a week-long excuse for banners. I love banners.",
+      ],
+      dance: [
+        "I made the decorations. The banner's crooked. I know. I'm choosing not to fix it.",
+        "Nobody's on the dance floor yet and it's making me anxious. Go dance. Please.",
       ],
     },
     // Real multi-club system (§23 Phase 6) — Priya's whole arc was "I'm

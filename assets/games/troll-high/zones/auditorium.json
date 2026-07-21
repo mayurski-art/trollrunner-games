@@ -68,6 +68,11 @@
       "type": "ballot-box",
       "x": 11,
       "y": 13
+    },
+    {
+      "type": "dance-floor",
+      "x": 9,
+      "y": 10
     }
   ],
   "doors": [

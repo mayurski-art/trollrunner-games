@@ -295,6 +295,7 @@ async function boot() {
     running = true;
     ambience.start();
     ambience.setIndoor(!OUTDOOR_ZONES.has(zone.id));
+    ambience.setDancing(todaysEventId === "dance" && zone.id === "auditorium");
     net.join(zone.id).catch(() => {});
     if (!orientationDone) openOrientation();
   };
@@ -675,16 +676,18 @@ async function boot() {
     yearbookStatusEl.hidden = true;
     const result = await capturePhoto(renderer.canvas, session.userId, { zoneId: zone.id, zoneName: zone.name });
     if (result.ok) {
-      // Real School Events (design doc §23 Phase 4) — Picture Day tags
-      // whatever you shoot that real day as an actual yearbook entry,
-      // not just another disposable-camera exposure.
+      // Real School Events (design doc §23 Phase 4/6) — Picture Day tags
+      // whatever you shoot that real day; a School Dance photo taken in
+      // the Auditorium during one gets the same treatment.
       if (todaysEventId === "picture-day") result.photo.eventTag = "Picture Day";
+      else if (todaysEventId === "dance" && zone.id === "auditorium") result.photo.eventTag = "School Dance";
       photos = addPhotoToRoll(photos, result.photo);
       saveDirty = true;
       persist();
       renderYearbook();
       sharePhoto(session.userId, identity.name, result.photo); // best-effort, no await needed
       if (todaysEventId === "picture-day") showToast("📸 That one's going in the yearbook — it's Picture Day.");
+      else if (result.photo.eventTag === "School Dance") showToast("📸 That one's going in the yearbook — School Dance.");
     } else {
       yearbookStatusEl.hidden = false;
       yearbookStatusEl.textContent = result.reason;
@@ -1102,6 +1105,19 @@ async function boot() {
     if (electionEl) { electionEl.remove(); electionEl = null; }
   }
 
+  // Dances (design doc §23 Phase 6) — the auditorium's dance floor is a
+  // simple toggle, not a form: stepping on it broadcasts `dancing` over
+  // presence (same mechanism as club/candidacy) so nearby real players
+  // see a 💃 tag on your name tag, and toggles the synthesized beat
+  // (audio.js's setDancing) for this player specifically. No persisted
+  // state — like elections, this is "a real thing happening right now."
+  let myDancing = false;
+  function toggleDancing() {
+    myDancing = !myDancing;
+    net.setDancing(myDancing);
+    showToast(myDancing ? "💃 You start dancing." : "🕺 You step off the dance floor.");
+  }
+
   // "See inside the TV": a small looping animated canvas standing in for
   // channel static, drawn fresh each time (no video asset, no license
   // concerns) — colored scanlines drifting over analog noise.
@@ -1176,6 +1192,7 @@ async function boot() {
     doorArmed = false;
     zoneNameEl.textContent = zone.name;
     ambience.setIndoor(!OUTDOOR_ZONES.has(zone.id));
+    ambience.setDancing(todaysEventId === "dance" && zone.id === "auditorium");
     ghosts.clear(); // last room's peers no longer apply
     net.join(zone.id).catch(() => {});
     visitedZones.add(zone.id);
@@ -1269,6 +1286,7 @@ async function boot() {
     ),
     spritesReady: studentSprites.ready,
     get ambienceStarted() { return ambience.started; },
+    ambience,
     net, ghosts, identity, session,
     openChat, closeChat,
     get chatOpen() { return chatOpen; },
@@ -1301,6 +1319,7 @@ async function boot() {
     get electionOpen() { return !!electionEl; },
     openElection, closeElection, runForOffice, castVote, voteTally,
     get myRunning() { return myRunning; },
+    toggleDancing, get myDancing() { return myDancing; },
     renderer, // exposed for test/dev inspection of weather + tint rendering
     openTrade, closeTrade,
     get cards() { return cards; },
@@ -1409,12 +1428,14 @@ async function boot() {
     const play = obj && (obj.play || obj.def.play);
     const shop = obj && (obj.shop || obj.def.shop);
     const election = obj && (obj.election || obj.def.election);
+    const dance = obj && (obj.dance || obj.def.dance);
     const arcadeHint = obj && obj.game ? ` Play ${obj.gameName || "a game"}` : null;
     const playHint = play ? ` Play ${obj.playName || obj.def.playName || minigameInfo(play).title}` : null;
     const shopHint = shop ? " Get lunch" : null;
     const electionHint = election ? " Ballot box" : null;
+    const danceHint = dance ? (myDancing ? " Stop dancing" : " Dance floor") : null;
     const peerHint = nearPeer ? ` Trade with ${nearPeer.name}` : null;
-    setHint((memoryEl || dialogueEl || electionEl || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden || !tradeOverlay.hidden || !bedroomOverlay.hidden || !yearbookOverlay.hidden) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (peerHint || arcadeHint || playHint || shopHint || electionHint || (mem ? ` ${mem.title}` : null)));
+    setHint((memoryEl || dialogueEl || electionEl || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden || !tradeOverlay.hidden || !bedroomOverlay.hidden || !yearbookOverlay.hidden) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (peerHint || arcadeHint || playHint || shopHint || electionHint || danceHint || (mem ? ` ${mem.title}` : null)));
     if (input.interactPressed() && mapOverlay.hidden && profileOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && bedroomOverlay.hidden && yearbookOverlay.hidden) {
       if (!tradeOverlay.hidden) closeTrade();
       else if (!cafeteriaOverlay.hidden) closeCafeteria();
@@ -1429,6 +1450,7 @@ async function boot() {
       else if (play) openMinigame(obj);
       else if (shop) openCafeteria();
       else if (election) openElection();
+      else if (dance) toggleDancing();
       else if (mem) showMemory(mem, obj);
     }
 

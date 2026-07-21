@@ -775,9 +775,51 @@ photo, and confirms it shows up captioned with her real username in
 Bob's Class Yearbook tab — the actual cross-account proof the RLS
 policies work, not just that the insert call didn't throw.
 
-**⚠️ Action needed:** run `docs/troll_high_shared_yearbook.sql` in the
-Supabase SQL editor (same project as everything else) before the Class
-Yearbook tab will show anything — without it, `sharePhoto()` fails
-silently (by design) and the tab always reads "No class photos yet."
-`troll-high-shared-yearbook-smoke.js` will fail until this is run;
-that's expected and exactly what it's there to catch.
+**✅ `docs/troll_high_shared_yearbook.sql` has been run** (2026-07-21) —
+verified end to end via `troll-high-shared-yearbook-smoke.js`: Alice's
+real photo showed up captioned with her real username in Bob's Class
+Yearbook tab. Also confirmed reads are genuinely public — even the
+fast stub session (no real JWT at all) can browse the Class Yearbook
+tab, since the RLS policy is `using (true)`; only writes need a real
+account. `troll-high-yearbook-smoke.js`'s Class Yearbook assertion was
+updated to expect either an empty or populated result (it may see real
+photos left behind by other real-account test runs) rather than
+assuming the table would always be empty.
+
+**Phase 6 (fourth slice) shipped 2026-07-21 — dances.** The existing
+"School Dance" event (last Friday of the month) went from a banner
+with `tint: null` to a real interactive happening in the Auditorium:
+
+- `events.js`: dance now has a real tint (`rgba(180, 40, 200, 0.14)`,
+  a soft purple wash) instead of `null`.
+- `audio.js`: `Ambience.setDancing(on)` — a synthesized 128bpm
+  four-on-the-floor beat (sine kick + filtered-noise hi-hat on the
+  off-beat), self-scheduling via `setTimeout` chained off
+  `ctx.currentTime` rather than `setInterval` so it can't drift or
+  stack up extra beats if the tab was backgrounded. `main.js` calls it
+  on both boot and `switchZone()`, keyed on `todaysEventId === "dance"
+  && zone.id === "auditorium"` — starts on entering, stops on leaving.
+- New `dance-floor` object (Auditorium, clear of the existing seats/
+  ballot-box footprints) — `dance: true` routes its interaction to
+  `toggleDancing()` instead of a memory card, same pattern as
+  `election`. No form, just a toggle: broadcasts `dancing` over
+  presence (`net.setDancing`, same mechanism as club/candidacy) so
+  nearby real players see a 💃 suffix on your name tag (folded into
+  the same label as election's 🗳, not a whole new line).
+  Session-scoped, not persisted — same "a real thing happening right
+  now" philosophy as elections.
+- Pep and Priya got `dance` eventLines (relations.js Phase 2's
+  cycling-dialogue-override mechanism, same as the other Real School
+  Events). A photo taken in the Auditorium during a dance gets
+  `eventTag = "School Dance"`, same tagging pattern as Picture Day,
+  and shares into the Class Yearbook like any other photo.
+
+Test: `tools/troll-high-dance-smoke.js` — freezes `Date` to a real
+School Dance day (found via the same `findDate()` scan pattern) at a
+school-hours period. Two real browser contexts: confirms the beat
+starts/stops on entering/leaving the Auditorium, Priya's dance-day
+eventLine fires, Alice's dance-floor toggle broadcasts and Bob's ghost
+view of her reflects it (💃), and a photo taken there gets tagged (or,
+under the stub session actually used here, fails soft the same way
+every other capture-under-stub test does — real tagging is covered by
+the pattern in `troll-high-shared-yearbook-smoke.js`).

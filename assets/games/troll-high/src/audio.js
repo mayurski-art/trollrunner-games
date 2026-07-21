@@ -100,4 +100,60 @@ export class Ambience {
 
   suspend() { this.ctx && this.ctx.suspend(); }
   resume() { this.ctx && this.ctx.state === "suspended" && this.ctx.resume(); }
+
+  /* Dances (design doc §23 Phase 6) — a small synthesized four-on-the-floor
+     beat, same house style as everything else here (no licensed audio):
+     a kick (short low sine thump) on every beat, a hi-hat (filtered noise
+     tick) on the off-beats. Self-scheduling via setTimeout chained off
+     ctx.currentTime rather than setInterval, so it can't drift or stack
+     up extra beats if the tab was backgrounded. setDancing(false) tears
+     the whole chain down; safe to call repeatedly. */
+  setDancing(on) {
+    if (!this.ctx) return;
+    if (on) {
+      if (this._danceTimer) return; // already playing
+      const bpm = 128;
+      const beatSec = 60 / bpm;
+      let beat = 0;
+      const scheduleBeat = () => {
+        const t0 = this.ctx.currentTime;
+        // kick on every beat
+        const kick = this.ctx.createOscillator();
+        kick.type = "sine";
+        kick.frequency.setValueAtTime(120, t0);
+        kick.frequency.exponentialRampToValueAtTime(45, t0 + 0.12);
+        const kg = this.ctx.createGain();
+        kg.gain.setValueAtTime(0.16, t0);
+        kg.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.18);
+        kick.connect(kg);
+        kg.connect(this.ctx.destination);
+        kick.start(t0);
+        kick.stop(t0 + 0.2);
+        // hi-hat on the off-beat
+        if (beat % 2 === 1) {
+          const hatBuf = this.ctx.createBuffer(1, this.ctx.sampleRate * 0.05, this.ctx.sampleRate);
+          const d = hatBuf.getChannelData(0);
+          for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+          const hat = this.ctx.createBufferSource();
+          hat.buffer = hatBuf;
+          const hf = this.ctx.createBiquadFilter();
+          hf.type = "highpass";
+          hf.frequency.value = 6000;
+          const hg = this.ctx.createGain();
+          hg.gain.setValueAtTime(0.05, t0);
+          hg.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.05);
+          hat.connect(hf);
+          hf.connect(hg);
+          hg.connect(this.ctx.destination);
+          hat.start(t0);
+        }
+        beat++;
+        this._danceTimer = setTimeout(scheduleBeat, beatSec * 1000);
+      };
+      scheduleBeat();
+    } else if (this._danceTimer) {
+      clearTimeout(this._danceTimer);
+      this._danceTimer = null;
+    }
+  }
 }

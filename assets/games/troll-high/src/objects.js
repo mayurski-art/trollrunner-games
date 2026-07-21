@@ -151,6 +151,12 @@ export const OBJECT_DEFS = {
   "ballot-box": {
     sprite: "ballot-box", w: 2, h: 2, footRows: 1, election: true,
   },
+  // Dances (design doc §23 Phase 6) — `dance: true` routes the
+  // interaction to toggleDancing() (broadcast over presence, same
+  // mechanism as club/election) instead of a memory card.
+  "dance-floor": {
+    sprite: "dance-floor", w: 4, h: 3, footRows: 1, dance: true,
+  },
   easel: {
     sprite: "easel", w: 2, h: 3, footRows: 1,
     memory: {
@@ -424,7 +430,7 @@ const FALLBACK_COLORS = {
   "reading-corner": "#a13a3a", bookshelf: "#7a5230", "lunch-table": "#828a92",
   "sink-counter": "#9fb2c2", "fish-tank": "#3d7fa3", bleachers: "#8a6a4a",
   "basketball-hoop": "#c2743a", "stage-curtain": "#8a1f2b",
-  "auditorium-seats": "#7a2530", "ballot-box": "#2b5a8a", easel: "#8a6a4a", "art-shelf": "#7a5230",
+  "auditorium-seats": "#7a2530", "ballot-box": "#2b5a8a", "dance-floor": "#8a2b8a", easel: "#8a6a4a", "art-shelf": "#7a5230",
   "drum-set": "#a13a3a", "music-stand": "#3a3a3a", "lab-table": "#3a3a3a",
   "nurse-cot": "#c8d4dc", "first-aid-cabinet": "#d8dce0", "swing-set": "#5a6a7a",
   slide: "#e8c22e", "goal-post": "#dfe4e8", "school-bus": "#e8b22e",

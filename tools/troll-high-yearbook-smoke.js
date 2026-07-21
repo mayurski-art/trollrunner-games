@@ -92,18 +92,29 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
     log(!statusHidden && statusText.length > 0, `capture with no real JWT (stub session) fails gracefully with a human status message, not a crash (${JSON.stringify(statusText)})`);
   }
 
-  // Shared Class Yearbook tab (design doc §23 Phase 6) — under the stub
-  // session (no real JWT), fetchSharedPhotos() fails gracefully to an
-  // empty array, same "fails soft, never crashes" contract as the rest
-  // of this file. Real end-to-end sharing is covered by
-  // troll-high-shared-yearbook-smoke.js with a genuine account.
+  // Shared Class Yearbook tab (design doc §23 Phase 6) — reads are public
+  // (RLS `using (true)`), so this succeeds even under the stub session
+  // once docs/troll_high_shared_yearbook.sql has been run — it may come
+  // back either empty or populated with real photos from other real-
+  // account test runs (troll-high-shared-yearbook-smoke.js). Either way
+  // it must fail soft, never crash. WRITES still need a real JWT — that
+  // half is what the stub session can't do, covered separately there.
   await page.click('#th-yearbook-tab-class');
   await page.waitForFunction(
-    '!document.getElementById("th-yearbook-class-status").hidden',
-    { timeout: 5000 }
+    () => {
+      const status = document.getElementById('th-yearbook-class-status');
+      const grid = document.getElementById('th-yearbook-class-grid');
+      return !status.hidden || grid.querySelector('.th-yearbook-photo');
+    },
+    { timeout: 8000 }
   );
-  const classStatusText = await page.$eval('#th-yearbook-class-status', el => el.textContent);
-  log(/No class photos yet/i.test(classStatusText), `Class Yearbook tab fails soft to an empty state under the stub session (${JSON.stringify(classStatusText)})`);
+  const classPhotoCount = await page.$eval('#th-yearbook-class-grid', el => el.querySelectorAll('.th-yearbook-photo').length);
+  if (classPhotoCount === 0) {
+    const classStatusText = await page.$eval('#th-yearbook-class-status', el => el.textContent);
+    log(/No class photos yet/i.test(classStatusText), `Class Yearbook tab fails soft to an empty state (${JSON.stringify(classStatusText)})`);
+  } else {
+    log(true, `Class Yearbook tab shows real shared photos from other accounts (count=${classPhotoCount})`);
+  }
   const classTabActive = await page.evaluate(() => document.getElementById('th-yearbook-tab-class').classList.contains('is-active'));
   log(classTabActive, 'Class Yearbook tab shows as active after switching to it');
   await page.click('#th-yearbook-tab-mine');

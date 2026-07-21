@@ -32,6 +32,7 @@ export class Ghost {
     this.name = "";
     this.club = null; // real multi-club system (§23 Phase 6)
     this.running = false; // student elections (§23 Phase 6) — declared candidate?
+    this.dancing = false; // dances (§23 Phase 6) — currently on the dance floor?
     this.animT = 0;
     this.bubble = null;             // { text, until }
   }
@@ -41,6 +42,7 @@ export class Ghost {
     this.dir = p.dir; this.moving = p.moving; this.name = p.name || this.name;
     this.club = p.club || null;
     this.running = !!p.running;
+    this.dancing = !!p.dancing;
     if (this.x === null) { this.x = p.x; this.y = p.y; } // snap on first sighting
   }
 
@@ -63,10 +65,11 @@ export class Ghost {
       draw: ctx => {
         this.sprites.draw(ctx, this.dir, this.moving, this.animT, this.x, this.y);
         // White + "Player" — the NPC equivalent (npc.js entity()) is gold
-        // + "NPC", so a floating name is unambiguous at a glance. A 🗳
-        // suffix flags a declared election candidate (§23 Phase 6) without
-        // needing a whole extra label line.
-        const label = `${this.name} · Player${this.running ? " 🗳" : ""}`;
+        // + "NPC", so a floating name is unambiguous at a glance. 🗳/💃
+        // suffixes flag a declared election candidate / dance-floor
+        // participant (§23 Phase 6) without needing a whole extra label
+        // line per status.
+        const label = `${this.name} · Player${this.running ? " 🗳" : ""}${this.dancing ? " 💃" : ""}`;
         ctx.font = "8px monospace";
         ctx.textAlign = "center";
         ctx.fillStyle = "rgba(0,0,0,0.55)";

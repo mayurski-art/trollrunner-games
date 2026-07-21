@@ -11,7 +11,7 @@
 export const EVENTS = {
   halloween: { icon: "🎃", name: "Halloween", tint: "rgba(255, 120, 20, 0.16)" },
   "snow-day": { icon: "❄️", name: "Snow Day", tint: "rgba(200, 220, 255, 0.20)" },
-  dance: { icon: "🪩", name: "School Dance", tint: null },
+  dance: { icon: "🪩", name: "School Dance", tint: "rgba(180, 40, 200, 0.14)" },
   "spirit-week": { icon: "📣", name: "Spirit Week", tint: null },
   "book-fair": { icon: "📚", name: "Book Fair", tint: null },
   "picture-day": { icon: "📸", name: "Picture Day", tint: null },
