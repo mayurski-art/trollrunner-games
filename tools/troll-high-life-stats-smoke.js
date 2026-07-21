@@ -98,7 +98,8 @@ const hold = async (page, key, ms) => { await page.keyboard.down(key); await new
   const shownRooms = await page.$eval('#th-profile-rooms-explored', el => el.textContent);
   const shownLunches = await page.$eval('#th-profile-lunches', el => el.textContent);
   const shownCards = await page.$eval('#th-profile-cards-collected', el => el.textContent);
-  log(shownRooms === '3 / 22', `profile card shows rooms explored (${JSON.stringify(shownRooms)})`);
+  const totalRooms = await page.evaluate(() => window.__th.lifeStats.totalRooms);
+  log(shownRooms === `3 / ${totalRooms}`, `profile card shows rooms explored (${JSON.stringify(shownRooms)})`);
   log(shownLunches === '1', `profile card shows lunches bought (${JSON.stringify(shownLunches)})`);
   log(shownCards === '0 / 14', `profile card shows cards collected out of the full set (${JSON.stringify(shownCards)})`);
 

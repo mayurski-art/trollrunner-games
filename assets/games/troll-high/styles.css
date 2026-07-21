@@ -548,6 +548,8 @@ html, body {
 .th-map-panel {
   position: relative;
   width: min(760px, 94vw);
+  max-height: 92vh;
+  overflow-y: auto;
   background: var(--th-paper);
   color: var(--th-ink);
   border-radius: 14px;

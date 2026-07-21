@@ -1,0 +1,33 @@
+{
+  "id": "arcade",
+  "name": "Arcade",
+  "tileset": "classroom",
+  "w": 18,
+  "h": 12,
+  "terrain": [
+    "###################",
+    "###################",
+    "#.................#",
+    "#.................#",
+    "#.................#",
+    "#.................#",
+    "#.................#",
+    "#.................#",
+    "#.................#",
+    "#.................#",
+    "#.................#",
+    "#.................#",
+    "###################"
+  ],
+  "objects": [
+    { "type": "door", "x": 9, "y": 0 },
+    { "type": "arcade-cabinet", "x": 2, "y": 3, "game": "troll-kombat.html", "gameName": "Troll Kombat" },
+    { "type": "arcade-cabinet", "x": 12, "y": 3, "game": "meme-metro.html", "gameName": "Troll Dash: Meme Metro" },
+    { "type": "arcade-cabinet", "x": 2, "y": 6, "game": "troll-casino.html?boot=1", "gameName": "Troll Casino" },
+    { "type": "arcade-cabinet", "x": 12, "y": 6 }
+  ],
+  "doors": [
+    { "x": 9, "y": 3, "w": 2, "h": 1, "to": "main-street", "tx": 14, "ty": 3, "label": "Main Street" }
+  ],
+  "spawn": { "x": 9, "y": 5 }
+}

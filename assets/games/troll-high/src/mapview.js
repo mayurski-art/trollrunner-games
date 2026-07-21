@@ -24,6 +24,12 @@ const HALLWAY_B = [
   { id: "sports-field", label: "Sports\nField" },
   { id: "bus-loop", label: "Bus Loop" },
 ];
+const DOWNTOWN = [
+  { id: "arcade", label: "Arcade" },
+  { id: "pizza-place", label: "Pizza\nPlace" },
+  { id: "convenience-store", label: "Corner\nStore" },
+  { id: "park", label: "Park" },
+];
 const SECRET = [
   { id: "basement", label: "??? Basement" },
   { id: "tunnels", label: "??? Tunnels" },
@@ -82,15 +88,22 @@ export function drawCampusMap(canvas, currentZoneId) {
   ctx.lineTo(W - 40, 200);
   ctx.stroke();
 
+  ctx.fillStyle = "#cfd6e0"; ctx.font = "bold 12px DM Mono, monospace";
+  ctx.fillText("Downtown (via Bus Loop)", 40, 320);
+  drawRow(ctx, DOWNTOWN, 330, W, currentZoneId);
+
   ctx.fillStyle = "#8a8f9a"; ctx.font = "10px DM Mono, monospace";
-  ctx.fillText("Somewhere down there…", 40, 320);
-  drawRow(ctx, SECRET, 330, W, currentZoneId);
+  ctx.fillText("Somewhere down there…", 40, 450);
+  drawRow(ctx, SECRET, 460, W, currentZoneId);
 
   if (currentZoneId === "hallway-a") {
     ctx.fillStyle = "#ffd23f"; ctx.font = "bold 12px DM Mono, monospace";
-    ctx.fillText("★ You are in the Main Hallway", 40, 400);
+    ctx.fillText("★ You are in the Main Hallway", 40, 530);
   } else if (currentZoneId === "hallway-b") {
     ctx.fillStyle = "#ffd23f"; ctx.font = "bold 12px DM Mono, monospace";
-    ctx.fillText("★ You are in the East Wing", 40, 400);
+    ctx.fillText("★ You are in the East Wing", 40, 530);
+  } else if (currentZoneId === "main-street") {
+    ctx.fillStyle = "#ffd23f"; ctx.font = "bold 12px DM Mono, monospace";
+    ctx.fillText("★ You are on Main Street", 40, 530);
   }
 }

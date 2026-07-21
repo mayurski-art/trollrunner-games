@@ -36,6 +36,11 @@
       "type": "bus-stop-sign",
       "x": 15,
       "y": 6
+    },
+    {
+      "type": "door",
+      "x": 17,
+      "y": 0
     }
   ],
   "doors": [
@@ -48,6 +53,16 @@
       "tx": 110,
       "ty": 3,
       "label": "Hallway"
+    },
+    {
+      "x": 17,
+      "y": 3,
+      "w": 2,
+      "h": 1,
+      "to": "main-street",
+      "tx": 3,
+      "ty": 3,
+      "label": "Downtown"
     }
   ],
   "spawn": {

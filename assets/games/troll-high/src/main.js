@@ -32,9 +32,11 @@ const ZONE_IDS = [
   "computer-lab", "cafeteria", "library", "bathroom",
   "hallway-b", "gym", "auditorium", "art-room", "music-room", "science-lab",
   "nurse", "playground", "sports-field", "bus-loop", "basement", "tunnels", "roof",
+  // Phase 8 — Neighborhood 1
+  "main-street", "arcade", "pizza-place", "convenience-store", "park",
 ];
 // open corridors + genuinely outdoor zones get the quieter ambience tone
-const OUTDOOR_ZONES = new Set(["hallway-a", "hallway-b", "playground", "sports-field", "bus-loop", "roof"]);
+const OUTDOOR_ZONES = new Set(["hallway-a", "hallway-b", "playground", "sports-field", "bus-loop", "roof", "main-street", "park"]);
 
 const $ = id => document.getElementById(id);
 

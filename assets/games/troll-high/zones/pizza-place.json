@@ -1,0 +1,31 @@
+{
+  "id": "pizza-place",
+  "name": "Pizza Place",
+  "tileset": "classroom",
+  "w": 16,
+  "h": 11,
+  "terrain": [
+    "#################",
+    "#################",
+    "#...............#",
+    "#...............#",
+    "#...............#",
+    "#...............#",
+    "#...............#",
+    "#...............#",
+    "#...............#",
+    "#...............#",
+    "#...............#",
+    "#################"
+  ],
+  "objects": [
+    { "type": "door", "x": 9, "y": 0 },
+    { "type": "pizza-oven", "x": 2, "y": 2 },
+    { "type": "lunch-table", "x": 8, "y": 5 },
+    { "type": "arcade-cabinet", "x": 2, "y": 5, "game": "troll-pizzeria.html", "gameName": "Papa Troll's Pizzeria" }
+  ],
+  "doors": [
+    { "x": 9, "y": 3, "w": 2, "h": 1, "to": "main-street", "tx": 26, "ty": 3, "label": "Main Street" }
+  ],
+  "spawn": { "x": 9, "y": 5 }
+}

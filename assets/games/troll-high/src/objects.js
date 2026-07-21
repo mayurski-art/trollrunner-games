@@ -260,6 +260,55 @@ export const OBJECT_DEFS = {
       text: "The seat in the very back is sacred ground. You do not sit there unless you have been formally invited.",
     },
   },
+  "ice-cream-truck": {
+    sprite: "ice-cream-truck", w: 4, h: 3, footRows: 1,
+    memory: {
+      title: "The ice cream truck",
+      text: "Same jingle every single day. You could hum it in your sleep. You have hummed it in your sleep.",
+    },
+  },
+  "arcade-cabinet": {
+    sprite: "arcade-cabinet", w: 2, h: 3, footRows: 1,
+    memory: {
+      title: "Arcade cabinet",
+      text: "The high score screen has the same three initials on it. Nobody's ever beaten them.",
+    },
+  },
+  "pizza-oven": {
+    sprite: "pizza-oven", w: 3, h: 3, footRows: 1,
+    memory: {
+      title: "The pizza oven",
+      text: "It's been on since 1994, probably. The heat hits you the second the door opens.",
+    },
+  },
+  "store-counter": {
+    sprite: "store-counter", w: 4, h: 2, footRows: 1,
+    memory: {
+      title: "The corner store counter",
+      text: "A jar of gum, a lottery sign nobody your age can read, and a bell that's always slightly out of tune.",
+    },
+  },
+  "candy-shelf": {
+    sprite: "candy-shelf", w: 3, h: 2, footRows: 1,
+    memory: {
+      title: "The candy shelf",
+      text: "Everything's a quarter except the good stuff, which is somehow always sold out.",
+    },
+  },
+  "park-bench": {
+    sprite: "park-bench", w: 3, h: 2, footRows: 1,
+    memory: {
+      title: "The park bench",
+      text: "Someone carved a trollface into the armrest. It's a little crooked. It's perfect.",
+    },
+  },
+  "park-tree": {
+    sprite: "park-tree", w: 3, h: 3, footRows: 1,
+    memory: {
+      title: "The big tree",
+      text: "There's a rope swing tied way too high up. Nobody knows who put it there or how.",
+    },
+  },
   "bus-stop-sign": {
     sprite: "bus-stop-sign", w: 2, h: 3, footRows: 1,
     memory: {
@@ -299,6 +348,8 @@ const FALLBACK_COLORS = {
   "foursquare-court": "#c2b46a", "tetherball-pole": "#6b4a2a",
   "hopscotch-court": "#b8ac82", "kickball-spot": "#a13a3a",
   "food-bar": "#c2743a",
+  "ice-cream-truck": "#e8e4d8", "arcade-cabinet": "#3a2f5a", "pizza-oven": "#8a3a2a",
+  "store-counter": "#7a5230", "candy-shelf": "#e05a7a", "park-bench": "#5a6a4a", "park-tree": "#2e5d3a",
 };
 
 export class ObjectSprites {
