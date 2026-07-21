@@ -676,11 +676,16 @@ async function boot() {
     yearbookStatusEl.hidden = true;
     const result = await capturePhoto(renderer.canvas, session.userId, { zoneId: zone.id, zoneName: zone.name });
     if (result.ok) {
-      // Real School Events (design doc §23 Phase 4/6) — Picture Day tags
-      // whatever you shoot that real day; a School Dance photo taken in
-      // the Auditorium during one gets the same treatment.
+      // Real School Events / Multiplayer Memories (design doc §23 Phase
+      // 4/6) — Picture Day tags whatever you shoot that real day; a
+      // School Dance photo in the Auditorium, or one taken mid-
+      // performance (either yours or someone else's — checked via any
+      // live ghost's `performing`, not just your own), gets the same
+      // treatment.
+      const someoneOnStage = myPerforming || [...ghosts.values()].some(g => g.performing);
       if (todaysEventId === "picture-day") result.photo.eventTag = "Picture Day";
       else if (todaysEventId === "dance" && zone.id === "auditorium") result.photo.eventTag = "School Dance";
+      else if (zone.id === "auditorium" && someoneOnStage) result.photo.eventTag = "Talent Show";
       photos = addPhotoToRoll(photos, result.photo);
       saveDirty = true;
       persist();
@@ -688,6 +693,7 @@ async function boot() {
       sharePhoto(session.userId, identity.name, result.photo); // best-effort, no await needed
       if (todaysEventId === "picture-day") showToast("📸 That one's going in the yearbook — it's Picture Day.");
       else if (result.photo.eventTag === "School Dance") showToast("📸 That one's going in the yearbook — School Dance.");
+      else if (result.photo.eventTag === "Talent Show") showToast("📸 That one's going in the yearbook — Talent Show.");
     } else {
       yearbookStatusEl.hidden = false;
       yearbookStatusEl.textContent = result.reason;
@@ -1118,6 +1124,33 @@ async function boot() {
     showToast(myDancing ? "💃 You start dancing." : "🕺 You step off the dance floor.");
   }
 
+  // Talent show (design doc §23 Phase 6) — same toggle pattern as the
+  // dance floor, on the Auditorium's existing stage-curtain object (a
+  // per-instance `perform: true` override in auditorium.json, not the
+  // shared def — most stage-curtains elsewhere are flavor-only). No
+  // real talent selection UI; a random flavor line stands in for "what
+  // you performed," same spirit as the disposable camera standing in
+  // for a real photo — the moment is what matters, not the mechanic.
+  const PERFORMANCES = [
+    "an air guitar solo that goes on slightly too long",
+    "a magic trick that mostly works",
+    "thirty seconds of freestyle rap you immediately regret",
+    "a dramatic monologue nobody asked for",
+    "an interpretive dance about Mondays",
+    "a card trick where you clearly saw the card",
+  ];
+  let myPerforming = false;
+  function togglePerforming() {
+    myPerforming = !myPerforming;
+    net.setPerforming(myPerforming);
+    if (myPerforming) {
+      const bit = PERFORMANCES[Math.floor(Math.random() * PERFORMANCES.length)];
+      showToast(`🎤 You take the stage and do ${bit}.`);
+    } else {
+      showToast("🎤 You leave the stage.");
+    }
+  }
+
   // "See inside the TV": a small looping animated canvas standing in for
   // channel static, drawn fresh each time (no video asset, no license
   // concerns) — colored scanlines drifting over analog noise.
@@ -1320,6 +1353,7 @@ async function boot() {
     openElection, closeElection, runForOffice, castVote, voteTally,
     get myRunning() { return myRunning; },
     toggleDancing, get myDancing() { return myDancing; },
+    togglePerforming, get myPerforming() { return myPerforming; },
     renderer, // exposed for test/dev inspection of weather + tint rendering
     openTrade, closeTrade,
     get cards() { return cards; },
@@ -1429,13 +1463,15 @@ async function boot() {
     const shop = obj && (obj.shop || obj.def.shop);
     const election = obj && (obj.election || obj.def.election);
     const dance = obj && (obj.dance || obj.def.dance);
+    const perform = obj && (obj.perform || obj.def.perform);
     const arcadeHint = obj && obj.game ? ` Play ${obj.gameName || "a game"}` : null;
     const playHint = play ? ` Play ${obj.playName || obj.def.playName || minigameInfo(play).title}` : null;
     const shopHint = shop ? " Get lunch" : null;
     const electionHint = election ? " Ballot box" : null;
     const danceHint = dance ? (myDancing ? " Stop dancing" : " Dance floor") : null;
+    const performHint = perform ? (myPerforming ? " Leave the stage" : " Take the stage") : null;
     const peerHint = nearPeer ? ` Trade with ${nearPeer.name}` : null;
-    setHint((memoryEl || dialogueEl || electionEl || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden || !tradeOverlay.hidden || !bedroomOverlay.hidden || !yearbookOverlay.hidden) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (peerHint || arcadeHint || playHint || shopHint || electionHint || danceHint || (mem ? ` ${mem.title}` : null)));
+    setHint((memoryEl || dialogueEl || electionEl || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden || !tradeOverlay.hidden || !bedroomOverlay.hidden || !yearbookOverlay.hidden) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (peerHint || arcadeHint || playHint || shopHint || electionHint || danceHint || performHint || (mem ? ` ${mem.title}` : null)));
     if (input.interactPressed() && mapOverlay.hidden && profileOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && bedroomOverlay.hidden && yearbookOverlay.hidden) {
       if (!tradeOverlay.hidden) closeTrade();
       else if (!cafeteriaOverlay.hidden) closeCafeteria();
@@ -1451,6 +1487,7 @@ async function boot() {
       else if (shop) openCafeteria();
       else if (election) openElection();
       else if (dance) toggleDancing();
+      else if (perform) togglePerforming();
       else if (mem) showMemory(mem, obj);
     }
 

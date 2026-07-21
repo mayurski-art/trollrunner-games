@@ -32,7 +32,8 @@
     {
       "type": "stage-curtain",
       "x": 9,
-      "y": 2
+      "y": 2,
+      "perform": true
     },
     {
       "type": "auditorium-seats",

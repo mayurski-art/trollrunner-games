@@ -89,7 +89,11 @@ async function enterRoom(page, { doorX, roomId, roomName, memWarp, memTitleRe, l
   // as computer-desk did for the arcade launcher in Phase 7. Check the
   // basketball hoop's memory instead.
   await enterRoom(page, { doorX: 14, roomId: 'gym', roomName: 'Gym', memWarp: [6, 14], memTitleRe: /the hoop/i, label: 'Gym' });
-  await enterRoom(page, { doorX: 26, roomId: 'auditorium', roomName: 'Auditorium', memWarp: [10, 5], memTitleRe: /stage curtain/i, label: 'Auditorium' });
+  // The stage curtain now triggers the talent show toggle (Multiplayer
+  // Memories, design doc §23 Phase 6) instead of its memory card — same
+  // "play"/"election"/"dance" priority pattern as the gym's bleachers
+  // above. Check the auditorium seats' memory instead.
+  await enterRoom(page, { doorX: 26, roomId: 'auditorium', roomName: 'Auditorium', memWarp: [5, 10], memTitleRe: /auditorium seats/i, label: 'Auditorium' });
   await enterRoom(page, { doorX: 110, roomId: 'bus-loop', roomName: 'Bus Loop', memWarp: [4, 7], memTitleRe: /bus 12/i, label: 'Bus Loop' });
   await page.screenshot({ path: path.join(OUT, 'th-p5-shot-2-busloop.png') });
 

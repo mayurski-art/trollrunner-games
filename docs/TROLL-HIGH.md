@@ -823,3 +823,42 @@ view of her reflects it (💃), and a photo taken there gets tagged (or,
 under the stub session actually used here, fails soft the same way
 every other capture-under-stub test does — real tagging is covered by
 the pattern in `troll-high-shared-yearbook-smoke.js`).
+
+**Phase 6 (fifth slice) shipped 2026-07-21 — the talent show.** Unlike
+dances, no calendar-event gating — the stage is always available, same
+philosophy as clubs/elections ("a real thing happening whenever people
+show up"), so `events.js` didn't need a new event id.
+
+- Reuses the Auditorium's EXISTING `stage-curtain` object rather than
+  adding a new one — `perform: true` as a **per-instance** override in
+  `auditorium.json` (not the shared `OBJECT_DEFS` entry, since
+  stage-curtains elsewhere are still flavor-only memory cards), same
+  pattern already established for computer-desk's `game` override.
+  `togglePerforming()` is the same toggle-not-form shape as
+  `toggleDancing()`: broadcasts `performing` over presence
+  (`net.setPerforming`), no persisted state.
+- No real talent-selection UI — a random line from a small
+  `PERFORMANCES` flavor array stands in for "what you performed" (same
+  spirit as the disposable camera standing in for a real photo: the
+  *moment* is what's real, not the mechanic behind it).
+- Ghost name tag gained a third optional suffix, 🎤, alongside 🗳
+  (candidate) and 💃 (dancing) — all three can stack on one label.
+- Photo tagging here is different from Picture Day/dances: it checks
+  whether **anyone** is performing (`myPerforming || any live ghost's
+  .performing`), not just the photographer — so a photo of someone
+  else's performance gets credited "Talent Show" too, which is the
+  more natural read of "a photo taken during the talent show."
+
+Test: `tools/troll-high-talent-show-smoke.js` — two real browser
+contexts. Alice takes the stage (toast shows the random flavor line,
+presence broadcasts `performing=true`), Bob's ghost view of her
+reflects it, and — the someone-else-performing case specifically —
+Bob (not performing himself) takes a photo that still gets tagged
+"Talent Show" because Alice is on stage nearby.
+
+**Regression note:** `troll-high-phase5-smoke.js` had been asserting
+the stage-curtain's memory card text since Phase 5 — now correctly
+routes to the talent-show toggle instead, so that check was swapped to
+the auditorium seats' memory card (same "swap the stale assertion to a
+different object" fix already used there once before, when the gym's
+bleachers became the PACER Test minigame).
