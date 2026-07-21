@@ -425,7 +425,7 @@ async function boot() {
   addEventListener("keydown", e => {
     if (e.code !== "KeyM" || e.target.tagName === "INPUT") return;
     if (!running) return;
-    if (mapOverlay.hidden) { if (!memoryEl && !dialogueEl && !electionEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && tradeOverlay.hidden && bedroomOverlay.hidden && yearbookOverlay.hidden) openMap(); }
+    if (mapOverlay.hidden) { if (!memoryEl && !dialogueEl && !electionEl && !scienceFairEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && tradeOverlay.hidden && bedroomOverlay.hidden && yearbookOverlay.hidden) openMap(); }
     else closeMap();
   });
 
@@ -683,9 +683,11 @@ async function boot() {
       // live ghost's `performing`, not just your own), gets the same
       // treatment.
       const someoneOnStage = myPerforming || [...ghosts.values()].some(g => g.performing);
+      const someoneAtScienceFair = myProject || [...ghosts.values()].some(g => g.project);
       if (todaysEventId === "picture-day") result.photo.eventTag = "Picture Day";
       else if (todaysEventId === "dance" && zone.id === "auditorium") result.photo.eventTag = "School Dance";
       else if (zone.id === "auditorium" && someoneOnStage) result.photo.eventTag = "Talent Show";
+      else if (zone.id === "science-lab" && someoneAtScienceFair) result.photo.eventTag = "Science Fair";
       photos = addPhotoToRoll(photos, result.photo);
       saveDirty = true;
       persist();
@@ -694,6 +696,7 @@ async function boot() {
       if (todaysEventId === "picture-day") showToast("📸 That one's going in the yearbook — it's Picture Day.");
       else if (result.photo.eventTag === "School Dance") showToast("📸 That one's going in the yearbook — School Dance.");
       else if (result.photo.eventTag === "Talent Show") showToast("📸 That one's going in the yearbook — Talent Show.");
+      else if (result.photo.eventTag === "Science Fair") showToast("📸 That one's going in the yearbook — Science Fair.");
     } else {
       yearbookStatusEl.hidden = false;
       yearbookStatusEl.textContent = result.reason;
@@ -1151,6 +1154,77 @@ async function boot() {
     }
   }
 
+  // Science fair (design doc §23 Phase 6) — "temporary player-submitted
+  // project displays," lighter/more ephemeral than the other Multiplayer
+  // Memories slices: no vote, no calendar gating, just a live list of
+  // whoever's currently presenting at the science lab's spare table
+  // (a per-instance `scienceFair: true` override, same pattern as
+  // `perform`). Presenting picks a random project title — same "moment
+  // over mechanic" spirit as the talent show — and broadcasts it over
+  // presence so it shows up in everyone's list, plus a 🧪 tag on your
+  // name. Un-presenting clears it. Session-scoped, nothing persisted.
+  const PROJECT_TITLES = [
+    "Does Static Electricity Affect Hallway Gossip?",
+    "The Physics of Cafeteria Trays",
+    "Baking Soda Volcano But Bigger This Time",
+    "Can Trollface Sightings Be Explained By Science?",
+    "Which Vending Machine Snack Falls Fastest?",
+    "A Study of Which Locker Combinations Get Forgotten Most",
+  ];
+  let myProject = null;
+  let scienceFairEl = null;
+
+  function scienceFairPresenters() {
+    const list = [...ghosts.values()].filter(g => g.project).map(g => ({ id: g.id, name: g.name, project: g.project }));
+    if (myProject) list.unshift({ id: net.id, name: identity.name + " (you)", project: myProject });
+    return list;
+  }
+  function presentProject() {
+    myProject = PROJECT_TITLES[Math.floor(Math.random() * PROJECT_TITLES.length)];
+    net.setProject(myProject);
+    showToast(`🧪 You set up your project: "${myProject}."`);
+    renderScienceFair();
+  }
+  function withdrawProject() {
+    myProject = null;
+    net.setProject(null);
+    showToast("🧪 You pack up your project.");
+    renderScienceFair();
+  }
+  function renderScienceFair() {
+    if (!scienceFairEl) return;
+    const presenters = scienceFairPresenters();
+    scienceFairEl.innerHTML =
+      `<h3>Science Fair</h3>` +
+      `<p>Whoever's set up a project right now — nothing saved after today.</p>` +
+      `<div class="th-election-list">` +
+      (presenters.length
+        ? presenters.map(p => `<div class="th-election-row"><span>${p.name}</span><b>${p.project}</b></div>`).join("")
+        : `<p><i>No projects set up right now.</i></p>`) +
+      `</div>` +
+      (myProject
+        ? `<button type="button" id="th-sciencefair-withdraw-btn">Pack up my project</button>`
+        : `<button type="button" id="th-sciencefair-present-btn">Present a project</button>`) +
+      `<div class="th-mem-close">E / tap outside the form — close</div>`;
+    scienceFairEl.querySelector(".th-election-list").addEventListener("click", e => e.stopPropagation());
+    scienceFairEl.querySelector("#th-sciencefair-present-btn")?.addEventListener("click", e => { e.stopPropagation(); presentProject(); });
+    scienceFairEl.querySelector("#th-sciencefair-withdraw-btn")?.addEventListener("click", e => { e.stopPropagation(); withdrawProject(); });
+  }
+  function openScienceFair() {
+    closeScienceFair();
+    scienceFairEl = document.createElement("div");
+    scienceFairEl.id = "th-sciencefair";
+    scienceFairEl.className = "th-popup-card";
+    scienceFairEl.setAttribute("role", "dialog");
+    scienceFairEl.setAttribute("aria-label", "Science Fair");
+    scienceFairEl.addEventListener("click", closeScienceFair);
+    $("th-root").appendChild(scienceFairEl);
+    renderScienceFair();
+  }
+  function closeScienceFair() {
+    if (scienceFairEl) { scienceFairEl.remove(); scienceFairEl = null; }
+  }
+
   // "See inside the TV": a small looping animated canvas standing in for
   // channel static, drawn fresh each time (no video asset, no license
   // concerns) — colored scanlines drifting over analog noise.
@@ -1253,7 +1327,7 @@ async function boot() {
   function escapeHtml(s) { return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
   function openChat() {
-    if (!running || memoryEl || dialogueEl || electionEl || !lbOverlay.hidden || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden || !tradeOverlay.hidden || !bedroomOverlay.hidden || !yearbookOverlay.hidden) return;
+    if (!running || memoryEl || dialogueEl || electionEl || scienceFairEl || !lbOverlay.hidden || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden || !tradeOverlay.hidden || !bedroomOverlay.hidden || !yearbookOverlay.hidden) return;
     chatOpen = true;
     chatBar.hidden = false;
     chatInput.value = "";
@@ -1354,6 +1428,9 @@ async function boot() {
     get myRunning() { return myRunning; },
     toggleDancing, get myDancing() { return myDancing; },
     togglePerforming, get myPerforming() { return myPerforming; },
+    get scienceFairOpen() { return !!scienceFairEl; },
+    openScienceFair, closeScienceFair, presentProject, withdrawProject,
+    get myProject() { return myProject; },
     renderer, // exposed for test/dev inspection of weather + tint rendering
     openTrade, closeTrade,
     get cards() { return cards; },
@@ -1418,7 +1495,7 @@ async function boot() {
       fade = Math.max(0, fade - dt * 4);
     }
 
-    if (!pendingDoor && !memoryEl && !dialogueEl && !electionEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && mapOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && tradeOverlay.hidden && bedroomOverlay.hidden && yearbookOverlay.hidden) {
+    if (!pendingDoor && !memoryEl && !dialogueEl && !electionEl && !scienceFairEl && !chatOpen && lbOverlay.hidden && arcadeOverlay.hidden && minigameOverlay.hidden && mapOverlay.hidden && profileOverlay.hidden && cafeteriaOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && tradeOverlay.hidden && bedroomOverlay.hidden && yearbookOverlay.hidden) {
       const axis = input.axis();
       tryPushFromInput(axis);
       player.update(dt, axis, zone);
@@ -1464,14 +1541,16 @@ async function boot() {
     const election = obj && (obj.election || obj.def.election);
     const dance = obj && (obj.dance || obj.def.dance);
     const perform = obj && (obj.perform || obj.def.perform);
+    const scienceFair = obj && (obj.scienceFair || obj.def.scienceFair);
     const arcadeHint = obj && obj.game ? ` Play ${obj.gameName || "a game"}` : null;
     const playHint = play ? ` Play ${obj.playName || obj.def.playName || minigameInfo(play).title}` : null;
     const shopHint = shop ? " Get lunch" : null;
     const electionHint = election ? " Ballot box" : null;
     const danceHint = dance ? (myDancing ? " Stop dancing" : " Dance floor") : null;
     const performHint = perform ? (myPerforming ? " Leave the stage" : " Take the stage") : null;
+    const scienceFairHint = scienceFair ? " Science fair table" : null;
     const peerHint = nearPeer ? ` Trade with ${nearPeer.name}` : null;
-    setHint((memoryEl || dialogueEl || electionEl || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden || !tradeOverlay.hidden || !bedroomOverlay.hidden || !yearbookOverlay.hidden) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (peerHint || arcadeHint || playHint || shopHint || electionHint || danceHint || performHint || (mem ? ` ${mem.title}` : null)));
+    setHint((memoryEl || dialogueEl || electionEl || scienceFairEl || !arcadeOverlay.hidden || !minigameOverlay.hidden || !mapOverlay.hidden || !profileOverlay.hidden || !cafeteriaOverlay.hidden || !orientationOverlay.hidden || !scheduleOverlay.hidden || !tradeOverlay.hidden || !bedroomOverlay.hidden || !yearbookOverlay.hidden) ? null : nearNPC ? ` Talk to ${nearNPC.name}` : (peerHint || arcadeHint || playHint || shopHint || electionHint || danceHint || performHint || scienceFairHint || (mem ? ` ${mem.title}` : null)));
     if (input.interactPressed() && mapOverlay.hidden && profileOverlay.hidden && orientationOverlay.hidden && scheduleOverlay.hidden && bedroomOverlay.hidden && yearbookOverlay.hidden) {
       if (!tradeOverlay.hidden) closeTrade();
       else if (!cafeteriaOverlay.hidden) closeCafeteria();
@@ -1480,6 +1559,7 @@ async function boot() {
       else if (dialogueEl) closeDialogue();
       else if (memoryEl) closeMemory();
       else if (electionEl) closeElection();
+      else if (scienceFairEl) closeScienceFair();
       else if (nearNPC) showDialogue(nearNPC);
       else if (nearPeer) openTrade(nearPeer.id, nearPeer.name);
       else if (obj && obj.game) openArcade(obj);
@@ -1488,6 +1568,7 @@ async function boot() {
       else if (election) openElection();
       else if (dance) toggleDancing();
       else if (perform) togglePerforming();
+      else if (scienceFair) openScienceFair();
       else if (mem) showMemory(mem, obj);
     }
 

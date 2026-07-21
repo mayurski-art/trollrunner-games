@@ -862,3 +862,48 @@ routes to the talent-show toggle instead, so that check was swapped to
 the auditorium seats' memory card (same "swap the stale assertion to a
 different object" fix already used there once before, when the gym's
 bleachers became the PACER Test minigame).
+
+**Phase 6 (sixth slice) shipped 2026-07-21 — the science fair,
+completing Multiplayer Memories' "temporary player-submitted project
+displays."** The lightest of the six slices: no calendar gating (same
+"whenever people show up" philosophy as clubs/elections/talent show),
+no vote — just a live list.
+
+- Reuses the Science Lab's existing spare `lab-table` (the one with no
+  `play` field — the OTHER lab-table there is already the Lab Mix
+  minigame) via a per-instance `scienceFair: true` override, same
+  pattern as `perform`.
+- Unlike the dance floor/stage's plain toggle, this reuses the
+  **election's list-popup shape** instead — the design doc's own
+  wording ("displays," plural) fit a live roster better than a single
+  toggle: `openScienceFair()`/`renderScienceFair()` mirror
+  `openElection()`/`renderElection()` almost exactly, right down to
+  reusing the `.th-election-list`/`.th-election-row` CSS classes
+  as-is. Presenting assigns a random title from a small
+  `PROJECT_TITLES` array (same "moment over mechanic" spirit as
+  `PERFORMANCES`) and broadcasts it over presence (`net.setProject`);
+  withdrawing clears it. A 🧪 tag joins 🗳/💃/🎤 on a live player's name
+  tag — all four can stack.
+- Photo tagging checks whether **anyone** has an active project
+  (`myProject || any live ghost's .project`) while in the Science Lab,
+  same "credit whoever's actually part of the moment" logic as the
+  talent show's tagging.
+
+Test: `tools/troll-high-science-fair-smoke.js` — two real browser
+contexts. Confirms the empty-list state before anyone's presented,
+Alice's project gets a real assigned title and broadcasts over
+presence, Bob's live list shows her real project name, a photo taken
+nearby gets tagged "Science Fair" (or fails soft under the stub
+session, same pattern as every other capture-under-stub test), and
+withdrawing clears everything back to null on both `myProject` and the
+presence broadcast. Hit the same "move away from the table before the
+other player approaches" gotcha as the club/dance tests, in both
+directions this time (Alice moves away for Bob's turn, then Bob moves
+away for Alice's return trip) — nearPeer's trade-range priority is a
+recurring theme across every one of these live-interaction popups.
+
+**Phase 6 is now fully complete** — all six Multiplayer Memories
+slices (clubs, elections, shared Class Yearbook, dances, talent show,
+science fair) built, tested, and shipped. Only graduation (the
+capstone, deliberately last since it can reference the others) remains
+unbuilt from the original Phase 6 list.

@@ -76,6 +76,8 @@ export class Net {
                                  // currently on the dance floor?
     this.performing = false;    // talent show (§23 Phase 6) — is this
                                  // player currently on stage?
+    this.project = null;        // science fair (§23 Phase 6) — this
+                                 // player's active project title, or null
     this.transport = null;
     this.room = null;
     this.connected = false;
@@ -129,7 +131,7 @@ export class Net {
   _onMessage(m) {
     if (!m || m.id === this.id) return;
     if (m.t === "pos") {
-      this.peers.set(m.id, { x: m.x, y: m.y, dir: m.dir, moving: m.moving, name: m.name, club: m.club || null, running: !!m.running, dancing: !!m.dancing, performing: !!m.performing, last: performance.now() });
+      this.peers.set(m.id, { x: m.x, y: m.y, dir: m.dir, moving: m.moving, name: m.name, club: m.club || null, running: !!m.running, dancing: !!m.dancing, performing: !!m.performing, project: m.project || null, last: performance.now() });
     } else if (m.t === "chat" && this.onChat) {
       this.onChat(m.id, m.name, m.text);
     } else if (m.t === "emote" && this.onEmote) {
@@ -167,7 +169,7 @@ export class Net {
     if (this._posAcc < 1 / POS_HZ) return;
     this._posAcc = 0;
     this.transport.send({
-      t: "pos", id: this.id, name: this.name, club: this.club, running: this.running, dancing: this.dancing, performing: this.performing,
+      t: "pos", id: this.id, name: this.name, club: this.club, running: this.running, dancing: this.dancing, performing: this.performing, project: this.project,
       x: Math.round(player.x), y: Math.round(player.y),
       dir: player.dir, moving: player.moving,
     });
@@ -177,6 +179,7 @@ export class Net {
   setRunning(v) { this.running = !!v; }
   setDancing(v) { this.dancing = !!v; }
   setPerforming(v) { this.performing = !!v; }
+  setProject(name) { this.project = name || null; }
   sendVote(forId) {
     if (!this.connected) return;
     this.transport.send({ t: "vote", id: this.id, name: this.name, for: forId });

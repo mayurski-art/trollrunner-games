@@ -34,6 +34,7 @@ export class Ghost {
     this.running = false; // student elections (§23 Phase 6) — declared candidate?
     this.dancing = false; // dances (§23 Phase 6) — currently on the dance floor?
     this.performing = false; // talent show (§23 Phase 6) — currently on stage?
+    this.project = null; // science fair (§23 Phase 6) — active project title, or null
     this.animT = 0;
     this.bubble = null;             // { text, until }
   }
@@ -45,6 +46,7 @@ export class Ghost {
     this.running = !!p.running;
     this.dancing = !!p.dancing;
     this.performing = !!p.performing;
+    this.project = p.project || null;
     if (this.x === null) { this.x = p.x; this.y = p.y; } // snap on first sighting
   }
 
@@ -67,11 +69,12 @@ export class Ghost {
       draw: ctx => {
         this.sprites.draw(ctx, this.dir, this.moving, this.animT, this.x, this.y);
         // White + "Player" — the NPC equivalent (npc.js entity()) is gold
-        // + "NPC", so a floating name is unambiguous at a glance. 🗳/💃/🎤
-        // suffixes flag a declared election candidate / dance-floor
-        // participant / stage performer (§23 Phase 6) without needing a
-        // whole extra label line per status.
-        const label = `${this.name} · Player${this.running ? " 🗳" : ""}${this.dancing ? " 💃" : ""}${this.performing ? " 🎤" : ""}`;
+        // + "NPC", so a floating name is unambiguous at a glance.
+        // 🗳/💃/🎤/🧪 suffixes flag a declared election candidate /
+        // dance-floor participant / stage performer / science fair
+        // presenter (§23 Phase 6) without needing a whole extra label
+        // line per status.
+        const label = `${this.name} · Player${this.running ? " 🗳" : ""}${this.dancing ? " 💃" : ""}${this.performing ? " 🎤" : ""}${this.project ? " 🧪" : ""}`;
         ctx.font = "8px monospace";
         ctx.textAlign = "center";
         ctx.fillStyle = "rgba(0,0,0,0.55)";

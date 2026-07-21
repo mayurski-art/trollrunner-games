@@ -40,7 +40,8 @@
     {
       "type": "lab-table",
       "x": 13,
-      "y": 6
+      "y": 6,
+      "scienceFair": true
     },
     {
       "type": "lab-table",
