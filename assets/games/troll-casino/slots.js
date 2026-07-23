@@ -150,8 +150,10 @@
 
   /* --- progressive meter — a REAL shared jackpot in troll_casino_jackpot.
      jackpotCache is a display-only local mirror; the pot itself only ever
-     changes via the troll_casino_jackpot_* RPCs (see troll_casino.sql), so
-     every player's bet feeds the same real pot and a win pays real balance. */
+     changes via troll_casino_slots_spin (see troll_casino.sql) as part of
+     the atomic spin, so every player's bet feeds the same real pot and a
+     win pays real balance. This module only ever READS the pot to display
+     it — it no longer contributes to or draws from it directly. */
   const jackpotCache = { ...JACKPOT_SEED };
   function dbClient() { return window.TrollrunnerAccounts && window.TrollrunnerAccounts.getClient(); }
   async function refreshJackpot() {
@@ -167,28 +169,6 @@
     } catch (_) {}
   }
   function meterLoad() { return { ...jackpotCache }; }
-  async function meterAdd(amount, cur) {
-    jackpotCache[cur] = Math.round((jackpotCache[cur] + amount) * 100) / 100; // optimistic
-    renderMeter();
-    const c = dbClient();
-    if (!c) return;
-    try {
-      const { data, error } = await c.rpc("troll_casino_jackpot_contribute", { p_currency: cur, p_delta: amount });
-      if (!error && data != null) { jackpotCache[cur] = Number(data); renderMeter(); }
-    } catch (_) {}
-  }
-  async function meterTake(share, cur, tier) {
-    const c = dbClient();
-    if (!c) return 0;
-    try {
-      const { data, error } = await c.rpc("troll_casino_jackpot_win", { p_currency: cur, p_share: share, p_tier: tier || null });
-      if (error) return 0;
-      const won = Number(data) || 0;
-      await refreshJackpot();
-      refreshJackpotFeed();
-      return won;
-    } catch (_) { return 0; }
-  }
 
   /* --- public jackpot-win feed — anyone can read troll_casino_jackpot_wins
      (see troll_casino_v2.sql), so the pot's payouts are visible, not just
@@ -370,7 +350,12 @@
     });
   }
 
-  /* --- the spin ---------------------------------------------------------------------- */
+  /* --- the spin ----------------------------------------------------------------
+     Bet debit + grid draw + payline/scatter eval + jackpot draw + win credit
+     all happen atomically server-side (troll_casino_slots_spin) — the reels
+     only animate to whatever grid the server already decided and already
+     paid out. evalSpin()/spinGrid() above stay for node-testing the model in
+     isolation; this module no longer calls either of them at runtime. */
   async function spin() {
     if (S.spinning) return;
     const cur = wallet().getCurrency();
@@ -381,18 +366,22 @@
       window.TrollCasinoMoneyUI?.openDeposit();
       return;
     }
-    if (!wallet().debit(S.bet, "Doge Reels spin")) return;
 
     S.spinning = true;
     $("#sl-spin").disabled = true;
     hideBanner();
     audio().ensure();
-    meterAdd(S.bet * 0.015, cur);                       // every spin feeds the pot
 
-    const grid = spinGrid();
-    const result = evalSpin(grid, S.bet);
-    await animateReels(grid);
-    await settle(grid, result, cur);
+    const res = await wallet().playSlots(S.bet, cur);
+    if (!res.ok) {
+      S.spinning = false;
+      $("#sl-spin").disabled = false;
+      setLine(res.message || "Spin failed — try again.");
+      return;
+    }
+
+    await animateReels(res.grid);
+    await settle(res.grid, res, cur);
 
     S.spinning = false;
     $("#sl-spin").disabled = false;
@@ -400,21 +389,15 @@
   }
 
   async function settle(grid, result, cur) {
-    let credited = 0;
+    // Balance, jackpot contribution, and any jackpot draw already happened
+    // server-side inside wallet().playSlots() — this only renders the
+    // outcome, it must not credit again.
+    const jackpotWon = Number(result.jackpotWon) || 0;
+    const credited = Number(result.total) + jackpotWon;
+    const tierName = result.jackpotTier ? result.jackpotTier[0] : null;
 
-    if (result.total > 0) {
-      credited += result.total;
-      wallet().credit(result.total, result.scatterWin && !result.lineWins.length
-        ? "Rocket scatter win" : "Doge Reels win");
-    }
-
-    let jackpotWon = 0, tierName = null;
-    if (result.jackpotTier) {
-      [tierName] = result.jackpotTier;
-      jackpotWon = await meterTake(result.jackpotTier[1], cur, tierName);
-      credited += jackpotWon;
-      if (jackpotWon > 0) wallet().credit(jackpotWon, `${tierName} jackpot 🐕`);
-    }
+    refreshJackpot();               // pot moved (this spin's contribution, maybe a draw)
+    if (jackpotWon > 0) refreshJackpotFeed();
 
     const winCells = [
       ...result.lineWins.flatMap(w => w.cells),

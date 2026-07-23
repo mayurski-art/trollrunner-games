@@ -284,6 +284,56 @@
     }
   }
 
+  /* --- Troll Wheel: stake debit + segment pick + payout credit, atomic and
+     server-side (troll_casino_wheel_spin). Replaces the old pattern of the
+     game module picking its own RNG target and calling debit()/credit()
+     directly — that let anyone credit their own balance from devtools
+     without a spin ever happening. ------------------------------------- */
+  async function playWheel(bets, cur) {
+    cur = cur || state.currency;
+    if (!state.userId) return { ok: false, reason: "login-required" };
+    const c = client();
+    if (!c) return { ok: false, reason: "unavailable" };
+    try {
+      const { data, error } = await c.rpc("troll_casino_wheel_spin", { p_bets: bets, p_currency: cur });
+      if (error) return { ok: false, reason: "db", message: error.message };
+      const row = Array.isArray(data) ? data[0] : data;
+      state.balances[cur] = Number(row.new_balance);
+      record(row.won ? "Troll Wheel win" : "Troll Wheel stake", Number(row.payout) - Number(row.total_staked), cur);
+      emit();
+      return {
+        ok: true,
+        segmentIndex: row.segment_index,
+        zoneId: row.zone_id,
+        totalStaked: Number(row.total_staked),
+        payout: Number(row.payout),
+        won: row.won,
+      };
+    } catch (e) { return { ok: false, reason: "db", message: String((e && e.message) || e) }; }
+  }
+
+  /* --- Doge Jackpot Reels: bet debit + grid draw + payline/scatter eval +
+     jackpot draw + win credit, atomic and server-side
+     (troll_casino_slots_spin). Replaces the old pattern of the game module
+     drawing its own grid, evaluating its own paylines, and calling
+     debit()/credit() (plus the shared jackpot RPCs) directly with
+     client-chosen amounts. ------------------------------------------- */
+  async function playSlots(bet, cur) {
+    cur = cur || state.currency;
+    if (!state.userId) return { ok: false, reason: "login-required" };
+    const c = client();
+    if (!c) return { ok: false, reason: "unavailable" };
+    try {
+      const { data, error } = await c.rpc("troll_casino_slots_spin", { p_bet: bet, p_currency: cur });
+      if (error) return { ok: false, reason: "db", message: error.message };
+      const credited = Number(data.total) + Number(data.jackpotWon);
+      state.balances[cur] = Number(data.newBalance);
+      record(credited > 0 ? "Doge Reels win" : "Doge Reels spin", credited - Number(bet), cur);
+      emit();
+      return { ok: true, ...data };
+    } catch (e) { return { ok: false, reason: "db", message: String((e && e.message) || e) }; }
+  }
+
   /* --- redemption: real payout out, manual admin review ------------------------- */
   async function requestRedemption({ amount, token, wallet }) {
     token = token || state.currency;
@@ -328,5 +378,6 @@
     list, getCurrency, setCurrency, getBalance, canAfford, fmt,
     debit, credit, onChange, getHistory: () => snapshot().history,
     deposit, requestRedemption, listMyRedemptions, mode, mountWalletChip, isReady,
+    playWheel, playSlots,
   };
 })();

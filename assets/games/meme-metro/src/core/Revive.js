@@ -196,9 +196,33 @@ export class ReviveController {
     if (this.dom.button) { this.dom.button.disabled = false; this.dom.button.textContent = 'I paid — Resume'; }
   }
 
-  manualMobileResume() {
-    sessionStorage.removeItem(REVIVE_PENDING_KEY);
-    this.onPaid();
+  // Fallback for when auto-detection (checkPendingMobile) gave up before
+  // seeing the payment land. This must re-check the treasury itself rather
+  // than trust the tap — otherwise opening Phantom and cancelling/backing
+  // out, then tapping "I paid — Resume", grants a free revive with nothing
+  // ever paid.
+  async manualMobileResume() {
+    if (this.mobileConfirmRunning) return;
+    const raw = sessionStorage.getItem(REVIVE_PENDING_KEY);
+    const TP = this.TP();
+    if (!raw || !TP) { sessionStorage.removeItem(REVIVE_PENDING_KEY); this.setStatus('Nothing pending — tap Revive to pay.'); return; }
+    let pending;
+    try { pending = JSON.parse(raw); } catch (e) { sessionStorage.removeItem(REVIVE_PENDING_KEY); return; }
+
+    this.mobileConfirmRunning = true;
+    if (this.dom.button) { this.dom.button.disabled = true; this.dom.button.textContent = 'Checking payment…'; }
+    this.setStatus('Confirming your payment…');
+    const result = await TP.waitForNewTreasuryPayment(pending.token, pending.sinceSig, 20000, null);
+    this.mobileConfirmRunning = false;
+    if (this.phase !== 'confirming') return;
+
+    if (result.ok) {
+      sessionStorage.removeItem(REVIVE_PENDING_KEY);
+      this.onPaid();
+      return;
+    }
+    this.setStatus("Still can't find that payment. Wait a moment and tap \"I paid — Resume\" again, or Decline and pay fresh.");
+    if (this.dom.button) { this.dom.button.disabled = false; this.dom.button.textContent = 'I paid — Resume'; }
   }
 
   onPaid() {

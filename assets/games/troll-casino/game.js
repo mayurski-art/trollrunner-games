@@ -442,25 +442,33 @@
   }
 
   /* --- the spin ----------------------------------------------------------------
-     Debit up front, animate to a crypto-RNG target, credit winnings after.
-     WAGER-BACKEND SEAM: to make spins real later, replace the debit/credit pair
-     with a server round-trip (stake escrow → verified result → payout) and
-     keep everything else identical. */
+     Stake debit + segment pick + payout credit happen atomically server-side
+     (troll_casino_wheel_spin) — the wheel only animates to whatever segment
+     the server already decided and already paid out. resolveSpin() below is
+     still used, but purely to re-derive the same zone/payout display values
+     from data the server returned, not to decide anything itself. */
   async function spin() {
     if (table.spinning) return;
     const total = stakedTotal();
     if (!total) { flashStatus("Place a bet first — tap a zone"); return; }
-    if (!wallet().debit(total, "Troll Wheel stake")) { flashStatus("Not enough balance"); return; }
+    if (!wallet().canAfford(total, wallet().getCurrency())) { flashStatus("Not enough balance"); return; }
 
     table.spinning = true;
     setControlsLocked(true);
     hideBanner();
     AudioFX.ensure();
 
-    const target = secureRandomSegment();
-    await animateTo(target);
+    const res = await wallet().playWheel({ ...table.staged }, wallet().getCurrency());
+    if (!res.ok) {
+      table.spinning = false;
+      setControlsLocked(false);
+      flashStatus(res.message || "Spin failed — try again.");
+      return;
+    }
 
-    const result = resolveSpin(table.staged, target);
+    await animateTo(res.segmentIndex);
+
+    const result = resolveSpin(table.staged, res.segmentIndex);
     settle(result);
 
     table.lastBets = { ...table.staged };
@@ -503,7 +511,8 @@
   function settle(result) {
     const { zone, zoneId, payout, totalStaked, won } = result;
 
-    if (won) wallet().credit(payout, `${zone.label} ×${zone.pays} win`);
+    // Balance already changed server-side inside wallet().playWheel() —
+    // this only renders the outcome, it must not credit again.
 
     // Banner + zone flash + sound + coins.
     showBanner(result);
