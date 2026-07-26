@@ -85,6 +85,12 @@ trollium gear → craft an **Emperor Sigil** (8 trollium bars + 10 bones +
   player-facing fast-travel list of every other pylon on the map
   (separate from the admin-only debug travel panel), labeled by village
   or biome.
+- **Cooking Pot**: a station that must sit above a lit campfire, unlocking
+  two multi-ingredient meals (Troll Stew, Berry Pie) that refill more
+  hunger than any single-ingredient food and grant a timed **Well Fed**
+  buff (regen + move speed), shown as a HUD countdown. Buffs live on a
+  small generic keyed system (`Player.buffs`) other consumables can plug
+  into later instead of a one-off special case.
 - **Economy**: hostile kills drop **Troll Coins** (HP-scaled, elites ×2,
   bosses drop purses). Coins are a normal item that appears on both
   sides of shop offer tables — buy rows and sell rows render through
