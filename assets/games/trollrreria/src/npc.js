@@ -88,6 +88,32 @@ export const SIGN_TIPS = [
   "Hungry? Hunt a boar or hen, then cook the meat at a campfire. Raw works too. Regret comes free.",
 ];
 
+/* Village happiness (Phase 3): each profession likes one or more biomes
+   and has an opinion of the two others it's built next door to (see
+   Game.buildVillage's fixed Smith/Cook/Trader/Farmer order, main.js) --
+   the same "villagers have opinions about their neighbors" idea Terraria
+   uses, scaled down to this game's fixed 4-house layout. Spawn-town
+   specialists (Blacksmith Grump etc.) don't set `profession`, so mood()
+   is simply inert for them -- this is a village-only system for now.
+   Biome lists overlap on purpose: with a single fixed preference each,
+   at most one profession per village could ever be happy (only one
+   biome per village), which would make the Trader's "≥2 happy
+   neighbors" pylon unlock (ui.js paintShop) mathematically impossible.
+   Every village biome needs at least two matching professions. */
+const PROFESSION_BIOME = {
+  smith: ["desert", "snow"],
+  cook: ["desert", "jungle"],
+  trader: ["snow", "jungle"],
+  farmer: ["snow", "desert", "jungle"],
+};
+const PROFESSION_NEIGHBOR = {
+  smith: { likes: "trader", dislikes: "farmer" },
+  cook: { likes: "farmer", dislikes: "smith" },
+  trader: { likes: "cook", dislikes: "farmer" },
+  farmer: { likes: "cook", dislikes: "trader" },
+};
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+
 export class TownNPC extends Entity {
   constructor(tx, ty, opts = {}) {
     super(tx * TILE + 2, ty * TILE - 46, 22, 46);
@@ -96,6 +122,9 @@ export class TownNPC extends Entity {
     this.tint = opts.tint || null;
     this.bodyH = opts.bodyH || 54;
     this.homeX = this.x;
+    this.profession = opts.profession || null;
+    this.village = opts.village || null;
+    this.biome = opts.biome || null;
     /* Town NPCs living in a stamped house (see main.js buildTownHouse)
        get a hard wander fence at the interior walls instead of the
        generic 10-tile drift -- otherwise once a player opens their door
@@ -116,6 +145,32 @@ export class TownNPC extends Entity {
 
   get portrait() { return this.rigDef.portrait; }
   get portraitFilter() { return this.tint || ""; }
+
+  /* Happiness score (-2..+2): +1 for standing in their preferred biome,
+     ±1 for whether their liked/disliked neighbor profession happens to
+     be the one built next door in this village. Returns null for NPCs
+     without a `profession` (spawn-town specialists, quest givers) --
+     mood is a village-only system. priceMod scales shop costs ±20% at
+     the extremes, same range the parity prompt's design doc calls for. */
+  mood(game) {
+    if (!this.profession) return null;
+    let score = 0;
+    const lines = [];
+    const homeBiomes = PROFESSION_BIOME[this.profession] || [];
+    if (this.biome && homeBiomes.includes(this.biome)) { score += 1; lines.push(`loves the ${this.biome}`); }
+    else if (this.biome) { lines.push(`isn't used to ${this.biome} weather`); }
+    const pref = PROFESSION_NEIGHBOR[this.profession];
+    if (pref && game) {
+      const hasLiked = game.npcs.some(n => n.isVillager && n.village === this.village && n.profession === pref.likes);
+      const hasDisliked = game.npcs.some(n => n.isVillager && n.village === this.village && n.profession === pref.dislikes);
+      if (hasLiked) { score += 1; lines.push(`enjoys living near the ${cap(pref.likes)}`); }
+      if (hasDisliked) { score -= 1; lines.push(`isn't thrilled about the ${cap(pref.dislikes)} next door`); }
+    }
+    const label = score >= 2 ? "Ecstatic" : score === 1 ? "Content" : score === 0 ? "Neutral"
+      : score === -1 ? "Grumpy" : "Miserable";
+    const priceMod = Math.max(0.8, Math.min(1.2, 1 - score * 0.1));
+    return { score, label, lines, priceMod };
+  }
 
   loadRig() {
     this.rig = {};
@@ -471,13 +526,14 @@ export class TrollHistorian extends TownNPC {
    stamps into its house (anvil/campfire/chest), the same "the workstation
    defines the job" idea Minecraft villages use. */
 export class VillageSmith extends TownNPC {
-  constructor(tx, ty, homeBounds, village) {
+  constructor(tx, ty, homeBounds, village, biome) {
     super(tx, ty, {
       name: `${village} Smith`,
       rig: "blacksmith",
       tint: "hue-rotate(200deg) saturate(1.2)",
       bodyH: 54,
-      homeBounds,
+      homeBounds, village, biome,
+      profession: "smith",
       tips: [
         "Out here we forge our own. Bring ore, take blades.",
         "Every village needs one troll who hits things for a living.",
@@ -490,13 +546,14 @@ export class VillageSmith extends TownNPC {
 }
 
 export class VillageCook extends TownNPC {
-  constructor(tx, ty, homeBounds, village) {
+  constructor(tx, ty, homeBounds, village, biome) {
     super(tx, ty, {
       name: `${village} Cook`,
       rig: "tavernKeeper",
       tint: "hue-rotate(60deg)",
       bodyH: 54,
-      homeBounds,
+      homeBounds, village, biome,
+      profession: "cook",
       tips: [
         "Fresh off the campfire. Best meal for three biomes.",
         "Never met a raw meat I couldn't improve.",
@@ -509,13 +566,14 @@ export class VillageCook extends TownNPC {
 }
 
 export class VillageTrader extends TownNPC {
-  constructor(tx, ty, homeBounds, village) {
+  constructor(tx, ty, homeBounds, village, biome) {
     super(tx, ty, {
       name: `${village} Trader`,
       rig: "pepe",
       tint: "hue-rotate(300deg) saturate(1.3)",
       bodyH: 48,
-      homeBounds,
+      homeBounds, village, biome,
+      profession: "trader",
       tips: [
         "Picked up some odds and ends out here. Take a look.",
         "Every village needs a chest, and someone to guard it.",
@@ -528,13 +586,14 @@ export class VillageTrader extends TownNPC {
 }
 
 export class VillageFarmer extends TownNPC {
-  constructor(tx, ty, homeBounds, village) {
+  constructor(tx, ty, homeBounds, village, biome) {
     super(tx, ty, {
       name: `${village} Farmer`,
       rig: "doge",
       tint: "hue-rotate(90deg) saturate(0.8)",
       bodyH: 50,
-      homeBounds,
+      homeBounds, village, biome,
+      profession: "farmer",
       tips: [
         "Berries don't grow themselves. Well, they do. I just wait.",
         "Trade me the harvest, I'll trade you the reagents.",

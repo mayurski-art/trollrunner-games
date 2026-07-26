@@ -1034,6 +1034,10 @@ class Game {
       this.readSign(m.tx, m.ty);
       return;
     }
+    if (id === T.PYLON && this.ui && this.ui.openPylonTravel) {
+      this.ui.openPylonTravel(m.tx, m.ty);
+      return;
+    }
     if (id === T.CHEST && this.ui && this.ui.openChest) {
       this.ui.openChest(m.tx, m.ty);
       return;
@@ -1728,10 +1732,10 @@ class Game {
     const name = villageName(rng);
     const groundY = this.world.topSolid[cx] ?? this.spawn.y;
     const roles = [
-      { dx: -20, decorTile: T.ANVIL, make: (tx, ty, hb) => new VillageSmith(tx, ty, hb, name) },
-      { dx: -7, decorTile: T.CAMPFIRE, make: (tx, ty, hb) => new VillageCook(tx, ty, hb, name) },
-      { dx: 7, decorTile: T.CHEST, make: (tx, ty, hb) => new VillageTrader(tx, ty, hb, name) },
-      { dx: 20, decorTile: null, farm: true, make: (tx, ty, hb) => new VillageFarmer(tx, ty, hb, name) },
+      { dx: -20, decorTile: T.ANVIL, make: (tx, ty, hb) => new VillageSmith(tx, ty, hb, name, biome) },
+      { dx: -7, decorTile: T.CAMPFIRE, make: (tx, ty, hb) => new VillageCook(tx, ty, hb, name, biome) },
+      { dx: 7, decorTile: T.CHEST, make: (tx, ty, hb) => new VillageTrader(tx, ty, hb, name, biome) },
+      { dx: 20, decorTile: null, farm: true, make: (tx, ty, hb) => new VillageFarmer(tx, ty, hb, name, biome) },
     ];
     let minX = Infinity, maxX = -Infinity, anchorY = groundY - 2, built = 0;
     for (const role of roles) {
@@ -2093,17 +2097,53 @@ class Game {
   teleportTo(id) {
     if (!this.isAdmin()) return;
     const wp = WAYPOINTS.find(w => w.id === id);
-    const p = this.player;
-    if (!wp || !p || p.dead) return;
+    if (!wp) return;
     const dest = wp.at(this);
-    p.x = dest.tx * TILE + (TILE - p.w) / 2;
-    p.y = dest.ty * TILE - p.h;
+    this.warpPlayerTo(dest.tx, dest.ty, wp.name);
+  }
+
+  /* Shared warp mechanic behind both the admin-only WAYPOINTS travel
+     panel and the player-facing pylon network (see listPylons/
+     openPylonTravel below) -- same landing feel (i-frames, no residual
+     fall speed, a little sparkle) regardless of which one triggered it. */
+  warpPlayerTo(tx, ty, label) {
+    const p = this.player;
+    if (!p || p.dead) return;
+    p.x = tx * TILE + (TILE - p.w) / 2;
+    p.y = ty * TILE - p.h;
     p.vx = 0; p.vy = 0;
     p.fallDist = 0;
     p.invuln = Math.max(p.invuln, 0.5);
     burst(this, p.cx, p.cy, "#4dd0ff", 18, { spread: 260, glow: true });
     this.sfx && this.sfx.potion();
-    this.announce(`🧭 Warped to ${wp.name}`);
+    if (label) this.announce(`🧭 Warped to ${label}`);
+  }
+
+  /* Every placed Troll Pylon, found by scanning the tile grid rather than
+     tracking a live registry -- only runs when the player actually opens
+     the pylon panel (infrequent), and works for free in co-op since tiles
+     already sync, with no separate persistence needed (pylons are just
+     tiles, saved the same as any other block). */
+  listPylons() {
+    const w = this.world;
+    const out = [];
+    for (let i = 0; i < w.tiles.length; i++) {
+      if (w.tiles[i] === T.PYLON) out.push({ tx: i % w.w, ty: Math.floor(i / w.w) });
+    }
+    return out;
+  }
+
+  /* Names a pylon by the nearest village if it's standing in one (the
+     common case, since Traders sell them), else falls back to the
+     biome's flavor name -- always something more useful than raw coords. */
+  pylonLabel(tx, ty) {
+    if (this.villages) {
+      for (const v of this.villages) {
+        if (Math.abs(tx - v.x) < 30 && Math.abs(ty - v.y) < 20) return v.name;
+      }
+    }
+    const biome = biomeAt(tx, this.world.w);
+    return BIOME_NAMES[biome] || biome;
   }
 
   /* Dynamic light sources: the player's own faint glow (so mining doesn't go
