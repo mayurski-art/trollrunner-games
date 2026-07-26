@@ -89,6 +89,11 @@ html, body {
 .hud-travel-btn { top: 182px; }
 
 #travel-list { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+#pylon-panel {
+  top: 50%; left: 50%; transform: translate(-50%, -50%);
+  width: min(340px, 90vw); max-height: 70vh; overflow-y: auto;
+}
+#pylon-list { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
 .travel-row {
   display: flex; align-items: center; gap: 8px; padding: 8px 10px;
   border: 0.5px solid var(--tt-line); border-radius: 8px;

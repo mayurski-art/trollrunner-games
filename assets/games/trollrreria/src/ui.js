@@ -3,7 +3,7 @@
 
 import {
   ITEMS, TILES, T, DAY_LEN, CYCLE, TILE, STATION_SCAN,
-  MERCHANT_OFFERS, RECIPES, FUEL, SMELT_TIME, ENCHANTS, ENCHANT_COST,
+  MERCHANT_OFFERS, RECIPES, FUEL, SMELT_TIME, ENCHANTS, ENCHANT_COST, PYLON_OFFER,
 } from "./defs.js";
 import { getIcon } from "./icons.js";
 import { fmtClock } from "./util.js";
@@ -69,6 +69,8 @@ export class UI {
       btnTravel: document.getElementById("btn-travel"),
       travelPanel: document.getElementById("travel-panel"),
       travelList: document.getElementById("travel-list"),
+      pylonPanel: document.getElementById("pylon-panel"),
+      pylonList: document.getElementById("pylon-list"),
       questTracker: document.getElementById("quest-tracker"),
       questTitle: document.getElementById("quest-title"),
       questObjectives: document.getElementById("quest-objectives"),
@@ -183,6 +185,7 @@ export class UI {
     document.getElementById("btn-hotkeys-close").addEventListener("click", () => this.toggleHotkeys(false));
     this.el.btnTravel.addEventListener("click", () => this.toggleTravel());
     document.getElementById("travel-close").addEventListener("click", () => this.toggleTravel(false));
+    document.getElementById("pylon-close").addEventListener("click", () => this.closePylonTravel());
     document.getElementById("btn-coop-host").addEventListener("click", () => game.hostCoop());
     document.getElementById("btn-coop-join").addEventListener("click", () =>
       game.joinCoop(document.getElementById("coop-code").value));
@@ -400,6 +403,12 @@ export class UI {
     } else {
       this.el.dialogText.textContent = npc.tips[npc.tipIdx];
     }
+    /* village happiness (Phase 3): a mood line under the tip, for the
+       NPCs it applies to -- mood() returns null for everyone else */
+    const mood = npc.mood ? npc.mood(g) : null;
+    if (mood) {
+      this.el.dialogText.textContent += ` (${mood.label}${mood.lines.length ? " — " + mood.lines[0] : ""})`;
+    }
     /* each NPC brings their own portrait (+ tint, if their in-world rig
        is tinted) so the dialog face matches who you're talking to */
     if (npc.portrait) {
@@ -444,13 +453,30 @@ export class UI {
     const inv = this.game.inventory;
     const list = document.getElementById("shop-list");
     list.innerHTML = "";
-    const offers = (this.shopNpc && this.shopNpc.offers) || MERCHANT_OFFERS;
+    const npc = this.shopNpc;
+    const baseOffers = (npc && npc.offers) || MERCHANT_OFFERS;
+    /* village happiness (Phase 3): scales this NPC's own prices ±20%,
+       and -- Trader only -- unlocks a Troll Pylon for sale once ≥2 of
+       their neighbors are happy (see npc.js TownNPC.mood). */
+    const mood = npc && npc.mood ? npc.mood(this.game) : null;
+    const priceMod = mood ? mood.priceMod : 1;
+    let offers = baseOffers;
+    if (npc && npc.profession === "trader" && npc.village) {
+      const happyNeighbors = this.game.npcs.filter(n => {
+        if (!n.isVillager || n.village !== npc.village || n === npc) return false;
+        const m = n.mood && n.mood(this.game);
+        return m && m.score >= 1;
+      }).length;
+      if (happyNeighbors >= 2) offers = [...baseOffers, PYLON_OFFER];
+    }
     for (const offer of offers) {
-      const can = offer.give.every(([id, n]) => inv.count(id) >= n);
+      const give = priceMod === 1 ? offer.give
+        : offer.give.map(([id, n]) => [id, Math.max(1, Math.round(n * priceMod))]);
+      const can = give.every(([id, n]) => inv.count(id) >= n);
       const row = document.createElement("div");
       row.className = "craft-row shop-row" + (can ? "" : " cant");
       const txt = document.createElement("div");
-      const giveStr = offer.give.map(([id, n]) => `${n} ${ITEMS[id].name}`).join(" + ");
+      const giveStr = give.map(([id, n]) => `${n} ${ITEMS[id].name}`).join(" + ");
       txt.innerHTML =
         `<div class="cr-name">${offer.get[1]} ${ITEMS[offer.get[0]].name}</div>` +
         `<div class="cr-ing">for ${giveStr}</div>`;
@@ -464,8 +490,8 @@ export class UI {
       row.appendChild(get);
       row.addEventListener("mousedown", e => {
         e.stopPropagation();
-        if (!offer.give.every(([id, n]) => inv.count(id) >= n)) return;
-        for (const [id, n] of offer.give) inv.consume(id, n);
+        if (!give.every(([id, n]) => inv.count(id) >= n)) return;
+        for (const [id, n] of give) inv.consume(id, n);
         const left = inv.add(offer.get[0], offer.get[1]);
         if (left > 0 && this.game.player) {
           this.game.spawnDrop(this.game.player.cx, this.game.player.cy - 8, offer.get[0], left);
@@ -856,6 +882,48 @@ export class UI {
     }
   }
 
+  /* Troll Pylon network: player-facing fast travel, unlike the admin-only
+     WAYPOINTS panel above -- opened by right-clicking any placed pylon
+     (Game.interact, main.js), lists every OTHER pylon Game.listPylons()
+     finds by scanning the tile grid. */
+  openPylonTravel(fromTx, fromTy) {
+    this.pylonOpen = true;
+    this.pylonFrom = { tx: fromTx, ty: fromTy };
+    this.el.pylonPanel.hidden = false;
+    this.paintPylonList();
+    this.pointerOver = true;
+  }
+
+  closePylonTravel() {
+    this.pylonOpen = false;
+    this.el.pylonPanel.hidden = true;
+    this.pointerOver = false;
+  }
+
+  paintPylonList() {
+    const list = this.el.pylonList;
+    list.innerHTML = "";
+    const g = this.game;
+    const from = this.pylonFrom;
+    const pylons = g.listPylons().filter(p => Math.abs(p.tx - from.tx) > 2 || Math.abs(p.ty - from.ty) > 2);
+    if (!pylons.length) {
+      list.innerHTML = `<div class="cr-ing" style="padding:6px">No other pylons placed yet.</div>`;
+      return;
+    }
+    for (const p of pylons) {
+      const label = g.pylonLabel(p.tx, p.ty);
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "travel-row";
+      row.textContent = `🔮 ${label}`;
+      row.addEventListener("click", () => {
+        g.warpPlayerTo(p.tx, p.ty, label);
+        this.closePylonTravel();
+      });
+      list.appendChild(row);
+    }
+  }
+
   toggleInventory(force) {
     this.invOpen = force !== undefined ? force : !this.invOpen;
     this.el.invPanel.hidden = !this.invOpen;
@@ -1193,6 +1261,7 @@ export class UI {
       if (this.bigMapOpen) this.toggleBigMap(false);
       else if (this.shopNpc) this.closeShop();
       else if (this.dialogNpc) this.closeDialog();
+      else if (this.pylonOpen) this.closePylonTravel();
       else if (this.invOpen) this.toggleInventory(false);
     }
     this.updateBossBar();

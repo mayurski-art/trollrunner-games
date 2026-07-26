@@ -154,6 +154,11 @@ function drawFurniture(g, id) {
     g.fillStyle = "#6b4a26"; g.fillRect(3, 14, 26, 6);
     g.fillStyle = "#4e3418"; g.fillRect(3, 14, 26, 2);
     g.fillStyle = "#3d4149"; g.fillRect(6, 18, 4, 2); g.fillRect(22, 18, 4, 2);
+  } else if (id === "pylon") {
+    g.fillStyle = "#3d2f5c"; g.fillRect(10, 22, 12, 6);
+    g.fillStyle = "#5a4499"; g.fillRect(13, 6, 6, 18);
+    g.fillStyle = "rgba(200,168,255,0.4)"; g.beginPath(); g.arc(16, 8, 8, 0, 7); g.fill();
+    g.fillStyle = "#c8a8ff"; g.beginPath(); g.arc(16, 8, 5, 0, 7); g.fill();
   } else if (id === "campfire") {
     g.fillStyle = "#5d4326"; g.fillRect(6, 24, 4, 4); g.fillRect(22, 24, 4, 4);
     g.strokeStyle = "#3a2a17"; g.lineWidth = 3;

@@ -47,6 +47,7 @@ export const T = {
   FENCE: 62, METEORITE: 63,
   REPEATER_L: 64, REPEATER_R: 65, TIMER_TORCH: 66, TIMER_TORCH_OFF: 67,
   TRAPDOOR_C: 68, TRAPDOOR_O: 69,
+  PYLON: 70,
   /* wires live on their own layer, not in T */
 };
 
@@ -133,6 +134,11 @@ TILES[T.TIMER_TORCH]     = { name: "Timer torch", solid: false, hp: 5, pow: 0, t
 TILES[T.TIMER_TORCH_OFF] = { name: "Timer torch (cooling)", solid: false, hp: 5, pow: 0, tool: "pick", drop: "timerTorch", needsSupport: true, noVariant: true };
 TILES[T.TRAPDOOR_C] = { name: "Trapdoor", solid: true, hp: 60, pow: 0, tool: "pick", drop: "trapdoor", needsFloor: true, noVariant: true };
 TILES[T.TRAPDOOR_O] = { name: "Trapdoor (open)", solid: false, hp: 60, pow: 0, tool: "pick", drop: "trapdoor", needsFloor: true, noVariant: true };
+/* Troll Pylon (parity Phase 3): right-click warps between every placed
+   pylon (Game.listPylons/usePylon, main.js) -- Terraria's fast-travel
+   network, unlocked from a village Trader once ≥2 of their neighbors are
+   happy (see npc.js TownNPC.mood + ui.js paintShop). */
+TILES[T.PYLON] = { name: "Troll Pylon", solid: false, hp: 120, pow: 0, tool: "pick", drop: "pylon", light: 130, needsFloor: true, noVariant: true };
 
 /* Tiles Game.interact() actually handles on right-click -- used to decide
    whether to show the hover "RMB" hint, so the list stays in sync with
@@ -143,7 +149,7 @@ export function isInteractableTile(id) {
   return id === T.DOOR_C || id === T.DOOR_O || id === T.SIGN || id === T.CHEST ||
     id === T.LEVER || id === T.TIMER_TORCH || id === T.TIMER_TORCH_OFF ||
     id === T.TRAPDOOR_C || id === T.TRAPDOOR_O || id === T.ROCKET_PAD ||
-    id === T.VAULT_DOOR || id === T.GRIN_ALTAR || id === T.BED;
+    id === T.VAULT_DOOR || id === T.GRIN_ALTAR || id === T.BED || id === T.PYLON;
 }
 
 export const CROP_GROW_TIME = 45;   // seconds per growth stage
@@ -202,6 +208,7 @@ export const ITEMS = {
   platform:    { name: "Platform", type: "block", tile: T.PLATFORM, max: 999 },
   rope:        { name: "Rope", type: "block", tile: T.ROPE, max: 999, needsSupport: true, desc: "Climb it with W/S — or grab it mid-fall to stop taking fall damage." },
   enchantTable: { name: "Enchant table", type: "block", tile: T.ENCHANT_TABLE, max: 99, needsFloor: true, desc: "Right-click to enchant a tool, weapon, or armor piece." },
+  pylon: { name: "Troll Pylon", type: "block", tile: T.PYLON, max: 9, needsFloor: true, desc: "Right-click to warp to any other placed pylon." },
   /* building-set variants */
   planks:         { name: "Planks", type: "block", tile: T.PLANKS, max: 999 },
   clay:           { name: "Clay", type: "block", tile: T.CLAY, max: 999 },
@@ -572,6 +579,12 @@ export const CHEF_OFFERS = [
   { give: [["egg", 6]], get: ["trollCoin", 10] },
   { give: [["trollCoin", 15]], get: ["omelette", 2] },
 ];
+
+/* Village happiness unlock (Phase 3): a village Trader adds this extra
+   barter row once ≥2 of their neighbors are happy (ui.js paintShop) --
+   pricier than a normal offer since it's a fast-travel network node, not
+   a consumable. */
+export const PYLON_OFFER = { give: [["goldBar", 10], ["gel", 5]], get: ["pylon", 1] };
 
 /* Starter kit (fresh worlds). */
 export const STARTER_ITEMS = [
