@@ -77,6 +77,14 @@ trollium gear → craft an **Emperor Sigil** (8 trollium bars + 10 bones +
   discovery toast the first time you wander into one. Deterministic from
   the world seed, so saves from before this shipped get one retrofitted
   in on load.
+- **Village happiness + Troll Pylons**: each villager has a mood (biome
+  preference + an opinion of their two fixed neighbors) that scales
+  their own shop prices ±20% and shows up as a line in their dialog. A
+  village Trader adds a **Troll Pylon** to their offers once ≥2
+  neighbors are happy — right-click a placed pylon to open a
+  player-facing fast-travel list of every other pylon on the map
+  (separate from the admin-only debug travel panel), labeled by village
+  or biome.
 - **Economy**: hostile kills drop **Troll Coins** (HP-scaled, elites ×2,
   bosses drop purses). Coins are a normal item that appears on both
   sides of shop offer tables — buy rows and sell rows render through
