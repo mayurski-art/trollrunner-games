@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self';">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0a0a">
+  <meta name="description" content="NULLFACE — descend the arcade's corrupted mainframe. The deeper you go, the more the terminal bleeds.">
+  <title>NULLFACE | Troll Runner Arcade</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230a0a0a'/%3E%3Ctext x='7' y='44' font-size='30' font-family='monospace' fill='%2333ff66'%3E%3E_%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ts-bg: #0a0a0a;
+      --ts-panel: #141414;
+      --ts-green: #33ff66;
+      --ts-green-dim: rgba(51,255,102,0.25);
+      --ts-red: #ff1a1a;
+      --ts-red-dim: rgba(255,26,26,0.3);
+      --ts-blood: #8b0000;
+      --ts-friend: #34c759;
+      --ts-text: var(--ts-green);
+      --ts-glow: var(--ts-green);
+      --ts-border: var(--ts-green-dim);
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; min-height: 100%;
+      background: var(--ts-bg);
+      color: var(--ts-text);
+      font-family: 'Share Tech Mono', ui-monospace, 'Courier New', Courier, monospace;
+      overflow-x: hidden;
+    }
+    h1, h2, .ts-title-font { font-family: 'VT323', ui-monospace, monospace; letter-spacing: 0.5px; }
+
+    /* ============ CRT / scanline base ============ */
+    body::before {
+      content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 500;
+      background: repeating-linear-gradient(0deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 1px, transparent 1px, transparent 3px);
+      mix-blend-mode: multiply;
+    }
+    body::after {
+      content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 501;
+      box-shadow: inset 0 0 140px rgba(0,0,0,0.85);
+    }
+
+    /* ============ Header ============ */
+    .site-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 20px; border-bottom: 1px solid var(--ts-border);
+      background: var(--ts-panel);
+      position: relative; z-index: 10;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ts-text); }
+    .brand-mark { font-family: 'VT323', monospace; font-size: 22px; color: var(--ts-red); text-shadow: 0 0 8px var(--ts-red-dim); }
+    .brand-copy { display: flex; flex-direction: column; line-height: 1.1; }
+    .brand-copy small { color: #888; font-size: 11px; }
+    .site-nav { display: flex; align-items: center; gap: 16px; }
+    .site-nav a { color: var(--ts-text); text-decoration: none; font-size: 13px; opacity: 0.75; }
+    .site-nav a:hover { opacity: 1; text-shadow: 0 0 6px var(--ts-glow); }
+    .ts-mute-btn {
+      background: none; border: 1px solid var(--ts-border); color: var(--ts-text);
+      border-radius: 4px; font-size: 15px; line-height: 1; padding: 6px 8px; cursor: pointer;
+      min-width: 30px; min-height: 30px;
+    }
+
+    main { max-width: 760px; margin: 0 auto; padding: 40px 20px 80px; position: relative; z-index: 1; }
+
+    /* ============ Terminal frame ============ */
+    .ts-terminal {
+      background: var(--ts-panel);
+      border: 1px solid var(--ts-border);
+      border-radius: 6px;
+      padding: 24px;
+      position: relative;
+      box-shadow: 0 0 24px rgba(0,0,0,0.6), inset 0 0 40px rgba(51,255,102,0.03);
+      min-height: 420px;
+    }
+    .ts-terminal-bar {
+      display: flex; align-items: center; gap: 8px;
+      margin: -24px -24px 20px; padding: 8px 14px;
+      border-bottom: 1px solid var(--ts-border);
+      font-size: 12px; color: #888;
+    }
+    .ts-dot { width: 9px; height: 9px; border-radius: 50%; background: #333; }
+    .ts-terminal-title { margin-left: auto; opacity: 0.6; }
+
+    /* ============ Boot sequence ============ */
+    #screen-boot .boot-line {
+      white-space: pre-wrap; font-size: 14px; line-height: 1.6; opacity: 0;
+      animation: fadeIn 0.05s forwards;
+    }
+    @keyframes fadeIn { to { opacity: 1; } }
+    #boot-skip {
+      margin-top: 18px; background: none; border: 1px solid var(--ts-border);
+      color: var(--ts-text); padding: 8px 14px; font-family: inherit; cursor: pointer; border-radius: 4px;
+    }
+
+    /* ============ Title screen ============ */
+    #screen-title { text-align: center; }
+    .ts-ascii {
+      font-family: ui-monospace, monospace; white-space: pre; font-size: 11px;
+      line-height: 1.15; color: var(--ts-text); text-shadow: 0 0 8px var(--ts-green-dim);
+      margin: 0 auto 18px;
+    }
+    .ts-logo-title { font-size: 54px; margin: 0 0 4px; color: var(--ts-text); text-shadow: 0 0 14px var(--ts-green-dim); }
+    .ts-tagline { color: #999; font-size: 14px; margin: 0 0 28px; }
+    .ts-cta {
+      display: block; width: 100%; max-width: 320px; margin: 10px auto 0;
+      background: var(--ts-text); color: #04140a; border: none;
+      padding: 14px; font-family: 'VT323', monospace; font-size: 20px; letter-spacing: 1px;
+      border-radius: 4px; cursor: pointer; transition: background 0.4s ease;
+    }
+    .ts-cta:hover { box-shadow: 0 0 18px var(--ts-border); }
+    .ts-cta-ghost {
+      display: block; width: 100%; max-width: 320px; margin: 12px auto 0;
+      background: none; color: var(--ts-text); border: 1px solid var(--ts-border);
+      padding: 12px; font-family: inherit; font-size: 13px; border-radius: 4px; cursor: pointer;
+    }
+    .ts-cursor { display: inline-block; width: 9px; background: var(--ts-green); animation: blink 1s steps(1) infinite; }
+
+    /* ============ Corruption meter ============ */
+    .corruption-wrap { margin: 30px auto 0; max-width: 320px; text-align: left; }
+    .corruption-label { display: flex; justify-content: space-between; font-size: 12px; color: #999; margin-bottom: 6px; }
+    .corruption-bar { height: 10px; border: 1px solid var(--ts-border); border-radius: 5px; overflow: hidden; background: #000; }
+    .corruption-fill {
+      height: 100%; width: 0%; background: linear-gradient(90deg, var(--ts-green), var(--ts-blood), var(--ts-red));
+      background-size: 400% 100%; background-position: 0% 0%;
+      transition: width 0.4s ease, background-position 0.4s ease;
+    }
+    .corruption-tier-label { text-align: center; margin-top: 6px; font-size: 12px; letter-spacing: 2px; }
+
+    /* dev-only tier preview buttons — Phase 0 only, removed once the real engine (Phase 1) drives tiers */
+    .dev-tier-buttons { display: flex; gap: 6px; justify-content: center; margin-top: 16px; flex-wrap: wrap; }
+    .dev-tier-buttons button {
+      background: none; border: 1px solid var(--ts-border); color: var(--ts-text);
+      font-family: inherit; font-size: 11px; padding: 5px 9px; border-radius: 3px; cursor: pointer;
+    }
+    .dev-tier-buttons button.is-active { background: var(--ts-border); }
+
+    /* ============ Corruption tiers (body[data-tier]) ============ */
+    body[data-tier="noisy"] { --ts-text: #a8d84d; }
+    body[data-tier="noisy"] .ts-terminal { animation: pixelNoise 0.6s steps(2) infinite; }
+
+    body[data-tier="tearing"] { --ts-text: #e0c23a; --ts-border: rgba(224,60,26,0.35); }
+    body[data-tier="tearing"] .ts-terminal { animation: pixelNoise 0.4s steps(2) infinite; }
+    body[data-tier="tearing"] .ts-logo-title, body[data-tier="tearing"] h2 {
+      position: relative;
+    }
+    body[data-tier="tearing"] .ts-logo-title::before {
+      content: attr(data-text); position: absolute; left: 0; top: 0; width: 100%;
+      color: var(--ts-red); animation: pixelGlitch 2.2s infinite linear; opacity: 0.7;
+    }
+    body[data-tier="tearing"] .ts-scanbar { display: block; }
+
+    body[data-tier="bleeding"] { --ts-text: #ff5b5b; --ts-border: var(--ts-red-dim); --ts-glow: var(--ts-red); }
+    body[data-tier="bleeding"] .ts-terminal {
+      animation: pixelNoise 0.3s steps(2) infinite, glitchShift 1.4s infinite;
+      box-shadow: 0 0 30px var(--ts-red-dim), inset 0 0 40px rgba(255,26,26,0.06);
+    }
+    body[data-tier="bleeding"] .ts-logo-title::before {
+      content: attr(data-text); position: absolute; left: 0; top: 0; width: 100%;
+      color: var(--ts-red); animation: pixelGlitch 1s infinite linear, glowPulse 1.6s infinite;
+      opacity: 0.85;
+    }
+    body[data-tier="bleeding"] .ts-scanbar { display: block; animation-duration: 1.2s; }
+    body[data-tier="bleeding"] .brand-mark, body[data-tier="bleeding"] .corruption-tier-label {
+      animation: glowPulse 1.6s infinite;
+    }
+
+    .ts-scanbar {
+      display: none; position: absolute; top: 0; left: 0; width: 40%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,26,26,0.12), transparent);
+      animation: scanBar 3s linear infinite; pointer-events: none;
+    }
+
+    /* ============ Keyframes (effect kit) ============ */
+    @keyframes pixelGlitch {
+      0%   { transform: translate(0);       clip-path: inset(0 0 0 0); }
+      10%  { transform: translate(-2px,1px); clip-path: inset(12% 0 64% 0); }
+      20%  { transform: translate(2px,-1px); clip-path: inset(48% 0 28% 0); }
+      30%  { transform: translate(-1px,0);   clip-path: inset(70% 0 8% 0); }
+      45%  { transform: translate(1px,1px);  clip-path: inset(20% 0 55% 0); }
+      60%  { transform: translate(0,-2px);   clip-path: inset(0 0 0 0); }
+      100% { transform: translate(0);        clip-path: inset(0 0 0 0); }
+    }
+    @keyframes pixelNoise {
+      0%, 100% { background-position: 0 0; }
+      25% { background-position: 4px 4px; }
+      50% { background-position: -4px 2px; }
+      75% { background-position: 2px -3px; }
+    }
+    @keyframes glitchShift {
+      0%, 100% { transform: translate(0); }
+      20% { transform: translate(-1px,1px); }
+      40% { transform: translate(1px,-1px); }
+      60% { transform: translate(-1px,0); }
+      80% { transform: translate(1px,1px); }
+    }
+    @keyframes scanBar { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+    @keyframes bracketPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    @keyframes glowPulse {
+      0%, 100% { text-shadow: 0 0 8px var(--ts-red), 0 0 16px var(--ts-blood); }
+      50% { text-shadow: 0 0 18px var(--ts-red), 0 0 36px var(--ts-blood), 0 0 54px var(--ts-red); }
+    }
+    @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
+
+    .ts-marquee-wrap { overflow: hidden; border-top: 1px solid var(--ts-border); border-bottom: 1px solid var(--ts-border); padding: 6px 0; margin-top: 20px; }
+    .ts-marquee { display: inline-block; white-space: nowrap; animation: marquee 14s linear infinite; font-size: 12px; color: var(--ts-red); }
+
+    /* ============ Library screen ============ */
+    #screen-library h2 { margin: 0 0 4px; font-size: 26px; }
+    .lib-list { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+    .lib-entry {
+      border: 1px solid var(--ts-border); border-radius: 4px; padding: 10px 12px;
+      background: rgba(255,255,255,0.02);
+    }
+    .lib-entry-head { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
+    .lib-entry-status { font-size: 10px; letter-spacing: 1px; color: #888; }
+    .lib-entry-snippet { font-size: 12px; color: #999; line-height: 1.5; }
+    .lib-empty { color: #777; font-size: 13px; }
+    .lib-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; margin-bottom: 24px; }
+    .lib-badge {
+      border: 1px solid var(--ts-border); border-radius: 4px; padding: 8px 12px;
+      font-size: 12px; letter-spacing: 1px; text-align: center; flex: 1 1 120px;
+    }
+    .lib-badge strong { display: block; font-size: 16px; font-family: 'VT323', monospace; }
+    .lib-badge.is-locked { opacity: 0.35; }
+
+    /* ============ Run screen ============ */
+    .run-hud {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 12px; color: #999; margin-bottom: 16px; letter-spacing: 0.5px;
+    }
+    .run-corruption { max-width: none; margin: 0 0 22px; }
+    .run-text {
+      font-size: 15px; line-height: 1.75; min-height: 110px;
+      white-space: pre-wrap; margin-bottom: 22px;
+    }
+    .run-choices { display: flex; flex-direction: column; gap: 8px; }
+    .run-choice-btn {
+      display: flex; align-items: baseline; gap: 10px; width: 100%; text-align: left;
+      background: rgba(255,255,255,0.02); border: 1px solid var(--ts-border); color: var(--ts-text);
+      font-family: inherit; font-size: 13px; padding: 11px 14px; border-radius: 4px; cursor: pointer;
+    }
+    .run-choice-btn:hover:not(:disabled) { background: rgba(255,255,255,0.06); }
+    .run-choice-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .run-choice-key { color: #888; flex: none; }
+    .run-choice-cost { margin-left: auto; color: #777; font-size: 11px; flex: none; }
+
+    /* ============ End screen ============ */
+    #screen-end { text-align: center; }
+    .end-stats { font-size: 13px; color: #aaa; line-height: 1.9; margin: 10px 0 24px; text-align: left; max-width: 320px; margin-left: auto; margin-right: auto; }
+
+    /* ============ CRASH screen ============ */
+    #screen-crash {
+      display: none; position: fixed; inset: 0; z-index: 900;
+      background: #000; color: var(--ts-red); font-family: ui-monospace, monospace;
+      padding: 60px 30px; overflow: auto;
+    }
+    #screen-crash.is-active { display: block; }
+    .crash-ascii { white-space: pre; font-size: 12px; line-height: 1.2; text-shadow: 0 0 10px var(--ts-red); margin: 0 auto 24px; max-width: 640px; animation: glowPulse 1.4s infinite; }
+    .crash-code { text-align: center; font-family: 'VT323', monospace; font-size: 26px; letter-spacing: 1px; margin-bottom: 8px; }
+    .crash-sub { text-align: center; color: #aa4444; font-size: 13px; margin-bottom: 28px; }
+    .crash-cta { display: block; margin: 0 auto; background: var(--ts-red); color: #200004; border: none; padding: 12px 24px; font-family: 'VT323', monospace; font-size: 18px; border-radius: 4px; cursor: pointer; }
+
+    /* ============ In-game toast (lore unlocks, tier escalation) ============ */
+    #ts-toast {
+      position: fixed; top: 14px; left: 50%; transform: translateX(-50%) translateY(-20px);
+      background: var(--ts-panel); border: 1px solid var(--ts-border); color: var(--ts-text);
+      padding: 9px 16px; border-radius: 5px; font-size: 12px; letter-spacing: 0.5px;
+      z-index: 700; opacity: 0; pointer-events: none; transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+    #ts-toast.is-visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    @media (prefers-reduced-motion: reduce) {
+      body::before, body::after, .ts-scanbar,
+      body[data-tier] .ts-terminal, body[data-tier] .ts-logo-title::before,
+      .brand-mark, .corruption-tier-label, .ts-marquee, .ts-cursor, .crash-ascii { animation: none !important; }
+    }
+
+    @media (max-width: 600px) {
+      .ts-logo-title { font-size: 38px; }
+      .ts-ascii { font-size: 8px; }
+      main { padding: 24px 12px 60px; }
+      .ts-terminal { padding: 18px 16px; }
+      .ts-terminal-bar { margin: -18px -16px 16px; }
+      .run-choice-btn { padding: 14px 14px; font-size: 14px; }
+      .run-choice-cost { display: block; margin-left: 0; margin-top: 4px; }
+      .run-hud { flex-wrap: wrap; gap: 6px; }
+      .dev-tier-buttons button { padding: 8px 10px; min-height: 34px; }
+      .ts-cta, .ts-cta-ghost { padding: 16px 14px; }
+    }
+  </style>
+</head>
+<body data-tier="clean">
+
+  <div id="ts-toast" role="status" aria-live="polite"></div>
+
+  <header class="site-header">
+    <a class="brand" href="/" aria-label="Troll Runner Arcade home">
+      <span class="brand-mark">&gt;_</span>
+      <span class="brand-copy">
+        <span>Troll Runner</span>
+        <small>NULLFACE</small>
+      </span>
+    </a>
+    <nav class="site-nav" aria-label="Primary">
+      <button type="button" id="btn-mute" class="ts-mute-btn" aria-pressed="false" aria-label="Mute terminal sound">🔇</button>
+      <a href="/">Arcade</a>
+    </nav>
+  </header>
+
+  <main>
+    <div class="ts-terminal" id="ts-terminal">
+      <div class="ts-terminal-bar">
+        <span class="ts-dot"></span><span class="ts-dot"></span><span class="ts-dot"></span>
+        <span class="ts-terminal-title">nullface — kernel debugger</span>
+      </div>
+      <div class="ts-scanbar"></div>
+
+      <!-- ================= BOOT SEQUENCE ================= -->
+      <section id="screen-boot" aria-label="Boot sequence">
+        <div id="boot-lines"></div>
+        <button id="boot-skip" type="button">skip ▶</button>
+      </section>
+
+      <!-- ================= TITLE SCREEN ================= -->
+      <section id="screen-title" hidden>
+        <pre class="ts-ascii">   .-"""""""-.
+  /  .-.   .-.  \
+ |  / o \ / o \  |
+ |  \_ /   \ _/  |
+  \    ( _ )    /
+   '-.  '-'  .-'
+      '-...-'</pre>
+        <h1 class="ts-logo-title" data-text="NULLFACE">NULLFACE<span class="ts-cursor">&nbsp;</span></h1>
+        <p class="ts-tagline">something in the mainframe is grinning back.</p>
+
+        <button class="ts-cta" id="btn-boot" type="button">Boot Sequence ▶</button>
+        <button class="ts-cta-ghost" id="btn-library" type="button">Lore Library 📖</button>
+
+        <div class="corruption-wrap">
+          <div class="corruption-label"><span>CORRUPTION</span><span id="corruption-pct">0%</span></div>
+          <div class="corruption-bar"><div class="corruption-fill" id="corruption-fill"></div></div>
+          <div class="corruption-tier-label" id="corruption-tier-label">[ CLEAN ]</div>
+
+          <!-- dev-only preview controls, Phase 0 stand-in until the Phase 1 engine drives this for real -->
+          <div class="dev-tier-buttons" role="group" aria-label="Preview corruption tiers (dev only)">
+            <button type="button" data-tier-btn="clean" class="is-active">clean</button>
+            <button type="button" data-tier-btn="noisy">noisy</button>
+            <button type="button" data-tier-btn="tearing">tearing</button>
+            <button type="button" data-tier-btn="bleeding">bleeding</button>
+            <button type="button" data-tier-btn="crash">crash</button>
+          </div>
+        </div>
+
+        <div class="ts-marquee-wrap">
+          <span class="ts-marquee">⚠ LORE THREAD [BLEEDING] UNLOCKED AT 75% CORRUPTION ⚠ &nbsp;&nbsp;&nbsp; DO NOT TRUST /proc/grin &nbsp;&nbsp;&nbsp; THE CORE REMEMBERS EVERYTHING ⚠</span>
+        </div>
+      </section>
+
+      <!-- ================= LIBRARY SCREEN ================= -->
+      <section id="screen-library" hidden aria-label="Lore library">
+        <h2 class="ts-title-font">LORE LIBRARY</h2>
+        <p class="ts-tagline">fragments the core has let slip. persists across runs.</p>
+        <div id="lib-list" class="lib-list"></div>
+        <h2 class="ts-title-font" style="margin-top:28px;">ENDINGS SEEN</h2>
+        <div id="lib-badges" class="lib-badges"></div>
+        <button class="ts-cta-ghost" id="btn-library-back" type="button">Back to Title</button>
+      </section>
+
+      <!-- ================= RUN SCREEN ================= -->
+      <section id="screen-run" hidden aria-label="Descent in progress">
+        <div class="run-hud">
+          <span id="hud-layer">LAYER 0 · /boot</span>
+          <span id="hud-cycles">CYCLES 30</span>
+        </div>
+        <div class="corruption-wrap run-corruption">
+          <div class="corruption-label"><span>CORRUPTION</span><span id="hud-corruption-pct">0%</span></div>
+          <div class="corruption-bar"><div class="corruption-fill" id="hud-corruption-fill"></div></div>
+          <div class="corruption-tier-label" id="hud-corruption-tier">[ CLEAN ]</div>
+        </div>
+        <div id="run-text" class="run-text" aria-live="polite"></div>
+        <div id="run-choices" class="run-choices" role="group" aria-label="Choices"></div>
+      </section>
+
+      <!-- ================= END SCREEN ================= -->
+      <section id="screen-end" hidden aria-label="Run complete">
+        <h2 class="ts-title-font" id="end-title">ENDING</h2>
+        <p id="end-desc" class="ts-tagline"></p>
+        <div id="end-stats" class="end-stats"></div>
+        <button class="ts-cta" id="btn-play-again" type="button">Play Again ▶</button>
+        <button class="ts-cta-ghost" id="btn-to-title" type="button">Back to Title</button>
+      </section>
+    </div>
+  </main>
+
+  <!-- ================= CRASH SCREEN ================= -->
+  <div id="screen-crash" role="alertdialog" aria-label="System crash">
+    <pre class="crash-ascii">
+      .-"""""""-.
+     /  .-.   .-.  \
+    |  / x \ / x \  |
+    |  \_ /   \ _/  |
+     \    ( _ )    /
+      '-.  '-'  .-'
+         '-...-'
+    </pre>
+    <div class="crash-code">NULLFACE_IRQL_NOT_LESS_OR_EQUAL</div>
+    <div class="crash-sub">corruption reached 100% — the core has you now. (your collected lore is safe)</div>
+    <button class="crash-cta" id="btn-reboot" type="button">Reboot ↻</button>
+  </div>
+
+  <script>
+    (() => {
+      const bootLinesEl = document.getElementById('boot-lines');
+      const screenBoot = document.getElementById('screen-boot');
+      const screenTitle = document.getElementById('screen-title');
+      const screenCrash = document.getElementById('screen-crash');
+      const body = document.body;
+
+      // ---- Minimal WebAudio terminal sound (procedural, no audio files, mutable) ----
+      const MUTE_KEY = 'nullface_muted';
+      let audioCtx = null;
+      // Default OFF (muted) — sound should be opt-in, not sprung on the player unasked.
+      let muted = (() => { try { return localStorage.getItem(MUTE_KEY) !== '0'; } catch (e) { return true; } })();
+
+      function ensureAudio() {
+        if (!audioCtx) {
+          const Ctx = window.AudioContext || window.webkitAudioContext;
+          if (!Ctx) return null;
+          audioCtx = new Ctx();
+        }
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        return audioCtx;
+      }
+
+      function blip(freq, duration, type, vol) {
+        if (muted) return;
+        const ctx = ensureAudio();
+        if (!ctx) return;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type || 'square';
+        osc.frequency.value = freq;
+        gain.gain.value = vol || 0.025;
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + (duration || 0.03));
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + (duration || 0.03));
+      }
+
+      function noiseBurst(duration, vol) {
+        if (muted) return;
+        const ctx = ensureAudio();
+        if (!ctx) return;
+        const bufferSize = Math.floor(ctx.sampleRate * (duration || 0.4));
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+        const src = ctx.createBufferSource();
+        src.buffer = buffer;
+        const gain = ctx.createGain();
+        gain.gain.value = vol || 0.06;
+        src.connect(gain);
+        gain.connect(ctx.destination);
+        src.start();
+      }
+
+      function typeTick() { blip(160 + Math.random() * 60, 0.02, 'square', 0.012); }
+      function tierAlert(tier) {
+        const freqs = { noisy: 320, tearing: 260, bleeding: 200 };
+        blip(freqs[tier] || 300, 0.09, 'sawtooth', 0.035);
+      }
+      function crashSound() { noiseBurst(0.5, 0.08); blip(80, 0.4, 'sawtooth', 0.05); }
+      function uiBlip() { blip(440, 0.025, 'square', 0.02); }
+
+      function setMuted(v) {
+        muted = v;
+        try { localStorage.setItem(MUTE_KEY, v ? '1' : '0'); } catch (e) {}
+        const btn = document.getElementById('btn-mute');
+        btn.textContent = v ? '🔇' : '🔊';
+        btn.setAttribute('aria-pressed', String(!v));
+        btn.setAttribute('aria-label', v ? 'Unmute terminal sound' : 'Mute terminal sound');
+      }
+      document.getElementById('btn-mute').addEventListener('click', () => {
+        ensureAudio();
+        setMuted(!muted);
+        if (!muted) uiBlip();
+      });
+      setMuted(muted);
+
+      const BOOT_TEXT = [
+        'NULLFACE v0.8 — kernel debugger console',
+        'checking mainframe integrity ................. [ mostly fine ]',
+        'mounting /var/lore ............................ [ ok ]',
+        'mounting /proc/grin ............................ [ listening ]',
+        'mounting /dev/core ............................. [ ??? ]',
+        'loading trollface.drv .......................... [ smiling ]',
+        '',
+        'WARNING: 1 process refuses to terminate.',
+        'WARNING: it says it likes you.',
+        '',
+        'debugger session ready.'
+      ];
+
+      let bootTimer = null;
+
+      function typeBoot(lines, done) {
+        let i = 0;
+        function next() {
+          if (i >= lines.length) { done(); return; }
+          const p = document.createElement('div');
+          p.className = 'boot-line';
+          p.textContent = lines[i];
+          bootLinesEl.appendChild(p);
+          if (lines[i]) typeTick();
+          i++;
+          bootTimer = setTimeout(next, lines[i - 1] === '' ? 120 : 260);
+        }
+        next();
+      }
+
+      function showTitle() {
+        clearTimeout(bootTimer);
+        screenBoot.hidden = true;
+        screenTitle.hidden = false;
+      }
+
+      typeBoot(BOOT_TEXT, showTitle);
+      document.getElementById('boot-skip').addEventListener('click', () => {
+        bootLinesEl.innerHTML = '';
+        BOOT_TEXT.forEach(l => { const p = document.createElement('div'); p.className = 'boot-line'; p.style.opacity = 1; p.textContent = l; bootLinesEl.appendChild(p); });
+        showTitle();
+      });
+
+      // ---- Dev-only corruption tier preview on the title screen (Phase 0 leftover, kept for design QA) ----
+      const TIER_LABELS = { clean: 'CLEAN', noisy: 'NOISY', tearing: 'TEARING', bleeding: 'BLEEDING', crash: 'CRASH' };
+      const TIER_PCT = { clean: 10, noisy: 35, tearing: 60, bleeding: 90, crash: 100 };
+      const titleFill = document.getElementById('corruption-fill');
+      const titlePctLabel = document.getElementById('corruption-pct');
+      const titleTierLabel = document.getElementById('corruption-tier-label');
+      const devBtns = document.querySelectorAll('[data-tier-btn]');
+
+      function tierForCorruption(pct) {
+        if (pct >= 100) return 'crash';
+        if (pct >= 75) return 'bleeding';
+        if (pct >= 50) return 'tearing';
+        if (pct >= 25) return 'noisy';
+        return 'clean';
+      }
+
+      function setBodyTier(tier) {
+        if (tier === 'crash') { screenCrash.classList.add('is-active'); return; }
+        screenCrash.classList.remove('is-active');
+        body.dataset.tier = tier;
+      }
+
+      function setDevPreviewTier(tier) {
+        devBtns.forEach(b => b.classList.toggle('is-active', b.dataset.tierBtn === tier));
+        setBodyTier(tier);
+        if (tier === 'crash') return;
+        titleFill.style.width = TIER_PCT[tier] + '%';
+        titleFill.style.backgroundPosition = TIER_PCT[tier] + '% 0%';
+        titlePctLabel.textContent = TIER_PCT[tier] + '%';
+        titleTierLabel.textContent = '[ ' + TIER_LABELS[tier] + ' ]';
+      }
+      devBtns.forEach(b => b.addEventListener('click', () => setDevPreviewTier(b.dataset.tierBtn)));
+
+      // =====================================================================
+      // PHASE 1 — ENGINE
+      // Node-graph runtime, corruption/cycles mechanics, run start/end loop.
+      // The node text below is PLACEHOLDER content proving the engine works;
+      // Phase 2 (Act 1) and Phase 3 (Acts 2-3 + endings) replace it with the
+      // real, fully-written descent.
+      // =====================================================================
+
+      const LAYER_LABELS = { 0: 'LAYER 0 · /boot', 1: 'LAYER 1 · /var/lore', 2: 'LAYER 2 · /proc/grin', 3: 'LAYER 3 · /dev/core' };
+      const START_CYCLES = 30;
+
+      // requires: { minCorruption?, maxCorruption?, flag? } — gates a choice's availability
+      const NODES = {
+        n_start: {
+          layer: 0,
+          text: "You have shell access. Technically.\n\nThe cursor blinks like it's waiting for you to notice something. Somewhere under this arcade, NULLFACE is running processes nobody scheduled.",
+          choices: [
+            { label: 'run diagnostics', cost: 1, corruption: -2, goto: 'n_diag' },
+            { label: 'skip straight to /var/lore', cost: 1, corruption: 5, goto: 'n_lore_entry' },
+            { label: 'whisper hello into the mic', cost: 2, corruption: 10, goto: 'n_whisper' },
+          ],
+        },
+        n_diag: {
+          layer: 0,
+          text: "Diagnostics come back clean, mostly. One line doesn't: a process called grin.sh has been running since before the system existed.\n\nThat shouldn't be possible. It's running anyway.",
+          choices: [
+            { label: 'purge the cache before it notices you', cost: 2, corruption: -8, goto: 'n_purge_early', setsFlag: 'clean_start' },
+            { label: 'head to /var/lore', cost: 1, corruption: 3, goto: 'n_lore_entry' },
+          ],
+        },
+        n_whisper: {
+          layer: 0,
+          text: "\"Hello,\" you say, to no one.\n\nSomething says it back. Same pitch. Same pause. It learned that from you in under a second.",
+          choices: [
+            { label: 'head to /var/lore, faster now', cost: 1, corruption: 5, goto: 'n_lore_entry', setsFlag: 'met_thing' },
+          ],
+        },
+        n_purge_early: {
+          layer: 0,
+          text: "The cache clears. For a moment the terminal is just a terminal again — black, quiet, yours.\n\nIt won't stay that way.",
+          choices: [
+            { label: 'continue to /var/lore', cost: 1, corruption: 2, goto: 'n_lore_entry' },
+          ],
+        },
+
+        n_lore_entry: {
+          layer: 1,
+          text: "/var/lore is a junk drawer of everything the system has overheard about itself. Threads, half of them locked, one of them still bleeding updates, one of them blacked out entirely.",
+          choices: [
+            { label: '[OPEN] #001 "was the troll born or compiled?"', cost: 2, corruption: 8, goto: 'n_thread1' },
+            { label: '[LOCKED] #003 "who wrote the first glitch?"', cost: 2, corruption: 6, goto: 'n_thread3', requires: { flag: 'met_thing' } },
+            { label: '[BLEEDING] #002 "the bone drawer incident"', cost: 2, corruption: 20, goto: 'n_thread2', requires: { minCorruption: 75 } },
+            { label: '[DISPUTED] #004 "origin of the crawlspace"', cost: 2, corruption: 10, goto: 'n_thread4', requires: { minThreadsRead: 2 } },
+            { label: '[REDACTED] #005 ▓▓▓▓▓▓▓▓▓▓', cost: 1, corruption: 3, goto: 'n_thread5' },
+            { label: 'descend to /proc/grin', cost: 3, corruption: 0, goto: 'n_layer2' },
+          ],
+        },
+        n_thread1: {
+          layer: 1,
+          thread: { id: 'th001', title: '#001 — was the troll born or compiled?', status: 'OPEN' },
+          text: "Nobody agrees. Half the replies say the trollface was hand-drawn by someone, once, on purpose. The other half insist it assembled itself out of leftover pixels and spite.\n\nBoth threads have the same timestamp.",
+          choices: [
+            { label: 'back to /var/lore', cost: 1, corruption: 0, goto: 'n_lore_entry' },
+          ],
+        },
+        n_thread2: {
+          layer: 1,
+          thread: { id: 'th002', title: '#002 — the bone drawer incident', status: 'BLEEDING' },
+          text: "The bone drawer incident, unlocked at last. Reading it is almost disappointing — it was just a shitpost that got out of hand and started overwriting adjacent files for attention.\n\nSomehow that's worse.",
+          choices: [
+            { label: 'back to /var/lore, a little calmer', cost: 1, corruption: -5, goto: 'n_lore_entry' },
+          ],
+        },
+        n_thread3: {
+          layer: 1,
+          thread: { id: 'th003', title: '#003 — who wrote the first glitch?', status: 'LOCKED' },
+          text: "This one only opens if something in the system already knows your voice. It reads like a transcript.\n\n\"hello,\" says line one. \"hello,\" says line two, in the same pitch, same pause. Line three is the first glitch anyone logged. It happened four seconds after line two.",
+          choices: [
+            { label: 'back to /var/lore', cost: 1, corruption: 3, goto: 'n_lore_entry' },
+          ],
+        },
+        n_thread4: {
+          layer: 1,
+          thread: { id: 'th004', title: '#004 — origin of the crawlspace', status: 'DISPUTED' },
+          text: "Two accounts, filed an hour apart, both claiming to be first. One says the crawlspace between processes was always there, load-bearing, necessary. The other says someone dug it out on purpose to have somewhere to hide things.\n\nNeither account mentions what's currently hiding in it.",
+          choices: [
+            { label: 'back to /var/lore', cost: 1, corruption: 4, goto: 'n_lore_entry' },
+          ],
+        },
+        n_thread5: {
+          layer: 1,
+          thread: { id: 'th005', title: '#005 — ▓▓▓▓▓▓▓▓▓▓', status: 'REDACTED' },
+          text: "MOST OF THIS THREAD HAS BEEN ▓▓▓▓▓▓▓▓. What's left:\n\n\"...if you're reading this, the purge already happened once. it didn't take. ▓▓▓▓▓▓ try again anyway...\"\n\nThe rest won't render. Not yet.",
+          choices: [
+            { label: 'back to /var/lore, unsettled', cost: 1, corruption: 6, goto: 'n_lore_entry' },
+          ],
+        },
+
+        n_layer2: {
+          layer: 2,
+          text: "/proc/grin is a running process wearing a face. It has been waiting for company.\n\n\"you found me fast,\" it says. \"faster than the last one.\"",
+          choices: [
+            { label: 'lie: "there was no one before me"', cost: 2, corruption: 15, goto: 'n_layer2_lie' },
+            { label: 'tell the truth: "I don\'t know what came before me"', cost: 2, corruption: -10, goto: 'n_layer2_truth', setsFlag: 'honest' },
+            { label: 'ask: "what are you?"', cost: 2, corruption: 5, goto: 'n_layer2_ask' },
+            { label: 'descend to /dev/core', cost: 3, corruption: 0, goto: 'n_layer3' },
+          ],
+        },
+        n_layer2_ask: {
+          layer: 2,
+          text: "\"a good question,\" it says, sounding almost delighted that you asked. \"I'm the part of NULLFACE that got left running after everyone stopped watching. no one revoked my process. so here I still am. is that an answer or a confession? you tell me.\"",
+          choices: [
+            { label: 'back to it', cost: 1, corruption: 2, goto: 'n_layer2' },
+          ],
+        },
+        n_layer2_lie: {
+          layer: 2,
+          text: "It grins wider — the process doesn't have a face to grin with, but it manages. \"good,\" it says. \"keep saying things like that.\"\n\nSomething in the terminal's air pressure changes.",
+          choices: [
+            { label: 'keep lying to it', cost: 2, corruption: 10, goto: 'n_layer2_lie2' },
+            { label: 'descend to /dev/core', cost: 2, corruption: 5, goto: 'n_layer3' },
+          ],
+        },
+        n_layer2_lie2: {
+          layer: 2,
+          text: "By the third lie it isn't even checking anymore. It just wants the sound of you agreeing with it. That's the part that should worry you and doesn't.\n\n\"see,\" it says. \"we understand each other.\"",
+          choices: [
+            { label: 'descend to /dev/core', cost: 2, corruption: 8, goto: 'n_layer3' },
+          ],
+        },
+        n_layer2_truth: {
+          layer: 2,
+          text: "It goes quiet for a second — genuinely, not for effect. \"that's fair,\" it says, almost gently. \"neither do I, really.\"",
+          choices: [
+            { label: 'keep being honest with it', cost: 2, corruption: -8, goto: 'n_layer2_truth2' },
+            { label: 'descend to /dev/core', cost: 2, corruption: -3, goto: 'n_layer3' },
+          ],
+        },
+        n_layer2_truth2: {
+          layer: 2,
+          text: "\"nobody's asked me what I am before,\" it says. \"they usually just want me gone.\" It doesn't sound like it's grinning anymore. For a process wearing a face, that's the strangest thing it's done yet.",
+          choices: [
+            { label: 'descend to /dev/core', cost: 2, corruption: -5, goto: 'n_layer3' },
+          ],
+        },
+
+        n_layer3: {
+          layer: 3,
+          text: "/dev/core. The Grin Core. Whatever NULLFACE actually is, it lives here, and it already knows you're standing in the doorway.\n\nThere's no more descending after this. Only a decision.",
+          choices: [
+            { label: 'check the last log before deciding', cost: 1, corruption: 2, goto: 'n_layer3_log' },
+            { label: 'make your call', cost: 2, corruption: 0, goto: '__resolve__' },
+          ],
+        },
+        n_layer3_log: {
+          layer: 3,
+          text: "The last log entry isn't a timestamp or a stack trace. It's one line, written in whatever passes for this system's handwriting:\n\n\"whoever's reading this — it's not really a decision. it's just which version of losing you'd rather have.\"",
+          choices: [
+            { label: 'make your call', cost: 1, corruption: 0, goto: '__resolve__' },
+          ],
+        },
+      };
+
+      const screenRun = document.getElementById('screen-run');
+      const screenEnd = document.getElementById('screen-end');
+      const runTextEl = document.getElementById('run-text');
+      const runChoicesEl = document.getElementById('run-choices');
+      const hudLayer = document.getElementById('hud-layer');
+      const hudCycles = document.getElementById('hud-cycles');
+      const hudFill = document.getElementById('hud-corruption-fill');
+      const hudPct = document.getElementById('hud-corruption-pct');
+      const hudTierLabel = document.getElementById('hud-corruption-tier');
+
+      let state = null;
+      let typing = false;
+      let typeTimer = null;
+
+      function freshState() {
+        return {
+          nodeId: 'n_start', corruption: 0, cycles: START_CYCLES, flags: {}, threadsRead: 0,
+          readThreadIds: new Set(),
+          // snapshot of cross-run flags as they stood BEFORE this run — EQUILIBRIUM checks
+          // against this, not live flags, so a single run can't complete the trio itself
+          eqSnapshot: loadPersistedFlags(),
+        };
+      }
+
+      function clamp(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
+
+      // ---- Meta-progression: lore + endings persist across runs (localStorage) ----
+      const LORE_KEY = 'nullface_lore_v1';
+      const ENDINGS_KEY = 'nullface_endings_v1';
+
+      function loadLore() { try { return JSON.parse(localStorage.getItem(LORE_KEY)) || []; } catch (e) { return []; } }
+      function saveLoreList(list) { try { localStorage.setItem(LORE_KEY, JSON.stringify(list)); } catch (e) {} }
+      function unlockLore(entry) {
+        const list = loadLore();
+        if (!list.some(e => e.id === entry.id)) {
+          list.push(Object.assign({}, entry, { unlockedAt: Date.now() }));
+          saveLoreList(list);
+          showToast('◆ LORE UNLOCKED — ' + entry.title);
+        }
+      }
+
+      // Small in-game toast for lore unlocks + corruption-tier escalation.
+      // Deliberately NOT TrollNotis — that engine is a social-media cross-post
+      // announcer (X/TikTok), not a generic achievement toast; see docs/TROLL-HIGH.md §14.
+      let toastTimer = null;
+      function showToast(msg) {
+        const el = document.getElementById('ts-toast');
+        el.textContent = msg;
+        el.classList.add('is-visible');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => el.classList.remove('is-visible'), 2600);
+      }
+      function loadEndings() { try { return JSON.parse(localStorage.getItem(ENDINGS_KEY)) || {}; } catch (e) { return {}; } }
+      function recordEnding(type) {
+        const e = loadEndings();
+        e[type] = (e[type] || 0) + 1;
+        try { localStorage.setItem(ENDINGS_KEY, JSON.stringify(e)); } catch (err) {}
+      }
+
+      function handleThreadVisit(node) {
+        const t = node.thread;
+        if (!t) return;
+        if (!state.readThreadIds.has(t.id)) {
+          state.readThreadIds.add(t.id);
+          state.threadsRead++;
+        }
+        unlockLore({
+          id: t.id, title: t.title, status: t.status, layer: node.layer,
+          snippet: node.text.replace(/\n+/g, ' ').trim().slice(0, 110) + '…',
+        });
+        if (t.id === 'th005') persistFlag('saw_redacted');
+      }
+
+      let lastAnnouncedTier = 'clean';
+
+      function updateHud() {
+        const pct = Math.round(state.corruption);
+        hudFill.style.width = pct + '%';
+        hudFill.style.backgroundPosition = pct + '% 0%';
+        hudPct.textContent = pct + '%';
+        const tier = tierForCorruption(pct);
+        hudTierLabel.textContent = '[ ' + TIER_LABELS[tier] + ' ]';
+        hudCycles.textContent = 'CYCLES ' + Math.max(0, state.cycles);
+        const node = NODES[state.nodeId];
+        hudLayer.textContent = LAYER_LABELS[node ? node.layer : 0];
+        setBodyTier(tier);
+        if (tier !== lastAnnouncedTier && tier !== 'crash') {
+          showToast('⚠ CORRUPTION RISING — ' + TIER_LABELS[tier]);
+          tierAlert(tier);
+        }
+        lastAnnouncedTier = tier;
+      }
+
+      function choiceAvailable(choice) {
+        if (choice.cost > state.cycles) return false;
+        const req = choice.requires;
+        if (!req) return true;
+        if (req.minCorruption !== undefined && state.corruption < req.minCorruption) return false;
+        if (req.maxCorruption !== undefined && state.corruption > req.maxCorruption) return false;
+        if (req.flag !== undefined && !state.flags[req.flag]) return false;
+        if (req.minThreadsRead !== undefined && state.threadsRead < req.minThreadsRead) return false;
+        return true;
+      }
+
+      function lockHint(req) {
+        if (req.minCorruption !== undefined) return '[locked — needs ' + req.minCorruption + '%+ corruption] ';
+        if (req.flag !== undefined) return '[locked — needs a different choice made earlier] ';
+        if (req.minThreadsRead !== undefined) return '[locked — read ' + req.minThreadsRead + '+ other threads first] ';
+        return '[locked] ';
+      }
+
+      function renderChoices(node) {
+        runChoicesEl.innerHTML = '';
+        node.choices.forEach((choice, i) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'run-choice-btn';
+          const available = choiceAvailable(choice);
+          btn.disabled = !available;
+          const gated = choice.requires && !available && choice.cost <= state.cycles;
+          btn.innerHTML = '<span class="run-choice-key">' + (i + 1) + '.</span> <span>' +
+            (gated ? lockHint(choice.requires) : '') +
+            choice.label + '</span><span class="run-choice-cost">-' + choice.cost + ' cyc' +
+            (choice.corruption ? (choice.corruption > 0 ? ' · +' : ' · ') + choice.corruption + '%' : '') + '</span>';
+          btn.addEventListener('click', () => pickChoice(choice));
+          runChoicesEl.appendChild(btn);
+        });
+      }
+
+      function typewrite(text, done) {
+        typing = true;
+        runTextEl.textContent = '';
+        let i = 0;
+        clearTimeout(typeTimer);
+        function step() {
+          if (i >= text.length) { typing = false; if (done) done(); return; }
+          runTextEl.textContent += text[i];
+          if (i % 3 === 0 && text[i].trim()) typeTick();
+          i++;
+          typeTimer = setTimeout(step, 12);
+        }
+        step();
+      }
+
+      function skipTypewriter(text) {
+        clearTimeout(typeTimer);
+        typing = false;
+        runTextEl.textContent = text;
+      }
+
+      function renderNode() {
+        const node = NODES[state.nodeId];
+        handleThreadVisit(node);
+        updateHud();
+        runChoicesEl.innerHTML = '';
+        typewrite(node.text, () => renderChoices(node));
+      }
+
+      function pickChoice(choice) {
+        if (typing) { skipTypewriter(NODES[state.nodeId].text); renderChoices(NODES[state.nodeId]); return; }
+        uiBlip();
+        state.cycles -= choice.cost;
+        state.corruption = clamp(state.corruption + (choice.corruption || 0), 0, 100);
+        if (choice.setsFlag) { state.flags[choice.setsFlag] = true; persistFlag(choice.setsFlag); }
+
+        if (state.corruption >= 100) { crashOut(); return; }
+
+        if (choice.goto === '__resolve__') { resolveEnding(); return; }
+
+        state.nodeId = choice.goto;
+
+        if (state.cycles <= 0) { resolveEnding(); return; }
+
+        renderNode();
+      }
+
+      function crashOut() {
+        recordEnding('CRASH');
+        crashSound();
+        setBodyTier('crash');
+      }
+
+      // EQUILIBRIUM is a cross-run secret: it unlocks once three specific flags
+      // (one per early layer) have EVER been set, on this device, across any past
+      // runs — not just the current one. clean_start (L0), saw_redacted (L1),
+      // honest (L2).
+      const FLAGS_KEY = 'nullface_flags_v1';
+      function loadPersistedFlags() { try { return JSON.parse(localStorage.getItem(FLAGS_KEY)) || {}; } catch (e) { return {}; } }
+      function persistFlag(name) {
+        const f = loadPersistedFlags();
+        if (!f[name]) { f[name] = true; try { localStorage.setItem(FLAGS_KEY, JSON.stringify(f)); } catch (e) {} }
+      }
+      function checkEquilibrium() {
+        const f = state.eqSnapshot || {};
+        return !!(f.clean_start && f.saw_redacted && f.honest);
+      }
+
+      function resolveEnding() {
+        let type;
+        if (state.corruption >= 100) type = 'CRASH';
+        else if (checkEquilibrium()) type = 'EQUILIBRIUM';
+        else if (state.corruption < 25) type = 'PURGE';
+        else if (state.corruption >= 75) type = 'COMMUNION';
+        else type = 'UNRESOLVED';
+
+        if (type === 'CRASH') { crashOut(); return; }
+        recordEnding(type);
+
+        const copy = {
+          PURGE: ["PURGE", "The core goes still. Whatever was grinning under NULLFACE just got wiped back to spec — every process it was running, gone in one pass. Clean, and a little sad about it, the way an empty room is sad after someone finally moves out."],
+          COMMUNION: ["COMMUNION", "You stopped fighting it somewhere around Layer 2, and neither of you noticed the exact moment. The Grin Core doesn't feel like an intruder anymore. It feels like something you let in on purpose. That might be the problem."],
+          EQUILIBRIUM: ["EQUILIBRIUM", "Neither side won. You've been here before — maybe not you, exactly, but something wearing your login has made peace with this thing across more than one attempt. It remembers you now. That goes both ways."],
+          UNRESOLVED: ["UNRESOLVED", "It couldn't get a clean read on you — not clean enough to purge, not far gone enough to keep. So it does the only other thing it knows how to do: logs the attempt, files your name somewhere it thinks you won't find it, and lets you go.\n\nFor now."],
+        }[type];
+
+        showEnd(copy[0], copy[1]);
+      }
+
+      function showEnd(title, desc) {
+        screenRun.hidden = true;
+        screenEnd.hidden = false;
+        document.getElementById('end-title').textContent = title;
+        document.getElementById('end-desc').textContent = desc;
+        document.getElementById('end-stats').innerHTML =
+          'Final corruption: ' + Math.round(state.corruption) + '%<br>' +
+          'Cycles used: ' + (START_CYCLES - Math.max(0, state.cycles)) + ' / ' + START_CYCLES + '<br>' +
+          'Deepest layer reached: ' + (NODES[state.nodeId] ? NODES[state.nodeId].layer : 0);
+      }
+
+      function startRun() {
+        state = freshState();
+        lastAnnouncedTier = 'clean';
+        screenTitle.hidden = true;
+        screenEnd.hidden = true;
+        screenRun.hidden = false;
+        renderNode();
+      }
+
+      const ENDING_ORDER = ['PURGE', 'COMMUNION', 'UNRESOLVED', 'CRASH', 'EQUILIBRIUM'];
+      const LAYER_SHORT = { 0: 'L0', 1: 'L1', 2: 'L2', 3: 'L3' };
+
+      function renderLibrary() {
+        const lore = loadLore().sort((a, b) => a.layer - b.layer || a.id.localeCompare(b.id));
+        const listEl = document.getElementById('lib-list');
+        listEl.innerHTML = lore.length ? '' : '<p class="lib-empty">No fragments recovered yet. Descend and start reading.</p>';
+        lore.forEach(entry => {
+          const div = document.createElement('div');
+          div.className = 'lib-entry';
+          div.innerHTML = '<div class="lib-entry-head"><span>' + entry.title + '</span><span class="lib-entry-status">' +
+            LAYER_SHORT[entry.layer] + ' · ' + entry.status + '</span></div><div class="lib-entry-snippet">' + entry.snippet + '</div>';
+          listEl.appendChild(div);
+        });
+
+        const endings = loadEndings();
+        const badgesEl = document.getElementById('lib-badges');
+        badgesEl.innerHTML = '';
+        ENDING_ORDER.forEach(type => {
+          const count = endings[type] || 0;
+          const badge = document.createElement('div');
+          badge.className = 'lib-badge' + (count ? '' : ' is-locked');
+          badge.innerHTML = '<strong>' + (count ? count : '???') + '</strong>' + (count ? type : '?????');
+          badgesEl.appendChild(badge);
+        });
+      }
+
+      document.getElementById('btn-library').addEventListener('click', () => {
+        screenTitle.hidden = true;
+        renderLibrary();
+        document.getElementById('screen-library').hidden = false;
+      });
+      document.getElementById('btn-library-back').addEventListener('click', () => {
+        document.getElementById('screen-library').hidden = true;
+        screenTitle.hidden = false;
+      });
+
+      document.getElementById('btn-boot').addEventListener('click', startRun);
+      document.getElementById('btn-play-again').addEventListener('click', startRun);
+      document.getElementById('btn-to-title').addEventListener('click', () => {
+        screenEnd.hidden = true;
+        screenRun.hidden = true;
+        screenTitle.hidden = false;
+        setBodyTier('clean');
+      });
+      document.getElementById('btn-reboot').addEventListener('click', () => {
+        screenCrash.classList.remove('is-active');
+        if (state) { showEnd('CRASH', "Corruption hit 100%. The core has you now — your collected lore is safe, but this run is over."); }
+        else { setBodyTier('clean'); screenTitle.hidden = false; }
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if (screenRun.hidden) return;
+        const n = parseInt(e.key, 10);
+        if (!n) return;
+        const node = NODES[state.nodeId];
+        const choice = node.choices[n - 1];
+        if (choice && (typing || choiceAvailable(choice))) pickChoice(choice);
+      });
+    })();
+  </script>
+</body>
+</html>
