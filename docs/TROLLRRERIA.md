@@ -97,6 +97,12 @@ trollium gear → craft an **Emperor Sigil** (8 trollium bars + 10 bones +
   a small queasy risk like raw meat), occasional junk, and a rare Golden
   Troll Fish sellable to traders. No depth/biome catch variance or daily
   quest-fish system yet — kept simple for v1.
+- **Grapple Ring + Rails**: a ring (anvil) that fires a troll tongue at
+  the nearest solid tile in range (**G**) and reels the player in — a
+  snappy pull-and-launch, not a simulated rope swing. **Rails**
+  (workbench) are a one-way, near-frictionless track tile with a 1.6x
+  speed cap while riding — the player's own body is the "cart," with no
+  separate minecart entity, slope physics, or wire-switchable junctions.
 - **Economy**: hostile kills drop **Troll Coins** (HP-scaled, elites ×2,
   bosses drop purses). Coins are a normal item that appears on both
   sides of shop offer tables — buy rows and sell rows render through
