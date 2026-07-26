@@ -86,7 +86,7 @@ export class Inventory {
      each frame by Player.update() (three slot lookups, cheap enough that
      caching on equip-change isn't worth the extra bookkeeping). */
   accessoryPerks() {
-    const p = { doubleJump: false, glide: false, dash: false, speedMult: 1, jumpBoost: 0, regenBonus: 0 };
+    const p = { doubleJump: false, glide: false, dash: false, grapple: false, speedMult: 1, jumpBoost: 0, regenBonus: 0 };
     for (const k of ["ring", "back", "feet"]) {
       const s = this.accessory[k];
       const d = s && ITEMS[s.id];
@@ -94,6 +94,7 @@ export class Inventory {
       if (d.doubleJump) p.doubleJump = true;
       if (d.glide) p.glide = true;
       if (d.dash) p.dash = true;
+      if (d.grapple) p.grapple = true;
       if (d.speedMult) p.speedMult *= d.speedMult;
       if (d.jumpBoost) p.jumpBoost += d.jumpBoost;
       if (d.regen) p.regenBonus += d.regen;

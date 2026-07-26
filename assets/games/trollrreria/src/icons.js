@@ -159,6 +159,11 @@ function drawFurniture(g, id) {
     g.fillStyle = "#5a4499"; g.fillRect(13, 6, 6, 18);
     g.fillStyle = "rgba(200,168,255,0.4)"; g.beginPath(); g.arc(16, 8, 8, 0, 7); g.fill();
     g.fillStyle = "#c8a8ff"; g.beginPath(); g.arc(16, 8, 5, 0, 7); g.fill();
+  } else if (id === "rail") {
+    g.fillStyle = "#6b4a26";
+    g.fillRect(3, 12, 4, 10); g.fillRect(14, 12, 4, 10); g.fillRect(25, 12, 4, 10);
+    g.strokeStyle = "#cfc9bd"; g.lineWidth = 2.5;
+    g.beginPath(); g.moveTo(2, 14); g.lineTo(30, 14); g.moveTo(2, 20); g.lineTo(30, 20); g.stroke();
   } else if (id === "cookingPot") {
     g.fillStyle = "#33363d"; g.beginPath(); g.ellipse(16, 20, 11, 8, 0, 0, Math.PI); g.fill();
     g.fillRect(5, 12, 22, 8);
@@ -237,8 +242,12 @@ function drawAccessory(g, id, def) {
   if (def.slot === "ring") {
     g.strokeStyle = "#f4c64c"; g.lineWidth = 4;
     g.beginPath(); g.arc(16, 18, 7, 0, 7); g.stroke();
-    g.fillStyle = id === "ringVigor" ? "#ff4d5e" : "#5ec8d8";
+    g.fillStyle = id === "ringVigor" ? "#ff4d5e" : id === "ringGrapple" ? "#c9302c" : "#5ec8d8";
     g.fillRect(13, 6, 6, 6);
+    if (id === "ringGrapple") {
+      g.strokeStyle = "#565a63"; g.lineWidth = 1.5;
+      g.beginPath(); g.moveTo(16, 6); g.lineTo(24, 2); g.lineTo(26, 6); g.stroke();
+    }
   } else if (def.slot === "back") {
     if (def.glide) {
       /* wings */
