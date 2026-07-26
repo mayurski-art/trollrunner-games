@@ -159,6 +159,11 @@ function drawFurniture(g, id) {
     g.fillStyle = "#5a4499"; g.fillRect(13, 6, 6, 18);
     g.fillStyle = "rgba(200,168,255,0.4)"; g.beginPath(); g.arc(16, 8, 8, 0, 7); g.fill();
     g.fillStyle = "#c8a8ff"; g.beginPath(); g.arc(16, 8, 5, 0, 7); g.fill();
+  } else if (id === "cookingPot") {
+    g.fillStyle = "#33363d"; g.beginPath(); g.ellipse(16, 20, 11, 8, 0, 0, Math.PI); g.fill();
+    g.fillRect(5, 12, 22, 8);
+    g.fillStyle = "#565a63"; g.fillRect(3, 10, 5, 4); g.fillRect(24, 10, 5, 4);
+    g.fillStyle = "#ff9a3c"; g.beginPath(); g.ellipse(16, 13, 8, 3, 0, 0, Math.PI * 2); g.fill();
   } else if (id === "campfire") {
     g.fillStyle = "#5d4326"; g.fillRect(6, 24, 4, 4); g.fillRect(22, 24, 4, 4);
     g.strokeStyle = "#3a2a17"; g.lineWidth = 3;
@@ -203,6 +208,18 @@ function drawFood(g, id) {
     g.fillStyle = "#e8a63c";
     g.beginPath(); g.ellipse(16, 16, 8, 5, 0, 0, 7); g.fill();
     g.fillStyle = "#c9645a"; g.fillRect(12, 14, 3, 3); g.fillRect(18, 16, 3, 3);
+  } else if (id === "trollStew") {
+    g.fillStyle = "#565a63"; g.beginPath(); g.ellipse(16, 20, 11, 6, 0, 0, Math.PI); g.fill();
+    g.fillStyle = "#8a5a2b"; g.beginPath(); g.ellipse(16, 15, 10, 5, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "#c9645a"; g.fillRect(11, 12, 4, 4);
+    g.fillStyle = "#8c2440"; g.beginPath(); g.arc(20, 14, 3, 0, 7); g.fill();
+    g.fillStyle = "#f2ead3"; g.beginPath(); g.arc(15, 11, 3, 0, 7); g.fill();
+  } else if (id === "berryPie") {
+    g.fillStyle = "#c9a35a"; g.beginPath(); g.arc(16, 18, 11, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "#8c2440"; g.beginPath(); g.arc(16, 15, 8, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "rgba(255,255,255,0.3)"; g.fillRect(11, 11, 3, 3); g.fillRect(18, 13, 3, 3);
+    g.strokeStyle = "#a67a3e"; g.lineWidth = 1.5;
+    g.beginPath(); g.moveTo(16, 7); g.lineTo(16, 27); g.moveTo(6, 18); g.lineTo(26, 18); g.stroke();
   }
 }
 

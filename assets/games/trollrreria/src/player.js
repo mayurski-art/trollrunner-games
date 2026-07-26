@@ -72,6 +72,11 @@ export class Player extends Entity {
     this.anim = "idle";
     this.hitFlash = 0;
     this.character = CHARACTERS[character] ? character : DEFAULT_CHARACTER;
+    /* Timed food buffs (Phase 4): keyed by buff.key so eating a second
+       different meal stacks rather than overwriting, but re-eating the
+       SAME meal just refreshes its timer instead of stacking regen/speed
+       -- see applyBuff() and the "food" case in useHeld() below. */
+    this.buffs = new Map();
     this.loadRig();
   }
 
@@ -133,6 +138,11 @@ export class Player extends Entity {
     if (this.swing > 0) this.swing = Math.max(0, this.swing - dt / this.swingDur);
     this.animTime += dt;
 
+    for (const [key, b] of this.buffs) {
+      b.timeLeft -= dt;
+      if (b.timeLeft <= 0) this.buffs.delete(key);
+    }
+
     /* live melee sweep: resolve hits across the swing's active window */
     if (this.melee) {
       game.meleeSweep && game.meleeSweep(this.melee);
@@ -148,6 +158,10 @@ export class Player extends Entity {
     const drop = input.down("KeyS") || input.down("ArrowDown");
 
     const perks = game.inventory.accessoryPerks();
+    for (const b of this.buffs.values()) {
+      if (b.speedMult) perks.speedMult *= b.speedMult;
+      if (b.regenBonus) perks.regenBonus += b.regenBonus;
+    }
     this.dashCd = Math.max(0, this.dashCd - dt);
 
     const water = this.inLiquid(world, 0);
@@ -408,12 +422,24 @@ export class Player extends Entity {
             this.hp = Math.max(1, this.hp - 4);
             game.floatText(this.cx, this.y - 14, "queasy...", "#8fb573");
           }
+          if (def.buff) this.applyBuff(def.buff, game);
           game.sfx && game.sfx.potion();
           game.ui && game.ui.dirtyHud();
           game.floatText(this.cx, this.y - 6, "+" + def.hunger, "#e8b23c");
         }
         break;
     }
+  }
+
+  /* Cooking-pot meals (Phase 4) grant a timed buff on top of the usual
+     hunger refill -- speed/regen multipliers folded into accessoryPerks'
+     output each frame (see the buffs loop in update() above), same one
+     system a future Alchemist migration could plug into rather than
+     inventing a second. Re-eating the same meal just refreshes the
+     timer; a different meal stacks alongside it. */
+  applyBuff(buff, game) {
+    this.buffs.set(buff.key, { ...buff, timeLeft: buff.dur });
+    game.floatText(this.cx, this.y - 22, buff.label || "Well Fed", "#ffd23c");
   }
 
   startSwing(dur) {

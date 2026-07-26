@@ -325,6 +325,7 @@ html, body {
 }
 #coop-code:focus { outline: none; border-color: var(--tt-gold); }
 #hud-coop { color: #7cc4ff; }
+#hud-buff { color: #ffd23c; }
 
 .menu-controls {
   display: flex; flex-direction: column; gap: 5px; margin: 12px 0;

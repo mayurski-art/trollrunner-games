@@ -1307,6 +1307,13 @@ export class UI {
         this.paintHunger();
         if (!this.invOpen) this.refreshStations();
         this.paintStationChips();
+        const buffEl = document.getElementById("hud-buff");
+        const buff = g.player.buffs && g.player.buffs.get("wellFed");
+        if (buff) {
+          buffEl.hidden = false;
+          const m = Math.floor(buff.timeLeft / 60), s = Math.floor(buff.timeLeft % 60);
+          buffEl.textContent = `🍲 ${buff.label} ${m}:${s < 10 ? "0" : ""}${s}`;
+        } else if (!buffEl.hidden) buffEl.hidden = true;
         const showBreath = g.player.breath < g.player.maxBreath - 0.05;
         this.el.breath.hidden = !showBreath;
         if (showBreath) {

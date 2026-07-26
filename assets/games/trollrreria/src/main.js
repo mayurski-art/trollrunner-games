@@ -950,12 +950,16 @@ class Game {
     const belowSolid = world.isSolid(tx, ty + 1) || world.isOneWay(tx, ty + 1);
     if (def.needsFloor && !belowSolid) return false;
     if (def.needsFarmland && world.get(tx, ty + 1) !== T.FARMLAND) return false;
+    if (def.needsCampfireBelow && world.get(tx, ty + 1) !== T.CAMPFIRE) return false;
     if (def.needsSupport && !this.torchSupported(tx, ty)) return false;
     if (def.tall === 2) {
       if (world.get(tx, ty - 1) !== T.AIR || !belowSolid) return false;
     }
-    /* generic support: neighbour tile or wall behind */
-    if (!def.needsFloor && !def.needsSupport) {
+    /* generic support: neighbour tile or wall behind -- skipped for the
+       cooking pot, whose campfire-below check just above IS its support
+       (a campfire isn't solid, so this generic check would otherwise
+       block placing one in the open with no walls around it) */
+    if (!def.needsFloor && !def.needsSupport && !def.needsCampfireBelow) {
       const support =
         world.isSolid(tx - 1, ty) || world.isSolid(tx + 1, ty) ||
         world.isSolid(tx, ty - 1) || world.isSolid(tx, ty + 1) ||
