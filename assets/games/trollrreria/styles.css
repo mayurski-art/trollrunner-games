@@ -57,6 +57,16 @@ html, body {
 }
 #hud-depth { color: var(--tt-muted); }
 
+#hud-stations {
+  position: absolute; top: 42px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 6px; font-family: "DM Mono", monospace; font-size: 12px;
+}
+#hud-stations[hidden] { display: none; }
+.station-chip {
+  background: rgba(0,0,0,0.5); border: 0.5px solid var(--tt-line);
+  border-radius: 999px; padding: 3px 10px; color: var(--tt-text);
+}
+
 #hotbar {
   position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
   display: flex; gap: 6px; pointer-events: auto;

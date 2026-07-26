@@ -134,6 +134,18 @@ TILES[T.TIMER_TORCH_OFF] = { name: "Timer torch (cooling)", solid: false, hp: 5,
 TILES[T.TRAPDOOR_C] = { name: "Trapdoor", solid: true, hp: 60, pow: 0, tool: "pick", drop: "trapdoor", needsFloor: true, noVariant: true };
 TILES[T.TRAPDOOR_O] = { name: "Trapdoor (open)", solid: false, hp: 60, pow: 0, tool: "pick", drop: "trapdoor", needsFloor: true, noVariant: true };
 
+/* Tiles Game.interact() actually handles on right-click -- used to decide
+   whether to show the hover "RMB" hint, so the list stays in sync with
+   interact() itself instead of drifting into its own copy. */
+export function isInteractableTile(id) {
+  const def = TILES[id];
+  if (def && def.station) return true;
+  return id === T.DOOR_C || id === T.DOOR_O || id === T.SIGN || id === T.CHEST ||
+    id === T.LEVER || id === T.TIMER_TORCH || id === T.TIMER_TORCH_OFF ||
+    id === T.TRAPDOOR_C || id === T.TRAPDOOR_O || id === T.ROCKET_PAD ||
+    id === T.VAULT_DOOR || id === T.GRIN_ALTAR || id === T.BED;
+}
+
 export const CROP_GROW_TIME = 45;   // seconds per growth stage
 
 /* Furnace fuel: real burn time instead of free/instant smelting. Wood is
