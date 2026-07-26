@@ -62,6 +62,21 @@ trollium gear → craft an **Emperor Sigil** (8 trollium bars + 10 bones +
   shop) → **Troll Historian** (lore). Troll cots set your spawn, and
   sleeping in one at night (with no threats nearby) skips straight to
   morning and tops up your HP.
+- **Stations**: workbench/furnace/anvil/campfire are right-clickable —
+  opens the crafting panel straight to that station's recipes instead of
+  requiring the player to already know "stand near it and press E." A HUD
+  chip row shows which stations are in range even with the panel closed,
+  and hovering any interactable tile in reach (stations, doors, chests,
+  beds) shows an "RMB" hint.
+- **Villages**: one procedurally sited village per snow/desert/jungle
+  biome band (`src/villages.js`), each with four houses — Smith, Cook,
+  Trader, Farmer — around a campfire plaza and public loot chest, built
+  from the same house-stamper the spawn Town uses. A villager's
+  profession comes from the decor tile in their house (anvil/campfire/
+  chest). Villages get meme-flavored procedural names and flash a
+  discovery toast the first time you wander into one. Deterministic from
+  the world seed, so saves from before this shipped get one retrofitted
+  in on load.
 - **Economy**: hostile kills drop **Troll Coins** (HP-scaled, elites ×2,
   bosses drop purses). Coins are a normal item that appears on both
   sides of shop offer tables — buy rows and sell rows render through
