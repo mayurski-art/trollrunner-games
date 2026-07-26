@@ -6,7 +6,7 @@
 
 import {
   T, TILES, W, ITEMS, ENEMIES, TILE, ZOOM, CYCLE, DAY_LEN, WORLD_W, WORLD_H, CROP_GROW_TIME,
-  REACH, STATION_SCAN, STARTER_ITEMS, TRADER_POOL, PLAYER_W, PLAYER_H,
+  REACH, STATION_SCAN, STARTER_ITEMS, TRADER_POOL, PLAYER_W, PLAYER_H, isInteractableTile,
 } from "./defs.js";
 import { hashStr, clamp, lerp, fmtClock, aabb, dist2 } from "./util.js";
 import { generateWorld, biomeAt, zoneAt, BIOME_NAMES, STONE_START, DEEP_START } from "./worldgen.js";
@@ -1009,6 +1009,14 @@ class Game {
     }
     if (id === T.ENCHANT_TABLE && this.ui && this.ui.openEnchant) {
       this.ui.openEnchant(m.tx, m.ty);
+      return;
+    }
+    /* Any other station tile (workbench/furnace/anvil/campfire): open the
+       crafting panel straight away instead of leaving the player to
+       discover on their own that standing nearby and pressing E is what
+       actually unlocks its recipes. */
+    if (TILES[id] && TILES[id].station && this.ui && this.ui.toggleInventory) {
+      this.ui.toggleInventory(true);
       return;
     }
     if (id === T.LEVER) {
@@ -2056,6 +2064,16 @@ class Game {
     ctx.strokeStyle = inReach ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.14)";
     ctx.lineWidth = 1;
     ctx.strokeRect(m.tx * TILE + 0.5, m.ty * TILE + 0.5, TILE - 1, TILE - 1);
+    if (inReach && isInteractableTile(this.world.get(m.tx, m.ty))) {
+      const label = "RMB";
+      ctx.font = "6px monospace";
+      const w = ctx.measureText(label).width + 4;
+      const x = m.tx * TILE + TILE / 2 - w / 2, y = m.ty * TILE - 9;
+      ctx.fillStyle = "rgba(0,0,0,0.6)";
+      ctx.fillRect(x, y, w, 8);
+      ctx.fillStyle = "#f2efe9";
+      ctx.fillText(label, x + 2, y + 6);
+    }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
 

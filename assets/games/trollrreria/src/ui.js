@@ -13,6 +13,14 @@ import { QUESTS, questFor, isDone } from "./quests.js";
 import { SKINS, isOwned, buySkin, equipSkin, buyRevive } from "./store.js";
 import { WAYPOINTS } from "./waypoints.js";
 
+const STATION_CHIP = {
+  workbench: ["🔨", "Workbench"],
+  furnace: ["🔥", "Furnace"],
+  anvil: ["⚒️", "Anvil"],
+  campfire: ["🏕️", "Campfire"],
+  enchant: ["✨", "Enchant table"],
+};
+
 export class UI {
   constructor(game) {
     this.game = game;
@@ -20,6 +28,7 @@ export class UI {
       hud: document.getElementById("hud"),
       hearts: document.getElementById("hud-hearts"),
       hunger: document.getElementById("hud-hunger"),
+      stationChips: document.getElementById("hud-stations"),
       breath: document.getElementById("hud-breath"),
       clock: document.getElementById("hud-clock"),
       depth: document.getElementById("hud-depth"),
@@ -966,6 +975,27 @@ export class UI {
     );
   }
 
+  /* Surfaces the same proximity scan the crafting panel uses, but always
+     visible -- so the "stand near a station" mechanic isn't only legible
+     once you've already opened the inventory to find out. */
+  paintStationChips() {
+    const box = this.el.stationChips;
+    if (!box) return;
+    const names = [...this.stations].sort();
+    const key = names.join();
+    if (this._stationChipKey === key) return;
+    this._stationChipKey = key;
+    box.innerHTML = "";
+    for (const name of names) {
+      const [icon, label] = STATION_CHIP[name] || ["⚙️", name];
+      const chip = document.createElement("span");
+      chip.className = "station-chip";
+      chip.textContent = `${icon} ${label}`;
+      box.appendChild(chip);
+    }
+    box.hidden = names.length === 0;
+  }
+
   /* The list is now a recipe browser, not an instant-craft button: clicking
      a row pulls that recipe's ingredients out of the bag and into the real
      3x3 grid below, where the output slot does the actual crafting (so
@@ -984,6 +1014,13 @@ export class UI {
       bar.className = "cr-ing";
       bar.style.padding = "4px 6px";
       bar.textContent = status;
+      list.appendChild(bar);
+    }
+    if (this.stations.has("campfire")) {
+      const bar = document.createElement("div");
+      bar.className = "cr-ing";
+      bar.style.padding = "4px 6px";
+      bar.textContent = "🏕️ crackling — ready to cook";
       list.appendChild(bar);
     }
     for (const { recipe, can } of rows) {
@@ -1199,6 +1236,8 @@ export class UI {
         const depthTiles = Math.floor(g.player.y / TILE) - SURFACE_BASE;
         this.el.depth.textContent = depthTiles > 4 ? `${depthTiles * 2} ft deep` : "Surface";
         this.paintHunger();
+        if (!this.invOpen) this.refreshStations();
+        this.paintStationChips();
         const showBreath = g.player.breath < g.player.maxBreath - 0.05;
         this.el.breath.hidden = !showBreath;
         if (showBreath) {
