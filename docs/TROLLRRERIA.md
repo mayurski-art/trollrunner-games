@@ -91,6 +91,12 @@ trollium gear → craft an **Emperor Sigil** (8 trollium bars + 10 bones +
   buff (regen + move speed), shown as a HUD countdown. Buffs live on a
   small generic keyed system (`Player.buffs`) other consumables can plug
   into later instead of a one-off special case.
+- **Fishing**: craft a Troll Rod at the workbench, cast into a near-full
+  open water surface, wait for a bite, click again during the brief "!"
+  window to reel it in. Catches: common Troll Fish (cookable, raw carries
+  a small queasy risk like raw meat), occasional junk, and a rare Golden
+  Troll Fish sellable to traders. No depth/biome catch variance or daily
+  quest-fish system yet — kept simple for v1.
 - **Economy**: hostile kills drop **Troll Coins** (HP-scaled, elites ×2,
   bosses drop purses). Coins are a normal item that appears on both
   sides of shop offer tables — buy rows and sell rows render through
