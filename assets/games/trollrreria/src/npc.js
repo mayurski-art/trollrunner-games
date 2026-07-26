@@ -11,6 +11,7 @@
 import {
   TILE, GRAVITY, MAX_FALL,
   BLACKSMITH_OFFERS, ALCHEMIST_OFFERS, TAVERN_OFFERS, BUTCHER_OFFERS, CHEF_OFFERS,
+  MERCHANT_OFFERS,
 } from "./defs.js";
 import { Entity } from "./entities.js";
 import { skyState } from "./render.js";
@@ -456,6 +457,91 @@ export class TrollHistorian extends TownNPC {
         "History is written by whoever's still standing when the raid ends.",
       ],
     });
+    this.tipIdx = 0;
+  }
+}
+
+/* ----------------------------------------------------- Village NPCs --
+   Procedurally sited villages (see villages.js + Game.spawnVillages,
+   main.js) get one of each profession per village, reusing existing rigs
+   with a distinct tint -- same trick as TrollChef/TrollHistorian above --
+   rather than commissioning a unique rig per instance, since there can
+   be several of the same profession scattered across the map. Which
+   profession an NPC gets is decided by which decor tile Game.buildVillage
+   stamps into its house (anvil/campfire/chest), the same "the workstation
+   defines the job" idea Minecraft villages use. */
+export class VillageSmith extends TownNPC {
+  constructor(tx, ty, homeBounds, village) {
+    super(tx, ty, {
+      name: `${village} Smith`,
+      rig: "blacksmith",
+      tint: "hue-rotate(200deg) saturate(1.2)",
+      bodyH: 54,
+      homeBounds,
+      tips: [
+        "Out here we forge our own. Bring ore, take blades.",
+        "Every village needs one troll who hits things for a living.",
+      ],
+    });
+    this.shop = true;
+    this.offers = BLACKSMITH_OFFERS;
+    this.tipIdx = 0;
+  }
+}
+
+export class VillageCook extends TownNPC {
+  constructor(tx, ty, homeBounds, village) {
+    super(tx, ty, {
+      name: `${village} Cook`,
+      rig: "tavernKeeper",
+      tint: "hue-rotate(60deg)",
+      bodyH: 54,
+      homeBounds,
+      tips: [
+        "Fresh off the campfire. Best meal for three biomes.",
+        "Never met a raw meat I couldn't improve.",
+      ],
+    });
+    this.shop = true;
+    this.offers = TAVERN_OFFERS;
+    this.tipIdx = 0;
+  }
+}
+
+export class VillageTrader extends TownNPC {
+  constructor(tx, ty, homeBounds, village) {
+    super(tx, ty, {
+      name: `${village} Trader`,
+      rig: "pepe",
+      tint: "hue-rotate(300deg) saturate(1.3)",
+      bodyH: 48,
+      homeBounds,
+      tips: [
+        "Picked up some odds and ends out here. Take a look.",
+        "Every village needs a chest, and someone to guard it.",
+      ],
+    });
+    this.shop = true;
+    this.offers = MERCHANT_OFFERS;
+    this.tipIdx = 0;
+  }
+}
+
+export class VillageFarmer extends TownNPC {
+  constructor(tx, ty, homeBounds, village) {
+    super(tx, ty, {
+      name: `${village} Farmer`,
+      rig: "doge",
+      tint: "hue-rotate(90deg) saturate(0.8)",
+      bodyH: 50,
+      homeBounds,
+      tips: [
+        "Berries don't grow themselves. Well, they do. I just wait.",
+        "Trade me the harvest, I'll trade you the reagents.",
+      ],
+    });
+    this.shop = true;
+    this.offers = CHEF_OFFERS;
     this.tipIdx = 0;
   }
 }
