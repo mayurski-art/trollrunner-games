@@ -5,7 +5,7 @@
 import {
   T, TILES, ITEMS, TILE, GRAVITY, MAX_FALL, PLAYER_W, PLAYER_H, REACH,
 } from "./defs.js";
-import { Entity, burst } from "./entities.js";
+import { Entity, burst, Bobber } from "./entities.js";
 import { SKINS } from "./store.js";
 import { getIcon } from "./icons.js";
 import { clamp } from "./util.js";
@@ -77,6 +77,7 @@ export class Player extends Entity {
        SAME meal just refreshes its timer instead of stacking regen/speed
        -- see applyBuff() and the "food" case in useHeld() below. */
     this.buffs = new Map();
+    this.fishing = null;      // { tx, ty, wx, wy, state: cast|waiting|biting, timer }
     this.loadRig();
   }
 
@@ -141,6 +142,23 @@ export class Player extends Entity {
     for (const [key, b] of this.buffs) {
       b.timeLeft -= dt;
       if (b.timeLeft <= 0) this.buffs.delete(key);
+    }
+
+    /* fishing: ticks every frame regardless of input, same as the buffs
+       loop just above -- useRod() (below) only handles the click edges
+       (cast / reel-in-early / catch), this is what actually advances the
+       wait between casting and getting a bite. */
+    if (this.fishing) {
+      const f = this.fishing;
+      f.timer -= dt;
+      if (f.state === "cast" && f.timer <= 0) {
+        f.state = "waiting"; f.timer = 2 + Math.random() * 5;
+      } else if (f.state === "waiting" && f.timer <= 0) {
+        f.state = "biting"; f.timer = 0.8;
+      } else if (f.state === "biting" && f.timer <= 0) {
+        f.state = "waiting"; f.timer = 2 + Math.random() * 4;
+        game.floatText(this.cx, this.y - 10, "The fish got away...", "#8fb573");
+      }
     }
 
     /* live melee sweep: resolve hits across the swing's active window */
@@ -364,6 +382,8 @@ export class Player extends Entity {
       case "tool":
         if (def.tool === "wrench") {
           if (inReach) game.wireTick(m.tx, m.ty);
+        } else if (def.tool === "rod") {
+          this.useRod(game, fresh, m);
         } else {
           /* touch taps snap to the nearest breakable neighbour tile */
           const t = game.input.coarseAim && def.tool !== "hammer"
@@ -440,6 +460,34 @@ export class Player extends Entity {
   applyBuff(buff, game) {
     this.buffs.set(buff.key, { ...buff, timeLeft: buff.dur });
     game.floatText(this.cx, this.y - 22, buff.label || "Well Fed", "#ffd23c");
+  }
+
+  /* Troll Rod (Phase 5): one click starts the cast, the next click either
+     catches (if a fish is biting) or reels in early with nothing. The
+     wait-then-bite timing itself is ticked every frame in update() above,
+     not here -- this only ever reacts to the click edge (fresh). */
+  useRod(game, fresh, m) {
+    if (!fresh) return;
+    if (!this.fishing) {
+      if (!this.tileInReach(m.tx, m.ty) || !game.isFishableWater(m.tx, m.ty)) return;
+      this.fishing = {
+        tx: m.tx, ty: m.ty,
+        wx: m.tx * TILE + 8, wy: m.ty * TILE + 4,
+        state: "cast", timer: 0.35,
+      };
+      game.entities.push(new Bobber(this.fishing.wx, this.fishing.wy));
+      game.sfx && game.sfx.swing();
+      return;
+    }
+    if (this.fishing.state === "biting") {
+      const caught = game.catchFish(this.fishing.tx, this.fishing.ty);
+      game.floatText(this.cx, this.y - 10, `Caught a ${ITEMS[caught].name}!`, "#57bd5c");
+      game.sfx && game.sfx.powerup();
+      this.fishing = null;
+      return;
+    }
+    game.floatText(this.cx, this.y - 10, "Reeled in.", "#8fb573");
+    this.fishing = null;
   }
 
   startSwing(dur) {

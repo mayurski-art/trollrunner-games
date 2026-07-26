@@ -2052,6 +2052,37 @@ class Game {
     this.entities.push(new DamageText(x, y, text, color));
   }
 
+  /* Fishing (Phase 5): a tile is castable if it's a near-full water cell
+     (liquid >= 6/8, matches the "real body of water" feel rather than a
+     shallow puddle) with the tile directly above it NOT also full water --
+     i.e. this IS the surface, not a submerged cell deeper in the pool.
+     Cheaper than a full connected-component flood fill and good enough:
+     you can't cast into a two-tile puddle, but you don't need to prove
+     the whole lake is connected either. */
+  isFishableWater(tx, ty) {
+    const w = this.world;
+    if (!w.inBounds(tx, ty)) return false;
+    const i = ty * w.w + tx;
+    if (w.liquid[i] < 6 || w.liquidType[i] !== 0) return false;
+    if (w.inBounds(tx, ty - 1)) {
+      const ai = (ty - 1) * w.w + tx;
+      if (w.liquid[ai] >= 6 && w.liquidType[ai] === 0) return false;
+    }
+    return true;
+  }
+
+  /* Catch table: common fish most of the time, occasional junk, a rare
+     golden fish that's purely a sell-to-traders reward (MERCHANT_OFFERS)
+     rather than a full daily-quest system -- kept deliberately simple for
+     v1. Depth/biome variation is a stretch-goal, not built here. */
+  catchFish(tx, ty) {
+    const r = Math.random();
+    const id = r < 0.6 ? "trollFish" : r < 0.85 ? "rope" : "goldenTrollFish";
+    const left = this.inventory.add(id, 1);
+    if (left > 0 && this.player) this.spawnDrop(this.player.cx, this.player.cy - 8, id, left);
+    return id;
+  }
+
   /* Game-feel: brief freeze-frame + camera shake for impactful hits.
      Durations/magnitudes are deliberately small -- see the note in
      frame() about this reading as weight, not lag. */
