@@ -8,7 +8,7 @@ import {
   T, TILES, W, ITEMS, ENEMIES, TILE, ZOOM, CYCLE, DAY_LEN, WORLD_W, WORLD_H, CROP_GROW_TIME,
   REACH, STATION_SCAN, STARTER_ITEMS, TRADER_POOL, PLAYER_W, PLAYER_H, isInteractableTile,
 } from "./defs.js";
-import { hashStr, clamp, lerp, fmtClock, aabb, dist2 } from "./util.js";
+import { hashStr, clamp, lerp, fmtClock, aabb, dist2, mulberry32 } from "./util.js";
 import { generateWorld, biomeAt, zoneAt, BIOME_NAMES, STONE_START, DEEP_START } from "./worldgen.js";
 import { Renderer, skyState } from "./render.js";
 import { Lighting } from "./lighting.js";
@@ -24,7 +24,9 @@ import {
   MerchantTroll, PepeHermit, RocketTinkerer, WhaleOracle,
   Blacksmith, Alchemist, TavernKeeper, Butcher, SIGN_TIPS, TravelingTrader,
   TrollChef, TrollHistorian,
+  VillageSmith, VillageCook, VillageTrader, VillageFarmer,
 } from "./npc.js";
+import { VILLAGE_BIOMES, VILLAGE_STYLE, siteBiomeX, villageName, villageLoot } from "./villages.js";
 
 /* Housing-gated arrivals, in order: build one qualifying house (see
    housing.js checkHouse) and the next un-housed NPC on this list moves
@@ -214,6 +216,8 @@ class Game {
     this.cam.y = this.player.cy - 260;
     this.placeQuestSign();
     this.spawnTownShops();
+    this.spawnVillages();
+    this.flags.villagesPlaced = true;
     this.revealAround(this.player.cx, this.player.cy);
     if (this.ui) this.ui.dirtyInv();
   }
@@ -253,6 +257,18 @@ class Game {
     this.cam.x = this.player.cx - this.viewW / 2;
     this.cam.y = this.player.cy - this.viewH / 2;
     if (Array.isArray(data.animals)) this.restoreAnimals(data.animals);
+    /* Villages retrofit: newWorld() above already ran spawnVillages() once
+       against a throwaway pre-overlay world, and applyWorldLayers() just
+       clobbered those tiles with whatever the save actually had -- for a
+       save from before this feature existed, that erases them for real.
+       Detect that from the SAVE's own flags (not this.flags, which the
+       throwaway regen may have already set true) and, if so, re-site and
+       re-stamp on top of the real restored terrain, steering clear of
+       ground the player has already explored where possible. */
+    if (!(data.flags && data.flags.villagesPlaced)) {
+      this.spawnVillages();
+      this.flags.villagesPlaced = true;
+    }
     if (this.ui) this.ui.dirtyInv();
   }
 
@@ -548,6 +564,21 @@ class Game {
         this._lastBiome = zone;
         if (this._announcedBiome) this.ui && this.ui.showAreaTitle(BIOME_NAMES[zone] || zone);
         this._announcedBiome = true;
+      }
+      /* Village discovery: first time the player wanders within range of
+         a generated village, flash its name (same area-title popup the
+         biome crossing above uses) and announce it once. */
+      if (this.villages) {
+        const ptx = Math.floor(this.player.cx / TILE), pty = Math.floor(this.player.cy / TILE);
+        for (const v of this.villages) {
+          if (!v.discovered && Math.abs(ptx - v.x) < 45 && Math.abs(pty - v.y) < 24) {
+            v.discovered = true;
+            if (!this.flags.villagesDiscovered) this.flags.villagesDiscovered = [];
+            if (!this.flags.villagesDiscovered.includes(v.name)) this.flags.villagesDiscovered.push(v.name);
+            this.ui && this.ui.showAreaTitle(v.name);
+            this.announce(`🏘 You found ${v.name}!`);
+          }
+        }
       }
       /* the Rickroller guards the Deep Web -- one permanent spawn per
          world, the first time anyone actually reaches that depth. Searches
@@ -1647,6 +1678,113 @@ class Game {
     /* interior wander fence for the NPC living here, one tile in from
        each side wall so the sprite doesn't clip into it */
     return { minX: (x0 + 1) * TILE, maxX: x1 * TILE };
+  }
+
+  /* One procedurally sited village per biome band (snow/desert/jungle,
+     see villages.js) -- four houses (Smith/Cook/Trader/Farmer) around a
+     small campfire plaza with a public loot chest, using the exact same
+     buildTownHouse stamper as the hand-placed spawn Town. Deterministic
+     from the world seed, so calling this twice (see applySave's retrofit
+     below) reproduces the same sites and names; safe to re-run because it
+     clears any previously spawned village NPCs first. */
+  spawnVillages() {
+    this.npcs = this.npcs.filter(n => !n.isVillager);
+    this.villages = [];
+    const rng = mulberry32(hashStr(this.seedStr + ":villages"));
+    for (const biome of VILLAGE_BIOMES) {
+      const cx = this.siteVillage(biome, rng);
+      if (cx != null) this.buildVillage(cx, biome, rng);
+    }
+  }
+
+  /* Re-rolls a candidate site up to 5 times, preferring one the player
+     hasn't explored yet (via this.explored, the same fog-of-war bitmap
+     the minimap uses) -- matters only for the old-save retrofit, where
+     the world is the player's real, already-explored one; on a brand
+     new world nothing is explored yet, so the first candidate always
+     wins. Falls back to the last candidate rolled if every try lands on
+     explored ground -- a village slightly spoiled beats no village. */
+  siteVillage(biome, rng) {
+    let cx = null;
+    for (let i = 0; i < 5; i++) {
+      cx = siteBiomeX(biome, this.world.w, rng);
+      if (cx == null) return null;
+      const groundY = this.world.topSolid[cx];
+      if (groundY == null || !this.isExploredTile(cx, groundY)) return cx;
+    }
+    return cx;
+  }
+
+  isExploredTile(tx, ty) {
+    if (!this.explored) return false;
+    const w4 = this.world.w >> 2, h4 = this.world.h >> 2;
+    const x = tx >> 2, y = ty >> 2;
+    if (x < 0 || y < 0 || x >= w4 || y >= h4) return false;
+    return !!this.explored[y * w4 + x];
+  }
+
+  buildVillage(cx, biome, rng) {
+    const style = VILLAGE_STYLE[biome] || VILLAGE_STYLE.jungle;
+    const name = villageName(rng);
+    const groundY = this.world.topSolid[cx] ?? this.spawn.y;
+    const roles = [
+      { dx: -20, decorTile: T.ANVIL, make: (tx, ty, hb) => new VillageSmith(tx, ty, hb, name) },
+      { dx: -7, decorTile: T.CAMPFIRE, make: (tx, ty, hb) => new VillageCook(tx, ty, hb, name) },
+      { dx: 7, decorTile: T.CHEST, make: (tx, ty, hb) => new VillageTrader(tx, ty, hb, name) },
+      { dx: 20, decorTile: null, farm: true, make: (tx, ty, hb) => new VillageFarmer(tx, ty, hb, name) },
+    ];
+    let minX = Infinity, maxX = -Infinity, anchorY = groundY - 2, built = 0;
+    for (const role of roles) {
+      const sx = cx + role.dx;
+      const doorSide = role.dx < 0 ? 1 : -1;
+      const colGround = this.world.topSolid[sx] ?? groundY;
+      for (let y = colGround - 6; y < colGround + 10; y++) {
+        if (!this.world.isSolid(sx, y) && !this.world.isSolid(sx, y - 1) && this.world.isSolid(sx, y + 1)) {
+          const bounds = this.buildTownHouse(sx, y, {
+            wallTile: style.wallTile, wallBg: style.wallBg, decorTile: role.decorTile, doorSide,
+          });
+          const npc = role.make(sx, y + 1, bounds);
+          npc.isVillager = true;
+          this.npcs.push(npc);
+          minX = Math.min(minX, sx); maxX = Math.max(maxX, sx);
+          anchorY = y - 2;
+          built++;
+          if (role.farm) this.plantVillageFarm(sx, colGround);
+          break;
+        }
+      }
+    }
+    if (!built) return;
+    /* plaza: a public campfire + loot chest between the two middle houses */
+    const plazaY = this.world.topSolid[cx] ?? groundY;
+    for (let y = plazaY - 4; y < plazaY + 6; y++) {
+      if (!this.world.isSolid(cx, y) && this.world.isSolid(cx, y + 1)) {
+        this.world.set(cx, y, T.CAMPFIRE);
+        if (!this.world.isSolid(cx + 1, y) && this.world.isSolid(cx + 1, y + 1)) {
+          this.world.set(cx + 1, y, T.CHEST);
+          this.world.addChest(cx + 1, y, villageLoot(rng));
+        }
+        break;
+      }
+    }
+    const anchor = { x: Math.round((minX + maxX) / 2), y: anchorY };
+    this.addSafeZone(anchor.x, anchor.y, 40);
+    const discovered = !!(this.flags.villagesDiscovered && this.flags.villagesDiscovered.includes(name));
+    this.villages.push({ name, biome, x: anchor.x, y: anchor.y, discovered });
+  }
+
+  /* A small pre-grown farm patch beside the village Farmer's house so
+     there's something to harvest on first arrival, not just an empty
+     tilled row -- a few ripe berries plus open farmland to plant on. */
+  plantVillageFarm(sx, groundY) {
+    for (let i = 0; i < 5; i++) {
+      const x = sx + 3 + i;
+      const y = this.world.topSolid[x] ?? groundY;
+      if (this.world.isSolid(x, y) && !this.world.isSolid(x, y - 1)) {
+        this.world.set(x, y, T.FARMLAND);
+        if (i < 3) this.world.set(x, y - 1, T.CROP3);
+      }
+    }
   }
 
   /* World event: a meteor crashes near the player at dawn, carving a
