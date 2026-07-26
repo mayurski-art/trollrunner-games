@@ -78,6 +78,8 @@ export class Player extends Entity {
        -- see applyBuff() and the "food" case in useHeld() below. */
     this.buffs = new Map();
     this.fishing = null;      // { tx, ty, wx, wy, state: cast|waiting|biting, timer }
+    this.grapple = null;      // { x, y, t } -- world point being reeled toward
+    this.grappleCd = 0;
     this.loadRig();
   }
 
@@ -188,12 +190,17 @@ export class Player extends Entity {
     const wet = water || sludge;     // swamp sludge swims like water, just toxic
     const onRope = this.onRope(world);
     const belowTy = Math.floor((this.y + this.h + 2) / TILE);
-    const tileBelow = TILES[world.get(Math.floor(this.cx / TILE), belowTy)];
+    const belowId = world.get(Math.floor(this.cx / TILE), belowTy);
+    const tileBelow = TILES[belowId];
     const icy = this.onGround && tileBelow && tileBelow.slippery;
+    /* Rail (Phase 6, simplified): a low-friction, higher-top-speed ride
+       rather than a separate cart entity -- the player's own body is the
+       "cart". No slope-acceleration or junction switching in this pass. */
+    const onRail = this.onGround && belowId === T.RAIL;
 
     const accel = wet ? 700 : 1250;
-    const fric = wet ? 320 : icy ? 190 : this.onGround ? 1350 : 260;
-    const maxSpd = (wet ? 88 : 152) * perks.speedMult;
+    const fric = wet ? 320 : onRail ? 40 : icy ? 190 : this.onGround ? 1350 : 260;
+    const maxSpd = (wet ? 88 : onRail ? 152 * 1.6 : 152) * perks.speedMult;
 
     if (left && !right) { this.vx = Math.max(this.vx - accel * dt, -maxSpd); this.dir = -1; }
     else if (right && !left) { this.vx = Math.min(this.vx + accel * dt, maxSpd); this.dir = 1; }
@@ -220,6 +227,16 @@ export class Player extends Entity {
         }
         this._tapRightT = this.animTime;
       }
+    }
+
+    /* Grapple Ring: press G to fire a troll tongue toward the cursor,
+       latching the first solid tile in range and reeling the player in
+       (see fireGrapple() / the pull override before moveCollide, below)
+       -- an instant pull-in rather than a simulated rope swing, simpler
+       to tune and plenty punchy for a platformer this size. */
+    this.grappleCd = Math.max(0, this.grappleCd - dt);
+    if (perks.grapple && input.hit("KeyG") && this.grappleCd <= 0 && !this.grapple) {
+      this.fireGrapple(game, game.mouseWorld());
     }
 
     /* -------- jumping / swimming */
@@ -263,10 +280,30 @@ export class Player extends Entity {
       }
     }
 
+    /* Grapple pull: overrides normal vx/vy for the frame while active,
+       same "just win the tug of war" approach as swimming/rope-climbing
+       above rather than layering in yet another physics mode. Releases
+       on arrival, timeout, or (implicitly) a wall stopping the player in
+       moveCollide just below -- momentum carries through either way. */
+    if (this.grapple) {
+      const gr = this.grapple;
+      gr.t -= dt;
+      const gdx = gr.x - this.cx, gdy = gr.y - this.cy;
+      const gdist = Math.hypot(gdx, gdy) || 1;
+      if (gdist < 18 || gr.t <= 0) {
+        this.grapple = null;
+        this.grappleCd = 0.6;
+      } else {
+        const pullSpeed = 560;
+        this.vx = (gdx / gdist) * pullSpeed;
+        this.vy = (gdy / gdist) * pullSpeed;
+      }
+    }
+
     /* -------- fall tracking + move */
     const fallingBefore = this.vy > 0 ? this.vy : 0;
     if (this.vy > 0 && !wet) this.fallDist += this.vy * dt;
-    if (wet || lava || onRope || game.creative) this.fallDist = 0;
+    if (wet || lava || onRope || game.creative || this.grapple) this.fallDist = 0;
     this.moveCollide(world, dt, true, drop);
     if (this.onGround) {
       /* Moon Boots: higher safe-fall threshold + softer landings */
@@ -462,6 +499,28 @@ export class Player extends Entity {
     game.floatText(this.cx, this.y - 22, buff.label || "Well Fed", "#ffd23c");
   }
 
+  /* Steps outward from the player toward `m` in small increments, looking
+     for the first solid tile within range -- a cheap raycast, adequate at
+     this tile scale without needing a proper line-tile intersection test. */
+  fireGrapple(game, m) {
+    const world = game.world;
+    const dx = m.x - this.cx, dy = m.y - this.cy;
+    const dist = Math.hypot(dx, dy) || 1;
+    const nx = dx / dist, ny = dy / dist;
+    const maxDist = TILE * 11, step = TILE * 0.4;
+    let hit = null;
+    for (let d = step; d <= maxDist; d += step) {
+      const wx = this.cx + nx * d, wy = this.cy + ny * d;
+      if (world.isSolid(Math.floor(wx / TILE), Math.floor(wy / TILE))) { hit = { x: wx, y: wy }; break; }
+    }
+    if (!hit) {
+      game.floatText(this.cx, this.y - 10, "No anchor in range", "#8fb573");
+      return;
+    }
+    this.grapple = { x: hit.x, y: hit.y, t: 0.45 };
+    game.sfx && game.sfx.swing();
+  }
+
   /* Troll Rod (Phase 5): one click starts the cast, the next click either
      catches (if a fish is biting) or reels in early with nothing. The
      wait-then-bite timing itself is ticked every frame in update() above,
@@ -627,6 +686,13 @@ export class Player extends Entity {
         ctx.drawImage(icon, 2, -s - 2, s, s);
         ctx.restore();
       }
+    }
+
+    if (this.grapple) {
+      ctx.strokeStyle = "#c9302c"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(feetX, this.y + 10); ctx.lineTo(this.grapple.x, this.grapple.y); ctx.stroke();
+      ctx.fillStyle = "#565a63";
+      ctx.beginPath(); ctx.arc(this.grapple.x, this.grapple.y, 3, 0, 7); ctx.fill();
     }
   }
 }

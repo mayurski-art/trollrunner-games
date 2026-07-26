@@ -49,6 +49,7 @@ export const T = {
   TRAPDOOR_C: 68, TRAPDOOR_O: 69,
   PYLON: 70,
   COOKING_POT: 71,
+  RAIL: 72,
   /* wires live on their own layer, not in T */
 };
 
@@ -146,6 +147,11 @@ TILES[T.PYLON] = { name: "Troll Pylon", solid: false, hp: 120, pow: 0, tool: "pi
    directly above a lit campfire to place (see tryPlace's needsCampfireBelow
    check, main.js) -- the default the parity prompt's design doc called for. */
 TILES[T.COOKING_POT] = { name: "Cooking Pot", solid: false, hp: 70, pow: 0, tool: "pick", drop: "cookingPot", station: "pot", noVariant: true };
+/* Rail (parity Phase 6, simplified): a one-way platform tile the player's
+   own body rides directly -- low friction, higher top speed -- rather
+   than a separate cart entity with junction-switching. See Player.onRail
+   in player.js for the ride mechanic. */
+TILES[T.RAIL] = { name: "Rail", solid: false, hp: 40, pow: 0, tool: "pick", drop: "rail", oneWay: true, noVariant: true };
 
 /* Tiles Game.interact() actually handles on right-click -- used to decide
    whether to show the hover "RMB" hint, so the list stays in sync with
@@ -305,6 +311,7 @@ export const ITEMS = {
      see Inventory.accessoryPerks() for how these fields get read. */
   ringVigor: { name: "Ring of Vigor", type: "accessory", slot: "ring", def: 2, regen: 0.6, desc: "Slow, steady grit. +2 defense, faster regen." },
   ringHaste: { name: "Signet of Haste", type: "accessory", slot: "ring", speedMult: 1.12, desc: "A restless ring. +12% move speed." },
+  ringGrapple: { name: "Grapple Ring", type: "accessory", slot: "ring", grapple: true, desc: "Press G to fire a troll tongue at the nearest solid tile in range and reel yourself in." },
   wingsTroll: { name: "Troll Wings", type: "accessory", slot: "back", doubleJump: true, glide: true, desc: "Molted from something enormous. Extra jump, plus a slow glide while airborne." },
   capeSwift: { name: "Swift Cape", type: "accessory", slot: "back", speedMult: 1.18, desc: "Billows dramatically. +18% move speed." },
   bootsDash: { name: "Dash Boots", type: "accessory", slot: "feet", dash: true, desc: "Double-tap A or D to dash." },
@@ -317,6 +324,7 @@ export const ITEMS = {
   egg:         { name: "Egg", type: "food", hunger: 8, max: 99, desc: "Laid by a tamed troll hen." },
   omelette:    { name: "Omelette", type: "food", hunger: 28, hpBonus: 3, max: 99, desc: "Ranch cooking. A proper breakfast." },
   cookingPot:  { name: "Cooking Pot", type: "block", tile: T.COOKING_POT, max: 9, needsCampfireBelow: true, desc: "Place above a lit campfire. Cooks multi-ingredient meals." },
+  rail:        { name: "Rail", type: "block", tile: T.RAIL, max: 999, desc: "Frictionless fast track. Stand on it and go; press S to drop through." },
   /* Cooking Pot meals (Phase 4): bigger hunger refill than any single-
      ingredient food, plus a timed Well Fed buff (see Player.applyBuff) --
      the payoff for having gathered a proper spread instead of just
@@ -439,6 +447,7 @@ export const RECIPES = [
   { out: "capeSwift", n: 1, ing: [["silverBar", 10], ["ironBar", 6]], station: "anvil" },
   { out: "bootsDash", n: 1, ing: [["goldBar", 8], ["gel", 8]], station: "anvil" },
   { out: "bootsSpring", n: 1, ing: [["ironBar", 10], ["gel", 4]], station: "anvil" },
+  { out: "ringGrapple", n: 1, ing: [["silverBar", 8], ["rope", 10], ["gel", 6]], station: "anvil" },
   /* ranching */
   { out: "fence", n: 6, ing: [["wood", 3]], station: "workbench" },
   { out: "omelette", n: 1, ing: [["egg", 2]], station: "campfire" },
@@ -455,6 +464,8 @@ export const RECIPES = [
   /* fishing (Phase 5) */
   { out: "trollRod", n: 1, ing: [["wood", 10], ["rope", 4], ["ironBar", 1]], station: "workbench" },
   { out: "cookedFish", n: 1, ing: [["trollFish", 1]], station: "campfire" },
+  /* rails (Phase 6) */
+  { out: "rail", n: 6, ing: [["ironBar", 1], ["wood", 2]], station: "workbench" },
 ];
 
 /* Traveling Trader (world event, main.js spawnTravelingTrader): picks 4
