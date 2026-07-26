@@ -719,6 +719,39 @@ export class Projectile extends Entity {
   }
 }
 
+/* ------------------------------------------------------------- fishing */
+/* Purely visual: the actual cast/wait/bite state machine lives on
+   Player.fishing (player.js useRod/update) -- this just mirrors it each
+   frame (position is fixed at cast time, but the bob animation and "!"
+   cue read player.fishing.state live) and self-removes the moment
+   fishing stops, whether that's a catch, a miss, or reeling in early. */
+export class Bobber extends Entity {
+  constructor(x, y) {
+    super(x - 3, y - 3, 6, 6);
+    this.t = 0;
+  }
+
+  update(dt, game) {
+    const f = game.player && game.player.fishing;
+    if (!f) { this.dead = true; return; }
+    this.t += dt * (f.state === "biting" ? 10 : 2.4);
+  }
+
+  draw(ctx, game) {
+    const f = game.player && game.player.fishing;
+    if (!f) return;
+    const bob = Math.sin(this.t) * (f.state === "biting" ? 4 : 1.5);
+    const x = this.cx, y = this.cy + bob;
+    ctx.strokeStyle = "rgba(230,230,230,0.5)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(game.player.cx, game.player.y + 10); ctx.lineTo(x, y); ctx.stroke();
+    ctx.fillStyle = f.state === "biting" ? "#ff4d5e" : "#e8e4da";
+    ctx.beginPath(); ctx.arc(x, y, 3.5, 0, 7); ctx.fill();
+    if (f.state === "biting") {
+      ctx.fillStyle = "#ffd23c"; ctx.font = "bold 12px 'DM Mono', monospace";
+      ctx.fillText("!", x + 5, y - 6);
+    }
+  }
+}
 
 /* ---------------------------------------------------------- quest marker */
 /* A floating "!" over static world fixtures (the spawn sign) that hand out

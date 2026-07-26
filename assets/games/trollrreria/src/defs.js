@@ -211,6 +211,7 @@ export const ITEMS = {
   timerTorch:  { name: "Timer torch", type: "block", tile: T.TIMER_TORCH, max: 99, needsSupport: true, desc: "Pulsing it goes dark for a few seconds, then it re-pulses its own wire network on its own." },
   trapdoor:    { name: "Trapdoor", type: "block", tile: T.TRAPDOOR_C, max: 99, needsFloor: true, desc: "Pulse to open -- swings shut on its own a few seconds later." },
   wrench:      { name: "Wrench", type: "tool", tool: "wrench", power: 0, speed: 6, dmg: 3, desc: "Lays wire (LMB) — needs Wire in your bag. Click a wired tile to cut." },
+  trollRod:    { name: "Troll Rod", type: "tool", tool: "rod", desc: "Cast into open water (LMB). Wait for a bite, then reel it in." },
   wire:        { name: "Wire", type: "material", max: 999 },
   platform:    { name: "Platform", type: "block", tile: T.PLATFORM, max: 999 },
   rope:        { name: "Rope", type: "block", tile: T.ROPE, max: 999, needsSupport: true, desc: "Climb it with W/S — or grab it mid-fall to stop taking fall damage." },
@@ -326,6 +327,13 @@ export const ITEMS = {
   berryPie:    { name: "Berry Pie", type: "food", hunger: 40, max: 99,
     buff: { key: "wellFed", dur: 150, regenBonus: 0.3, speedMult: 1.05, label: "Well Fed" },
     desc: "Berries and egg, baked together. Lighter than stew, still lingers." },
+  /* Fishing (Phase 5): cast a Troll Rod into open water (Player.useRod) --
+     catchFish() (main.js) rolls this table. Raw fish carries the same
+     small "queasy" risk raw meat does (def.raw, see the food case in
+     Player.useHeld); cooking it at a campfire removes that risk. */
+  trollFish:   { name: "Troll Fish", type: "food", hunger: 20, max: 99, raw: true, desc: "Fresh catch. Cook it at a campfire, or risk it raw." },
+  cookedFish:  { name: "Cooked Fish", type: "food", hunger: 38, hpBonus: 4, max: 99, desc: "Cooked at a campfire. Reliable, filling." },
+  goldenTrollFish: { name: "Golden Troll Fish", type: "material", max: 20, desc: "A rare glimmering catch. Traders pay well for these." },
   trollTotem:  { name: "Troll totem", type: "summon", max: 5, desc: "Wakes the Troll King. Use at night." },
   emperorSigil: { name: "Emperor sigil", type: "summon", max: 5, desc: "Calls the Troll Emperor. Hardmode, night, regrets." },
   /* Grin Core relics — quest rewards, kept in the bag as trophies/keys */
@@ -444,6 +452,9 @@ export const RECIPES = [
   { out: "cookingPot", n: 1, ing: [["stone", 10], ["ironBar", 1]], station: "workbench" },
   { out: "trollStew", n: 1, ing: [["rawMeat", 1], ["berry", 2], ["egg", 1]], station: "pot" },
   { out: "berryPie", n: 1, ing: [["berry", 4], ["egg", 2]], station: "pot" },
+  /* fishing (Phase 5) */
+  { out: "trollRod", n: 1, ing: [["wood", 10], ["rope", 4], ["ironBar", 1]], station: "workbench" },
+  { out: "cookedFish", n: 1, ing: [["trollFish", 1]], station: "campfire" },
 ];
 
 /* Traveling Trader (world event, main.js spawnTravelingTrader): picks 4
@@ -546,6 +557,7 @@ export const MERCHANT_OFFERS = [
   { give: [["trollCoin", 14]], get: ["arrow", 25] },
   { give: [["gel", 5]], get: ["trollCoin", 6] },
   { give: [["bone", 5]], get: ["trollCoin", 10] },
+  { give: [["goldenTrollFish", 3]], get: ["trollCoin", 20] },
 ];
 
 /* Trollrreria Town: four specialist barter shops, same no-currency hustle

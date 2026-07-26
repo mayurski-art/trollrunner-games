@@ -208,6 +208,16 @@ function drawFood(g, id) {
     g.fillStyle = "#e8a63c";
     g.beginPath(); g.ellipse(16, 16, 8, 5, 0, 0, 7); g.fill();
     g.fillStyle = "#c9645a"; g.fillRect(12, 14, 3, 3); g.fillRect(18, 16, 3, 3);
+  } else if (id === "trollFish" || id === "cookedFish") {
+    const body = id === "cookedFish" ? "#8a5a2b" : "#7fb4c9";
+    g.fillStyle = body;
+    g.beginPath(); g.ellipse(14, 16, 9, 5, 0, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.moveTo(23, 16); g.lineTo(29, 11); g.lineTo(29, 21); g.closePath(); g.fill();
+    g.fillStyle = "#1c1424"; g.beginPath(); g.arc(9, 15, 1.4, 0, 7); g.fill();
+    if (id === "cookedFish") {
+      g.strokeStyle = "#4e3418"; g.lineWidth = 1.2;
+      g.beginPath(); g.moveTo(8, 14); g.lineTo(20, 18); g.moveTo(8, 18); g.lineTo(20, 14); g.stroke();
+    }
   } else if (id === "trollStew") {
     g.fillStyle = "#565a63"; g.beginPath(); g.ellipse(16, 20, 11, 6, 0, 0, Math.PI); g.fill();
     g.fillStyle = "#8a5a2b"; g.beginPath(); g.ellipse(16, 15, 10, 5, 0, 0, Math.PI * 2); g.fill();
@@ -255,6 +265,14 @@ function drawAccessory(g, id, def) {
 }
 
 function drawTool(g, kind, m) {
+  if (kind === "rod") {
+    g.strokeStyle = "#8a5a2b"; g.lineWidth = 2.5;
+    g.beginPath(); g.moveTo(6, 27); g.lineTo(26, 6); g.stroke();
+    g.strokeStyle = "rgba(230,230,230,0.7)"; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(26, 6); g.lineTo(16, 24); g.stroke();
+    g.fillStyle = "#565a63"; g.beginPath(); g.arc(16, 24, 2, 0, 7); g.fill();
+    return;
+  }
   /* handle */
   g.save();
   g.translate(16, 16); g.rotate(-Math.PI / 4);
@@ -374,6 +392,12 @@ function drawMaterial(g, id, m) {
     for (const [x, y] of [[8, 20], [12, 24], [20, 8], [24, 12]]) {
       g.beginPath(); g.arc(x, y, 3.5, 0, 7); g.fill();
     }
+  } else if (id === "goldenTrollFish") {
+    g.fillStyle = "#f4c64c";
+    g.beginPath(); g.ellipse(14, 16, 9, 5, 0, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.moveTo(23, 16); g.lineTo(29, 11); g.lineTo(29, 21); g.closePath(); g.fill();
+    g.fillStyle = "#8a6512"; g.beginPath(); g.arc(9, 15, 1.4, 0, 7); g.fill();
+    g.fillStyle = "rgba(255,255,255,0.5)"; g.fillRect(10, 12, 3, 2);
   } else if (id === "mushroom") {
     g.fillStyle = "#c9d86a"; g.fillRect(14, 16, 4, 10);
     g.fillStyle = "#8fd14f";
