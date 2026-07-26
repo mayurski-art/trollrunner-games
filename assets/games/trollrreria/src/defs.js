@@ -48,6 +48,7 @@ export const T = {
   REPEATER_L: 64, REPEATER_R: 65, TIMER_TORCH: 66, TIMER_TORCH_OFF: 67,
   TRAPDOOR_C: 68, TRAPDOOR_O: 69,
   PYLON: 70,
+  COOKING_POT: 71,
   /* wires live on their own layer, not in T */
 };
 
@@ -139,6 +140,12 @@ TILES[T.TRAPDOOR_O] = { name: "Trapdoor (open)", solid: false, hp: 60, pow: 0, t
    network, unlocked from a village Trader once ≥2 of their neighbors are
    happy (see npc.js TownNPC.mood + ui.js paintShop). */
 TILES[T.PYLON] = { name: "Troll Pylon", solid: false, hp: 120, pow: 0, tool: "pick", drop: "pylon", light: 130, needsFloor: true, noVariant: true };
+/* Cooking Pot (parity Phase 4): a "pot" station, so it gets the generic
+   right-click-opens-crafting behavior from Phase 1 for free (TILES[].
+   station is the hook Game.interact()/stationsNear() key off). Must sit
+   directly above a lit campfire to place (see tryPlace's needsCampfireBelow
+   check, main.js) -- the default the parity prompt's design doc called for. */
+TILES[T.COOKING_POT] = { name: "Cooking Pot", solid: false, hp: 70, pow: 0, tool: "pick", drop: "cookingPot", station: "pot", noVariant: true };
 
 /* Tiles Game.interact() actually handles on right-click -- used to decide
    whether to show the hover "RMB" hint, so the list stays in sync with
@@ -308,6 +315,17 @@ export const ITEMS = {
   berry:       { name: "Troll berry", type: "food", hunger: 10, max: 99, desc: "Tart little thing, farmed on tilled soil." },
   egg:         { name: "Egg", type: "food", hunger: 8, max: 99, desc: "Laid by a tamed troll hen." },
   omelette:    { name: "Omelette", type: "food", hunger: 28, hpBonus: 3, max: 99, desc: "Ranch cooking. A proper breakfast." },
+  cookingPot:  { name: "Cooking Pot", type: "block", tile: T.COOKING_POT, max: 9, needsCampfireBelow: true, desc: "Place above a lit campfire. Cooks multi-ingredient meals." },
+  /* Cooking Pot meals (Phase 4): bigger hunger refill than any single-
+     ingredient food, plus a timed Well Fed buff (see Player.applyBuff) --
+     the payoff for having gathered a proper spread instead of just
+     grilling one thing at a campfire. */
+  trollStew:   { name: "Troll Stew", type: "food", hunger: 55, hpBonus: 6, max: 99,
+    buff: { key: "wellFed", dur: 240, regenBonus: 0.6, speedMult: 1.08, label: "Well Fed" },
+    desc: "Meat, berry, egg, all in one pot. Restores plenty, and it lingers." },
+  berryPie:    { name: "Berry Pie", type: "food", hunger: 40, max: 99,
+    buff: { key: "wellFed", dur: 150, regenBonus: 0.3, speedMult: 1.05, label: "Well Fed" },
+    desc: "Berries and egg, baked together. Lighter than stew, still lingers." },
   trollTotem:  { name: "Troll totem", type: "summon", max: 5, desc: "Wakes the Troll King. Use at night." },
   emperorSigil: { name: "Emperor sigil", type: "summon", max: 5, desc: "Calls the Troll Emperor. Hardmode, night, regrets." },
   /* Grin Core relics — quest rewards, kept in the bag as trophies/keys */
@@ -422,6 +440,10 @@ export const RECIPES = [
   { out: "repeater", n: 2, ing: [["copperBar", 4], ["stone", 4]], station: "workbench" },
   { out: "timerTorch", n: 2, ing: [["torch", 2], ["gel", 3]], station: "workbench" },
   { out: "trapdoor", n: 1, ing: [["wood", 6], ["ironBar", 2]], station: "anvil" },
+  /* cooking pot (Phase 4) */
+  { out: "cookingPot", n: 1, ing: [["stone", 10], ["ironBar", 1]], station: "workbench" },
+  { out: "trollStew", n: 1, ing: [["rawMeat", 1], ["berry", 2], ["egg", 1]], station: "pot" },
+  { out: "berryPie", n: 1, ing: [["berry", 4], ["egg", 2]], station: "pot" },
 ];
 
 /* Traveling Trader (world event, main.js spawnTravelingTrader): picks 4
