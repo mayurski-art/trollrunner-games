@@ -133,6 +133,9 @@
       coin(n = 3) { for (let i = 0; i < n; i++) tone(1046 + i * 180, 0.09, "square", 0.035, i * 0.07); },
       grr()   { tone(160, 0.3, "sawtooth", 0.05, 0, -60); },
       jingle(){ [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.16, "triangle", 0.05, i * 0.11)); },
+      gotcha(){ tone(700, 0.06, "square", 0.05, 0, 500); tone(1400, 0.1, "square", 0.045, 0.05); },
+      trollHeh(){ [900, 700, 500].forEach((f, i) => tone(f, 0.09, "sawtooth", 0.045, i * 0.06, -80)); },
+      grin()  { tone(660, 0.08, "triangle", 0.05, 0, 260); tone(990, 0.14, "triangle", 0.05, 0.07, 260); },
     };
   })();
 
@@ -154,6 +157,12 @@
     armedBin: null,
     cut: { ticketId: null, needed: 0, done: [], sweeping: false, angle: 0, raf: 0 },
     lastTick: 0, ticketSeq: 1,
+    // Grin Combo: chained perfect stations grow tips, any bad station resets it
+    grinStage: 0, dayMaxGrin: 0,
+    // Troll Events + Grin Hunt (docs/TROLL-PIZZERIA-V2.md) — mid-shift
+    // sabotage the player can cancel by spotting a hidden grin in time
+    troll: { nextIn: 0, active: null, binSwapPair: null, binSwapUntil: 0, pineappleRaidLeft: 0,
+             dialScrambleUntil: 0, quakeUntil: 0, tipBonusNext: 1 },
   };
 
   /* Cross-device progress: when logged in, mirrored into the shared
@@ -388,6 +397,37 @@
     return { order, bake, cut, total, tip };
   }
 
+  /* ============================== grin combo ============================ */
+  /* Chain "perfect" (≥90%) station grades into a growing trollface grin;
+     any station under 60% wipes it. Up to +50% tips at max stage. Purely
+     a scoring layer — no station gameplay changes. */
+
+  const GRIN_MAX = 5;
+  const GRIN_BONUS_PER_STAGE = 0.1;
+
+  function applyGrinCombo(res) {
+    const stations = [res.order, res.bake, res.cut];
+    if (stations.some(v => v < 0.6)) {
+      S.grinStage = 0;                              // any bad station wipes the whole combo
+    } else {
+      for (const v of stations) if (v >= 0.9) S.grinStage = Math.min(GRIN_MAX, S.grinStage + 1);
+    }
+    S.dayMaxGrin = Math.max(S.dayMaxGrin, S.grinStage);
+    const bonus = 1 + S.grinStage * GRIN_BONUS_PER_STAGE;
+    res.tip = Math.max(1, Math.round(res.tip * bonus));
+    return res;
+  }
+
+  function renderGrinMeter() {
+    const el = $("#pz-hud-grin");
+    if (!el) return;
+    el.textContent = "🧌".repeat(S.grinStage) + "·".repeat(GRIN_MAX - S.grinStage);
+    el.title = S.grinStage
+      ? `Grin combo ×${S.grinStage} — tips +${S.grinStage * GRIN_BONUS_PER_STAGE * 100}%`
+      : "Grin combo — chain perfect stations for bonus tips";
+    el.classList.toggle("is-maxed", S.grinStage >= GRIN_MAX);
+  }
+
   /* ============================ pizza rendering ======================== */
 
   /* Layer stack inside a .pz-pizza-wrap. Fallback CSS discs render first;
@@ -511,6 +551,7 @@
     $("#pz-hud-day").textContent = "Day " + S.day;
     $("#pz-hud-coins").textContent = "🪙 " + S.dayTips;
     $("#pz-hud-score").textContent = "⭐ " + Math.round(S.dayScore);
+    renderGrinMeter();
     const rack = $("#pz-ticket-rack");
     rack.innerHTML = "";
     for (const t of S.tickets) {
@@ -674,8 +715,14 @@
   function renderBins(t) {
     const bins = $("#pz-bins");
     bins.innerHTML = "";
-    for (const top of unlockedToppings(S.day)) {
-      const b = el("button", "pz-bin" + (S.armedBin === top.id ? " is-armed" : ""));
+    let order = unlockedToppings(S.day);
+    const swap = S.troll.binSwapPair;
+    if (swap) {                                    // troll event: two bins trade places
+      const ia = order.findIndex(x => x.id === swap[0]), ib = order.findIndex(x => x.id === swap[1]);
+      if (ia !== -1 && ib !== -1) { order = order.slice(); [order[ia], order[ib]] = [order[ib], order[ia]]; }
+    }
+    for (const top of order) {
+      const b = el("button", "pz-bin" + (S.armedBin === top.id ? " is-armed" : "") + (swap && swap.includes(top.id) ? " pz-bin-swapped" : ""));
       b.type = "button";
       b.dataset.tid = top.id;
       b.setAttribute("aria-label", "Topping bin: " + top.name);
@@ -732,7 +779,7 @@
         return;
       }
       // click-to-place with an armed bin
-      if (S.armedBin) placeAt(ev);
+      if (S.armedBin) placeAt(ev, null, true);
     });
 
     document.addEventListener("pointermove", (ev) => {
@@ -755,11 +802,11 @@
         renderBins(t);
         return;
       }
-      if (t && placeAt(ev, d.tid)) return;
+      if (t && placeAt(ev, d.tid, !d.repositioning)) return;
       if (d.repositioning) { Sfx.plop(); renderBuild(); } // dropped off the pie = removed
     });
 
-    function placeAt(ev, tid) {
+    function placeAt(ev, tid, fresh) {
       const t = activeTicket();
       if (!t) return false;
       let x, y;
@@ -774,7 +821,13 @@
       }
       const dist = Math.hypot(x - 0.5, y - 0.5);
       if (dist > PIZZA_RADIUS) return false;
-      t.build.placed.push({ tid: tid || S.armedBin, x: clamp(x, 0.06, 0.94), y: clamp(y, 0.06, 0.94) });
+      let placeTid = tid || S.armedBin;
+      // troll event: a pineapple raid can hijack the next few fresh drags
+      if (fresh && S.troll.pineappleRaidLeft > 0) {
+        S.troll.pineappleRaidLeft--;
+        if (Math.random() < 0.3 && unlockedToppings(S.day).some(x => x.id === "pineapple")) placeTid = "pineapple";
+      }
+      t.build.placed.push({ tid: placeTid, x: clamp(x, 0.06, 0.94), y: clamp(y, 0.06, 0.94) });
       Sfx.plop();
       renderBuild(); renderHud();
       return true;
@@ -804,6 +857,12 @@
 
   /* ============================ bake station =========================== */
 
+  // Troll event: "dial scramble" flips the doneness bars upside-down for a
+  // stretch — visual only, the real doneness value used for scoring/pull
+  // timing never changes.
+  const dialScrambled = () => performance.now() < S.troll.dialScrambleUntil;
+  const dialPct = (v) => dialScrambled() ? 100 - pct(v) : pct(v);
+
   function renderBake() {
     const slots = $("#pz-oven-slots");
     slots.innerHTML = "";
@@ -815,12 +874,12 @@
       const pie = el("div", "slot-pizza");
       if (t) renderPizza(pie, t);
       slot.appendChild(pie);
-      const bar = el("div", "pz-doneness");
+      const bar = el("div", "pz-doneness" + (dialScrambled() ? " pz-dial-scrambled" : ""));
       const fill = el("i");
       if (t) {
-        fill.style.width = pct(t.doneness) + "%";
+        fill.style.width = dialPct(t.doneness) + "%";
         const tgt = el("span", "tgt");
-        tgt.style.left = pct(BAKES.find(b => b.id === t.order.bake).target) + "%";
+        tgt.style.left = dialPct(BAKES.find(b => b.id === t.order.bake).target) + "%";
         bar.appendChild(tgt);
       }
       bar.appendChild(fill);
@@ -999,6 +1058,11 @@
     if (!t) return;
     stopSweeper();
     const res = scoreTicket(t);
+    applyGrinCombo(res);
+    if (S.troll.tipBonusNext > 1) {                    // Nana's coupon
+      res.tip = Math.round(res.tip * S.troll.tipBonusNext);
+      S.troll.tipBonusNext = 1;
+    }
     t.state = "served";
     t.result = res;
     S.cutShelf = S.cutShelf.filter(x => x !== t.id);
@@ -1073,6 +1137,11 @@
     S.activeTicketId = null; S.bakeSelect = null; S.armedBin = null; S.stormedOut = 0;
     S.dayScore = 0; S.dayTips = 0; S.servedToday = 0; S.ticketSeq = 1;
     S.cut = { ticketId: null, needed: 0, done: [], sweeping: false, angle: 0, raf: 0 };
+    S.grinStage = 0; S.dayMaxGrin = 0;
+    resetTrollEvent();
+    scheduleNextTrollEvent();
+    S.troll.binSwapPair = null; S.troll.pineappleRaidLeft = 0;
+    S.troll.dialScrambleUntil = 0; S.troll.quakeUntil = 0; S.troll.tipBonusNext = 1;
     S.screen = "game";
     $("#pz-title").style.display = "none";
     $("#pz-game").hidden = false;
@@ -1111,6 +1180,8 @@
     const rows = S.tickets.map(t =>
       `<tr><td>${t.cust.emoji} ${t.cust.name}</td><td>${pct(t.result.total)}%</td><td>🪙 ${t.result.tip}</td></tr>`).join("");
     const stormed = S.stormedOut ? `<p class="pz-serve-line">${S.stormedOut} customer${S.stormedOut > 1 ? "s" : ""} stormed out. Trolled.</p>` : "";
+    const grinLine = S.dayMaxGrin
+      ? `<p class="pz-serve-line">Best grin combo: ${"🧌".repeat(S.dayMaxGrin)} (×${S.dayMaxGrin * GRIN_BONUS_PER_STAGE * 100}% tips)</p>` : "";
     const unlocks = (newTops.length || newCusts.length)
       ? `<div class="pz-unlock">Tomorrow: ${[...newTops.map(t => t.emoji + " " + t.name), ...newCusts.map(c => c.emoji + " " + c.name)].join(" · ")}</div>`
       : "";
@@ -1120,6 +1191,7 @@
       <h2>Day ${S.day} complete!</h2>
       <table class="pz-day-table"><tbody>${rows}</tbody></table>
       ${stormed}
+      ${grinLine}
       <p class="pz-serve-total">⭐ ${Math.round(S.dayScore)}${newBest ? " · new best!" : ""}</p>
       <p class="pz-serve-tip">Tips: 🪙 ${S.dayTips} · XP +${xpGain} · rank: ${rankName(S.xp)}</p>
       ${unlocks}
@@ -1134,6 +1206,121 @@
 
     $("#pz-next-day").addEventListener("click", () => { ov.hidden = true; startShift(); });
     $("#pz-to-title").addEventListener("click", () => { ov.hidden = true; showTitle(); });
+  }
+
+  /* ============================ troll events ============================ */
+  /* Mid-shift sabotage: "the kitchen trolls back" (docs/TROLL-PIZZERIA-V2.md).
+     Every fired event has a ~2s tell where a hidden grin appears somewhere
+     on screen — click it in time to cancel the event and bank a small
+     score bonus; miss it and the chaos lands. Never fires before day 3. */
+
+  const TROLL_TELL_SECONDS = 2;
+  const TROLL_EVENTS = ["problem", "binswap", "pineapple", "dial", "quake", "coupon"];
+
+  function scheduleNextTrollEvent() {
+    S.troll.nextIn = rand(Math.max(22, 55 - S.day * 1.5), Math.max(34, 80 - S.day * 1.5));
+  }
+
+  function startTrollTell() {
+    // pineapple raid only makes sense once pineapple is unlocked
+    const pool = S.day >= 7 ? TROLL_EVENTS : TROLL_EVENTS.filter(e => e !== "pineapple");
+    const type = pick(pool);
+    S.troll.active = { type, tellLeft: TROLL_TELL_SECONDS };
+    renderGrinHunt();
+  }
+
+  function renderGrinHunt() {
+    const stage = $(".pz-stage");
+    if (!stage) return;
+    let btn = document.getElementById("pz-grin-hunt");
+    if (!S.troll.active) { if (btn) btn.remove(); return; }
+    if (!btn) {
+      btn = el("button", "pz-grin-hunt");
+      btn.type = "button";
+      btn.id = "pz-grin-hunt";
+      btn.textContent = "🧌";
+      btn.setAttribute("aria-label", "Something's off — click quick!");
+      btn.style.left = rand(8, 84) + "%";
+      btn.style.top = rand(14, 78) + "%";
+      btn.addEventListener("click", (ev) => { ev.stopPropagation(); resolveTrollEvent(true); });
+      stage.appendChild(btn);
+    }
+  }
+
+  function resolveTrollEvent(cancelled) {
+    if (!S.troll.active) return;
+    const type = S.troll.active.type;
+    S.troll.active = null;
+    const btn = document.getElementById("pz-grin-hunt");
+    if (btn) btn.remove();
+    if (cancelled) {
+      S.dayScore += 15;
+      Sfx.gotcha();
+      renderHud();
+    } else {
+      fireTrollEvent(type);
+      Sfx.trollHeh();
+    }
+    scheduleNextTrollEvent();
+  }
+
+  // Silent reset for day/shift boundaries — no score bonus, no chaos fired.
+  function resetTrollEvent() {
+    S.troll.active = null;
+    const btn = document.getElementById("pz-grin-hunt");
+    if (btn) btn.remove();
+  }
+
+  function fireTrollEvent(type) {
+    switch (type) {
+      case "problem": {                          // Trollio edits a live ticket
+        const building = S.tickets.filter(t => t.state === "building" && t.order.tops.length);
+        const t = pick(building);
+        if (!t) return;
+        const entry = pick(t.order.tops);
+        const pool = unlockedToppings(S.day).filter(x => !t.order.tops.some(e => e.id === x.id));
+        const swap = pick(pool);
+        if (!swap) return;
+        entry.id = swap.id;
+        if (S.activeTicketId === t.id) {
+          renderBuild();
+          const card = $("#pz-build-ticket .pz-ticket");
+          if (card) card.classList.add("pz-ticket-rattle");
+        }
+        renderHud();
+        break;
+      }
+      case "binswap": {                          // two bins trade places
+        const pool = unlockedToppings(S.day);
+        if (pool.length < 2) return;
+        const a = pick(pool);
+        const b = pick(pool.filter(x => x.id !== a.id));
+        if (!b) return;
+        S.troll.binSwapPair = [a.id, b.id];
+        S.troll.binSwapUntil = performance.now() + 15000;
+        if (S.station === "build") renderBins(activeTicket());
+        break;
+      }
+      case "pineapple":                          // next few toppings roll pineapple
+        S.troll.pineappleRaidLeft = 3;
+        break;
+      case "dial":                               // oven bars read upside-down
+        S.troll.dialScrambleUntil = performance.now() + 20000;
+        if (S.station === "bake") renderBake();
+        break;
+      case "quake": {                             // build table trembles
+        S.troll.quakeUntil = performance.now() + 8000;
+        const box = $("#pz-build-pizza");
+        if (box) {
+          box.classList.add("pz-quake");
+          setTimeout(() => box.classList.remove("pz-quake"), 8000);
+        }
+        break;
+      }
+      case "coupon":                              // Nana's coupon — next tip x2
+        S.troll.tipBonusNext = 2;
+        break;
+    }
   }
 
   /* =============================== ticking ============================= */
@@ -1175,6 +1362,21 @@
     else if (S.lobby.length) updatePatienceBars();
     if (baking && S.station === "bake") renderBakeBarsOnly();
     renderBadges();
+
+    // troll events: never before day 3
+    if (S.day >= 3) {
+      if (S.troll.active) {
+        S.troll.active.tellLeft -= dt;
+        if (S.troll.active.tellLeft <= 0) resolveTrollEvent(false);
+      } else {
+        S.troll.nextIn -= dt;
+        if (S.troll.nextIn <= 0) startTrollTell();
+      }
+    }
+    if (S.troll.binSwapPair && performance.now() > S.troll.binSwapUntil) {
+      S.troll.binSwapPair = null;
+      if (S.station === "build") renderBins(activeTicket());
+    }
   }
 
   function updatePatienceBars() {
@@ -1193,8 +1395,10 @@
       const id = S.ovens[i];
       if (!id) return;
       const t = ticketById(id);
+      const bar = slot.querySelector(".pz-doneness");
+      if (bar) bar.classList.toggle("pz-dial-scrambled", dialScrambled());
       const fill = slot.querySelector(".pz-doneness i");
-      if (fill) fill.style.width = pct(t.doneness) + "%";
+      if (fill) fill.style.width = dialPct(t.doneness) + "%";
       const burn = Math.max(0, (t.doneness - 0.85) / 0.15);
       const pie = slot.querySelector(".slot-pizza");
       if (pie && t.doneness > 0.05) {
@@ -1312,5 +1516,8 @@
   else boot();
 
   // Debug/smoke-test handle (same pattern as Bridge Patrol's __bp)
-  window.__pz = { S, ticketById, switchStation, checkDayEnd, BAKES, TOPPINGS };
+  window.__pz = {
+    S, ticketById, switchStation, checkDayEnd, BAKES, TOPPINGS,
+    startTrollTell, resolveTrollEvent, applyGrinCombo, GRIN_MAX,
+  };
 })();

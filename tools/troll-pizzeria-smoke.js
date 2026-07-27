@@ -195,6 +195,42 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
     !!document.querySelector('#lb-root .lb-table') && document.querySelector('#lb-root').textContent.includes('YOU'));
   log(lbRendered, 'weekly leaderboard rendered by shared engine');
 
+  // Grin Combo: three all-perfect station scores should grow the meter and
+  // pay a tip bonus (never fires in the real loop on day 1-2, so drive it
+  // directly — this is scoring logic, not a rendering path).
+  const grinOk = await page.evaluate(() => {
+    const p = window.__pz;
+    p.S.grinStage = 0; p.S.dayMaxGrin = 0;
+    const res = { order: 0.95, bake: 0.95, cut: 0.95, total: 0.95, tip: 10 };
+    p.applyGrinCombo(res);
+    const stageAfterOne = p.S.grinStage;                 // 3 perfect stations = +3
+    const tipAfterOne = res.tip;
+    const res2 = { order: 0.3, bake: 0.95, cut: 0.95, total: 0.5, tip: 10 };
+    p.applyGrinCombo(res2);                              // one bad station resets it
+    return { stageAfterOne, tipAfterOne, resetStage: p.S.grinStage };
+  });
+  log(grinOk.stageAfterOne === 3 && grinOk.tipAfterOne === 13 && grinOk.resetStage === 0,
+    `grin combo: stage ${grinOk.stageAfterOne}→tip ${grinOk.tipAfterOne} (+30%), then reset to ${grinOk.resetStage} on a bad station`);
+
+  // Troll Events + Grin Hunt: force day 3 (events are gated off before it),
+  // start a tell, and confirm clicking the hidden grin cancels it + pays a
+  // small score bonus instead of letting the sabotage land.
+  await page.evaluate(() => {
+    const p = window.__pz;
+    p.S.day = 3;
+    p.S.dayScore = 0;
+    p.startTrollTell();
+  });
+  await page.waitForSelector('#pz-grin-hunt');
+  const scoreBefore = await page.evaluate(() => window.__pz.S.dayScore);
+  await page.click('#pz-grin-hunt');
+  const trollCancelled = await page.evaluate((before) => {
+    const p = window.__pz;
+    return { active: p.S.troll.active, gained: p.S.dayScore - before };
+  }, scoreBefore);
+  log(trollCancelled.active === null, 'grin hunt: clicking the grin cancels the troll event');
+  await page.screenshot({ path: path.join(OUT, 'pz-8-grinhunt.png') });
+
   // ?flat=1 forces the DOM pizza — the 3D layer must stay fully optional
   await page.goto(`http://localhost:${PORT}/troll-pizzeria.html?flat=1`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction('window.__pz && window.__pz.S.screen === "title"');
