@@ -94,13 +94,15 @@ const P3D = {
 };
 
 let renderer, scene, camera, raycaster, pickPlane;
-let doughGroup, sauceMesh, cheeseMesh, toppingGroup, cutGroup, guideGroup;
+let pieRoot, doughGroup, sauceMesh, cheeseMesh, toppingGroup, cutGroup, guideGroup;
+let cutGuideGroup, sweepMesh, sectorGroup = null, lidMesh = null;
 let sauceMat, cheeseMat, crustMat, doughMat;
 let tweens = [];
 let rafId = 0;
 let prevKeys = [];
 let curView = null;
 let resizeObs = null;
+let cleaveKey = null;
 
 const CRUST_COLOR = 0xdfae63, DOUGH_COLOR = 0xf2d49b;
 const SAUCE_COLOR = 0xc0392b, CHEESE_COLOR = 0xf6cf65;
@@ -133,6 +135,11 @@ function initScene() {
   shadow.position.y = -0.06;
   scene.add(shadow);
 
+  /* everything that IS the pie lives under pieRoot so the serve shot can
+     spin it as one object */
+  pieRoot = new THREE.Group();
+  scene.add(pieRoot);
+
   /* dough: base disc + crust ring + inner surface */
   doughGroup = new THREE.Group();
   crustMat = flat(CRUST_COLOR);
@@ -156,23 +163,23 @@ function initScene() {
   const surface = new THREE.Mesh(blobbyCircle(0.94, 26, 0.02, 0, 7), doughMat);
   surface.position.y = 0.052;
   doughGroup.add(surface);
-  scene.add(doughGroup);
+  pieRoot.add(doughGroup);
 
   sauceMat = flat(SAUCE_COLOR);
   cheeseMat = flat(CHEESE_COLOR);
   sauceMesh = new THREE.Mesh(blobbyCircle(SAUCE_R.normal, 26, 0.07, 0, 21), sauceMat);
   sauceMesh.position.y = 0.075;
   sauceMesh.visible = false;
-  scene.add(sauceMesh);
+  pieRoot.add(sauceMesh);
   cheeseMesh = new THREE.Mesh(blobbyCircle(CHEESE_R.normal, 26, 0.1, 0.05, 33), cheeseMat);
   cheeseMesh.position.y = 0.09;
   cheeseMesh.visible = false;
-  scene.add(cheeseMesh);
+  pieRoot.add(cheeseMesh);
 
   toppingGroup = new THREE.Group();
-  scene.add(toppingGroup);
+  pieRoot.add(toppingGroup);
   cutGroup = new THREE.Group();
-  scene.add(cutGroup);
+  pieRoot.add(cutGroup);
 
   /* half-order guide: dashed dark strip across the middle (screen-vertical) */
   guideGroup = new THREE.Group();
@@ -183,7 +190,25 @@ function initScene() {
     guideGroup.add(dash);
   }
   guideGroup.visible = false;
-  scene.add(guideGroup);
+  pieRoot.add(guideGroup);
+
+  /* cut guides: green dashed target lines shown while sweeping, drawn
+     fresh each time the required cut count changes */
+  cutGuideGroup = new THREE.Group();
+  pieRoot.add(cutGuideGroup);
+
+  /* the sweeping cutter: a bright bar across the diameter with a little
+     roller wheel riding the rim — rotates around Y as the player sweeps it */
+  sweepMesh = new THREE.Group();
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(1.86, 0.02, 0.03), new THREE.MeshBasicMaterial({ color: 0xffe066 }));
+  sweepMesh.add(bar);
+  const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.06, 10), new THREE.MeshBasicMaterial({ color: 0xe8e8e8 }));
+  wheel.rotation.z = Math.PI / 2;
+  wheel.position.x = 0.93;
+  sweepMesh.add(wheel);
+  sweepMesh.position.y = 0.135;
+  sweepMesh.visible = false;
+  pieRoot.add(sweepMesh);
 
   /* invisible picking disc, slightly larger than the dough */
   pickPlane = new THREE.Mesh(
@@ -332,6 +357,124 @@ function syncCuts(cutAngles) {
   }
 }
 
+/* ------------------------------ cleaving ----------------------------- */
+/* Once every cut is made we "cleave" the pie: the sauce/cheese/topping
+   deck splits into real wedge sectors that spring apart along their own
+   bisector. No CSG — each sector is drawn as its own CircleGeometry slice
+   (radius matches the current sauce/cheese amount) and existing topping
+   meshes are nudged by whatever offset their sector gets. Slice widths
+   come straight from the player's actual cut angles, so an uneven cut
+   reads as visibly uneven slices — the scoring feedback IS the visual. */
+
+const CLEAVE_GAP = 0.2;
+let cleaveSectors = [];
+let lastCutSig = null;
+
+const norm2pi = (a) => { const t = Math.PI * 2; return ((a % t) + t) % t; };
+
+function wedgeGeo(radius, thetaStart, thetaLength) {
+  const g = new THREE.CircleGeometry(radius, 10, thetaStart, thetaLength);
+  g.rotateX(-Math.PI / 2);
+  return g;
+}
+
+function clearCleave() {
+  for (const s of cleaveSectors) {
+    s.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
+    pieRoot.remove(s.group);
+  }
+  cleaveSectors = [];
+  lastCutSig = null;
+}
+
+function buildCleave(cutAngles, sauceAmt, cheeseAmt, placed) {
+  const sig = (cutAngles || []).map(a => a.toFixed(1)).sort().join(",");
+  if (sig === lastCutSig) return;
+  lastCutSig = sig;
+  clearCleave();
+  if (!cutAngles || !cutAngles.length) {
+    sauceMesh.visible = sauceAmt !== "none";
+    cheeseMesh.visible = cheeseAmt !== "none";
+    return;
+  }
+  // full-circle boundaries: each cut is a diameter, so it contributes
+  // two opposite boundary angles
+  const bounds = [];
+  for (const a of cutAngles) {
+    const y0 = norm2pi(-a * Math.PI / 180);
+    bounds.push(y0, norm2pi(y0 + Math.PI));
+  }
+  bounds.sort((a, b) => a - b);
+  const uniq = bounds.filter((a, i) => i === 0 || Math.abs(a - bounds[i - 1]) > 1e-3);
+  const n = uniq.length;
+  if (n < 2) return;
+
+  sauceMesh.visible = false;
+  cheeseMesh.visible = false;
+
+  for (let i = 0; i < n; i++) {
+    const start = uniq[i];
+    let len = uniq[(i + 1) % n] - start;
+    if (len <= 0) len += Math.PI * 2;
+    const mid = start + len / 2;
+    const dir = new THREE.Vector3(Math.cos(mid), 0, -Math.sin(mid));
+
+    const group = new THREE.Group();
+    if (sauceAmt !== "none")
+      group.add(new THREE.Mesh(wedgeGeo(SAUCE_R[sauceAmt], start, len), sauceMat).translateY(0.075 - 0.09));
+    if (cheeseAmt !== "none")
+      group.add(new THREE.Mesh(wedgeGeo(CHEESE_R[cheeseAmt], start, len), cheeseMat));
+    group.position.y = 0.09;
+    pieRoot.add(group);
+
+    // toppings whose polar angle falls inside this sector ride along
+    const movedTops = [];
+    for (const mesh of toppingGroup.children) {
+      const p = mesh.position;
+      const a = norm2pi(Math.atan2(-p.z, p.x));
+      let inSector = a - start;
+      if (inSector < 0) inSector += Math.PI * 2;
+      if (inSector <= len) movedTops.push(mesh);
+    }
+
+    const sector = { group, dir, movedTops, base: movedTops.map(m => m.position.clone()) };
+    cleaveSectors.push(sector);
+    const baseY = group.position.y;
+    addTween(0.32, (t) => {
+      const e = t * t * (3 - 2 * t);              // smoothstep
+      const off = dir.clone().multiplyScalar(CLEAVE_GAP * e);
+      const pop = Math.sin(t * Math.PI) * 0.05;   // little lift as it separates
+      group.position.x = off.x; group.position.z = off.z;
+      group.position.y = baseY + pop;
+      group.rotation.y = (dpr(i + 1) - 0.5) * 0.16 * e;
+      sector.base.forEach((b, k) => {
+        movedTops[k].position.x = b.x + off.x;
+        movedTops[k].position.z = b.z + off.z;
+        movedTops[k].position.y = b.y + pop;
+      });
+    });
+  }
+}
+
+function syncCutGuides(k) {
+  if (cutGuideGroup.userData.k === k) return;
+  cutGuideGroup.userData.k = k;
+  cutGuideGroup.clear();
+  if (!k) return;
+  const mat = new THREE.MeshBasicMaterial({ color: 0x2f9e44, transparent: true, opacity: 0.55 });
+  for (let i = 0; i < k; i++) {
+    const line = new THREE.Mesh(new THREE.BoxGeometry(1.86, 0.012, 0.02), mat);
+    line.position.y = 0.118;
+    line.rotation.y = -((i * 180) / k) * Math.PI / 180;
+    cutGuideGroup.add(line);
+  }
+}
+
+function setSweep(angleDeg, active) {
+  sweepMesh.visible = !!active;
+  if (active) sweepMesh.rotation.y = -angleDeg * Math.PI / 180;
+}
+
 function syncDoneness(d) {
   const t = Math.min(Math.max(d || 0, 0), 1);
   const bake = Math.min(t * 1.15, 1);
@@ -389,16 +532,24 @@ P3D.isMounted = function (container) {
   return !!container && P3D._mountedIn === container;
 };
 
-/* view: { sauce, cheese, placed, doneness, cutAngles, halfGuide } */
+/* view: { sauce, cheese, placed, doneness, cutAngles, halfGuide,
+   cutNeeded, sweeping, sweepAngle } — the cut-station fields are optional;
+   build station calls just pass sauce/cheese/placed/doneness/halfGuide. */
 P3D.sync = function (view) {
   if (!P3D.ok || !P3D._mountedIn) return;
   curView = view;
+  const cleaving = view.cutAngles && view.cutAngles.length > 0;
+  // while whole, the live cover meshes track sauce/cheese amount as usual;
+  // once cleaved, buildCleave owns visibility of the equivalent wedges
   syncCover(sauceMesh, sauceMat, SAUCE_R, view.sauce, 21, 0.07, 0, 0.075);
   syncCover(cheeseMesh, cheeseMat, CHEESE_R, view.cheese, 33, 0.1, 0.05, 0.09);
   syncToppings(view.placed || []);
-  syncCuts(view.cutAngles);
   syncDoneness(view.doneness);
   guideGroup.visible = !!view.halfGuide;
+  syncCutGuides(view.cutNeeded || 0);
+  setSweep(view.sweepAngle || 0, !!view.sweeping);
+  if (cleaving) buildCleave(view.cutAngles, view.sauce, view.cheese, view.placed);
+  else { clearCleave(); syncCuts(view.cutAngles); }
 };
 
 /* Screen point → 0..1 pie coords (same space the DOM pizza used), or
@@ -410,10 +561,34 @@ P3D.pointToPie = function (clientX, clientY) {
   return toGame(p.x, p.z);
 };
 
+/* Lightweight per-frame sweep update — the sweeper ticks at ~60fps while
+   the player lines up a cut, so this skips the full sync() cost (topping
+   diffing, cleave signature check, etc). */
+P3D.updateSweep = function (angleDeg) {
+  if (!P3D.ok || !P3D._mountedIn || !sweepMesh.visible) return;
+  sweepMesh.rotation.y = -angleDeg * Math.PI / 180;
+};
+
 /* Screen point → index into the placed[] array, or null. */
 P3D.toppingAt = function (clientX, clientY) {
   const hits = castAt(clientX, clientY, toppingGroup.children);
   return hits.length ? hits[0].object.userData.idx : null;
+};
+
+/* The serve "money shot": pieRoot does one quick spin, done fires at the
+   apex so game.js can pop the score overlay right as the pie flourishes. */
+P3D.serveSpin = function (done) {
+  if (!P3D.ok || !P3D._mountedIn) { if (done) done(); return; }
+  const start = pieRoot.rotation.y;
+  addTween(0.7, (t) => {
+    const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    pieRoot.rotation.y = start + e * Math.PI * 2;
+    pieRoot.position.y = Math.sin(t * Math.PI) * 0.22;
+  }, () => {
+    pieRoot.rotation.y = start;
+    pieRoot.position.y = 0;
+    if (done) done();
+  });
 };
 
 /* ------------------------------- boot ------------------------------- */
@@ -429,6 +604,9 @@ try {
   console.warn("[pizza3d] init failed, DOM pizza fallback stays on:", e);
   P3D.ok = false;
 }
+
+// debug/smoke-test handle, same pattern as game.js's window.__pz
+P3D.__debugSectorCount = () => cleaveSectors.length;
 
 window.TrollPizza3D = P3D;
 window.dispatchEvent(new CustomEvent("pizza3d:ready", { detail: { ok: P3D.ok } }));
