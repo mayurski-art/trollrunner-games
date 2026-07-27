@@ -1,6 +1,7 @@
 # Papa Troll's Pizzeria v2 — "The Pie Dimension" (design doc)
 
-Status: APPROVED 2026-07-27 — decisions locked (see bottom).
+Status: SHIPPED 2026-07-27 — phases 1-3 all merged to main. Stretch phase
+(delivery run + Midnight Order) remains parked, unscheduled.
 
 v1 (docs/TROLL-PIZZERIA.md) shipped a faithful Papa's-style loop with a
 meme skin. It plays well but it *is* a clone. v2 has two goals:
