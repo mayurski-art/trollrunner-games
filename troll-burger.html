@@ -54,7 +54,7 @@
         <div class="tb-overlay-card">
           <h2>How to play</h2>
           <ol class="tb-howto-list">
-            <li><strong>You are the fry cook.</strong> The screen is what you see. Turn between the griddle, the counter, and the order window with ← → (or the edge arrows, or keys 1 / 2 / 3).</li>
+            <li><strong>You are the fry cook.</strong> The screen is what you see. Move your mouse to look around, and turn between the griddle, the counter, and the order window with ← → (or the edge arrows, or keys 1 / 2 / 3).</li>
             <li><strong>Griddle</strong> — tap the tub to lay a patty. Each patty cooks the side facing DOWN. Tap a patty to flip it; hit the green band on both sides, then plate it. Burnt is forever.</li>
             <li><strong>Counter</strong> — pin a ticket, then tap bins in the ticket's exact stack order. Patties come from your plate rack. Wrong order costs you.</li>
             <li><strong>Window</strong> — tickets ding through the pass. Finished Trolly Patty? Ring the bell. Faster service, bigger tips.</li>
@@ -158,6 +158,14 @@
 
           <!-- POV vignette -->
           <div class="tb-vignette" aria-hidden="true"></div>
+
+          <!-- VR-style hand/controller reticle — spring-follows the pointer,
+               squeezes shut on grab. Mouse/pen only (see FINE check in game.js). -->
+          <div class="tb-hand" id="tb-hand" aria-hidden="true">
+            <div class="tb-hand-glow"></div>
+            <div class="tb-hand-ring"></div>
+            <div class="tb-hand-dot"></div>
+          </div>
         </div>
       </div>
 

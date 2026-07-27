@@ -223,7 +223,7 @@
   function grabRefs() {
     ["tb-title", "tb-start-btn", "tb-howto-btn", "tb-howto", "tb-howto-close", "tb-title-stats",
      "tb-game", "tb-hud-shift", "tb-hud-coins", "tb-hud-score", "tb-hud-waste", "tb-sound-toggle",
-     "tb-world", "tb-turn-left", "tb-turn-right", "tb-slots", "tb-patty-tub", "tb-plate-rack",
+     "tb-pov", "tb-world", "tb-hand", "tb-turn-left", "tb-turn-right", "tb-slots", "tb-patty-tub", "tb-plate-rack",
      "tb-trash", "tb-spatula", "tb-pinned-ticket", "tb-build-stack", "tb-undo", "tb-scrap",
      "tb-bins", "tb-counter-hint", "tb-queue", "tb-ticket-rail", "tb-serve-spot", "tb-bell",
      "tb-order-overlay", "tb-shift-overlay"]
@@ -231,10 +231,27 @@
     el.facingTabs = [...document.querySelectorAll(".tb-facing-tab")];
   }
 
-  /* ---- facing / camera ---------------------------------------------------- */
+  /* ---- facing / camera ------------------------------------------------------
+     The world strip's transform is owned entirely by updateCamera(), which
+     runs every animation frame and blends three things into one spring-eased
+     3D transform: (1) which facing you're turned to, (2) head-look tilt
+     from the mouse position (VR-style parallax + a subtle perspective tilt
+     on .tb-world, matched by translate parallax on individual background
+     layers via --tb-look-x/--tb-look-y), and (3) a small idle sway so
+     standing still doesn't look frozen. face() only updates target state;
+     it never touches el.world.style directly. */
+  const FINE_POINTER = !window.matchMedia || matchMedia("(pointer: fine)").matches;
+  const cam = {
+    faceCur: 0,                 // eased % translateX offset (target = -S.face*33.3333)
+    lookX: 0, lookY: 0,         // eased look direction, -1..1
+    lookTX: 0, lookTY: 0,       // raw pointer-driven target
+    t: 0,                       // idle-sway clock
+    handX: 0, handY: 0,         // eased reticle position (px, relative to .tb-pov)
+    handTX: 0, handTY: 0,
+  };
+
   function face(i, opts) {
     S.face = clamp(i, 0, 2);
-    el.world.style.transform = `translateX(${-S.face * 33.3333}%)`;
     el.world.classList.add("is-turning");
     setTimeout(() => el.world.classList.remove("is-turning"), 380);
     el.facingTabs.forEach((tab, k) => {
@@ -245,6 +262,35 @@
     el.turnLeft.disabled = S.face === 0;
     el.turnRight.disabled = S.face === 2;
     if (!opts || !opts.quiet) SFX.drop();
+  }
+
+  function updateCamera(dt) {
+    cam.t += dt;
+
+    // ease the look vector toward wherever the pointer currently is
+    const lookRate = Math.min(1, dt * 6);
+    cam.lookX += (cam.lookTX - cam.lookX) * lookRate;
+    cam.lookY += (cam.lookTY - cam.lookY) * lookRate;
+    el.pov.style.setProperty("--tb-look-x", cam.lookX.toFixed(3));
+    el.pov.style.setProperty("--tb-look-y", cam.lookY.toFixed(3));
+
+    // ease the facing offset toward its target (replaces the old CSS transition)
+    const faceTarget = -S.face * 33.3333;
+    cam.faceCur += (faceTarget - cam.faceCur) * Math.min(1, dt * 12);
+
+    const bobY = Math.sin(cam.t * 0.9) * 2.2;          // idle standing sway
+    const bobR = Math.sin(cam.t * 0.6) * 0.32;
+    const lookShiftPct = cam.lookX * -1.1;              // subtle in-facing look drift
+    el.world.style.transform =
+      `translateX(${(cam.faceCur + lookShiftPct).toFixed(3)}%) translateY(${bobY.toFixed(2)}px) ` +
+      `rotateY(${(cam.lookX * 3.4).toFixed(2)}deg) rotateX(${(-cam.lookY * 1.7).toFixed(2)}deg) rotateZ(${bobR.toFixed(2)}deg)`;
+
+    if (FINE_POINTER && el.hand) {
+      const handRate = Math.min(1, dt * 16);
+      cam.handX += (cam.handTX - cam.handX) * handRate;
+      cam.handY += (cam.handTY - cam.handY) * handRate;
+      el.hand.style.transform = `translate(${cam.handX.toFixed(1)}px, ${cam.handY.toFixed(1)}px)`;
+    }
   }
 
   /* ---- grill rendering + actions ----------------------------------------- */
@@ -736,6 +782,7 @@
     patienceAcc += dt;
     if (patienceAcc > 0.5) { patienceAcc = 0; updatePatience(); }
 
+    updateCamera(dt);
     maybeSpawn();
     requestAnimationFrame(tick);
   }
@@ -773,6 +820,34 @@
       else if (ev.key === "2") face(1);
       else if (ev.key === "3") face(2);
     });
+
+    // VR reticle: spring-follows the mouse, squeezes on grab, widens over
+    // anything reachable. Mouse/pen only — touch has its own finger.
+    if (FINE_POINTER && el.hand && el.pov) {
+      const REACHABLE = ".tb-slot, .tb-slot-plate, .tb-tub, .tb-plate, .tb-trash, .tb-bin, " +
+        ".tb-ticket, .tb-bell, .tb-turn, .tb-facing-tab, .tb-btn, .tb-icon-btn";
+      el.pov.classList.add("has-hand");
+      el.pov.addEventListener("pointermove", (ev) => {
+        if (ev.pointerType === "touch") return;
+        const r = el.pov.getBoundingClientRect();
+        cam.handTX = ev.clientX - r.left;
+        cam.handTY = ev.clientY - r.top;
+        cam.lookTX = clamp((cam.handTX / r.width - 0.5) * 2, -1, 1);
+        cam.lookTY = clamp((cam.handTY / r.height - 0.5) * 2, -1, 1);
+        el.hand.classList.add("is-active");
+        el.hand.classList.toggle("is-over", !!ev.target.closest(REACHABLE));
+      });
+      el.pov.addEventListener("pointerleave", (ev) => {
+        if (ev.pointerType === "touch") return;
+        el.hand.classList.remove("is-active");
+        cam.lookTX = 0; cam.lookTY = 0;
+      });
+      el.pov.addEventListener("pointerdown", (ev) => {
+        if (ev.pointerType === "touch") return;
+        el.hand.classList.add("is-grab");
+      });
+      window.addEventListener("pointerup", () => el.hand.classList.remove("is-grab"));
+    }
 
     // swipe to turn (the POV is pan-y so vertical scroll still works)
     let touchX = null;

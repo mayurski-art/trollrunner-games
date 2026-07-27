@@ -229,15 +229,36 @@ button { cursor: pointer; }
   height: clamp(460px, 60vh, 640px);
   overflow: hidden;
   touch-action: pan-y;
+  perspective: 1200px;              /* the "headset lens" — world tilts in 3D as you look */
+  perspective-origin: 50% 46%;
 }
+.tb-pov.has-hand { cursor: none; }  /* the reticle replaces the system cursor */
 .tb-world {
   display: flex;
   width: 300%; height: 100%;
   transform: translateX(0);
-  transition: transform 0.38s cubic-bezier(0.22, 0.9, 0.24, 1);
+  transform-style: flat;
   will-change: transform;
+  /* transform is driven entirely by JS (updateCamera) every frame once a
+     shift is running — combines facing offset + head-look tilt + idle
+     sway into one spring-eased value, so no CSS transition here. */
 }
 .tb-view { position: relative; width: 33.3333%; height: 100%; overflow: hidden; }
+
+/* head-look parallax: JS sets --tb-look-x/--tb-look-y (-1..1) on .tb-pov each
+   frame; these inherit down. Depth values below are motion-parallax weight —
+   far background layers barely move, near counter/window props drift more. */
+.tb-grill-backwall, .tb-counter-backwall, .tb-passwall { --tb-depth: 3; }
+.tb-hood, .tb-menu-board { --tb-depth: 6; }
+.tb-griddle, .tb-countertop, .tb-passwindow, .tb-passcounter { --tb-depth: 10; }
+.tb-grill-backwall, .tb-hood, .tb-griddle,
+.tb-counter-backwall, .tb-menu-board, .tb-countertop,
+.tb-passwall, .tb-passwindow, .tb-passcounter {
+  transform: translate(
+    calc(var(--tb-look-x, 0) * var(--tb-depth, 1) * -1px),
+    calc(var(--tb-look-y, 0) * var(--tb-depth, 1) * -0.7px)
+  );
+}
 
 .tb-turn {
   position: absolute; top: 50%; z-index: 26;
@@ -259,6 +280,54 @@ button { cursor: pointer; }
   background:
     radial-gradient(120% 96% at 50% 44%, transparent 58%, rgba(4, 3, 2, 0.5) 100%),
     linear-gradient(180deg, rgba(4, 3, 2, 0.32), transparent 12% 84%, rgba(4, 3, 2, 0.5));
+}
+.tb-vignette::after {
+  /* faint lens-edge fringing, headset-glass feel */
+  content: "";
+  position: absolute; inset: 0;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04), inset 0 0 60px 6px rgba(77, 238, 255, 0.05);
+  mix-blend-mode: screen;
+}
+
+/* ---- VR hand/controller reticle ----------------------------------------- */
+.tb-hand {
+  position: absolute; z-index: 28; left: 0; top: 0;
+  width: 44px; height: 44px; margin: -22px 0 0 -22px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.tb-hand.is-active { opacity: 1; }
+.tb-hand-glow {
+  position: absolute; inset: -12px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(77, 238, 255, 0.16), transparent 70%);
+}
+.tb-hand-ring {
+  position: absolute; inset: 0;
+  border: 2px solid rgba(77, 238, 255, 0.85);
+  border-radius: 50%;
+  box-shadow: 0 0 14px rgba(77, 238, 255, 0.5), inset 0 0 10px rgba(77, 238, 255, 0.22);
+  transition: transform 0.13s cubic-bezier(0.32, 1.6, 0.4, 1), border-color 0.13s ease, box-shadow 0.13s ease;
+}
+.tb-hand-dot {
+  position: absolute; left: 50%; top: 50%;
+  width: 6px; height: 6px; margin: -3px 0 0 -3px;
+  border-radius: 50%; background: #fff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.9);
+}
+.tb-hand.is-grab .tb-hand-ring {
+  transform: scale(0.6);
+  border-color: rgba(255, 216, 77, 0.95);
+  box-shadow: 0 0 18px rgba(255, 216, 77, 0.6), inset 0 0 10px rgba(255, 216, 77, 0.3);
+}
+.tb-hand.is-grab .tb-hand-dot { background: #ffe9d6; }
+.tb-hand.is-over .tb-hand-ring {
+  transform: scale(1.22);
+  border-color: rgba(255, 255, 255, 0.95);
+}
+@media (pointer: coarse) {
+  .tb-hand { display: none; }
 }
 
 /* turn blur flourish */
