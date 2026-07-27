@@ -206,6 +206,7 @@ button { cursor: pointer; }
 }
 .tb-hud-coins { color: var(--gold); border-color: rgba(255, 216, 77, 0.4); }
 .tb-hud-waste { color: var(--muted); }
+.tb-hud-rank { color: var(--cyan); border-color: rgba(77, 238, 255, 0.35); }
 .tb-facing-tabs { display: flex; gap: 4px; margin-left: auto; }
 .tb-facing-tab {
   min-height: 34px; padding: 5px 12px;
@@ -537,6 +538,26 @@ button { cursor: pointer; }
 .tb-plate.is-selected { outline: 2px solid var(--gold); outline-offset: 3px; border-radius: 8px; }
 .tb-plate:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; border-radius: 8px; }
 
+.tb-side-chip {
+  position: relative;
+  display: grid; place-items: center;
+  width: 44px; height: 40px;
+  border: 0; border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.tb-side-chip:hover, .tb-side-chip:focus-visible { background: rgba(255, 255, 255, 0.18); outline: none; }
+.tb-side-chip-art { font-size: 20px; }
+.tb-side-chip-grade {
+  position: absolute; top: -8px; left: 50%; translate: -50%;
+  font-family: var(--mono); font-size: 9px; font-weight: 800;
+  padding: 0 3px; border-radius: 3px;
+  background: rgba(0, 0, 0, 0.6); color: var(--rt-warn); white-space: nowrap;
+}
+.tb-side-chip.is-perfect .tb-side-chip-grade { color: var(--rt-good); }
+.tb-side-chip.is-burnt .tb-side-chip-grade { color: var(--rt-bad); }
+.tb-side-chip.is-selected { outline: 2px solid var(--gold); outline-offset: 2px; }
+
 .tb-trash {
   position: absolute; left: 3%; bottom: 24%; z-index: 22;
   width: 52px; height: 52px;
@@ -579,6 +600,39 @@ button { cursor: pointer; }
   45% { transform: rotate(-6deg) translateY(-34px); }
   100% { transform: rotate(-14deg) translateY(0); }
 }
+
+/* fry station: two small tubs flanking the basket slots, centered low on
+   the griddle scene between the patty tub and the tray. Unlocks by shift. */
+.tb-fry-station {
+  position: absolute; left: 50%; bottom: 2%; z-index: 22;
+  translate: -50% 0;
+  display: flex; align-items: flex-end; gap: 8px;
+}
+.tb-tub-small {
+  position: static;   /* cancel .tb-tub's absolute positioning — this tub
+                          lays out inside the .tb-fry-station flex row instead */
+  min-width: 70px; padding: 7px 10px 6px;
+}
+.tb-tub-small .tb-tub-art { font-size: 19px; }
+.tb-tub-small .tb-tub-label { font-size: 9.5px; }
+.tb-basket-slots { display: flex; gap: 6px; align-items: flex-end; }
+.tb-basket {
+  position: relative;
+  width: 58px; height: 46px;
+  border: 2px solid #1d2023; border-radius: 8px 8px 12px 12px;
+  background: repeating-linear-gradient(45deg, #7c828a 0 4px, #656a71 4px 8px);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
+}
+.tb-basket:hover, .tb-basket:focus-visible { filter: brightness(1.1); outline: none; }
+.tb-basket-art { position: absolute; top: -20px; left: 50%; translate: -50% 0; font-size: 20px; }
+.tb-basket-bar {
+  position: absolute; left: 6%; right: 6%; bottom: 6%; height: 6px;
+  border-radius: 3px; background: rgba(0, 0, 0, 0.5); overflow: hidden;
+}
+.tb-basket-fill { display: block; height: 100%; width: 0; border-radius: 3px; background: var(--rt-warn); }
+.tb-basket-fill.is-perfect { background: var(--rt-good); }
+.tb-basket-fill.is-burnt { background: var(--rt-bad); }
+.tb-basket.is-burnt { animation: tb-pulse 0.9s ease-in-out infinite; }
 
 /* ======================= FACING 1 · COUNTER ============================= */
 .tb-view-counter {
@@ -628,6 +682,34 @@ button { cursor: pointer; }
 }
 .tb-pinned-empty { color: var(--rt-ink-soft); font-size: 12.5px; text-align: center; padding: 8px 0; }
 
+/* soda machine: hold to fill, release in the perfect band. Unlocks shift 4. */
+.tb-soda {
+  position: absolute; top: 6%; right: 3%; z-index: 22;
+  display: grid; justify-items: center; gap: 4px;
+  width: 96px; padding: 10px 8px 8px;
+  border: 2px solid #1d2023; border-radius: 10px 10px 6px 6px;
+  background: linear-gradient(180deg, #3a4650 0%, #232b32 100%);
+  color: #fff;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.4);
+}
+.tb-soda:hover, .tb-soda:focus-visible { filter: brightness(1.08); outline: none; }
+.tb-soda.is-filling { filter: brightness(1.18); }
+.tb-soda-cup {
+  position: relative;
+  width: 40px; height: 48px;
+  border: 2px solid rgba(255, 255, 255, 0.4); border-radius: 4px 4px 10px 10px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.tb-soda-fill {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 0%;
+  background: var(--rt-warn);
+  transition: height 0.05s linear;
+}
+.tb-soda-fill.is-perfect { background: var(--rt-good); }
+.tb-soda-fill.is-over { background: var(--rt-bad); }
+.tb-soda-label { font-family: var(--mono); font-size: 10px; font-weight: 700; text-transform: uppercase; }
+
 .tb-buildzone {
   position: absolute; left: 50%; bottom: 20%; z-index: 22;
   translate: -50%;
@@ -665,6 +747,9 @@ button { cursor: pointer; }
   to { transform: translateY(0); opacity: 1; }
 }
 .tb-build-controls { display: flex; gap: 8px; }
+.tb-build-sides:not(:empty) { display: flex; gap: 4px; justify-content: center; margin-top: -4px; }
+.tb-mini-side { font-size: 18px; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.4)); }
+.tb-mini-side-row { display: block; margin-top: 2px; font-size: 12px; text-align: center; }
 
 .tb-bins {
   position: absolute; left: 0; right: 0; bottom: 1.5%; z-index: 23;
@@ -862,6 +947,12 @@ button { cursor: pointer; }
 .tb-shift-table td { padding: 4px 2px; border-bottom: 1px dashed var(--rt-line); }
 .tb-shift-table td:last-child { text-align: right; font-weight: 800; }
 .tb-shift-big { font-family: var(--pixel); font-size: 40px; line-height: 1; }
+.tb-promo-banner {
+  width: 100%; padding: 8px 12px;
+  border-radius: 8px; text-align: center;
+  background: rgba(255, 216, 77, 0.18); border: 1px solid rgba(255, 216, 77, 0.5);
+  color: #8a6d1c; font-size: 14px;
+}
 
 /* ---- responsive --------------------------------------------------------- */
 @media (max-width: 760px) {
@@ -876,4 +967,7 @@ button { cursor: pointer; }
   .tb-bin { min-width: 56px; }
   .tb-hint { bottom: auto; top: 2%; }
   .tb-passwindow { width: 88%; }
+  .tb-fry-station { bottom: 1%; scale: 0.86; }
+  .tb-soda { top: 4%; right: 2%; width: 78px; }
+  .tb-hud-rank { display: none; }  /* HUD is crowded enough on small screens */
 }

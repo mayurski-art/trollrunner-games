@@ -1,7 +1,10 @@
-/* The Rusty Troll — game 009, phase 1 core loop.
+/* The Rusty Troll — game 009, phases 1-2 + VR-feel camera.
    First-person fry cook: three facings (griddle / counter / window) on a
-   sliding world strip. Per-side patty doneness with flip timing, exact-order
-   stack assembly scored by LCS, bell serve, shift quota, localStorage save.
+   sliding world strip, turned by a JS-owned spring camera that also drives
+   head-look parallax and idle sway (see updateCamera). Per-side patty
+   doneness with flip timing, exact-order stack assembly scored by LCS,
+   fry baskets + hold-to-fill drinks, customer patience/mood/quirks,
+   promotion track, comedic payday screen, localStorage save.
    No external calls — the game must run with every cross-repo script blocked. */
 (() => {
   "use strict";
@@ -13,14 +16,28 @@
   const COOK_MAX = 110;          // bar length in cook units; > COOK_MAX = burnt
   const COOK_RATE = 7.5;         // units per second on the down side
   const PERFECT = { lo: 60, hi: 90, target: 75 };
-  const GRILL_SLOTS = 4;
-  const RACK_MAX = 4;
   const RAIL_MAX = 5;
 
-  /* slot spots on the griddle: back row smaller (farther away) */
+  const BASKET_MAX = 100;
+  const BASKET_RATE = 11;
+  const BASKET_PERFECT = { lo: 50, hi: 82, target: 64 };
+
+  const DRINK_MAX = 100;
+  const DRINK_OVERFLOW = 122;
+  const DRINK_RATE = 60;         // fill units/sec while held
+  const DRINK_PERFECT = { lo: 66, hi: 96 };
+
+  const PANTRY_CAP = { patty: 4, fries: 3, rings: 3, drink: 3 };
+  const SIDES_START_SHIFT = 2;   // fries become orderable
+  const RINGS_START_SHIFT = 3;   // onion rings unlock
+  const DRINK_START_SHIFT = 4;   // soda machine unlocks
+
+  /* slot spots on the griddle: back row smaller (farther away). Up to 6 —
+     rank perks unlock the last two. */
   const SLOT_POS = [
     { x: 37, y: 30, w: 104 }, { x: 63, y: 30, w: 104 },
     { x: 30, y: 68, w: 134 }, { x: 70, y: 68, w: 134 },
+    { x: 12, y: 48, w: 82 },  { x: 88, y: 48, w: 82 },
   ];
 
   /* ---- ingredients ------------------------------------------------------ */
@@ -37,6 +54,11 @@
     mustard: { label: "Mustard",    short: "Mustard",  c: "#e3b505", w: 122, h: 6,  r: "3px",              emoji: "🌭" },
     jalapeno:{ label: "Jalapeños",  short: "Jalapeño", c: "#2f9e44", w: 112, h: 8,  r: "4px",              emoji: "🌶" },
   };
+  const SIDE_META = {
+    fries: { emoji: "🍟", label: "Fries",        short: "Fries" },
+    rings: { emoji: "🧅", label: "Onion rings",  short: "Rings" },
+    drink: { emoji: "🥤", label: "Drink",        short: "Drink" },
+  };
 
   function toppingPool(shift) {
     const pool = ["cheese", "lettuce", "tomato"];
@@ -48,15 +70,17 @@
     return pool;
   }
 
-  /* customers — flavor only in phase 1; quirks land in phase 2 */
+  /* customers — patience (windowMult) + tip lean + Grumpy's extra score
+     weight, reusing the Pizzeria meme roster & quirks per the design doc. */
   const CUSTS = [
-    { n: "Trollio", e: "🧌", tip: 1.1 },
-    { n: "Pepe",    e: "🐸", tip: 1.25 },
-    { n: "Doge",    e: "🐶", tip: 1.0 },
-    { n: "Chad",    e: "🗿", tip: 0.9 },
-    { n: "Nana",    e: "👵", tip: 1.2 },
-    { n: "Harold",  e: "🙂", tip: 1.0 },
+    { n: "Trollio", e: "🧌", tip: 1.1,  windowMult: 0.8 },
+    { n: "Pepe",    e: "🐸", tip: 1.25, windowMult: 1.3 },
+    { n: "Doge",    e: "🐶", tip: 1.0,  windowMult: 1.0 },
+    { n: "Chad",    e: "🗿", tip: 0.9,  windowMult: 0.8 },
+    { n: "Nana",    e: "👵", tip: 1.2,  windowMult: 1.5 },
+    { n: "Harold",  e: "🙂", tip: 1.0,  windowMult: 1.0 },
   ];
+  const GRUMPY = { n: "Grumpy", e: "😾", tip: 0.7, windowMult: 0.75, scoreWeight: 2 };
 
   const REACTIONS = [
     [95, "PERFECT. Problem?"],
@@ -66,11 +90,46 @@
     [0,  "I'm telling Mr. Grabs about this."],
   ];
 
+  /* ---- promotion track ---------------------------------------------------- */
+  const RANKS = [
+    { title: "Trainee",                threshold: 0,     grillSlots: 4, baskets: 1, tipBonus: 1.00 },
+    { title: "Fry Cook",                threshold: 700,   grillSlots: 5, baskets: 1, tipBonus: 1.00 },
+    { title: "Grill Master",            threshold: 2200,  grillSlots: 5, baskets: 2, tipBonus: 1.05 },
+    { title: "Employee of the Month",   threshold: 5500,  grillSlots: 6, baskets: 2, tipBonus: 1.10 },
+    { title: "Assistant to Mr. Grabs",  threshold: 11000, grillSlots: 6, baskets: 2, tipBonus: 1.15 },
+  ];
+  function rankFor(totalScore) {
+    let r = RANKS[0], idx = 0;
+    for (let i = 0; i < RANKS.length; i++) if (totalScore >= RANKS[i].threshold) { r = RANKS[i]; idx = i; }
+    return { ...r, index: idx };
+  }
+
+  /* ---- payday flavor (never touches real score/tips) --------------------- */
+  const DEDUCTIONS = [
+    ["Paper hat rental", 0.75],
+    ["Spatula depreciation", 0.50],
+    ["Griddle ambience fee", 1.25],
+    ["Grease trap surcharge", 0.60],
+    ["Mandatory fun tax", 0.40],
+    ["Mr. Grabs's ‘processing fee’", 0.90],
+    ["Uniform dry cleaning (theoretical)", 0.35],
+    ["Bell maintenance levy", 0.45],
+  ];
+  function paydayBreakdown(tips) {
+    const gross = Math.round((tips * 0.08 + 2) * 100) / 100;
+    const picks = sample(DEDUCTIONS, 2 + rnd(2));
+    let ded = 0;
+    const lines = picks.map(([label, amt]) => { ded += amt; return { label, amt }; });
+    const net = Math.max(0.15, Math.round((gross - ded) * 100) / 100);
+    return { gross, lines, net };
+  }
+
   /* ---- state ------------------------------------------------------------ */
   const S = {
     screen: "title",           // title | shift | between
     face: 0,                   // 0 griddle · 1 counter · 2 window
     shift: 1,
+    rank: RANKS[0],
     quota: 5,
     spawned: 0,
     served: 0,
@@ -80,10 +139,13 @@
     tickets: [],               // open tickets (max RAIL_MAX on the rail)
     nextTicket: 1,
     activeTicketId: null,
-    grill: new Array(GRILL_SLOTS).fill(null),
-    rack: [],                  // plated patties {id, up, down, burnt, grade, pct}
-    build: null,               // {layers:[key], patties:[pattyRec]}
-    selectedPlate: null,
+    grill: [],
+    baskets: [],
+    pantry: { patty: [], fries: [], rings: [], drink: [] },
+    build: null,               // {layers:[key], patties:[], sides:[], log:[]}
+    selectedItem: null,        // {kind:'patty'|'fries'|'rings'|'drink', id}
+    drinkFill: 0,
+    drinkHolding: false,
     orders: [],                // completed order results this shift
     soundOn: true,
     running: false,
@@ -92,12 +154,14 @@
     save: null,
   };
   let nextPattyId = 1;
+  let nextBasketId = 1;
 
   /* ---- save ------------------------------------------------------------- */
   function loadSave() {
     try { S.save = JSON.parse(localStorage.getItem(SAVE_KEY)) || null; }
     catch { S.save = null; }
-    if (!S.save) S.save = { shift: 1, best: 0, lifetime: { shifts: 0, served: 0, tips: 0, waste: 0 } };
+    if (!S.save) S.save = { shift: 1, best: 0, totalScore: 0, lifetime: { shifts: 0, served: 0, tips: 0, waste: 0 } };
+    if (S.save.totalScore === undefined) S.save.totalScore = 0; // upgrade older saves
     S.shift = S.save.shift || 1;
   }
   function persist() {
@@ -140,6 +204,7 @@
     drop: () => tone(180, 0.08, "square", 0.06),
     buzz: () => { tone(120, 0.18, "sawtooth", 0.07); },
     coin: () => { tone(920, 0.08, "square", 0.05); tone(1380, 0.16, "square", 0.05, 0.07); },
+    pour: () => { tone(500, 0.05, "sine", 0.04); },
   };
 
   /* ---- helpers ---------------------------------------------------------- */
@@ -196,20 +261,54 @@
     return `rgb(${mix(1)},${mix(2)},${mix(3)})`;
   }
 
+  /* ---- fry basket + drink math -------------------------------------------- */
+  function basketPct(b) {
+    if (b.burnt) return 8;
+    return Math.max(0, Math.round(100 - Math.abs(BASKET_PERFECT.target - b.cook) * 2.2));
+  }
+  function basketGrade(b) {
+    if (b.burnt) return "BURNT";
+    const pct = basketPct(b);
+    if (pct >= 85) return "GOLDEN";
+    if (pct >= 55) return "GOOD";
+    if (pct >= 25) return "MEH";
+    return "RAW";
+  }
+  function drinkPct(fill) {
+    if (fill < 18) return 0;
+    if (fill > DRINK_MAX) return 10;
+    const mid = (DRINK_PERFECT.lo + DRINK_PERFECT.hi) / 2;
+    return Math.max(0, Math.round(100 - Math.abs(mid - fill) * 1.6));
+  }
+  function drinkGrade(pct) {
+    if (pct >= 85) return "PERFECT";
+    if (pct >= 50) return "GOOD";
+    if (pct > 0) return "FLAT";
+    return "FLAT";
+  }
+
   /* ---- tickets ----------------------------------------------------------- */
-  function genTicket(shift) {
+  function genTicket(shift, forceGrumpy) {
     const nTop = Math.min(2 + Math.floor((shift - 1) / 2), 6);
     const tops = shuffle(sample(toppingPool(shift), Math.min(nTop, toppingPool(shift).length)));
     const mid = ["patty", ...tops];
     if (shift >= 5 && Math.random() < 0.3) mid.splice(1 + rnd(mid.length), 0, "patty");
-    const cust = CUSTS[rnd(CUSTS.length)];
+    const cust = forceGrumpy ? GRUMPY : CUSTS[rnd(CUSTS.length)];
     const layers = ["bun_b", ...mid, "bun_t"];
+
+    const sides = [];
+    if (shift >= SIDES_START_SHIFT && Math.random() < 0.55) {
+      sides.push(shift >= RINGS_START_SHIFT && Math.random() < 0.4 ? "rings" : "fries");
+    }
+    if (shift >= DRINK_START_SHIFT && Math.random() < 0.5) sides.push("drink");
+
     return {
       id: S.nextTicket++,
       cust,
       layers,
+      sides,
       bornAt: S.clock,
-      window: 55 + layers.length * 9,   // seconds until mood bottoms out
+      window: (55 + layers.length * 9 + sides.length * 8) * (cust.windowMult || 1),
     };
   }
   function ticketById(id) { return S.tickets.find((t) => t.id === id) || null; }
@@ -222,10 +321,12 @@
   const el = {};
   function grabRefs() {
     ["tb-title", "tb-start-btn", "tb-howto-btn", "tb-howto", "tb-howto-close", "tb-title-stats",
-     "tb-game", "tb-hud-shift", "tb-hud-coins", "tb-hud-score", "tb-hud-waste", "tb-sound-toggle",
+     "tb-game", "tb-hud-shift", "tb-hud-coins", "tb-hud-score", "tb-hud-waste", "tb-hud-rank", "tb-sound-toggle",
      "tb-pov", "tb-world", "tb-hand", "tb-turn-left", "tb-turn-right", "tb-slots", "tb-patty-tub", "tb-plate-rack",
-     "tb-trash", "tb-spatula", "tb-pinned-ticket", "tb-build-stack", "tb-undo", "tb-scrap",
-     "tb-bins", "tb-counter-hint", "tb-queue", "tb-ticket-rail", "tb-serve-spot", "tb-bell",
+     "tb-trash", "tb-spatula", "tb-fries-tub", "tb-rings-tub", "tb-baskets",
+     "tb-pinned-ticket", "tb-build-stack", "tb-build-sides", "tb-undo", "tb-scrap",
+     "tb-bins", "tb-counter-hint", "tb-soda-machine", "tb-soda-fill",
+     "tb-queue", "tb-ticket-rail", "tb-serve-spot", "tb-bell",
      "tb-order-overlay", "tb-shift-overlay"]
       .forEach((id) => { el[id.replace(/^tb-/, "").replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = document.getElementById(id); });
     el.facingTabs = [...document.querySelectorAll(".tb-facing-tab")];
@@ -296,7 +397,7 @@
   /* ---- grill rendering + actions ----------------------------------------- */
   function buildSlots() {
     el.slots.innerHTML = "";
-    for (let i = 0; i < GRILL_SLOTS; i++) {
+    for (let i = 0; i < S.rank.grillSlots; i++) {
       const p = SLOT_POS[i];
       const b = document.createElement("button");
       b.type = "button";
@@ -370,47 +471,150 @@
   }
   function plateSlot(i) {
     const p = S.grill[i]; if (!p) return;
-    if (S.rack.length >= RACK_MAX) { SFX.buzz(); hint("Plate rack is full — use or trash a patty."); return; }
+    if (S.pantry.patty.length >= PANTRY_CAP.patty) { SFX.buzz(); hint("Tray is full — use or trash a patty."); return; }
     S.grill[i] = null;
-    const rec = { ...p, pct: pattyPct(p), grade: pattyGrade(p) };
-    S.rack.push(rec);
+    const rec = { id: p.id, up: p.up, down: p.down, burnt: p.burnt, pct: pattyPct(p), grade: pattyGrade(p) };
+    S.pantry.patty.push(rec);
     SFX.drop(); workSpatula();
-    renderSlot(i); renderRack(); renderBins();
+    renderSlot(i); renderPantry(); renderBins();
   }
   function workSpatula() {
     el.spatula.classList.remove("is-working"); void el.spatula.offsetWidth;
     el.spatula.classList.add("is-working");
   }
 
-  function renderRack() {
-    el.plateRack.innerHTML = "";
-    S.rack.forEach((p, idx) => {
+  /* ---- fry baskets --------------------------------------------------------- */
+  function buildBaskets() {
+    el.baskets.innerHTML = "";
+    for (let i = 0; i < S.rank.baskets; i++) {
       const b = document.createElement("button");
       b.type = "button";
-      b.className = "tb-plate" + (p.grade === "PERFECT" ? " is-perfect" : p.grade === "BURNT" ? " is-burnt" : "");
-      if (S.selectedPlate === p.id) b.classList.add("is-selected");
-      b.setAttribute("aria-label", `Plated patty — ${p.grade} (${p.pct}%). Click to select for the trash.`);
-      b.innerHTML = `<span class="tb-plate-meat" style="--patty-color:${cookColor(p.up)}"></span><span class="tb-plate-grade">${p.grade}</span>`;
-      b.addEventListener("click", () => {
-        S.selectedPlate = S.selectedPlate === p.id ? null : p.id;
-        el.trash.classList.toggle("is-armed", S.selectedPlate !== null);
-        renderRack();
-      });
-      el.plateRack.appendChild(b);
+      b.className = "tb-basket";
+      b.dataset.basket = i;
+      b.setAttribute("aria-label", `Fry basket ${i + 1} — empty`);
+      b.addEventListener("click", () => { if (S.baskets[i]) pullBasket(i); });
+      el.baskets.appendChild(b);
+    }
+  }
+  function renderBasket(i) {
+    const btn = el.baskets.children[i]; if (!btn) return;
+    const item = S.baskets[i];
+    btn.classList.toggle("is-burnt", !!(item && item.burnt));
+    btn.classList.toggle("has-item", !!item);
+    if (!item) {
+      btn.innerHTML = "";
+      btn.setAttribute("aria-label", `Fry basket ${i + 1} — empty`);
+      return;
+    }
+    if (!btn.querySelector(".tb-basket-bar")) {
+      btn.innerHTML = `<span class="tb-basket-art">${SIDE_META[item.type].emoji}</span>
+        <span class="tb-basket-bar"><span class="tb-basket-fill"></span></span>`;
+    }
+    const fill = btn.querySelector(".tb-basket-fill");
+    fill.style.width = clamp(item.cook / BASKET_MAX * 100, 0, 100) + "%";
+    fill.classList.toggle("is-perfect", item.cook >= BASKET_PERFECT.lo && item.cook <= BASKET_PERFECT.hi);
+    fill.classList.toggle("is-burnt", item.cook > BASKET_MAX);
+    btn.setAttribute("aria-label",
+      `Fry basket ${i + 1} — ${SIDE_META[item.type].label}, ${Math.round(item.cook)} of ${BASKET_MAX}${item.burnt ? ", burnt" : ""}. Click to pull.`);
+  }
+  function dropBasket(type) {
+    const free = S.baskets.findIndex((b) => !b);
+    if (free === -1) { SFX.buzz(); hint("Baskets are full."); return; }
+    S.baskets[free] = { id: nextBasketId++, type, cook: 0, burnt: false };
+    SFX.sizzle();
+    renderBasket(free);
+  }
+  function pullBasket(i) {
+    const item = S.baskets[i]; if (!item) return;
+    if (S.pantry[item.type].length >= PANTRY_CAP[item.type]) { SFX.buzz(); hint("Tray is full — use or trash one."); return; }
+    S.baskets[i] = null;
+    S.pantry[item.type].push({ id: item.id, type: item.type, pct: basketPct(item), grade: basketGrade(item) });
+    SFX.drop();
+    renderBasket(i); renderPantry(); renderBins();
+  }
+
+  /* ---- drink machine -------------------------------------------------------- */
+  function updateSodaVisual() {
+    if (!el.sodaFill) return;
+    const pct = clamp(S.drinkFill, 0, DRINK_OVERFLOW) / DRINK_OVERFLOW * 100;
+    el.sodaFill.style.height = pct + "%";
+    el.sodaFill.classList.toggle("is-perfect", S.drinkFill >= DRINK_PERFECT.lo && S.drinkFill <= DRINK_PERFECT.hi);
+    el.sodaFill.classList.toggle("is-over", S.drinkFill > DRINK_MAX);
+    el.sodaMachine.classList.toggle("is-filling", S.drinkHolding);
+  }
+  function releaseSoda() {
+    if (!S.drinkHolding) return;
+    S.drinkHolding = false;
+    if (S.drinkFill < 18) { S.drinkFill = 0; updateSodaVisual(); return; }        // let go too early — no penalty
+    if (S.pantry.drink.length >= PANTRY_CAP.drink) {
+      SFX.buzz(); hint("Tray is full — use or trash one.");
+      S.drinkFill = 0; updateSodaVisual(); return;
+    }
+    const pct = drinkPct(S.drinkFill);
+    S.pantry.drink.push({ id: nextBasketId++, type: "drink", pct, grade: drinkGrade(pct) });
+    S.drinkFill = 0;
+    SFX.drop();
+    updateSodaVisual(); renderPantry(); renderBins();
+  }
+
+  /* ---- shared pantry (patty / fries / rings / drink) ----------------------- */
+  function appendPattyChip(p) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "tb-plate" + (p.grade === "PERFECT" ? " is-perfect" : p.grade === "BURNT" ? " is-burnt" : "");
+    if (S.selectedItem && S.selectedItem.kind === "patty" && S.selectedItem.id === p.id) b.classList.add("is-selected");
+    b.setAttribute("aria-label", `Plated patty — ${p.grade} (${p.pct}%). Click to select for the trash.`);
+    b.innerHTML = `<span class="tb-plate-meat" style="--patty-color:${cookColor(p.up)}"></span><span class="tb-plate-grade">${p.grade}</span>`;
+    b.addEventListener("click", () => {
+      S.selectedItem = (S.selectedItem && S.selectedItem.kind === "patty" && S.selectedItem.id === p.id)
+        ? null : { kind: "patty", id: p.id };
+      el.trash.classList.toggle("is-armed", S.selectedItem !== null);
+      renderPantry();
     });
-    el.trash.classList.toggle("is-armed", S.selectedPlate !== null);
+    el.plateRack.appendChild(b);
+  }
+  function appendSideChip(type, item) {
+    const meta = SIDE_META[type];
+    const b = document.createElement("button");
+    b.type = "button";
+    const good = type === "drink" ? "PERFECT" : "GOLDEN";
+    b.className = "tb-side-chip" + (item.grade === good ? " is-perfect" : (item.grade === "BURNT" ? " is-burnt" : ""));
+    if (S.selectedItem && S.selectedItem.kind === type && S.selectedItem.id === item.id) b.classList.add("is-selected");
+    b.innerHTML = `<span class="tb-side-chip-art">${meta.emoji}</span><span class="tb-side-chip-grade">${item.grade}</span>`;
+    b.setAttribute("aria-label", `${meta.label} — ${item.grade} (${item.pct}%). Click to select for the trash.`);
+    b.addEventListener("click", () => {
+      S.selectedItem = (S.selectedItem && S.selectedItem.kind === type && S.selectedItem.id === item.id)
+        ? null : { kind: type, id: item.id };
+      el.trash.classList.toggle("is-armed", S.selectedItem !== null);
+      renderPantry();
+    });
+    el.plateRack.appendChild(b);
+  }
+  function renderPantry() {
+    el.plateRack.innerHTML = "";
+    S.pantry.patty.forEach(appendPattyChip);
+    S.pantry.fries.forEach((p) => appendSideChip("fries", p));
+    S.pantry.rings.forEach((p) => appendSideChip("rings", p));
+    S.pantry.drink.forEach((p) => appendSideChip("drink", p));
+    el.trash.classList.toggle("is-armed", S.selectedItem !== null);
   }
   function trashSelected() {
-    if (S.selectedPlate === null) { hint("Click a plated patty first, then the trash."); return; }
-    const idx = S.rack.findIndex((p) => p.id === S.selectedPlate);
-    if (idx >= 0) { S.rack.splice(idx, 1); S.waste++; SFX.buzz(); }
-    S.selectedPlate = null;
-    renderRack(); renderBins(); updateHud();
+    if (!S.selectedItem) { hint("Click a plated item first, then the trash."); return; }
+    const { kind, id } = S.selectedItem;
+    const arr = S.pantry[kind];
+    const idx = arr.findIndex((p) => p.id === id);
+    if (idx >= 0) { arr.splice(idx, 1); S.waste++; SFX.buzz(); }
+    S.selectedItem = null;
+    renderPantry(); renderBins(); updateHud();
   }
 
   /* ---- counter: bins + build --------------------------------------------- */
   function unlockedBins(shift) {
-    return ["patty", "bun", ...toppingPool(shift)];
+    const bins = ["patty", "bun", ...toppingPool(shift)];
+    if (shift >= SIDES_START_SHIFT) bins.push("fries");
+    if (shift >= RINGS_START_SHIFT) bins.push("rings");
+    if (shift >= DRINK_START_SHIFT) bins.push("drink");
+    return bins;
   }
   function renderBins() {
     el.bins.innerHTML = "";
@@ -420,7 +624,7 @@
       b.className = "tb-bin";
       b.dataset.bin = key;
       if (key === "patty") {
-        const n = S.rack.length;
+        const n = S.pantry.patty.length;
         b.innerHTML = `<span class="tb-bin-art">🥩</span><span class="tb-bin-label">Patty ×${n}</span>`;
         b.disabled = n === 0;
         b.setAttribute("aria-label", `Add a plated patty to the build (${n} available)`);
@@ -429,6 +633,12 @@
         b.innerHTML = `<span class="tb-bin-art">🍞</span><span class="tb-bin-label">Bun</span>`;
         b.setAttribute("aria-label", "Bun — bottom bun on an empty plate, top bun to finish");
         b.addEventListener("click", addBun);
+      } else if (key === "fries" || key === "rings" || key === "drink") {
+        const meta = SIDE_META[key], n = S.pantry[key].length;
+        b.innerHTML = `<span class="tb-bin-art">${meta.emoji}</span><span class="tb-bin-label">${meta.short} ×${n}</span>`;
+        b.disabled = n === 0;
+        b.setAttribute("aria-label", `Add ${meta.label} to the tray (${n} available)`);
+        b.addEventListener("click", () => addSideToBuild(key));
       } else {
         const d = LAYERS[key];
         b.innerHTML = `<span class="tb-bin-art">${d.emoji}</span><span class="tb-bin-label">${d.short}</span>`;
@@ -452,46 +662,74 @@
   }
 
   function buildClosed() { return !!(S.build && S.build.layers.includes("bun_t")); }
+  function ensureBuild() {
+    if (!S.build) S.build = { layers: [], patties: [], sides: [], log: [] };
+    return S.build;
+  }
 
   function addBun() {
-    if (!S.build || S.build.layers.length === 0) {
-      S.build = { layers: ["bun_b"], patties: [] };
-    } else if (buildClosed()) { SFX.buzz(); hint("It already has a top bun. Serve it or scrap it."); return; }
-    else S.build.layers.push("bun_t");
+    const b = ensureBuild();
+    if (b.layers.length === 0) { b.layers.push("bun_b"); b.log.push({ t: "layer", key: "bun_b" }); }
+    else if (buildClosed()) { SFX.buzz(); hint("It already has a top bun. Serve it or scrap it."); return; }
+    else { b.layers.push("bun_t"); b.log.push({ t: "layer", key: "bun_t" }); }
     SFX.drop(); renderBuild();
   }
   function addLayer(key) {
     if (!S.build || S.build.layers.length === 0) { SFX.buzz(); hint("Bottom bun first — tap the bun."); return; }
     if (buildClosed()) { SFX.buzz(); hint("It already has a top bun. Serve it or scrap it."); return; }
     S.build.layers.push(key);
+    S.build.log.push({ t: "layer", key });
     SFX.drop(); renderBuild();
   }
   function addPattyToBuild() {
     if (!S.build || S.build.layers.length === 0) { SFX.buzz(); hint("Bottom bun first — tap the bun."); return; }
     if (buildClosed()) { SFX.buzz(); hint("It already has a top bun."); return; }
-    if (!S.rack.length) { SFX.buzz(); hint("No plated patties — the griddle is behind you."); return; }
+    if (!S.pantry.patty.length) { SFX.buzz(); hint("No plated patties — the griddle is behind you."); return; }
     let best = 0;
-    S.rack.forEach((p, i) => { if (p.pct > S.rack[best].pct) best = i; });
-    const patty = S.rack.splice(best, 1)[0];
-    if (S.selectedPlate === patty.id) S.selectedPlate = null;
+    S.pantry.patty.forEach((p, i) => { if (p.pct > S.pantry.patty[best].pct) best = i; });
+    const patty = S.pantry.patty.splice(best, 1)[0];
+    if (S.selectedItem && S.selectedItem.kind === "patty" && S.selectedItem.id === patty.id) S.selectedItem = null;
     S.build.layers.push("patty");
     S.build.patties.push(patty);
-    SFX.drop(); renderBuild(); renderRack(); renderBins();
+    S.build.log.push({ t: "layer", key: "patty" });
+    SFX.drop(); renderBuild(); renderPantry(); renderBins();
+  }
+  function addSideToBuild(type) {
+    if (!S.pantry[type].length) {
+      SFX.buzz();
+      hint(`No ${SIDE_META[type].label.toLowerCase()} ready — check the griddle${type === "drink" ? " or the soda machine" : ""}.`);
+      return;
+    }
+    let best = 0;
+    S.pantry[type].forEach((p, i) => { if (p.pct > S.pantry[type][best].pct) best = i; });
+    const item = S.pantry[type].splice(best, 1)[0];
+    if (S.selectedItem && S.selectedItem.kind === type && S.selectedItem.id === item.id) S.selectedItem = null;
+    const b = ensureBuild();
+    b.sides.push(item);
+    b.log.push({ t: "side", type });
+    SFX.drop(); renderBuild(); renderPantry(); renderBins();
   }
   function undoLayer() {
-    if (!S.build || !S.build.layers.length) return;
-    const key = S.build.layers.pop();
-    if (key === "patty") {
-      const patty = S.build.patties.pop();
-      if (patty && S.rack.length < RACK_MAX) S.rack.push(patty);
-      else if (patty) S.waste++;
+    if (!S.build || !S.build.log.length) return;
+    const entry = S.build.log.pop();
+    if (entry.t === "side") {
+      const item = S.build.sides.pop();
+      if (item && S.pantry[entry.type].length < PANTRY_CAP[entry.type]) S.pantry[entry.type].push(item);
+      else if (item) S.waste++;
+    } else {
+      const key = S.build.layers.pop();
+      if (key === "patty") {
+        const patty = S.build.patties.pop();
+        if (patty && S.pantry.patty.length < PANTRY_CAP.patty) S.pantry.patty.push(patty);
+        else if (patty) S.waste++;
+      }
     }
-    if (!S.build.layers.length) S.build = null;
-    SFX.flip(); renderBuild(); renderRack(); renderBins(); updateHud();
+    if (!S.build.layers.length && !S.build.sides.length) S.build = null;
+    SFX.flip(); renderBuild(); renderPantry(); renderBins(); updateHud();
   }
   function scrapBuild() {
     if (!S.build) return;
-    S.waste += 1 + S.build.patties.length;
+    S.waste += 1 + S.build.patties.length + S.build.sides.length;
     S.build = null;
     SFX.buzz(); renderBuild(); renderBins(); updateHud();
   }
@@ -512,9 +750,20 @@
     }
     return s;
   }
+  function sideChipSpan(item) {
+    const s = document.createElement("span");
+    s.className = "tb-mini-side";
+    s.textContent = SIDE_META[item.type].emoji;
+    s.title = `${SIDE_META[item.type].label} — ${item.grade}`;
+    return s;
+  }
   function renderBuild() {
     el.buildStack.innerHTML = "";
     if (S.build) for (const key of S.build.layers) el.buildStack.appendChild(layerDiv(key));
+    if (el.buildSides) {
+      el.buildSides.innerHTML = "";
+      if (S.build) for (const item of S.build.sides) el.buildSides.appendChild(sideChipSpan(item));
+    }
     highlightNextBin();
     updateBell();
   }
@@ -540,6 +789,12 @@
       b.innerHTML = `<span class="tb-ticket-head"><span>#${t.id}</span><span class="tb-ticket-cust">${t.cust.e}</span></span>
         <span class="tb-patience"><span class="tb-patience-fill" style="width:100%"></span></span>`;
       b.appendChild(mini);
+      if (t.sides.length) {
+        const row = document.createElement("span");
+        row.className = "tb-mini-side-row";
+        row.textContent = t.sides.map((s) => SIDE_META[s].emoji).join(" ");
+        b.appendChild(row);
+      }
       b.addEventListener("click", () => pinTicket(t.id));
       el.ticketRail.appendChild(b);
     }
@@ -567,6 +822,11 @@
     for (const key of t.layers) {
       const li = document.createElement("li");
       li.textContent = LAYERS[key].label;
+      list.appendChild(li);
+    }
+    for (const s of t.sides) {
+      const li = document.createElement("li");
+      li.textContent = SIDE_META[s].label;
       list.appendChild(li);
     }
     el.pinnedTicket.appendChild(list);
@@ -607,11 +867,26 @@
     if (build.patties.length) {
       grill = Math.round(build.patties.reduce((s, p) => s + p.pct, 0) / Math.max(build.patties.length, need));
     }
+
+    let sidesScore = null;
+    if (t.sides.length) {
+      const avail = build.sides.slice();
+      let sum = 0;
+      for (const want of t.sides) {
+        const idx = avail.findIndex((s) => s.type === want);
+        if (idx >= 0) { sum += avail[idx].pct; avail.splice(idx, 1); }
+      }
+      sidesScore = Math.round(sum / t.sides.length);
+    }
+
     const mood = moodMult(t);
-    const raw = 0.55 * stack + 0.45 * grill;
+    const raw = sidesScore === null
+      ? 0.5625 * stack + 0.4375 * grill               // 45/35 renormalized to 100 when no sides ordered
+      : 0.45 * stack + 0.35 * grill + 0.20 * sidesScore;
     const total = clamp(Math.round(raw * mood), 0, 115);
-    const tip = Math.max(0, Math.round((total / 100) * (3 + t.layers.length * 0.7) * t.cust.tip));
-    return { stack, grill, mood, total, tip };
+    const tipBonus = S.rank ? S.rank.tipBonus : 1;
+    const tip = Math.max(0, Math.round((total / 100) * (3 + t.layers.length * 0.7 + t.sides.length) * t.cust.tip * tipBonus));
+    return { stack, grill, sides: sidesScore, mood, total, tip };
   }
 
   function doServe() {
@@ -623,7 +898,7 @@
     S.tickets = S.tickets.filter((x) => x.id !== t.id);
     S.activeTicketId = null;
     S.served++;
-    S.score += r.total;
+    S.score += Math.round(r.total * (t.cust.scoreWeight || 1));
     S.tips += r.tip;
     S.orders.push({ ticket: t, r });
 
@@ -634,6 +909,7 @@
     // tray flies out through the window
     el.serveSpot.innerHTML = "";
     for (const key of build.layers) el.serveSpot.appendChild(layerDiv(key));
+    for (const item of build.sides) el.serveSpot.appendChild(sideChipSpan(item));
     el.serveSpot.classList.remove("is-serving"); void el.serveSpot.offsetWidth;
     el.serveSpot.classList.add("is-serving");
 
@@ -653,11 +929,13 @@
   }
   function showOrderScore(t, r) {
     SFX.coin();
+    const sidesRow = r.sides !== null ? meterRow("Sides", r.sides) : "";
     el.orderOverlay.innerHTML = `<div class="tb-overlay-card">
       <h2>Order #${t.id} · ${t.cust.e} ${t.cust.n}</h2>
       <div class="tb-score-grid">
         ${meterRow("Stack", r.stack)}
         ${meterRow("Grill", r.grill)}
+        ${sidesRow}
       </div>
       <p class="tb-reaction">“${reaction(r.total)}” <span style="font-style:normal;color:var(--rt-ink-soft)">· mood ×${r.mood.toFixed(2)}</span></p>
       <div class="tb-order-total"><span>+${r.total} pts</span><span class="tb-tip">🪙 ${r.tip} tip</span></div>
@@ -672,17 +950,29 @@
   }
 
   /* ---- shift lifecycle ---------------------------------------------------- */
+  function updateFryUnlocks() {
+    el.friesTub.hidden = S.shift < SIDES_START_SHIFT;
+    el.ringsTub.hidden = S.shift < RINGS_START_SHIFT;
+    el.sodaMachine.hidden = S.shift < DRINK_START_SHIFT;
+  }
+
   function startShift() {
     S.screen = "shift";
+    S.rank = rankFor(S.save.totalScore || 0);
     S.quota = Math.min(4 + S.shift, 9);
     S.spawned = 0; S.served = 0; S.score = 0; S.tips = 0; S.waste = 0;
     S.tickets = []; S.activeTicketId = null; S.nextTicket = 1;
-    S.grill = new Array(GRILL_SLOTS).fill(null);
-    S.rack = []; S.build = null; S.selectedPlate = null; S.orders = [];
+    S.grill = new Array(S.rank.grillSlots).fill(null);
+    S.baskets = new Array(S.rank.baskets).fill(null);
+    S.pantry = { patty: [], fries: [], rings: [], drink: [] };
+    S.build = null; S.selectedItem = null; S.orders = [];
+    S.drinkFill = 0; S.drinkHolding = false;
     S.clock = 0; S.spawnAt = 1.2;
     el.title.hidden = true;
     el.game.hidden = false;
-    buildSlots(); renderRack(); renderBins(); renderBuild(); renderRail(); renderQueue();
+    buildSlots(); buildBaskets(); updateFryUnlocks();
+    renderPantry(); renderBins(); renderBuild(); renderRail(); renderQueue();
+    updateSodaVisual();
     updateHud();
     face(0, { quiet: true });
     S.running = true;
@@ -696,8 +986,10 @@
     if (S.spawned >= S.quota || S.tickets.length >= RAIL_MAX) return;
     if (S.clock < S.spawnAt) return;
     S.spawnAt = S.clock + spawnInterval();
+    const isLast = S.spawned === S.quota - 1;
     S.spawned++;
-    S.tickets.push(genTicket(S.shift));
+    const forceGrumpy = isLast && S.shift % 7 === 0;
+    S.tickets.push(genTicket(S.shift, forceGrumpy));
     SFX.ding();
     renderRail(); renderQueue();
     if (S.face !== 2) el.facingTabs[2].classList.add("has-new");
@@ -707,17 +999,24 @@
     S.running = false;
     S.screen = "between";
     const sv = S.save;
+    const prevRank = S.rank;
     sv.lifetime.shifts++; sv.lifetime.served += S.served;
     sv.lifetime.tips += S.tips; sv.lifetime.waste += S.waste;
     sv.best = Math.max(sv.best || 0, S.score);
+    sv.totalScore = (sv.totalScore || 0) + S.score;
     sv.shift = ++S.shift;
     persist();
+
+    const newRank = rankFor(sv.totalScore);
+    const promoted = newRank.index > prevRank.index;
+    const pay = paydayBreakdown(S.tips);
 
     const avg = S.orders.length ? Math.round(S.orders.reduce((s, o) => s + o.r.total, 0) / S.orders.length) : 0;
     const best = S.orders.reduce((b, o) => (o.r.total > (b ? b.r.total : -1) ? o : b), null);
     el.shiftOverlay.innerHTML = `<div class="tb-overlay-card">
       <h2>Shift ${S.shift - 1} — clocked out</h2>
       <p class="tb-shift-big">⭐ ${S.score}</p>
+      ${promoted ? `<p class="tb-promo-banner">🎉 Promoted to <strong>${newRank.title}</strong>!</p>` : ""}
       <table class="tb-shift-table">
         <tr><td>Orders served</td><td>${S.served}</td></tr>
         <tr><td>Average order</td><td>${avg}%</td></tr>
@@ -725,6 +1024,12 @@
         <tr><td>Tips</td><td>🪙 ${S.tips}</td></tr>
         <tr><td>Food wasted</td><td>🗑 ${S.waste}</td></tr>
         <tr><td>Personal best shift</td><td>⭐ ${sv.best}</td></tr>
+      </table>
+      <h3 style="margin:2px 0 0;font-family:var(--pixel);font-size:16px">Paycheck (flavor only)</h3>
+      <table class="tb-shift-table">
+        <tr><td>Gross pay</td><td>$${pay.gross.toFixed(2)}</td></tr>
+        ${pay.lines.map((l) => `<tr><td>− ${l.label}</td><td>-$${l.amt.toFixed(2)}</td></tr>`).join("")}
+        <tr><td><strong>Net pay</strong></td><td><strong>$${pay.net.toFixed(2)}</strong></td></tr>
       </table>
       <p class="tb-reaction">Mr. Grabs counted the register twice. You may keep working here.</p>
       <div style="display:flex;gap:10px;justify-content:flex-end;width:100%">
@@ -750,13 +1055,15 @@
     el.hudCoins.textContent = `🪙 ${S.tips}`;
     el.hudScore.textContent = `⭐ ${S.score}`;
     el.hudWaste.textContent = `🗑 ${S.waste}`;
+    if (el.hudRank) el.hudRank.textContent = S.rank.title;
   }
   function renderTitleStats() {
     const lt = S.save.lifetime;
     if (!lt.shifts) { el.titleStats.hidden = true; return; }
     el.titleStats.hidden = false;
+    const rank = rankFor(S.save.totalScore || 0);
     el.titleStats.textContent =
-      `Shift ${S.save.shift} · best shift ⭐ ${S.save.best} · lifetime 🪙 ${lt.tips} · ${lt.served} served`;
+      `${rank.title} · Shift ${S.save.shift} · best shift ⭐ ${S.save.best} · lifetime 🪙 ${lt.tips} · ${lt.served} served`;
   }
 
   /* ---- main loop ---------------------------------------------------------- */
@@ -768,16 +1075,34 @@
     lastT = t;
     S.clock += dt;
 
-    for (let i = 0; i < GRILL_SLOTS; i++) {
+    for (let i = 0; i < S.grill.length; i++) {
       const p = S.grill[i];
       if (!p) continue;
       p.down += COOK_RATE * dt;
       if (p.down > COOK_MAX && !p.burnt) { p.burnt = true; renderSlot(i); }
     }
+    for (let i = 0; i < S.baskets.length; i++) {
+      const b = S.baskets[i];
+      if (!b) continue;
+      b.cook += BASKET_RATE * dt;
+      if (b.cook > BASKET_MAX && !b.burnt) { b.burnt = true; renderBasket(i); }
+    }
+    if (S.drinkHolding) {
+      S.drinkFill += DRINK_RATE * dt;
+      updateSodaVisual();
+      if (S.drinkFill >= DRINK_OVERFLOW) {
+        S.drinkHolding = false;
+        S.waste++;
+        S.drinkFill = 0;
+        SFX.buzz();
+        updateSodaVisual(); updateHud();
+      }
+    }
     visualAcc += dt;
     if (visualAcc > 0.12) {
       visualAcc = 0;
-      for (let i = 0; i < GRILL_SLOTS; i++) updateSlotVisual(i);
+      for (let i = 0; i < S.grill.length; i++) updateSlotVisual(i);
+      for (let i = 0; i < S.baskets.length; i++) if (S.baskets[i]) renderBasket(i);
     }
     patienceAcc += dt;
     if (patienceAcc > 0.5) { patienceAcc = 0; updatePatience(); }
@@ -802,10 +1127,21 @@
       if (free === -1) { SFX.buzz(); hint("Griddle is full."); return; }
       layPatty(free);
     });
+    el.friesTub.addEventListener("click", () => dropBasket("fries"));
+    el.ringsTub.addEventListener("click", () => dropBasket("rings"));
     el.trash.addEventListener("click", trashSelected);
     el.undo.addEventListener("click", undoLayer);
     el.scrap.addEventListener("click", scrapBuild);
     el.bell.addEventListener("click", doServe);
+
+    el.sodaMachine.addEventListener("pointerdown", (ev) => {
+      ev.preventDefault();
+      S.drinkHolding = true;
+      updateSodaVisual();
+    });
+    el.sodaMachine.addEventListener("pointerup", releaseSoda);
+    el.sodaMachine.addEventListener("pointerleave", releaseSoda);
+    el.sodaMachine.addEventListener("pointercancel", releaseSoda);
 
     el.soundToggle.addEventListener("click", () => {
       S.soundOn = !S.soundOn;
@@ -824,8 +1160,8 @@
     // VR reticle: spring-follows the mouse, squeezes on grab, widens over
     // anything reachable. Mouse/pen only — touch has its own finger.
     if (FINE_POINTER && el.hand && el.pov) {
-      const REACHABLE = ".tb-slot, .tb-slot-plate, .tb-tub, .tb-plate, .tb-trash, .tb-bin, " +
-        ".tb-ticket, .tb-bell, .tb-turn, .tb-facing-tab, .tb-btn, .tb-icon-btn";
+      const REACHABLE = ".tb-slot, .tb-slot-plate, .tb-tub, .tb-basket, .tb-soda, .tb-plate, .tb-side-chip, " +
+        ".tb-trash, .tb-bin, .tb-ticket, .tb-bell, .tb-turn, .tb-facing-tab, .tb-btn, .tb-icon-btn";
       el.pov.classList.add("has-hand");
       el.pov.addEventListener("pointermove", (ev) => {
         if (ev.pointerType === "touch") return;
@@ -872,8 +1208,11 @@
 
   /* smoke-test / debug hook */
   window.__tb = {
-    S, LAYERS, genTicket, face, layPatty, flipSlot, plateSlot, addBun, addLayer,
-    addPattyToBuild, pinTicket, doServe, endShift, startShift, scoreOrder, lcsLen,
-    pattyGrade, pattyPct, COOK_MAX, PERFECT,
+    S, LAYERS, SIDE_META, RANKS, genTicket, rankFor, face, layPatty, flipSlot, plateSlot,
+    addBun, addLayer, addPattyToBuild, addSideToBuild, dropBasket, pullBasket,
+    pinTicket, doServe, endShift, startShift, scoreOrder, lcsLen,
+    pattyGrade, pattyPct, basketGrade, basketPct, drinkPct, drinkGrade,
+    updateSodaVisual, releaseSoda,
+    COOK_MAX, PERFECT, BASKET_MAX, BASKET_PERFECT, DRINK_MAX, DRINK_PERFECT,
   };
 })();

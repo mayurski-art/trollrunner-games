@@ -58,6 +58,7 @@
             <li><strong>Griddle</strong> — tap the tub to lay a patty. Each patty cooks the side facing DOWN. Tap a patty to flip it; hit the green band on both sides, then plate it. Burnt is forever.</li>
             <li><strong>Counter</strong> — pin a ticket, then tap bins in the ticket's exact stack order. Patties come from your plate rack. Wrong order costs you.</li>
             <li><strong>Window</strong> — tickets ding through the pass. Finished Trolly Patty? Ring the bell. Faster service, bigger tips.</li>
+            <li><strong>Fries, rings, drinks</strong> unlock as shifts go on — drop a basket on the griddle and pull it golden, or hold the soda machine and let go in the sweet spot.</li>
             <li><strong>Remember:</strong> patties keep cooking while your back is turned. That's the job.</li>
           </ol>
           <button type="button" class="tb-btn tb-btn-primary" id="tb-howto-close">Got it</button>
@@ -73,6 +74,7 @@
           <span class="tb-hud-chip tb-hud-coins" id="tb-hud-coins" title="Tips earned this shift">🪙 0</span>
           <span class="tb-hud-chip" id="tb-hud-score" title="Shift score">⭐ 0</span>
           <span class="tb-hud-chip tb-hud-waste" id="tb-hud-waste" title="Food wasted this shift">🗑 0</span>
+          <span class="tb-hud-chip tb-hud-rank" id="tb-hud-rank" title="Your rank">Trainee</span>
           <div class="tb-facing-tabs" role="tablist" aria-label="Facing">
             <button type="button" class="tb-facing-tab is-active" data-face="0" role="tab" aria-selected="true">🔥 Griddle</button>
             <button type="button" class="tb-facing-tab" data-face="1" role="tab" aria-selected="false">🍔 Counter</button>
@@ -100,12 +102,25 @@
                 <span class="tb-tub-art" aria-hidden="true">🥩</span>
                 <span class="tb-tub-label">Raw patties</span>
               </button>
-              <div class="tb-plate-rack" id="tb-plate-rack" aria-label="Plated patties"></div>
-              <button type="button" class="tb-trash" id="tb-trash" title="Trash can" aria-label="Trash can — click a plated patty first, then here, to bin it">🗑</button>
+              <div class="tb-plate-rack" id="tb-plate-rack" aria-label="Tray — plated patties and sides"></div>
+              <button type="button" class="tb-trash" id="tb-trash" title="Trash can" aria-label="Trash can — click a plated item first, then here, to bin it">🗑</button>
               <div class="tb-spatula" id="tb-spatula" aria-hidden="true">
                 <div class="tb-spatula-head"></div>
                 <div class="tb-spatula-neck"></div>
                 <div class="tb-spatula-grip"></div>
+              </div>
+
+              <!-- fry station: unlocks shift 2 (fries) / shift 3 (rings) -->
+              <div class="tb-fry-station" id="tb-fry-station">
+                <button type="button" class="tb-tub tb-tub-small" id="tb-fries-tub" title="Drop a batch of fries" hidden>
+                  <span class="tb-tub-art" aria-hidden="true">🍟</span>
+                  <span class="tb-tub-label">Fries</span>
+                </button>
+                <div class="tb-basket-slots" id="tb-baskets" aria-label="Fry baskets"></div>
+                <button type="button" class="tb-tub tb-tub-small" id="tb-rings-tub" title="Drop a batch of onion rings" hidden>
+                  <span class="tb-tub-art" aria-hidden="true">🧅</span>
+                  <span class="tb-tub-label">Rings</span>
+                </button>
               </div>
             </section>
 
@@ -117,9 +132,18 @@
               <aside class="tb-pinned-ticket" id="tb-pinned-ticket" aria-label="Pinned ticket">
                 <p class="tb-pinned-empty">Pin a ticket at the window →</p>
               </aside>
+
+              <!-- soda machine: unlocks shift 4 -->
+              <button type="button" class="tb-soda" id="tb-soda-machine" hidden
+                      aria-label="Hold to fill a drink, release to serve it">
+                <span class="tb-soda-cup" aria-hidden="true"><span class="tb-soda-fill" id="tb-soda-fill"></span></span>
+                <span class="tb-soda-label">Hold to fill</span>
+              </button>
+
               <div class="tb-countertop" aria-hidden="true"></div>
               <div class="tb-buildzone">
                 <div class="tb-build-stack" id="tb-build-stack" aria-label="Burger in progress"></div>
+                <div class="tb-build-sides" id="tb-build-sides" aria-label="Sides in the tray"></div>
                 <div class="tb-build-controls">
                   <button type="button" class="tb-btn tb-btn-small" id="tb-undo">↩ Undo</button>
                   <button type="button" class="tb-btn tb-btn-small tb-btn-danger" id="tb-scrap" title="Bin the whole build">🗑 Scrap</button>
