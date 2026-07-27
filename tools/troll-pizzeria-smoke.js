@@ -144,6 +144,8 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
   await page.evaluate(() => window.__pz.switchStation('cut'));
   await page.waitForSelector('#pz-cutshelf-row .pz-shelf-pizza');
   await page.click('#pz-cutshelf-row .pz-shelf-pizza');
+  const cutCanvas3d = await page.evaluate(() => !!document.querySelector('#pz-cut-pizza canvas.pz3d-canvas'));
+  log(cutCanvas3d === p3dOk, p3dOk ? '3D canvas active at the cut station' : '3D unavailable — DOM pizza in use');
   await page.click('#pz-cut-btn');                                  // start sweeper
   const cuts = order.cutCount / 2;
   for (let i = 0; i < cuts; i++) {
@@ -154,9 +156,16 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
   await page.screenshot({ path: path.join(OUT, 'pz-5-cut.png') });
   log(true, `${cuts} cuts made, serve button visible`);
 
+  // Once every cut is committed, the Pizza Cam should have cleaved the
+  // deck into that many wedge sectors (3D only — no DOM equivalent).
+  if (p3dOk) {
+    const sectors = await page.evaluate(() => window.TrollPizza3D.__debugSectorCount());
+    log(sectors === cuts * 2, `pie cleaved into ${sectors} sectors (expected ${cuts * 2})`);
+  }
+
   await page.click('#pz-serve-btn');
   await page.waitForSelector('#pz-serve-overlay:not([hidden])');
-  await new Promise(r => setTimeout(r, 1100));                      // meters animate
+  await new Promise(r => setTimeout(r, p3dOk ? 1900 : 1100));        // 3D adds a ~0.7s spin before the overlay
   await page.screenshot({ path: path.join(OUT, 'pz-6-serve.png') });
   const result = await page.evaluate(() => window.__pz.S.tickets[0].result);
   log(result && result.total > 0, `served: total=${Math.round(result.total * 100)}% order=${Math.round(result.order * 100)}% bake=${Math.round(result.bake * 100)}% cut=${Math.round(result.cut * 100)}% tip=${result.tip}`);

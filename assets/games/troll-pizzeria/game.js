@@ -905,26 +905,34 @@
     const box = $("#pz-cut-pizza");
     const t = S.cut.ticketId ? ticketById(S.cut.ticketId) : null;
     if (!t) {
+      if (p3d()) p3d().unmount();
       box.innerHTML = "";
       $("#pz-cut-hint").textContent = "Pick a baked pie from the shelf.";
       $("#pz-cut-btn").hidden = true;
       $("#pz-serve-btn").hidden = true;
       return;
     }
-    renderPizza(box, t);
-    // guide + sweeper overlay
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("viewBox", "0 0 100 100");
-    svg.id = "pz-cut-svg";
     const k = t.order.cutCount / 2;
-    for (let i = 0; i < k; i++) svg.appendChild(cutLine((i * 180) / k, "pz-guide"));
-    for (const a of S.cut.done) svg.appendChild(cutLine(a, "pz-cutline"));
-    if (S.cut.sweeping) {
-      const sweep = cutLine(S.cut.angle, "pz-sweeper");
-      sweep.id = "pz-sweep-line";
-      svg.appendChild(sweep);
+    if (p3d()) {
+      p3d().mount(box);
+      p3d().sync(Object.assign(view3d(t), {
+        cutNeeded: k, sweeping: S.cut.sweeping, sweepAngle: S.cut.angle,
+      }));
+    } else {
+      renderPizza(box, t);
+      // guide + sweeper overlay
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("viewBox", "0 0 100 100");
+      svg.id = "pz-cut-svg";
+      for (let i = 0; i < k; i++) svg.appendChild(cutLine((i * 180) / k, "pz-guide"));
+      for (const a of S.cut.done) svg.appendChild(cutLine(a, "pz-cutline"));
+      if (S.cut.sweeping) {
+        const sweep = cutLine(S.cut.angle, "pz-sweeper");
+        sweep.id = "pz-sweep-line";
+        svg.appendChild(sweep);
+      }
+      box.appendChild(svg);
     }
-    box.appendChild(svg);
 
     const left = S.cut.needed - S.cut.done.length;
     if (left > 0) {
@@ -955,11 +963,15 @@
       if (!S.cut.sweeping) return;
       S.cut.angle = (S.cut.angle + speed * (now - last) / 1000) % 180;
       last = now;
-      const lineEl = document.getElementById("pz-sweep-line");
-      if (lineEl) {
-        const rep = cutLine(S.cut.angle, "pz-sweeper");
-        rep.id = "pz-sweep-line";
-        lineEl.replaceWith(rep);
+      if (p3d()) {
+        p3d().updateSweep(S.cut.angle);
+      } else {
+        const lineEl = document.getElementById("pz-sweep-line");
+        if (lineEl) {
+          const rep = cutLine(S.cut.angle, "pz-sweeper");
+          rep.id = "pz-sweep-line";
+          lineEl.replaceWith(rep);
+        }
       }
       S.cut.raf = requestAnimationFrame(step);
     };
@@ -1002,6 +1014,13 @@
     if (mood === "bad") Sfx.grr(); else Sfx.ding();
     setTimeout(() => Sfx.coin(Math.min(6, Math.ceil(res.tip / 3))), 500);
 
+    // Pizza Cam money shot: one quick spin of the finished pie, then the
+    // score overlay pops. Falls straight through to the overlay without 3D.
+    if (p3d() && p3d().isMounted($("#pz-cut-pizza"))) p3d().serveSpin(() => showServeOverlay(t, res, mood));
+    else showServeOverlay(t, res, mood);
+  }
+
+  function showServeOverlay(t, res, mood) {
     const ov = $("#pz-serve-overlay");
     const meter = (label, v) => `
       <div class="pz-meter"><label><span>${label}</span><span>${pct(v)}%</span></label>
@@ -1193,7 +1212,7 @@
 
   function switchStation(name) {
     S.station = name;
-    if (name !== "build" && p3d()) p3d().unmount();   // stop the 3D loop off-station
+    if (name !== "build" && name !== "cut" && p3d()) p3d().unmount();  // stop the 3D loop off-station
     document.querySelectorAll(".pz-station").forEach(s => s.classList.remove("is-active"));
     $("#st-" + name).classList.add("is-active");
     document.querySelectorAll(".pz-tab").forEach(t => t.classList.toggle("is-active", t.dataset.station === name));
