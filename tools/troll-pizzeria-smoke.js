@@ -35,7 +35,8 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
     executablePath: CHROME, headless: 'new',
     args: ['--window-size=1180,860', '--disable-background-timer-throttling',
       '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows',
-      '--disable-features=CalculateNativeWinOcclusion'],
+      '--disable-features=CalculateNativeWinOcclusion',
+      '--enable-unsafe-swiftshader'],           // software WebGL for the Pizza Cam
   });
   const page = await browser.newPage();
   await page.setViewport({ width: 1160, height: 840 });
@@ -56,6 +57,11 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
   await page.waitForFunction('window.__pz && window.__pz.S.screen === "title"');
   await page.screenshot({ path: path.join(OUT, 'pz-1-title.png') });
   log(true, 'page loads, boots to title screen');
+
+  // Pizza Cam module should be up (vendored three, so it loads hermetically)
+  await page.waitForFunction('window.TrollPizza3D !== undefined', { timeout: 10000 }).catch(() => {});
+  const p3dOk = await page.evaluate(() => !!(window.TrollPizza3D && window.TrollPizza3D.ok));
+  log(p3dOk, 'Pizza Cam (3D) module initialized');
 
   // Start the shift
   await page.click('#pz-start-btn');
@@ -94,7 +100,9 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
         const n = spotSeq + attempt * 17;
         const a = n * 2.39996;                                     // golden angle
         const r = box.width * (0.12 + 0.26 * Math.sqrt(((n * 7) % 20) / 20));
-        let dx = Math.cos(a) * r, dy = Math.sin(a) * r * 0.9;
+        // dy stays conservative: the 3D camera foreshortens the vertical
+        // axis, so screen-y clicks travel further in pie coords than in 2D
+        let dx = Math.cos(a) * r, dy = Math.sin(a) * r * 0.55;
         if (entry.side === 'left') dx = -Math.abs(dx) - box.width * 0.02;
         if (entry.side === 'right') dx = Math.abs(dx) + box.width * 0.02;
         await page.mouse.click(cx + dx, cy + dy);
@@ -108,6 +116,8 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
   const placed = await page.evaluate(() => window.__pz.S.tickets[0].build.placed.length);
   const wanted = order.tops.reduce((n, t) => n + t.count, 0);
   log(placed === wanted, `toppings placed: ${placed}/${wanted}`);
+  const canvas3d = await page.evaluate(() => !!document.querySelector('#pz-build-pizza canvas.pz3d-canvas'));
+  log(canvas3d === p3dOk, p3dOk ? '3D canvas active at the build station' : '3D unavailable — DOM pizza in use');
   await page.screenshot({ path: path.join(OUT, 'pz-3-build.png') });
 
   // To the oven → pick the raw pie → slot it
@@ -175,6 +185,19 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
   const lbRendered = await page.evaluate(() =>
     !!document.querySelector('#lb-root .lb-table') && document.querySelector('#lb-root').textContent.includes('YOU'));
   log(lbRendered, 'weekly leaderboard rendered by shared engine');
+
+  // ?flat=1 forces the DOM pizza — the 3D layer must stay fully optional
+  await page.goto(`http://localhost:${PORT}/troll-pizzeria.html?flat=1`, { waitUntil: 'domcontentloaded' });
+  await page.waitForFunction('window.__pz && window.__pz.S.screen === "title"');
+  await page.click('#pz-start-btn');
+  await page.waitForSelector('.pz-cust.at-counter', { timeout: 15000 });
+  await page.click('.pz-cust.at-counter');
+  await page.waitForFunction('window.__pz.S.tickets.length === 1');
+  const flatOk = await page.evaluate(() =>
+    !document.querySelector('#pz-build-pizza canvas.pz3d-canvas') &&
+    !!document.querySelector('#pz-build-pizza .pz-layer-fallback, #pz-build-pizza .pz-layer'));
+  log(flatOk, 'flat=1 renders the DOM pizza (no 3D canvas)');
+  await page.screenshot({ path: path.join(OUT, 'pz-8-flat.png') });
 
   if (consoleIssues.length) {
     console.log('\nConsole issues:');

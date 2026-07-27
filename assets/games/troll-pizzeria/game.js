@@ -13,6 +13,16 @@
   const SAVE_KEY = "troll-pizzeria-save-v1";
   const GAME_ID = "troll-pizzeria";
 
+  /* Pizza Cam (pizza3d.js module): big pies render in 3D when the module
+     initialized; everything falls back to the DOM pizza otherwise.
+     ?flat=1 forces the fallback (docs/TROLL-PIZZERIA-V2.md). */
+  const FLAT_MODE = /[?&]flat=1/.test(location.search);
+  const p3d = () => (!FLAT_MODE && window.TrollPizza3D && window.TrollPizza3D.ok ? window.TrollPizza3D : null);
+  const view3d = (t, opts) => ({
+    sauce: t.build.sauce, cheese: t.build.cheese, placed: t.build.placed,
+    doneness: t.doneness, cutAngles: t.cutAngles, halfGuide: !!(opts && opts.halfGuide),
+  });
+
   const BAKE_SECONDS = 46;          // 0 → 1.0 doneness in the oven
   const OVEN_SLOTS = 4;
   const PIZZA_RADIUS = 0.44;        // max topping distance from center (0..1)
@@ -631,6 +641,7 @@
     const pizzaBox = $("#pz-build-pizza");
     const hasHalf = t && t.order.tops.some(e => e.side !== "whole");
     if (!t) {
+      if (p3d()) p3d().unmount();
       ticketBox.innerHTML = "";
       pizzaBox.innerHTML = "";
       $("#pz-build-hint").textContent = "No open ticket — take an order first.";
@@ -640,7 +651,12 @@
       return;
     }
     ticketBox.innerHTML = `<div class="pz-ticket">${ticketHtml(t, true)}</div>`;
-    renderPizza(pizzaBox, t, { halfGuide: hasHalf });
+    if (p3d()) {
+      p3d().mount(pizzaBox);
+      p3d().sync(view3d(t, { halfGuide: hasHalf }));
+    } else {
+      renderPizza(pizzaBox, t, { halfGuide: hasHalf });
+    }
     $("#pz-build-hint").textContent = hasHalf
       ? "Half orders: left half is the LEFT side of the pie as you look at it."
       : "Drag toppings from the bins — or click a bin, then click the pie.";
@@ -699,12 +715,17 @@
     pizzaBox.addEventListener("pointerdown", (ev) => {
       const t = activeTicket();
       if (!t) return;
-      const topNode = ev.target.closest(".pz-topping");
-      if (topNode) {
+      // picking up a topping already on the pie (3D: raycast, DOM: node hit)
+      let idx = null;
+      if (p3d() && p3d().isMounted(pizzaBox)) {
+        idx = p3d().toppingAt(ev.clientX, ev.clientY);
+      } else {
+        const topNode = ev.target.closest(".pz-topping");
+        if (topNode) idx = +topNode.dataset.idx;
+      }
+      if (idx !== null && t.build.placed[idx]) {
         ev.preventDefault();
-        const idx = +topNode.dataset.idx;
         const p = t.build.placed[idx];
-        if (!p) return;
         t.build.placed.splice(idx, 1);
         drag = { tid: p.tid, ghost: ghostAt(ev.clientX, ev.clientY, p.tid, topOf(p.tid).emoji), moved: true, repositioning: true };
         renderBuild();
@@ -741,9 +762,16 @@
     function placeAt(ev, tid) {
       const t = activeTicket();
       if (!t) return false;
-      const rect = pizzaBox.getBoundingClientRect();
-      const x = (ev.clientX - rect.left) / rect.width;
-      const y = (ev.clientY - rect.top) / rect.height;
+      let x, y;
+      if (p3d() && p3d().isMounted(pizzaBox)) {
+        const hit = p3d().pointToPie(ev.clientX, ev.clientY);
+        if (!hit) return false;
+        x = hit.x; y = hit.y;
+      } else {
+        const rect = pizzaBox.getBoundingClientRect();
+        x = (ev.clientX - rect.left) / rect.width;
+        y = (ev.clientY - rect.top) / rect.height;
+      }
       const dist = Math.hypot(x - 0.5, y - 0.5);
       if (dist > PIZZA_RADIUS) return false;
       t.build.placed.push({ tid: tid || S.armedBin, x: clamp(x, 0.06, 0.94), y: clamp(y, 0.06, 0.94) });
@@ -1165,6 +1193,7 @@
 
   function switchStation(name) {
     S.station = name;
+    if (name !== "build" && p3d()) p3d().unmount();   // stop the 3D loop off-station
     document.querySelectorAll(".pz-station").forEach(s => s.classList.remove("is-active"));
     $("#st-" + name).classList.add("is-active");
     document.querySelectorAll(".pz-tab").forEach(t => t.classList.toggle("is-active", t.dataset.station === name));
@@ -1240,6 +1269,12 @@
         ev.preventDefault();
         doCut();
       }
+    });
+
+    // Pizza Cam module loads async (ES module) — swap the big pie to 3D
+    // whenever it comes up while the build station is showing.
+    window.addEventListener("pizza3d:ready", () => {
+      if (S.screen === "game" && S.station === "build") renderBuild();
     });
 
     setupBuildPointer();
