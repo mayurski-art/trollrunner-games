@@ -181,6 +181,9 @@ button { cursor: pointer; }
   display: flex; gap: 6px; align-items: center; flex: 1; min-width: 120px;
   overflow-x: auto; padding: 2px;
 }
+/* Grin Combo meter: chain perfect stations for bonus tips (docs/TROLL-PIZZERIA-V2.md) */
+.pz-grin-meter { letter-spacing: 1px; }
+.pz-grin-meter.is-maxed { background: rgba(255, 216, 77, 0.22); border-color: rgba(255, 216, 77, 0.55); color: var(--gold); }
 .pz-mini-ticket {
   font-family: var(--mono); font-size: 11px; line-height: 1.25;
   background: var(--pz-paper); color: var(--pz-ink);
@@ -197,6 +200,26 @@ button { cursor: pointer; }
 .pz-station { position: absolute; inset: 0; display: none; flex-direction: column; overflow: hidden; }
 .pz-station.is-active { display: flex; }
 .pz-hint { font-family: var(--mono); font-size: 13px; color: var(--pz-ink-soft); text-align: center; padding: 4px 10px; }
+
+/* ---- troll events + grin hunt --------------------------------------------- */
+/* Hidden grin: appears over whichever station is showing during an event's
+   ~2s tell. Click it to cancel the sabotage and bank a small bonus. */
+.pz-grin-hunt {
+  position: absolute; z-index: 15; border: none; background: none; padding: 0;
+  font-size: 30px; line-height: 1; cursor: pointer; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4));
+  animation: pz-grin-pulse 0.7s ease-in-out infinite;
+}
+@keyframes pz-grin-pulse { 0%, 100% { transform: scale(1); opacity: 0.55; } 50% { transform: scale(1.22); opacity: 1; } }
+.pz-bin-swapped { outline: 2px dashed var(--pz-sauce); }
+.pz-quake { animation: pz-quake-shake 0.35s ease-in-out infinite; }
+@keyframes pz-quake-shake {
+  0%, 100% { transform: rotate(0deg) translate(0, 0); }
+  25% { transform: rotate(-1.5deg) translate(-2px, 1px); }
+  75% { transform: rotate(1.5deg) translate(2px, -1px); }
+}
+.pz-dial-scrambled { outline: 1px dashed var(--pz-bad); }
+.pz-ticket-rattle { animation: pz-rattle 0.4s ease-in-out 2; }
+@keyframes pz-rattle { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-3deg); } 75% { transform: rotate(3deg); } }
 
 /* ---- lobby -------------------------------------------------------------- */
 .pz-lobby-scene {

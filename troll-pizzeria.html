@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=DM+Sans:wght@500;700;900&family=DM+Mono:wght@500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/troll-leaderboard.css?v=lb-engine-v1">
-  <link rel="stylesheet" href="assets/games/troll-pizzeria/style.css?v=pizzeria-3d1">
+  <link rel="stylesheet" href="assets/games/troll-pizzeria/style.css?v=pizzeria-3d3">
 </head>
 <body>
 
@@ -74,6 +74,7 @@
           <span class="pz-hud-chip" id="pz-hud-day">Day 1</span>
           <span class="pz-hud-chip pz-hud-coins" id="pz-hud-coins" title="Tips earned today">🪙 0</span>
           <span class="pz-hud-chip" id="pz-hud-score" title="Day score">⭐ 0</span>
+          <span class="pz-hud-chip pz-grin-meter" id="pz-hud-grin" title="Grin combo — chain perfect stations for bonus tips">·····</span>
           <div class="pz-ticket-rack" id="pz-ticket-rack" aria-label="Open tickets"></div>
           <button type="button" class="pz-icon-btn" id="pz-sound-toggle" aria-pressed="true" title="Toggle sound" aria-label="Toggle sound">
             <span class="when-on">🔊</span><span class="when-off">🔇</span>
@@ -185,7 +186,7 @@
   <!-- Leaderboard engine + game -->
   <script src="assets/js/troll-leaderboard.js?v=lb-engine-v1" defer></script>
   <script src="assets/games/troll-pizzeria/leaderboard.js?v=pizzeria-lb-v1" defer></script>
-  <script src="assets/games/troll-pizzeria/game.js?v=pizzeria-3d2" defer></script>
+  <script src="assets/games/troll-pizzeria/game.js?v=pizzeria-3d3" defer></script>
   <!-- Pizza Cam: 3D pie renderer (vendored Three.js — hermetic, no CDN).
        Optional: if it fails to load, game.js keeps the DOM pizza. -->
   <script type="importmap">
