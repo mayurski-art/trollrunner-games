@@ -8,10 +8,15 @@ tickets through the order window, and a tiny rival keeps trying to
 steal the secret sauce recipe.
 
 This is NOT another Papa's-style station-tab game (that's Pizzeria).
-The whole kitchen is one continuous side-view scene — grill on the
-left, assembly counter in the middle, order window + register on the
-right — and your fry cook sprite walks to whichever station you click.
-The feel is "I am standing in this kitchen during a rush."
+It plays in **first-person POV**: the screen is what the fry cook sees.
+You stand in the kitchen and turn between three facings — the **griddle**
+(looking down at the patties, your spatula at the bottom of the frame),
+the **assembly counter** (build the stack, bins within arm's reach), and
+the **order window** (tickets slide through, the bell, Wojak and the
+dining room beyond). Turning is a quick camera pan (← → keys, edge
+arrows, or swipe). The feel is "I am standing at this grill during a
+rush." Patties keep cooking while you're facing the other way — the
+tension of the game is what's behind you.
 
 **IP note:** we capture the *fantasy* (fry cook, cheapskate boss,
 miserable cashier, formula thief), never the property. No SpongeBob
@@ -155,6 +160,9 @@ register cha-ching). No audio files, no new CSP entries.
 2. **Register double-duty** — v2. v1 keeps Wojak on the register full time.
 3. **Events** — all five ship in v1.
 4. **Grill** — per-side doneness with flip timing.
+5. **Camera** — first-person POV with three turnable facings
+   (griddle / counter / window), requested mid-build 2026-07-27.
+   Replaces the earlier side-view walking-sprite idea.
 
 ## Build phases
 
