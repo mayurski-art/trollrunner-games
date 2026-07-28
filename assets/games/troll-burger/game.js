@@ -509,8 +509,12 @@
            <span class="tb-bar tb-bar-up"><span class="tb-bar-fill"></span></span>
            <span class="tb-bar tb-bar-down"><span class="tb-bar-fill"></span></span>
          </span>
-         <span class="tb-slot-plate" title="Plate this patty">🍽</span>`;
-      btn.querySelector(".tb-slot-plate").addEventListener("click", (ev) => { ev.stopPropagation(); plateSlot(i); });
+         <span class="tb-slot-plate" role="button" tabindex="0" aria-label="Plate this patty" title="Plate this patty">🍽</span>`;
+      const plateBtn = btn.querySelector(".tb-slot-plate");
+      plateBtn.addEventListener("click", (ev) => { ev.stopPropagation(); plateSlot(i); });
+      plateBtn.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); ev.stopPropagation(); plateSlot(i); }
+      });
     }
     updateSlotVisual(i);
     btn.setAttribute("aria-label",
