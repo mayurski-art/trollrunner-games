@@ -139,9 +139,14 @@ button { cursor: pointer; }
   min-height: clamp(430px, 62vh, 640px);
   padding: 40px 20px;
   text-align: center;
+  /* PixelLab storefront scene as a dimmed hero backdrop — the gradients
+     above it keep the logo legible and remain the fallback if the image
+     404s (a failed background-image layer just drops out, harmless). */
   background:
-    radial-gradient(circle at 50% 118%, rgba(198, 90, 46, 0.5), transparent 52%),
+    radial-gradient(circle at 50% 118%, rgba(198, 90, 46, 0.6), transparent 55%),
+    linear-gradient(180deg, rgba(16, 27, 31, 0.55) 0%, rgba(20, 16, 10, 0.7) 55%, rgba(13, 9, 6, 0.94) 100%),
     radial-gradient(circle at 14% 12%, rgba(77, 238, 255, 0.1), transparent 30%),
+    url("art/storefront.png") center 38% / cover no-repeat,
     linear-gradient(180deg, #101b1f 0%, #14100a 68%, #0d0906 100%);
 }
 .tb-title::before {
@@ -758,6 +763,7 @@ button { cursor: pointer; }
   z-index: -1;
 }
 .tb-layer {
+  position: relative;
   display: grid; place-items: center;
   width: var(--layer-w, 150px); height: var(--layer-h, 18px);
   margin-top: -2px;
@@ -768,6 +774,19 @@ button { cursor: pointer; }
   box-shadow: 0 3px 5px rgba(0, 0, 0, 0.28);
   animation: tb-drop 0.22s ease;
 }
+/* PixelLab sprite bleeds slightly past the CSS bar (real ingredient art
+   isn't a clean rectangle) and fades in over the color bar, which stays
+   underneath as both a loading placeholder and a permanent 404 fallback. */
+.tb-layer-art {
+  position: absolute; left: 50%; top: 50%;
+  width: 132%; height: 220%;
+  transform: translate(-50%, -50%);
+  object-fit: contain;
+  image-rendering: pixelated;
+  opacity: 0; transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+.tb-layer.has-art .tb-layer-art { opacity: 1; }
 @keyframes tb-drop {
   from { transform: translateY(-26px); opacity: 0.4; }
   to { transform: translateY(0); opacity: 1; }
@@ -911,11 +930,13 @@ button { cursor: pointer; }
 
 .tb-mini-stack { display: flex; flex-direction: column-reverse; align-items: center; gap: 1px; padding: 4px 0 2px; }
 .tb-mini-layer {
+  position: relative;
   width: var(--mini-w, 54px); height: var(--mini-h, 7px);
   border-radius: var(--mini-r, 3px);
   background: var(--layer-c, #ccc);
   border: 1px solid rgba(0, 0, 0, 0.25);
 }
+.tb-mini-layer .tb-layer-art { width: 150%; height: 260%; }
 
 .tb-passcounter {
   position: absolute; left: 0; right: 0; bottom: 0; height: 22%;
@@ -982,10 +1003,12 @@ button { cursor: pointer; }
 
 /* ---- responsive --------------------------------------------------------- */
 @media (max-width: 760px) {
-  .tb-hud { gap: 6px; padding: 10px 10px; }
-  .tb-facing-tabs { margin-left: 0; order: 5; width: 100%; justify-content: center; }
-  .tb-pov { height: clamp(420px, 66vh, 560px); }
-  .tb-turn { width: 38px; height: 68px; }
+  .tb-hud { gap: 5px; padding: 8px 10px; }
+  .tb-hud-chip { min-height: 28px; padding: 4px 9px; font-size: 12px; }
+  .tb-facing-tabs { margin-left: 0; order: 5; width: 100%; justify-content: center; gap: 6px; }
+  .tb-facing-tab { min-height: 30px; padding: 4px 10px; }
+  .tb-pov { height: clamp(420px, 62vh, 560px); }
+  .tb-turn { width: 44px; height: 72px; }   /* meet the ~44px touch-target guideline */
   .tb-pinned-ticket { width: 128px; }
   .tb-plate-rack { min-width: 0; }
   .tb-spatula { right: 12%; scale: 0.82; }
@@ -996,4 +1019,7 @@ button { cursor: pointer; }
   .tb-fry-station { bottom: 1%; scale: 0.86; }
   .tb-soda { top: 4%; right: 2%; width: 78px; }
   .tb-hud-rank { display: none; }  /* HUD is crowded enough on small screens */
+  .tb-event-banner { padding: 6px 10px; gap: 8px; }
+  .tb-event-text strong { font-size: 12px; }
+  .tb-event-text span { font-size: 10.5px; }
 }

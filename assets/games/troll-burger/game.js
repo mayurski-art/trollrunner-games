@@ -11,6 +11,17 @@
 
   const $ = (s) => document.querySelector(s);
   const SAVE_KEY = "troll-burger-save-v1";
+  const ART = "assets/games/troll-burger/art/";
+  /* PixelLab top-down sprites for the burger layers — see art/README.md.
+     Every use goes through layerDiv()'s fallback-first swap (matches the
+     Pizzeria pattern): the CSS color bar renders immediately and stays as
+     the permanent 404 fallback; the sprite fades in on top once loaded. */
+  const LAYER_SPRITE = {
+    bun_b: "bun-bottom.png", bun_t: "bun-top.png", patty: "patty.png",
+    cheese: "top-cheese.png", lettuce: "top-lettuce.png", tomato: "top-tomato.png",
+    ketchup: "top-ketchup.png", pickles: "top-pickles.png", onions: "top-onions.png",
+    mustard: "top-mustard.png", jalapeno: "top-jalapeno.png",
+  };
 
   /* ---- tuning ----------------------------------------------------------- */
   const COOK_MAX = 110;          // bar length in cook units; > COOK_MAX = burnt
@@ -230,7 +241,7 @@
     drop: () => tone(180, 0.08, "square", 0.06),
     buzz: () => { tone(120, 0.18, "sawtooth", 0.07); },
     coin: () => { tone(920, 0.08, "square", 0.05); tone(1380, 0.16, "square", 0.05, 0.07); },
-    pour: () => { tone(500, 0.05, "sine", 0.04); },
+    pour: () => { tone(420, 0.07, "sine", 0.045); tone(640, 0.09, "sine", 0.04, 0.06); },
   };
 
   /* ---- helpers ---------------------------------------------------------- */
@@ -592,7 +603,7 @@
     const pct = drinkPct(S.drinkFill);
     S.pantry.drink.push({ id: nextBasketId++, type: "drink", pct, grade: drinkGrade(pct) });
     S.drinkFill = 0;
-    SFX.drop();
+    SFX.pour();
     updateSodaVisual(); renderPantry(); renderBins();
   }
 
@@ -791,6 +802,16 @@
       s.style.setProperty("--layer-h", d.h + "px");
       s.style.setProperty("--layer-r", d.r);
       s.title = d.label;
+    }
+    const file = LAYER_SPRITE[key];
+    if (file) {
+      const img = new Image();
+      img.className = "tb-layer-art";
+      img.alt = "";
+      img.draggable = false;
+      img.onload = () => s.classList.add("has-art");
+      img.src = ART + file;
+      s.appendChild(img);
     }
     return s;
   }
