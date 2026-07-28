@@ -22,6 +22,81 @@
     ketchup: "top-ketchup.png", pickles: "top-pickles.png", onions: "top-onions.png",
     mustard: "top-mustard.png", jalapeno: "top-jalapeno.png",
   };
+  /* PixelLab full-body customer sprites (queue walk-in/wait/leave + the
+     Wojak cashier's idle loop) — see art/README.md's customer-sprite batch
+     section. Same fallback-first pattern as LAYER_SPRITE: the emoji face
+     in .tb-cust/.tb-wojak-face renders immediately and stays the permanent
+     404 fallback (this is what the hermetic smoke test exercises, since it
+     blocks all non-localhost requests); the sprite image fades in on top
+     only once its frame has actually loaded. PixelLab's animate_character
+     returns each frame as a separately-numbered PNG, not one spritesheet,
+     so frames are stepped with a small setInterval instead of a CSS
+     steps() spritesheet animation. */
+  const CUST_ART = ART + "customers/";
+  const CUST_SPRITE = {
+    Trollio: { key: "trollio", frames: 8 },
+    Pepe:    { key: "pepe",    frames: 8 },
+    Doge:    { key: "doge",    frames: 8 },
+    Chad:    { key: "chad",    frames: 8 },
+    Nana:    { key: "nana",    frames: 8 },
+    Harold:  { key: "harold",  frames: 8 },
+    Grumpy:  { key: "grumpy",  frames: 8 },
+  };
+  const WOJAK_SPRITE = { key: "wojak", frames: 4 };
+  const WALK_FRAME_MS = 110;   // ~90 SPF-ish gait for the 8-frame walk cycle
+  const IDLE_FRAME_MS = 260;   // slower breathing-idle loop for the cashier
+
+  const custAnimTimers = new WeakMap();
+  function custWalkSrc(key, i) { return `${CUST_ART}${key}-walk-${i}.png`; }
+  function custStandSrc(key) { return `${CUST_ART}${key}-stand.png`; }
+  function stopCustAnim(node) {
+    const t = custAnimTimers.get(node);
+    if (t) { clearInterval(t); custAnimTimers.delete(node); }
+  }
+  function attachCustSprite(node, custName) {
+    const sprite = CUST_SPRITE[custName];
+    if (!sprite) return; // no sprite generated for this cast member — emoji-only fallback
+    const img = document.createElement("img");
+    img.className = "tb-cust-art";
+    img.alt = ""; img.draggable = false;
+    img.onload = () => img.classList.add("has-art");
+    node.appendChild(img);
+    node.dataset.custKey = sprite.key;
+    node.dataset.custFrames = sprite.frames;
+    playCustWalk(node, img);
+  }
+  function playCustWalk(node, img) {
+    stopCustAnim(node);
+    const key = node.dataset.custKey, frames = +node.dataset.custFrames;
+    if (!key) return;
+    let i = 0;
+    img.src = custWalkSrc(key, i);
+    custAnimTimers.set(node, setInterval(() => {
+      i = (i + 1) % frames;
+      img.src = custWalkSrc(key, i);
+    }, WALK_FRAME_MS));
+  }
+  function freezeCustStand(node, img) {
+    stopCustAnim(node);
+    const key = node.dataset.custKey;
+    if (!key) return;
+    img.src = custStandSrc(key);
+  }
+  function initWojakSprite() {
+    const face = document.querySelector(".tb-wojak-face");
+    if (!face) return;
+    const img = document.createElement("img");
+    img.className = "tb-wojak-art";
+    img.alt = ""; img.draggable = false;
+    img.onload = () => img.classList.add("has-art");
+    face.appendChild(img);
+    let i = 0;
+    img.src = `${CUST_ART}${WOJAK_SPRITE.key}-idle-${i}.png`;
+    setInterval(() => {
+      i = (i + 1) % WOJAK_SPRITE.frames;
+      img.src = `${CUST_ART}${WOJAK_SPRITE.key}-idle-${i}.png`;
+    }, IDLE_FRAME_MS);
+  }
 
   /* ---- tuning ----------------------------------------------------------- */
   const COOK_MAX = 110;          // bar length in cook units; > COOK_MAX = burnt
@@ -942,7 +1017,12 @@
     for (const [id, node] of existing) {
       if (currentIds.has(id)) continue;
       node.classList.add("is-leaving");
-      node.addEventListener("animationend", () => node.remove(), { once: true });
+      // reuse the same west-walk sheet mirrored, rather than generating a
+      // separate east animation — cheaper and reads correctly for walking
+      // back out the door.
+      const img = node.querySelector(".tb-cust-art");
+      if (img) { img.classList.add("is-mirrored"); playCustWalk(node, img); }
+      node.addEventListener("animationend", () => { stopCustAnim(node); node.remove(); }, { once: true });
     }
 
     for (const t of S.tickets) {
@@ -952,7 +1032,12 @@
       d.dataset.ticket = t.id;
       d.style.setProperty("--idle-delay", (Math.random() * 1.6).toFixed(2) + "s");
       d.innerHTML = `${t.cust.e}<small>${t.cust.n}</small>`;
-      d.addEventListener("animationend", () => d.classList.replace("is-arriving", "is-waiting"), { once: true });
+      attachCustSprite(d, t.cust.n);
+      d.addEventListener("animationend", () => {
+        d.classList.replace("is-arriving", "is-waiting");
+        const img = d.querySelector(".tb-cust-art");
+        if (img) freezeCustStand(d, img);
+      }, { once: true });
       el.queue.appendChild(d);
     }
   }
@@ -1561,6 +1646,7 @@
     loadSave();
     renderTitleStats();
     wire();
+    initWojakSprite();
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();

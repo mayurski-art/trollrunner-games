@@ -945,6 +945,17 @@ button { cursor: pointer; }
   background: #d7dade;
 }
 .tb-wojak-face { position: relative; font-size: 34px; filter: grayscale(0.7); }
+/* PixelLab idle-breathing sprite for the cashier — fades in over the emoji,
+   which stays the permanent fallback (see initWojakSprite in game.js). */
+.tb-wojak-art {
+  position: absolute; left: 50%; bottom: -6px; translate: -50%;
+  height: 56px; width: auto;
+  image-rendering: pixelated;
+  opacity: 0; transition: opacity 0.15s ease;
+  pointer-events: none;
+  filter: none;
+}
+.tb-wojak-art.has-art { opacity: 1; }
 
 /* the line packs from the register (left) toward the door (right) —
    oldest ticket (first appended) sits closest to the front of the line,
@@ -966,6 +977,19 @@ button { cursor: pointer; }
   background: rgba(0, 0, 0, 0.22);
 }
 .tb-cust small { font-size: 10px; color: rgba(20, 30, 26, 0.75); font-family: var(--mono); }
+/* PixelLab full-body walk/stand sprite, overlaid on the emoji face — the
+   emoji stays underneath as the permanent fallback (never removed) and the
+   sprite fades in on top once its current frame has actually loaded. Sized
+   to roughly cover the 44px emoji glyph above the name label. */
+.tb-cust-art {
+  position: absolute; left: 50%; bottom: 15px; translate: -50%;
+  height: 58px; width: auto;
+  image-rendering: pixelated;
+  opacity: 0; transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+.tb-cust-art.has-art { opacity: 1; }
+.tb-cust-art.is-mirrored { scale: -1 1; }
 
 /* customers walking in through the door and crossing the room to join the
    line, then a small idle shuffle while they wait — swapped in once the
