@@ -244,6 +244,36 @@
     pour: () => { tone(420, 0.07, "sine", 0.045); tone(640, 0.09, "sine", 0.04, 0.06); },
   };
 
+  /* ---- funny audio dialogue -----------------------------------------------
+     Browser-native speech synthesis reads out the game's flavor lines —
+     Mr. Grabs's money lines, Gremlin's taunts, customer reactions — without
+     any audio files (keeps the CSP/asset story identical to the WebAudio
+     SFX above: nothing fetched, nothing to fail to load). Silently no-ops
+     wherever unsupported (headless test runners, some mobile browsers) —
+     never throws, never blocks the game if it can't speak. Cancels any
+     still-playing line first so a rush of quick events (rush hour, a fast
+     order streak) can't pile up a backlog of overlapping speech. */
+  function speak(text, pitch, rate) {
+    if (!S.soundOn) return;
+    try {
+      if (!("speechSynthesis" in window)) return;
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.pitch = pitch == null ? 1 : pitch;
+      u.rate = rate == null ? 1.05 : rate;
+      u.volume = 0.85;
+      window.speechSynthesis.speak(u);
+    } catch (_) { /* speech synthesis unsupported/blocked */ }
+  }
+  const VOICE_PITCH = { "🦀": 0.72, "🕵️": 1.45 };   // Mr. Grabs gruff, Gremlin squeaky
+  const VOICE_RATE  = { "🦀": 0.92, "🕵️": 1.25 };
+  function custPitch(cust) {
+    // stable per-character "voice" rather than random each line
+    let h = 0;
+    for (const ch of cust.n) h = (h * 31 + ch.charCodeAt(0)) % 97;
+    return 0.85 + (h / 97) * 0.5;
+  }
+
   /* ---- helpers ---------------------------------------------------------- */
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const rnd = (n) => Math.floor(Math.random() * n);
@@ -370,6 +400,7 @@
   function grabRefs() {
     ["tb-title", "tb-start-btn", "tb-howto-btn", "tb-howto", "tb-howto-close", "tb-title-stats",
      "tb-game", "tb-hud-shift", "tb-hud-coins", "tb-hud-score", "tb-hud-waste", "tb-hud-rank", "tb-sound-toggle",
+     "tb-fullscreen-toggle", "tb-cabinet",
      "tb-pov", "tb-world", "tb-hand", "tb-turn-left", "tb-turn-right", "tb-slots", "tb-patty-tub", "tb-plate-rack",
      "tb-trash", "tb-spatula", "tb-fries-tub", "tb-rings-tub", "tb-baskets",
      "tb-pinned-ticket", "tb-build-stack", "tb-build-sides", "tb-undo", "tb-scrap",
@@ -897,11 +928,27 @@
     el.pinnedTicket.appendChild(list);
   }
   function renderQueue() {
-    el.queue.innerHTML = "";
+    // Diffed, not rebuilt: a full innerHTML wipe would replay the walk-in
+    // animation for every customer already in line each time one more
+    // arrives. Existing customers keep their DOM node untouched; only new
+    // arrivals get the walk-in, only departures (served) get a walk-out.
+    const existing = new Map([...el.queue.children].map((c) => [+c.dataset.ticket, c]));
+    const currentIds = new Set(S.tickets.map((t) => t.id));
+
+    for (const [id, node] of existing) {
+      if (currentIds.has(id)) continue;
+      node.classList.add("is-leaving");
+      node.addEventListener("animationend", () => node.remove(), { once: true });
+    }
+
     for (const t of S.tickets) {
+      if (existing.has(t.id)) continue;
       const d = document.createElement("span");
-      d.className = "tb-cust";
+      d.className = "tb-cust is-arriving";
+      d.dataset.ticket = t.id;
+      d.style.setProperty("--idle-delay", (Math.random() * 1.6).toFixed(2) + "s");
       d.innerHTML = `${t.cust.e}<small>${t.cust.n}</small>`;
+      d.addEventListener("animationend", () => d.classList.replace("is-arriving", "is-waiting"), { once: true });
       el.queue.appendChild(d);
     }
   }
@@ -1027,6 +1074,7 @@
   function toast(msg, icon, seconds) {
     S.toastMsg = msg; S.toastIcon = icon || "💬"; S.toastUntil = S.clock + (seconds || 3.5);
     renderEventBanner();
+    speak(msg, VOICE_PITCH[icon], VOICE_RATE[icon]);
   }
   function renderEventBanner() {
     if (S.event) {
@@ -1196,6 +1244,7 @@
   }
   function showOrderScore(t, r) {
     SFX.coin();
+    speak(reaction(r.total), custPitch(t.cust), 1 + (custPitch(t.cust) - 1) * 0.4);
     const sidesRow = r.sides !== null ? meterRow("Sides", r.sides) : "";
     el.orderOverlay.innerHTML = `<div class="tb-overlay-card">
       <h2>Order #${t.id} · ${t.cust.e} ${t.cust.n}</h2>
@@ -1437,6 +1486,22 @@
       S.soundOn = !S.soundOn;
       el.soundToggle.setAttribute("aria-pressed", String(S.soundOn));
     });
+
+    if (el.fullscreenToggle && el.cabinet && (el.cabinet.requestFullscreen || el.cabinet.webkitRequestFullScreen)) {
+      el.fullscreenToggle.addEventListener("click", () => {
+        const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+        if (fsEl) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+        else (el.cabinet.requestFullscreen || el.cabinet.webkitRequestFullScreen).call(el.cabinet);
+      });
+      const syncFsBtn = () => {
+        const on = !!(document.fullscreenElement || document.webkitFullscreenElement);
+        el.fullscreenToggle.setAttribute("aria-pressed", String(on));
+      };
+      document.addEventListener("fullscreenchange", syncFsBtn);
+      document.addEventListener("webkitfullscreenchange", syncFsBtn);
+    } else if (el.fullscreenToggle) {
+      el.fullscreenToggle.hidden = true; // Fullscreen API unsupported (rare) — don't show a dead button
+    }
 
     document.addEventListener("keydown", (ev) => {
       if (S.screen !== "shift" || !el.orderOverlay.hidden || !el.shiftOverlay.hidden || !el.howto.hidden) return;
