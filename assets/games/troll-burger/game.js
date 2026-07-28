@@ -1255,6 +1255,17 @@
     sv.shift = ++S.shift;
     persist();
 
+    // shared weekly ladder — engine is display-only/mock, see docs/LEADERBOARD.md
+    try {
+      if (window.TrollLeaderboard) window.TrollLeaderboard.record("troll-burger", {
+        score: S.score, tips: S.tips, served: S.served,
+      });
+    } catch (_) {}
+    try {
+      if (window.TrollNotis && typeof window.TrollNotis.push === "function")
+        window.TrollNotis.push({ icon: "🍔", title: "The Rusty Troll", body: `Shift ${S.shift - 1} done — ⭐ ${S.score} and 🪙 ${S.tips} in tips.` });
+    } catch (_) {}
+
     const newRank = rankFor(sv.totalScore);
     const promoted = newRank.index > prevRank.index;
     const pay = paydayBreakdown(S.tips);

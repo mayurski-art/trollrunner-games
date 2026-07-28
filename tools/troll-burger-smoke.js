@@ -191,20 +191,37 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
   await page.evaluate(() => window.__tb.face(0));
   await new Promise((r) => setTimeout(r, 500));
 
-  // Boss walk-through: trashing an item while he's watching docks pay.
-  await page.evaluate(() => window.__tb.startEvent('boss'));
+  // Boss walk-through: trashing an item while he's watching docks pay. The
+  // real 12s countdown keeps ticking against wall-clock time while we take
+  // a screenshot and drive several IPC round trips below, so stretch the
+  // window immediately or an occasional slow run lets it auto-expire before
+  // the trash click lands (intermittent failure otherwise).
+  await page.evaluate(() => { window.__tb.startEvent('boss'); window.__tb.S.event.until = window.__tb.S.clock + 999; });
   await page.screenshot({ path: path.join(OUT, 'tb-9-boss-banner.png') });
   const bossActive = await page.evaluate(() => !!(window.__tb.S.event && window.__tb.S.event.type === 'boss'));
   log(bossActive, 'boss walk-through event active + banner shown');
 
   // Give score/tips a positive baseline first — both are legitimately 0 this
   // early in the shift, and applyBossPenalty() clamps at Math.max(0, ...),
-  // so a deduction from an already-zero balance would be invisible.
-  await page.evaluate(() => { window.__tb.S.score = 200; window.__tb.S.tips = 20; });
-  const friesChip = await page.$('.tb-side-chip'); // leftover golden fries from the basket test
-  if (friesChip) await friesChip.click();
+  // so a deduction from an already-zero balance would be invisible. Also
+  // plate a fresh patty deterministically rather than relying on a chip
+  // left over from an earlier test step (that made this check flaky).
+  await page.evaluate(() => {
+    const S = window.__tb.S;
+    S.score = 200; S.tips = 20;
+    S.grill[0] = { id: 999, up: 75, down: 75, burnt: false };
+    window.__tb.plateSlot(0);
+  });
+  await page.waitForSelector('.tb-plate, .tb-side-chip');
+  const trayItem = await page.$('.tb-plate, .tb-side-chip');
+  if (trayItem) await trayItem.click();
   const beforeScore = await page.evaluate(() => window.__tb.S.score);
   const beforeTips = await page.evaluate(() => window.__tb.S.tips);
+  // Give the VR camera's mouse-driven look-tilt a moment to finish easing
+  // after the tray click before clicking again elsewhere — back-to-back
+  // clicks in different screen regions faster than a human would otherwise
+  // land while the world is still mid-tilt from the previous one.
+  await new Promise((r) => setTimeout(r, 150));
   await page.click('#tb-trash');
   const afterScore = await page.evaluate(() => window.__tb.S.score);
   const afterTips = await page.evaluate(() => window.__tb.S.tips);
