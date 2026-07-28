@@ -104,6 +104,27 @@
     return { ...r, index: idx };
   }
 
+  /* ---- shift events (the workplace drama) --------------------------------- */
+  const EVENT_META = {
+    boss:      { icon: "🦀", label: "Mr. Grabs is walking the floor" },
+    rush:      { icon: "🚌", label: "Rush hour" },
+    thief:     { icon: "🕵️", label: "Formula thief" },
+    inspector: { icon: "📋", label: "Health inspection" },
+  };
+  const BOSS_LINES = [
+    "That patty cost me FOUR CENTS!!",
+    "You call that portion control?!",
+    "I'm docking that from your paycheck.",
+    "Waste is a CHOICE, fry troll.",
+  ];
+  const THIEF_NEEDED = 3;
+  const INSPECTOR_WIPES_NEEDED = 5;
+  const CLOSING_TASKS = [
+    { key: "grill", label: "Scrub the grill", needed: 6, icon: "🧽" },
+    { key: "floor", label: "Mop the floor",   needed: 6, icon: "🪣" },
+    { key: "sign",  label: "Flip the sign",   needed: 1, icon: "🔌" },
+  ];
+
   /* ---- payday flavor (never touches real score/tips) --------------------- */
   const DEDUCTIONS = [
     ["Paper hat rental", 0.75],
@@ -147,6 +168,11 @@
     drinkFill: 0,
     drinkHolding: false,
     orders: [],                // completed order results this shift
+    eventSchedule: [],          // [{type, atSpawn}], consumed as tickets spawn
+    event: null,                 // active event state, see startEvent()
+    eventBonus: 0,               // running total of event score deltas this shift
+    toastMsg: "", toastIcon: "💬", toastUntil: 0,
+    closing: null,               // {task, tasks, counts, startedAt, bonus} once quota is hit
     soundOn: true,
     running: false,
     spawnAt: 0,                // clock time of next spawn
@@ -311,6 +337,17 @@
       window: (55 + layers.length * 9 + sides.length * 8) * (cust.windowMult || 1),
     };
   }
+  function genRushTicket() {
+    return {
+      id: S.nextTicket++,
+      cust: CUSTS[rnd(CUSTS.length)],
+      layers: ["bun_b", "patty", "cheese", "bun_t"],
+      sides: [],
+      isRush: true,
+      bornAt: S.clock,
+      window: 26,
+    };
+  }
   function ticketById(id) { return S.tickets.find((t) => t.id === id) || null; }
   function moodMult(t) {
     const age = S.clock - t.bornAt;
@@ -327,7 +364,8 @@
      "tb-pinned-ticket", "tb-build-stack", "tb-build-sides", "tb-undo", "tb-scrap",
      "tb-bins", "tb-counter-hint", "tb-soda-machine", "tb-soda-fill",
      "tb-queue", "tb-ticket-rail", "tb-serve-spot", "tb-bell",
-     "tb-order-overlay", "tb-shift-overlay"]
+     "tb-event-banner", "tb-event-icon", "tb-event-label", "tb-event-sub", "tb-event-timer", "tb-event-action",
+     "tb-order-overlay", "tb-shift-overlay", "tb-closing-overlay"]
       .forEach((id) => { el[id.replace(/^tb-/, "").replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = document.getElementById(id); });
     el.facingTabs = [...document.querySelectorAll(".tb-facing-tab")];
   }
@@ -530,6 +568,7 @@
     S.baskets[i] = null;
     S.pantry[item.type].push({ id: item.id, type: item.type, pct: basketPct(item), grade: basketGrade(item) });
     SFX.drop();
+    if (item.burnt && S.event && S.event.type === "boss") applyBossPenalty();
     renderBasket(i); renderPantry(); renderBins();
   }
 
@@ -603,7 +642,12 @@
     const { kind, id } = S.selectedItem;
     const arr = S.pantry[kind];
     const idx = arr.findIndex((p) => p.id === id);
-    if (idx >= 0) { arr.splice(idx, 1); S.waste++; SFX.buzz(); }
+    if (idx >= 0) {
+      arr.splice(idx, 1);
+      S.waste++;
+      SFX.buzz();
+      if (S.event && S.event.type === "boss") applyBossPenalty();
+    }
     S.selectedItem = null;
     renderPantry(); renderBins(); updateHud();
   }
@@ -857,6 +901,194 @@
     });
   }
 
+  /* ---- shift events --------------------------------------------------------
+     A schedule of {type, atSpawn} is built at shift start; checkEventSchedule
+     (called every tick) fires the next one once S.spawned reaches its
+     checkpoint. Only one event runs at a time. The banner lives outside the
+     3D world (below the HUD) so it's visible regardless of which facing
+     you're turned to — events shouldn't require camera gymnastics. */
+  function scheduleEvents() {
+    const sched = [];
+    const q = S.quota;
+    if (S.shift >= 1) {
+      sched.push({ type: "boss", atSpawn: Math.min(2, q) });
+      if (q >= 4) sched.push({ type: "boss", atSpawn: Math.max(1, q - 1) });
+    }
+    if (S.shift >= 2 && Math.random() < 0.9) sched.push({ type: "rush", atSpawn: Math.max(1, Math.round(q * 0.4)) });
+    if (S.shift >= 2 && Math.random() < 0.55) sched.push({ type: "thief", atSpawn: 1 + rnd(Math.max(1, q - 1)) });
+    if (S.shift >= 3 && Math.random() < 0.35) sched.push({ type: "inspector", atSpawn: 1 + rnd(Math.max(1, q - 1)) });
+    sched.sort((a, b) => a.atSpawn - b.atSpawn);
+    for (let i = 1; i < sched.length; i++) if (sched[i].atSpawn <= sched[i - 1].atSpawn) sched[i].atSpawn = sched[i - 1].atSpawn + 1;
+    return sched;
+  }
+  function checkEventSchedule() {
+    if (S.event || !S.eventSchedule.length) return;
+    if (S.spawned >= S.eventSchedule[0].atSpawn) startEvent(S.eventSchedule.shift().type);
+  }
+  function startEvent(type) {
+    if (type === "boss") {
+      S.event = { type, until: S.clock + 12 };
+      toast("Mr. Grabs is walking the floor. Don't waste anything.", "🦀", 3);
+    } else if (type === "rush") {
+      S.event = { type, until: S.clock + 60, spawnedR: 0, servedR: 0, nextSpawn: S.clock + 1.5 };
+      toast("A busload just walked in. RUSH!", "🚌", 3);
+    } else if (type === "thief") {
+      S.event = { type, until: S.clock + 9, hits: 0 };
+      toast("Gremlin is creeping toward the safe!", "🕵️", 3);
+    } else if (type === "inspector") {
+      S.event = { type, until: S.clock + 45, wipes: 0, clean: true };
+      toast("Health inspector! Nothing burnt, and wipe that counter.", "📋", 3);
+    }
+    renderEventBanner();
+  }
+  function endEvent(msg, icon) {
+    S.event = null;
+    toast(msg, icon || "💬", 4);
+    updateHud();
+    if (S.served >= S.quota && !S.closing && el.orderOverlay.hidden) startClosing();
+  }
+  function applyBossPenalty() {
+    S.tips = Math.max(0, S.tips - 2);
+    S.score = Math.max(0, S.score - 15);
+    S.eventBonus -= 15;
+    toast(BOSS_LINES[rnd(BOSS_LINES.length)], "🦀", 3);
+    updateHud();
+  }
+  function hitThief() {
+    if (!S.event || S.event.type !== "thief") return;
+    S.event.hits++;
+    SFX.flip();
+    if (S.event.hits >= THIEF_NEEDED) {
+      S.score += 20; S.tips += 3; S.eventBonus += 20;
+      endEvent("Yeeted the Gremlin! +20 pts, +3 tips", "🥾");
+    } else {
+      renderEventBanner();
+    }
+  }
+  function wipeCounter() {
+    if (!S.event || S.event.type !== "inspector") return;
+    S.event.wipes = Math.min(INSPECTOR_WIPES_NEEDED, S.event.wipes + 1);
+    SFX.drop();
+    renderEventBanner();
+  }
+  function updateEvents(dt) {
+    if (!S.event) return;
+    if (S.event.type === "rush" && S.clock >= S.event.nextSpawn && S.tickets.length < RAIL_MAX) {
+      S.event.nextSpawn = S.clock + 3.4;
+      S.event.spawnedR++;
+      S.tickets.push(genRushTicket());
+      SFX.ding();
+      renderRail(); renderQueue();
+      if (S.face !== 2) el.facingTabs[2].classList.add("has-new");
+    }
+    if (S.clock < S.event.until) return;
+    if (S.event.type === "boss") { endEvent("Mr. Grabs wandered off.", "🦀"); return; }
+    if (S.event.type === "rush") {
+      const survival = S.event.spawnedR ? S.event.servedR / S.event.spawnedR : 1;
+      const bonus = Math.round(survival * 50);
+      S.score += bonus; S.eventBonus += bonus;
+      endEvent(`Rush survived: ${S.event.servedR}/${S.event.spawnedR} (+${bonus} pts)`, "🚌");
+      return;
+    }
+    if (S.event.type === "thief") {
+      const steal = Math.max(3, Math.round(S.tips * 0.15));
+      S.tips = Math.max(0, S.tips - steal);
+      endEvent(`Gremlin swiped 🪙${steal} from the tip jar.`, "🕵️");
+      return;
+    }
+    if (S.event.type === "inspector") {
+      const pass = S.event.clean && S.event.wipes >= INSPECTOR_WIPES_NEEDED;
+      if (pass) { S.score += 25; S.eventBonus += 25; endEvent("Passed inspection! +25 pts", "✅"); }
+      else { S.score = Math.max(0, S.score - 25); S.eventBonus -= 25; endEvent("Failed inspection. -25 pts", "⚠️"); }
+      return;
+    }
+  }
+  function toast(msg, icon, seconds) {
+    S.toastMsg = msg; S.toastIcon = icon || "💬"; S.toastUntil = S.clock + (seconds || 3.5);
+    renderEventBanner();
+  }
+  function renderEventBanner() {
+    if (S.event) {
+      const meta = EVENT_META[S.event.type];
+      el.eventBanner.hidden = false;
+      el.eventBanner.classList.remove("is-toast");
+      el.eventIcon.textContent = meta.icon;
+      el.eventLabel.textContent = meta.label;
+      el.eventTimer.textContent = Math.max(0, Math.ceil(S.event.until - S.clock)) + "s";
+      if (S.event.type === "rush") {
+        el.eventSub.textContent = `${S.event.servedR}/${S.event.spawnedR} served`;
+        el.eventAction.hidden = true;
+      } else if (S.event.type === "thief") {
+        el.eventSub.textContent = `${S.event.hits}/${THIEF_NEEDED} hits`;
+        el.eventAction.hidden = false;
+        el.eventAction.textContent = "👊 Yeet him";
+      } else if (S.event.type === "inspector") {
+        el.eventSub.textContent = `wipe ${S.event.wipes}/${INSPECTOR_WIPES_NEEDED}${S.event.clean ? "" : " · burnt served!"}`;
+        el.eventAction.hidden = false;
+        el.eventAction.textContent = "🧽 Wipe";
+      } else {
+        el.eventSub.textContent = "Don't waste anything.";
+        el.eventAction.hidden = true;
+      }
+      el.eventBanner.classList.toggle("is-bad", S.event.type === "inspector" && !S.event.clean);
+      return;
+    }
+    if (S.clock < S.toastUntil) {
+      el.eventBanner.hidden = false;
+      el.eventBanner.classList.add("is-toast");
+      el.eventIcon.textContent = S.toastIcon;
+      el.eventLabel.textContent = S.toastMsg;
+      el.eventSub.textContent = "";
+      el.eventTimer.textContent = "";
+      el.eventAction.hidden = true;
+      return;
+    }
+    el.eventBanner.hidden = true;
+  }
+
+  /* ---- closing time --------------------------------------------------------
+     Fires once the last non-rush order is served (and no event is holding
+     things up). Three quick tap tasks; total elapsed time feeds a bonus. */
+  function startClosing() {
+    S.closing = { taskIdx: 0, counts: CLOSING_TASKS.map(() => 0), startedAt: S.clock };
+    renderClosing();
+  }
+  function renderClosing() {
+    const c = S.closing; if (!c) return;
+    const task = CLOSING_TASKS[c.taskIdx];
+    const n = c.counts[c.taskIdx];
+    el.closingOverlay.innerHTML = `<div class="tb-overlay-card">
+      <h2>Closing time</h2>
+      <p class="tb-reaction">Last ticket's out. Button it up before Mr. Grabs locks the door on you.</p>
+      <button type="button" class="tb-btn tb-btn-primary tb-closing-btn" id="tb-closing-tap">
+        <span style="font-size:28px">${task.icon}</span><br>${task.label} (${n}/${task.needed})
+      </button>
+    </div>`;
+    el.closingOverlay.hidden = false;
+    $("#tb-closing-tap").addEventListener("click", tapClosing);
+    $("#tb-closing-tap").focus();
+  }
+  function tapClosing() {
+    const c = S.closing; if (!c) return;
+    const task = CLOSING_TASKS[c.taskIdx];
+    c.counts[c.taskIdx]++;
+    SFX.drop();
+    if (c.counts[c.taskIdx] >= task.needed) {
+      c.taskIdx++;
+      if (c.taskIdx >= CLOSING_TASKS.length) { finishClosing(); return; }
+    }
+    renderClosing();
+  }
+  function finishClosing() {
+    const c = S.closing;
+    const elapsed = S.clock - c.startedAt;
+    const bonus = Math.max(0, Math.round(40 - elapsed * 3));
+    S.score += bonus; S.eventBonus += bonus;
+    S.closing = null;
+    el.closingOverlay.hidden = true;
+    endShift(bonus);
+  }
+
   /* ---- scoring + serve ---------------------------------------------------- */
   function scoreOrder(t, build) {
     const lcs = lcsLen(build.layers, t.layers);
@@ -897,10 +1129,20 @@
     const r = scoreOrder(t, build);
     S.tickets = S.tickets.filter((x) => x.id !== t.id);
     S.activeTicketId = null;
-    S.served++;
-    S.score += Math.round(r.total * (t.cust.scoreWeight || 1));
-    S.tips += r.tip;
-    S.orders.push({ ticket: t, r });
+
+    const servedBurnt = build.patties.some((p) => p.grade === "BURNT") || build.sides.some((s) => s.grade === "BURNT");
+    if (servedBurnt && S.event && S.event.type === "inspector") S.event.clean = false;
+
+    if (t.isRush) {
+      if (S.event && S.event.type === "rush") S.event.servedR++;
+      S.tips += r.tip;
+      S.score += Math.round(r.total * 0.3);
+    } else {
+      S.served++;
+      S.score += Math.round(r.total * (t.cust.scoreWeight || 1));
+      S.tips += r.tip;
+      S.orders.push({ ticket: t, r });
+    }
 
     el.bell.classList.add("is-ringing");
     setTimeout(() => el.bell.classList.remove("is-ringing"), 450);
@@ -914,7 +1156,11 @@
     el.serveSpot.classList.add("is-serving");
 
     renderRail(); renderQueue(); renderBuild(); renderBins(); updateHud();
-    setTimeout(() => { el.serveSpot.innerHTML = ""; showOrderScore(t, r); }, 620);
+    if (t.isRush) {
+      setTimeout(() => { el.serveSpot.innerHTML = ""; }, 620);
+    } else {
+      setTimeout(() => { el.serveSpot.innerHTML = ""; showOrderScore(t, r); }, 620);
+    }
   }
 
   function reaction(total) {
@@ -939,12 +1185,12 @@
       </div>
       <p class="tb-reaction">“${reaction(r.total)}” <span style="font-style:normal;color:var(--rt-ink-soft)">· mood ×${r.mood.toFixed(2)}</span></p>
       <div class="tb-order-total"><span>+${r.total} pts</span><span class="tb-tip">🪙 ${r.tip} tip</span></div>
-      <button type="button" class="tb-btn tb-btn-primary" id="tb-order-next">${S.served >= S.quota ? "Clock out" : "Next order"}</button>
+      <button type="button" class="tb-btn tb-btn-primary" id="tb-order-next">${S.served >= S.quota && !S.event ? "Clock out" : "Next order"}</button>
     </div>`;
     el.orderOverlay.hidden = false;
     $("#tb-order-next").addEventListener("click", () => {
       el.orderOverlay.hidden = true;
-      if (S.served >= S.quota) endShift();
+      if (S.served >= S.quota && !S.event) startClosing();
     });
     $("#tb-order-next").focus();
   }
@@ -967,12 +1213,14 @@
     S.pantry = { patty: [], fries: [], rings: [], drink: [] };
     S.build = null; S.selectedItem = null; S.orders = [];
     S.drinkFill = 0; S.drinkHolding = false;
+    S.eventSchedule = scheduleEvents(); S.event = null; S.eventBonus = 0; S.toastUntil = 0; S.closing = null;
     S.clock = 0; S.spawnAt = 1.2;
     el.title.hidden = true;
     el.game.hidden = false;
     buildSlots(); buildBaskets(); updateFryUnlocks();
     renderPantry(); renderBins(); renderBuild(); renderRail(); renderQueue();
     updateSodaVisual();
+    renderEventBanner();
     updateHud();
     face(0, { quiet: true });
     S.running = true;
@@ -995,7 +1243,7 @@
     if (S.face !== 2) el.facingTabs[2].classList.add("has-new");
   }
 
-  function endShift() {
+  function endShift(closingBonus) {
     S.running = false;
     S.screen = "between";
     const sv = S.save;
@@ -1021,6 +1269,8 @@
         <tr><td>Orders served</td><td>${S.served}</td></tr>
         <tr><td>Average order</td><td>${avg}%</td></tr>
         <tr><td>Best order</td><td>${best ? `#${best.ticket.id} ${best.ticket.cust.e} · ${best.r.total}` : "—"}</td></tr>
+        <tr><td>Event bonus</td><td>${S.eventBonus >= 0 ? "+" : ""}${S.eventBonus} pts</td></tr>
+        <tr><td>Closing bonus</td><td>+${closingBonus || 0} pts</td></tr>
         <tr><td>Tips</td><td>🪙 ${S.tips}</td></tr>
         <tr><td>Food wasted</td><td>🗑 ${S.waste}</td></tr>
         <tr><td>Personal best shift</td><td>⭐ ${sv.best}</td></tr>
@@ -1105,10 +1355,12 @@
       for (let i = 0; i < S.baskets.length; i++) if (S.baskets[i]) renderBasket(i);
     }
     patienceAcc += dt;
-    if (patienceAcc > 0.5) { patienceAcc = 0; updatePatience(); }
+    if (patienceAcc > 0.5) { patienceAcc = 0; updatePatience(); renderEventBanner(); }
 
     updateCamera(dt);
     maybeSpawn();
+    checkEventSchedule();
+    updateEvents(dt);
     requestAnimationFrame(tick);
   }
 
@@ -1133,6 +1385,12 @@
     el.undo.addEventListener("click", undoLayer);
     el.scrap.addEventListener("click", scrapBuild);
     el.bell.addEventListener("click", doServe);
+
+    el.eventAction.addEventListener("click", () => {
+      if (!S.event) return;
+      if (S.event.type === "thief") hitThief();
+      else if (S.event.type === "inspector") wipeCounter();
+    });
 
     el.sodaMachine.addEventListener("pointerdown", (ev) => {
       ev.preventDefault();
@@ -1208,11 +1466,12 @@
 
   /* smoke-test / debug hook */
   window.__tb = {
-    S, LAYERS, SIDE_META, RANKS, genTicket, rankFor, face, layPatty, flipSlot, plateSlot,
+    S, LAYERS, SIDE_META, RANKS, genTicket, genRushTicket, rankFor, face, layPatty, flipSlot, plateSlot,
     addBun, addLayer, addPattyToBuild, addSideToBuild, dropBasket, pullBasket,
     pinTicket, doServe, endShift, startShift, scoreOrder, lcsLen,
     pattyGrade, pattyPct, basketGrade, basketPct, drinkPct, drinkGrade,
     updateSodaVisual, releaseSoda,
+    startEvent, endEvent, hitThief, wipeCounter, startClosing, tapClosing,
     COOK_MAX, PERFECT, BASKET_MAX, BASKET_PERFECT, DRINK_MAX, DRINK_PERFECT,
   };
 })();

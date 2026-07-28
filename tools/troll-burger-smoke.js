@@ -185,6 +185,75 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
   const drinkItem = await page.evaluate(() => window.__tb.S.pantry.drink[0] || null);
   log(!!drinkItem, `drink filled and committed to the tray (grade: ${drinkItem && drinkItem.grade})`);
 
+  // ---- Phase 3: shift events. The event banner lives outside the 3D world
+  // (below the HUD), so it's visible from any facing — turn to the griddle
+  // first only because the trash/tray it interacts with live there. ----
+  await page.evaluate(() => window.__tb.face(0));
+  await new Promise((r) => setTimeout(r, 500));
+
+  // Boss walk-through: trashing an item while he's watching docks pay.
+  await page.evaluate(() => window.__tb.startEvent('boss'));
+  await page.screenshot({ path: path.join(OUT, 'tb-9-boss-banner.png') });
+  const bossActive = await page.evaluate(() => !!(window.__tb.S.event && window.__tb.S.event.type === 'boss'));
+  log(bossActive, 'boss walk-through event active + banner shown');
+
+  // Give score/tips a positive baseline first — both are legitimately 0 this
+  // early in the shift, and applyBossPenalty() clamps at Math.max(0, ...),
+  // so a deduction from an already-zero balance would be invisible.
+  await page.evaluate(() => { window.__tb.S.score = 200; window.__tb.S.tips = 20; });
+  const friesChip = await page.$('.tb-side-chip'); // leftover golden fries from the basket test
+  if (friesChip) await friesChip.click();
+  const beforeScore = await page.evaluate(() => window.__tb.S.score);
+  const beforeTips = await page.evaluate(() => window.__tb.S.tips);
+  await page.click('#tb-trash');
+  const afterScore = await page.evaluate(() => window.__tb.S.score);
+  const afterTips = await page.evaluate(() => window.__tb.S.tips);
+  log(afterScore < beforeScore && afterTips < beforeTips,
+    `boss docks pay for trashing while watched (score ${beforeScore}->${afterScore}, tips ${beforeTips}->${afterTips})`);
+
+  await page.evaluate(() => { window.__tb.S.event.until = window.__tb.S.clock; }); // let the running tick loop resolve it
+  await new Promise((r) => setTimeout(r, 200));
+  log(await page.evaluate(() => window.__tb.S.event === null), 'boss event auto-ends');
+
+  // Formula thief: 3 taps yeets Gremlin before he reaches the safe.
+  await page.evaluate(() => window.__tb.startEvent('thief'));
+  await page.screenshot({ path: path.join(OUT, 'tb-10-thief-banner.png') });
+  await page.click('#tb-event-action');
+  await page.click('#tb-event-action');
+  await page.click('#tb-event-action');
+  log(await page.evaluate(() => window.__tb.S.event === null), 'three taps yeets the Gremlin (event resolves)');
+
+  // Health inspector: 5 wipes + nothing burnt served -> passes.
+  await page.evaluate(() => window.__tb.startEvent('inspector'));
+  for (let i = 0; i < 5; i++) await page.click('#tb-event-action');
+  log(await page.evaluate(() => window.__tb.S.event && window.__tb.S.event.wipes === 5 && window.__tb.S.event.clean),
+    'inspector: 5/5 wipes logged, still clean');
+  const scoreBeforeInspect = await page.evaluate(() => window.__tb.S.score);
+  await page.evaluate(() => { window.__tb.S.event.until = window.__tb.S.clock; });
+  await new Promise((r) => setTimeout(r, 200));
+  const scoreAfterInspect = await page.evaluate(() => window.__tb.S.score);
+  log(scoreAfterInspect > scoreBeforeInspect, `inspection passed (+${scoreAfterInspect - scoreBeforeInspect} pts)`);
+
+  // Rush hour: floods the ticket rail while active, survival % feeds a bonus.
+  await page.evaluate(() => window.__tb.startEvent('rush'));
+  await new Promise((r) => setTimeout(r, 2200)); // let 1-2 rush tickets spawn
+  const rushSpawned = await page.evaluate(() => window.__tb.S.event && window.__tb.S.event.spawnedR);
+  log(rushSpawned > 0, `rush hour spawned ${rushSpawned} extra ticket(s)`);
+  await page.evaluate(() => { window.__tb.S.event.until = window.__tb.S.clock; });
+  await new Promise((r) => setTimeout(r, 200));
+  log(await page.evaluate(() => window.__tb.S.event === null), 'rush hour ends and resolves its bonus');
+
+  // Closing time: scrub/mop/flip taps feed a speed bonus, then the shift ends.
+  await page.evaluate(() => { window.__tb.S.served = window.__tb.S.quota; window.__tb.startClosing(); });
+  await page.waitForSelector('#tb-closing-overlay:not([hidden])');
+  await page.screenshot({ path: path.join(OUT, 'tb-11-closing.png') });
+  for (let i = 0; i < 6; i++) await page.click('#tb-closing-tap');  // scrub the grill
+  for (let i = 0; i < 6; i++) await page.click('#tb-closing-tap');  // mop the floor
+  await page.click('#tb-closing-tap');                              // flip the sign
+  await page.waitForSelector('#tb-shift-overlay:not([hidden])');
+  const closingBonusShown = await page.evaluate(() => document.getElementById('tb-shift-overlay').textContent.includes('Closing bonus'));
+  log(closingBonusShown, 'closing sequence completes into the shift-end summary');
+
   if (consoleIssues.length) {
     console.log('\nConsole issues:');
     consoleIssues.forEach((c) => console.log('  ' + c));
