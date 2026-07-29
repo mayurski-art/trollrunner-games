@@ -193,28 +193,59 @@ function blocked(x, z) {
 
 const flat = (color) => new THREE.MeshLambertMaterial({ color, flatShading: true });
 
+const ART3D = "assets/games/troll-pizzeria/art3d/";
+const textureLoader = new THREE.TextureLoader();
+
+/* Pixel-art textures (phase 5): nearest filtering keeps them crisp instead
+   of blurring into the low-poly pie's smooth look — the game's existing
+   2D sprites use the same "image-rendering: pixelated" idea, just done
+   here at the material level since these are 3D-mapped, not <img>s. */
+function loadPixelTexture(file, repeatX, repeatY) {
+  const tex = textureLoader.load(ART3D + file);
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  if (repeatX || repeatY) {
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(repeatX || 1, repeatY || 1);
+  }
+  return tex;
+}
+
 function buildRoom() {
+  const floorTex = loadPixelTexture("floor.png", (ROOM_HALF_W * 2) / 2.2, (ROOM_BACK + ROOM_FRONT) / 2.2);
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(ROOM_HALF_W * 2, ROOM_BACK + ROOM_FRONT),
-    flat(0xd9c79a));
+    new THREE.MeshLambertMaterial({ map: floorTex }));
   floor.rotation.x = -Math.PI / 2;
   floor.position.set(0, 0, (ROOM_FRONT - ROOM_BACK) / 2);
   scene.add(floor);
 
-  const wallMat = flat(0xf3e2c0);
   const wallH = 2.6;
+  const wallTex = loadPixelTexture("wall.png", (ROOM_HALF_W * 2) / 3, wallH / 2.6);
+  const wallMat = new THREE.MeshLambertMaterial({ map: wallTex });
+  const sideWallTex = loadPixelTexture("wall.png", (ROOM_BACK + ROOM_FRONT) / 3, wallH / 2.6);
+  const sideWallMat = new THREE.MeshLambertMaterial({ map: sideWallTex });
   const back = new THREE.Mesh(new THREE.BoxGeometry(ROOM_HALF_W * 2 + WALL_T * 2, wallH, WALL_T), wallMat);
   back.position.set(0, wallH / 2, -ROOM_BACK - WALL_T / 2);
   scene.add(back);
-  const left = new THREE.Mesh(new THREE.BoxGeometry(WALL_T, wallH, ROOM_BACK + ROOM_FRONT + WALL_T * 2), wallMat);
+  const left = new THREE.Mesh(new THREE.BoxGeometry(WALL_T, wallH, ROOM_BACK + ROOM_FRONT + WALL_T * 2), sideWallMat);
   left.position.set(-ROOM_HALF_W - WALL_T / 2, wallH / 2, (ROOM_FRONT - ROOM_BACK) / 2);
   scene.add(left);
   const right = left.clone();
   right.position.x = ROOM_HALF_W + WALL_T / 2;
   scene.add(right);
 
+  const counterTex = loadPixelTexture("counter.png", STATION_HALF.x * 2 / 1.4, 1);
+  const ovenTex = loadPixelTexture("oven.png");
   for (const s of STATIONS) {
-    const furn = new THREE.Mesh(new THREE.BoxGeometry(STATION_HALF.x * 2, 0.95, STATION_HALF.z * 2), flat(s.color));
+    const sideMat = flat(s.color);
+    const frontMat = new THREE.MeshLambertMaterial({ map: s.id === "bake" ? ovenTex : counterTex });
+    // BoxGeometry's default face-group order is [+x,-x,+y,-y,+z,-z]; index 4
+    // (+z) faces the player, since stations sit at -z and the trigger point
+    // to stand at is further +z toward the room's open floor.
+    const materials = [sideMat, sideMat, sideMat, sideMat, frontMat, sideMat];
+    const furn = new THREE.Mesh(new THREE.BoxGeometry(STATION_HALF.x * 2, 0.95, STATION_HALF.z * 2), materials);
     furn.position.set(s.x, 0.475, s.z);
     scene.add(furn);
     const label = document.createElement("div");
