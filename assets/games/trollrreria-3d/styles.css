@@ -207,7 +207,7 @@ html, body {
 .tr3-hotbar-swatch-empty { background: rgba(255,255,255,0.06); }
 .tr3-hotbar-count { opacity: 0.8; }
 
-.tr3-pause-btn, .tr3-inv-btn, .tr3-music-btn {
+.tr3-pause-btn, .tr3-inv-btn, .tr3-music-btn, .tr3-coop-btn {
   position: absolute;
   top: 16px;
   width: 40px;
@@ -221,8 +221,35 @@ html, body {
   pointer-events: auto;
 }
 .tr3-pause-btn { right: 16px; }
-.tr3-music-btn { right: 64px; font-size: 16px; }
-.tr3-inv-btn { right: 112px; font-size: 18px; }
+.tr3-coop-btn { right: 64px; font-size: 16px; }
+.tr3-music-btn { right: 112px; font-size: 16px; }
+.tr3-inv-btn { right: 160px; font-size: 18px; }
+
+.tr3-peer-count {
+  position: absolute;
+  top: 60px;
+  right: 16px;
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.tr3-coop-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--tr3-border);
+  border-radius: 10px;
+  padding: 12px;
+  color: #fff;
+  font-family: 'DM Mono', monospace;
+  font-size: 16px;
+  letter-spacing: 3px;
+  text-align: center;
+  text-transform: uppercase;
+  margin: 12px 0 16px;
+}
 
 /* Inventory / crafting / chest panels */
 .tr3-panel-wide {

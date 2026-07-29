@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://mayurski-art.github.io https://trollrunner.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://mayurski-art.github.io https://trollrunner.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://tjsyhfplxjtakdfkpdtg.supabase.co wss://tjsyhfplxjtakdfkpdtg.supabase.co; object-src 'none'; base-uri 'self'; frame-ancestors 'self';">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
   <meta name="theme-color" content="#0a0616">
   <meta name="description" content="Trollrreria 3D — dig, build and survive a voxel island. Early MVP.">
@@ -26,9 +26,11 @@
       </div>
       <div id="tr3-clock" class="tr3-clock">Day 1 · 06:00</div>
       <div id="tr3-hardmode-badge" class="tr3-hardmode-badge" hidden>⚔ HARDMODE</div>
+      <div id="tr3-peer-count" class="tr3-peer-count"></div>
       <div id="tr3-hotbar" class="tr3-hotbar" role="listbox" aria-label="Block hotbar"></div>
       <button id="tr3-btn-inventory" class="tr3-inv-btn" type="button" aria-label="Open inventory and crafting">🎒</button>
       <button id="tr3-btn-music" class="tr3-music-btn" type="button" aria-label="Mute music">🔊</button>
+      <button id="tr3-btn-coop" class="tr3-coop-btn" type="button" aria-label="Co-op multiplayer">🌐</button>
       <button id="tr3-btn-pause" class="tr3-pause-btn" type="button" aria-label="Pause game">❚❚</button>
     </div>
 
@@ -117,6 +119,23 @@
       </div>
     </section>
 
+    <!-- Co-op -->
+    <section id="tr3-screen-coop" class="tr3-screen" aria-label="Co-op multiplayer">
+      <div class="tr3-dialog-panel">
+        <header class="tr3-panel-head">
+          <h2 class="tr3-dialog-title">CO-OP</h2>
+          <button id="tr3-btn-coop-close" class="tr3-panel-close" type="button" aria-label="Close">✕</button>
+        </header>
+        <p id="tr3-coop-status" class="tr3-panel-hint">Playing solo.</p>
+        <input id="tr3-coop-code" class="tr3-coop-input" type="text" maxlength="5" placeholder="ROOM CODE" autocomplete="off" autocapitalize="characters">
+        <div class="tr3-dialog-actions">
+          <button id="tr3-btn-coop-host" class="tr3-btn-primary" type="button">Host New Room</button>
+          <button id="tr3-btn-coop-join" class="tr3-btn-ghost" type="button">Join Room</button>
+          <button id="tr3-btn-coop-leave" class="tr3-btn-ghost" type="button" hidden>Leave Room</button>
+        </div>
+      </div>
+    </section>
+
     <!-- Respawn -->
     <section id="tr3-screen-respawn" class="tr3-screen" aria-label="Respawned">
       <div class="tr3-dialog-panel">
@@ -129,6 +148,7 @@
     </section>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.3" integrity="sha384-uVefCux0Kf6w34gQVv8+jUPUwvwFUdnrcwI1kOJHs7sfPPXdDDucwcrPrppD6oUe" crossorigin="anonymous" defer></script>
   <script type="importmap">
     { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
   </script>

@@ -11,6 +11,7 @@ import { MerchantScreen } from '../ui/MerchantScreen.js';
 import { Merchant } from '../npc/Merchant.js';
 import { DayNightCycle } from './DayNightCycle.js';
 import { MusicManager } from './MusicManager.js';
+import { Net } from '../net/Net.js';
 import * as Save from '../world/Save.js';
 import { BLOCKS, PLACEABLE, UNARMED, WEAPON_STATS, DROP_OVERRIDE } from '../world/blocks.js';
 
@@ -57,6 +58,7 @@ export class Game {
     this.openChestPos = null;
     this.merchantScreen = new MerchantScreen(hud.tradeList, this.inventory);
     this.merchant = null;
+    this.net = new Net(this);
 
     this.input = new InputManager(canvas, touchRoot, {
       onDig: () => this.handleDig(),
@@ -74,7 +76,7 @@ export class Game {
     document.addEventListener('pointerlockchange', () => {
       if (document.pointerLockElement !== this.canvas && this.state === 'running') this.pause();
     });
-    window.addEventListener('beforeunload', () => this.saveNow());
+    window.addEventListener('beforeunload', () => { this.saveNow(); this.net.stop(); });
 
     this.clock = new THREE.Clock();
   }
@@ -155,15 +157,35 @@ export class Game {
 
   // Escape closes whichever menu screen is open; otherwise it pauses.
   handleEscape() {
-    if (this.state === 'inventory' || this.state === 'chest' || this.state === 'merchant') {
+    if (this.state === 'inventory' || this.state === 'chest' || this.state === 'merchant' || this.state === 'coop') {
       this.closeMenus();
       return;
     }
     this.togglePause();
   }
 
+  toggleCoop() {
+    if (this.state === 'running') {
+      this.state = 'coop';
+      this.input.exitPointerLock();
+      this.onStateChange('coop');
+    } else if (this.state === 'coop') {
+      this.closeMenus();
+    }
+  }
+
   toggleMusic() {
     return this.music.toggle();
+  }
+
+  // Returns { kind: 'online'|'tabs' } on success, or null if both
+  // transports failed to connect (offline / room unreachable).
+  async startCoop(room, asHost) {
+    return this.net.start(room, asHost);
+  }
+
+  stopCoop() {
+    this.net.stop();
   }
 
   toggleInventory() {
@@ -275,6 +297,7 @@ export class Game {
     }
     if (targetId === BLOCKS.LEVER) {
       this.world.toggleLever(hit.x, hit.y, hit.z);
+      this.net.broadcastLever(hit.x, hit.y, hit.z);
       return;
     }
 
@@ -333,6 +356,9 @@ export class Game {
       if (this.player.takeDamage(dmg)) died = true;
     }
     if (fellOff === 'fell') died = true;
+
+    this.net.update(dt, this.player.pos, this.player.yaw);
+    if (this.hud.peerCount) this.hud.peerCount.textContent = this.net.active ? `🌐 ${this.net.peerCount}` : '';
 
     this.hud.hpFill.style.width = `${Math.max(0, (this.player.hp / this.player.maxHp) * 100)}%`;
 

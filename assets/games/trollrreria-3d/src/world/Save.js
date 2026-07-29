@@ -58,27 +58,36 @@ export function clearSave() {
   try { localStorage.removeItem(SAVE_KEY); } catch { /* ignore */ }
 }
 
-// Captures everything needed to resume: terrain (per-chunk RLE), chests,
-// player state, inventory, and the day/night clock.
-export function saveGame(game) {
+// The world-only slice (terrain + chests + wiring + hardmode) — shared by
+// local saveGame() and Net.js's host->joiner snapshot handoff, since both
+// need to hand a peer/future-session an exact copy of the live world.
+export function buildWorldSnapshot(world) {
   const chunks = {};
-  for (const [key, chunk] of game.world.chunks) {
+  for (const [key, chunk] of world.chunks) {
     chunks[key] = bytesToBase64(rleEncode(chunk.data));
   }
   const chests = {};
-  for (const [key, slots] of game.world.chests) chests[key] = slots;
+  for (const [key, slots] of world.chests) chests[key] = slots;
   const levers = {};
-  for (const [key, on] of game.world.leverStates) levers[key] = on;
+  for (const [key, on] of world.leverStates) levers[key] = on;
 
-  const data = {
+  return {
     version: SAVE_VERSION,
-    savedAt: Date.now(),
-    seed: game.world.seed,
+    seed: world.seed,
     chunks,
     chests,
     levers,
-    lamps: [...game.world.lamps],
-    hardmode: game.world.hardmode,
+    lamps: [...world.lamps],
+    hardmode: world.hardmode,
+  };
+}
+
+// Captures everything needed to resume: terrain (per-chunk RLE), chests,
+// player state, inventory, and the day/night clock.
+export function saveGame(game) {
+  const data = {
+    ...buildWorldSnapshot(game.world),
+    savedAt: Date.now(),
     player: {
       pos: game.player.pos,
       spawn: game.player.spawn,

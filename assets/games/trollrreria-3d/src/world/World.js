@@ -227,6 +227,8 @@ export class World {
 
     const isNetworkEdge = prevId === BLOCKS.LEVER || prevId === BLOCKS.WIRE || id === BLOCKS.LEVER || id === BLOCKS.WIRE;
     if (isNetworkEdge && !this._inPowerRecompute) this.recomputePower();
+
+    this.onEdit?.(x, y, z, id); // hooked by Net.js to broadcast to co-op peers
   }
 
   registerLever(x, y, z) {
