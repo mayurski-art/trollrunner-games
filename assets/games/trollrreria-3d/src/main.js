@@ -12,13 +12,15 @@ const recipeList = document.getElementById('tr3-recipe-list');
 const armorSlot = document.getElementById('tr3-armor-slot');
 const chestGrid = document.getElementById('tr3-chest-grid');
 const chestPlayerGrid = document.getElementById('tr3-chest-player-grid');
+const tradeList = document.getElementById('tr3-trade-list');
 
 const screenMenu = document.getElementById('tr3-screen-menu');
 const screenPause = document.getElementById('tr3-screen-pause');
 const screenRespawn = document.getElementById('tr3-screen-respawn');
 const screenInventory = document.getElementById('tr3-screen-inventory');
 const screenChest = document.getElementById('tr3-screen-chest');
-const allScreens = [screenMenu, screenPause, screenRespawn, screenInventory, screenChest];
+const screenMerchant = document.getElementById('tr3-screen-merchant');
+const allScreens = [screenMenu, screenPause, screenRespawn, screenInventory, screenChest, screenMerchant];
 
 const btnStart = document.getElementById('tr3-btn-start');
 const btnContinue = document.getElementById('tr3-btn-continue');
@@ -30,6 +32,7 @@ const btnInventory = document.getElementById('tr3-btn-inventory');
 const btnMusic = document.getElementById('tr3-btn-music');
 const btnInvClose = document.getElementById('tr3-btn-inv-close');
 const btnChestClose = document.getElementById('tr3-btn-chest-close');
+const btnMerchantClose = document.getElementById('tr3-btn-merchant-close');
 
 const isTouch = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 
@@ -42,6 +45,7 @@ function onStateChange(state) {
   else if (state === 'respawn') showScreen(screenRespawn);
   else if (state === 'inventory') showScreen(screenInventory);
   else if (state === 'chest') showScreen(screenChest);
+  else if (state === 'merchant') showScreen(screenMerchant);
   else showScreen(null);
   if (touchRoot) touchRoot.hidden = !(isTouch && state === 'running');
 }
@@ -49,7 +53,7 @@ function onStateChange(state) {
 const game = new Game(
   canvas,
   touchRoot,
-  { hud: hudRoot, hpFill, clock, hotbar, invGrid, recipeList, armorSlot, chestGrid, chestPlayerGrid },
+  { hud: hudRoot, hpFill, clock, hotbar, invGrid, recipeList, armorSlot, chestGrid, chestPlayerGrid, tradeList },
   { onStateChange },
 );
 
@@ -97,3 +101,4 @@ btnMusic.addEventListener('click', () => {
 });
 btnInvClose.addEventListener('click', () => game.closeMenus());
 btnChestClose.addEventListener('click', () => game.closeMenus());
+btnMerchantClose.addEventListener('click', () => game.closeMenus());

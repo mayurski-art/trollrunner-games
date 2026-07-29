@@ -7,6 +7,8 @@ import { performRaycast } from '../player/Interaction.js';
 import { Inventory } from '../ui/Inventory.js';
 import { InventoryScreen } from '../ui/InventoryScreen.js';
 import { ChestScreen } from '../ui/ChestScreen.js';
+import { MerchantScreen } from '../ui/MerchantScreen.js';
+import { Merchant } from '../npc/Merchant.js';
 import { DayNightCycle } from './DayNightCycle.js';
 import { MusicManager } from './MusicManager.js';
 import * as Save from '../world/Save.js';
@@ -52,6 +54,8 @@ export class Game {
     this.invScreen = new InventoryScreen(hud.invGrid, hud.recipeList, hud.armorSlot, this.inventory);
     this.chestScreen = new ChestScreen(hud.chestGrid, hud.chestPlayerGrid, this.inventory);
     this.openChestPos = null;
+    this.merchantScreen = new MerchantScreen(hud.tradeList, this.inventory);
+    this.merchant = null;
 
     this.input = new InputManager(canvas, touchRoot, {
       onDig: () => this.handleDig(),
@@ -148,7 +152,7 @@ export class Game {
 
   // Escape closes whichever menu screen is open; otherwise it pauses.
   handleEscape() {
-    if (this.state === 'inventory' || this.state === 'chest') {
+    if (this.state === 'inventory' || this.state === 'chest' || this.state === 'merchant') {
       this.closeMenus();
       return;
     }
@@ -178,11 +182,41 @@ export class Game {
     this.onStateChange('chest');
   }
 
+  openMerchant() {
+    this.state = 'merchant';
+    this.input.exitPointerLock();
+    this.merchantScreen.render();
+    this.onStateChange('merchant');
+  }
+
   closeMenus() {
     this.openChestPos = null;
     this.state = 'running';
     this.input.requestPointerLock();
     this.onStateChange('running');
+  }
+
+  // Right-clicking a bed: at night it skips straight to morning; either
+  // way it sets your respawn point here (Terraria-style).
+  useBed(x, y, z) {
+    this.player.spawn = { x: x + 0.5, y: y + 1, z: z + 0.5 };
+    if (this.dayNight.isNight()) this.dayNight.timeOfDay = 0.28;
+  }
+
+  entities() {
+    return this.merchant ? [...this.spawner.enemies, this.merchant] : this.spawner.enemies;
+  }
+
+  // Merchants appear once you've put down a bed — spawned just beside it.
+  spawnMerchantNear(x, y, z) {
+    if (this.merchant) return;
+    for (const [dx, dz] of [[2, 0], [-2, 0], [0, 2], [0, -2]]) {
+      const mx = x + dx, mz = z + dz;
+      const top = this.world.heightMap.get(`${mx},${mz}`);
+      if (top === undefined || top < 0) continue;
+      this.merchant = new Merchant(this.scene, { x: mx + 0.5, y: top + 1, z: mz + 0.5 });
+      return;
+    }
   }
 
   respawnPlayer() {
@@ -194,9 +228,10 @@ export class Game {
 
   handleDig() {
     if (this.state !== 'running') return;
-    const hit = performRaycast(this.world, this.player.eyePos, this.player.forwardVector(), REACH, this.spawner.enemies);
+    const hit = performRaycast(this.world, this.player.eyePos, this.player.forwardVector(), REACH, this.entities());
     if (!hit) return;
     if (hit.type === 'entity') {
+      if (hit.entity === this.merchant) return; // can't be hurt
       if (this.attackCooldownTimer > 0) return;
       const weapon = this.inventory.selectedItem();
       const stats = (weapon && WEAPON_STATS[weapon.id]) || UNARMED;
@@ -215,12 +250,24 @@ export class Game {
 
   handlePlace() {
     if (this.state !== 'running') return;
-    const hit = performRaycast(this.world, this.player.eyePos, this.player.forwardVector(), REACH, this.spawner.enemies);
-    if (!hit || hit.type !== 'block') return;
+    const hit = performRaycast(this.world, this.player.eyePos, this.player.forwardVector(), REACH, this.entities());
+    if (!hit) return;
 
-    // Right-clicking an existing chest opens it instead of placing.
-    if (this.world.getBlock(hit.x, hit.y, hit.z) === BLOCKS.CHEST) {
+    // Right-clicking the merchant opens the trade screen.
+    if (hit.type === 'entity') {
+      if (hit.entity === this.merchant) this.openMerchant();
+      return;
+    }
+    if (hit.type !== 'block') return;
+
+    // Right-clicking an existing chest/bed interacts instead of placing.
+    const targetId = this.world.getBlock(hit.x, hit.y, hit.z);
+    if (targetId === BLOCKS.CHEST) {
       this.openChest(hit.x, hit.y, hit.z);
+      return;
+    }
+    if (targetId === BLOCKS.BED) {
+      this.useBed(hit.x, hit.y, hit.z);
       return;
     }
 
@@ -237,6 +284,7 @@ export class Game {
     if (!this.inventory.consumeSelected()) return;
     this.world.setBlock(px, py, pz, placeId);
     if (placeId === BLOCKS.CHEST) this.world.getChest(px, py, pz);
+    if (placeId === BLOCKS.BED) this.spawnMerchantNear(px, py, pz);
   }
 
   _loop() {

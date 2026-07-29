@@ -15,4 +15,5 @@ export const RECIPES = [
   { id: 'wood_armor', inputs: [{ id: BLOCKS.PLANK, count: 6 }], output: { id: BLOCKS.WOOD_ARMOR, count: 1 } },
   { id: 'stone_armor', inputs: [{ id: BLOCKS.STONE, count: 6 }], output: { id: BLOCKS.STONE_ARMOR, count: 1 } },
   { id: 'gem_armor', inputs: [{ id: BLOCKS.GEMSTONE, count: 6 }], output: { id: BLOCKS.GEM_ARMOR, count: 1 } },
+  { id: 'bed', inputs: [{ id: BLOCKS.PLANK, count: 4 }, { id: BLOCKS.STICK, count: 2 }], output: { id: BLOCKS.BED, count: 1 } },
 ];

@@ -24,6 +24,7 @@ export const BLOCKS = {
   WOOD_ARMOR: 20,
   STONE_ARMOR: 21,
   GEM_ARMOR: 22,
+  BED: 23,
 };
 
 // Per-face color so a merged mesh can use vertex colors instead of textures.
@@ -50,6 +51,7 @@ export const BLOCK_COLOR = {
   [BLOCKS.WOOD_ARMOR]: 0x9a6a3c,
   [BLOCKS.STONE_ARMOR]: 0x7a7a84,
   [BLOCKS.GEM_ARMOR]: 0xc026d3,
+  [BLOCKS.BED]: 0xef4444,
 };
 
 export const BLOCK_NAME = {
@@ -74,6 +76,7 @@ export const BLOCK_NAME = {
   [BLOCKS.WOOD_ARMOR]: 'Wood Armor',
   [BLOCKS.STONE_ARMOR]: 'Stone Armor',
   [BLOCKS.GEM_ARMOR]: 'Gem Armor',
+  [BLOCKS.BED]: 'Bed',
 };
 
 // Melee weapons: held item id -> { damage, cooldown (seconds) }. Anything
@@ -96,7 +99,7 @@ export const ARMOR_STATS = {
 export const MINEABLE = [
   BLOCKS.GRASS, BLOCKS.DIRT, BLOCKS.STONE, BLOCKS.WOOD, BLOCKS.ORE,
   BLOCKS.SAND, BLOCKS.LEAVES, BLOCKS.PLANK, BLOCKS.TORCH, BLOCKS.CHEST,
-  BLOCKS.STONE_BRICK, BLOCKS.SNOW, BLOCKS.CACTUS, BLOCKS.GEMSTONE,
+  BLOCKS.STONE_BRICK, BLOCKS.SNOW, BLOCKS.CACTUS, BLOCKS.GEMSTONE, BLOCKS.BED,
 ];
 
 // Items the player can right-click place as a world block. STICK is
@@ -104,7 +107,7 @@ export const MINEABLE = [
 export const PLACEABLE = [
   BLOCKS.DIRT, BLOCKS.STONE, BLOCKS.WOOD, BLOCKS.SAND, BLOCKS.ORE,
   BLOCKS.LEAVES, BLOCKS.PLANK, BLOCKS.TORCH, BLOCKS.CHEST, BLOCKS.STONE_BRICK,
-  BLOCKS.SNOW, BLOCKS.CACTUS,
+  BLOCKS.SNOW, BLOCKS.CACTUS, BLOCKS.BED,
 ];
 
 export const MAX_STACK = 64;
