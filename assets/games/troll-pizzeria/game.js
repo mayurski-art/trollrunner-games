@@ -69,6 +69,28 @@
     breadsticks: { name: "Breadsticks", emoji: "🥖", target: 0.5, speed: 1.7 },
   };
 
+  /* Meta progression (v3): permanent upgrades bought with the Til Jar
+     (10% of each day's tips, banked automatically at day end — separate
+     from lifetimeTips, which stays a pure stat). Each id maps 1:1 to an
+     S.upgrades field, so buying just flips/increments that field. */
+  const UPGRADES = [
+    { id: "oven1", name: "Faster oven I", desc: "-3s bake time", cost: 40 },
+    { id: "oven2", name: "Faster oven II", desc: "-3s more bake time", cost: 90, requires: "oven1" },
+    { id: "oven3", name: "Faster oven III", desc: "-3s more bake time", cost: 160, requires: "oven2" },
+    { id: "slot6", name: "6th oven slot", desc: "one more pie (or breadsticks) baking at once", cost: 220 },
+    { id: "patience", name: "Thicker skin", desc: "+15% customer patience", cost: 70 },
+    { id: "steady", name: "Steady hands", desc: "topping placement scoring is more forgiving", cost: 80 },
+    { id: "grinInsurance", name: "Grin insurance", desc: "one bad station a day won't reset your Grin Combo", cost: 120 },
+  ];
+  const ovenLevelIds = ["oven1", "oven2", "oven3"];
+  const upgradeOwned = (id) => id === "oven1" ? S.upgrades.ovenLevel >= 1
+    : id === "oven2" ? S.upgrades.ovenLevel >= 2
+    : id === "oven3" ? S.upgrades.ovenLevel >= 3
+    : !!S.upgrades[id];
+  const ovenSlotsCount = () => OVEN_SLOTS + (S.upgrades.slot6 ? 1 : 0);
+  const bakeSeconds = () => BAKE_SECONDS - S.upgrades.ovenLevel * 3;
+  const patienceMult = () => (S.upgrades.patience ? 1.15 : 1);
+
   const BAKES = [
     { id: "light",   name: "Light bake",   target: 0.45 },
     { id: "regular", name: "Regular bake", target: 0.62 },
@@ -177,6 +199,11 @@
     station: "order",
     // persistent
     day: 1, xp: 0, lifetimeTips: 0, bestDay: 0, daysWorked: 0, servedTotal: 0,
+    // meta progression (v3): Til Jar is a spendable currency, separate from
+    // lifetimeTips (which stays a pure lifetime stat, never spent)
+    tilJar: 0,
+    upgrades: { ovenLevel: 0, slot6: false, patience: false, steady: false, grinInsurance: false },
+    grinInsuranceUsedToday: false,
     // shift
     roster: [], arrivalsLeft: 0, nextArrivalIn: 0, stormedOut: 0,
     lobby: [], waiting: [], tickets: [],
@@ -210,6 +237,7 @@
     return {
       day: S.day, xp: S.xp, lifetimeTips: S.lifetimeTips, bestDay: S.bestDay,
       daysWorked: S.daysWorked, servedTotal: S.servedTotal,
+      tilJar: S.tilJar, upgrades: S.upgrades,
     };
   }
   function applySnapshot(d) {
@@ -217,6 +245,8 @@
     Object.assign(S, {
       day: d.day || 1, xp: d.xp || 0, lifetimeTips: d.lifetimeTips || 0,
       bestDay: d.bestDay || 0, daysWorked: d.daysWorked || 0, servedTotal: d.servedTotal || 0,
+      tilJar: d.tilJar || 0,
+      upgrades: Object.assign({ ovenLevel: 0, slot6: false, patience: false, steady: false, grinInsurance: false }, d.upgrades || {}),
     });
   }
   function readLocal(key) {
@@ -390,12 +420,14 @@
       if (entry.side === "whole") good = placed.length;
       else good = placed.filter(p => sideOf(p) === entry.side).length;
       const wrongSide = placed.length - good;
-      const countScore = Math.max(0, 1 - Math.abs(good - entry.count) / entry.count) ;
-      parts += 2 * clamp(countScore - wrongSide * 0.12, 0, 1);
+      const countTolerance = S.upgrades.steady ? entry.count * 1.4 : entry.count;
+      const countScore = Math.max(0, 1 - Math.abs(good - entry.count) / countTolerance);
+      const wrongSidePenalty = S.upgrades.steady ? 0.07 : 0.12;
+      parts += 2 * clamp(countScore - wrongSide * wrongSidePenalty, 0, 1);
     }
     // toppings that don't belong at all
     const strays = Object.values(placedByType).reduce((n, arr) => n + arr.length, 0);
-    parts -= strays * 0.25;
+    parts -= strays * (S.upgrades.steady ? 0.15 : 0.25);
     // evenness bonus: quadrant spread of everything placed
     if (b.placed.length >= 4) {
       const q = [0, 0, 0, 0];
@@ -470,7 +502,11 @@
   function applyGrinCombo(res) {
     const stations = [res.order, res.bake, res.cut];
     if (stations.some(v => v < 0.6)) {
-      S.grinStage = 0;                              // any bad station wipes the whole combo
+      if (S.upgrades.grinInsurance && !S.grinInsuranceUsedToday) {
+        S.grinInsuranceUsedToday = true;              // one bad station spared, once per day
+      } else {
+        S.grinStage = 0;                              // any bad station wipes the whole combo
+      }
     } else {
       for (const v of stations) if (v >= 0.9) S.grinStage = Math.min(GRIN_MAX, S.grinStage + 1);
     }
@@ -666,6 +702,7 @@
 
   function spawnCustomer() {
     const c = Object.assign({}, pickArrival());
+    c.patience = c.patience * patienceMult();
     c.patienceLeft = c.patience;
     c.walking = true;
     S.lobby.push(c);
@@ -1225,7 +1262,8 @@
     S.arrivalsLeft = S.roster.length;
     S.nextArrivalIn = 1.2;
     S.lobby = []; S.waiting = []; S.tickets = [];
-    S.ovens = Array(OVEN_SLOTS).fill(null);
+    S.ovens = Array(ovenSlotsCount()).fill(null);
+    S.grinInsuranceUsedToday = false;
     S.builtShelf = []; S.cutShelf = [];
     S.activeTicketId = null; S.bakeSelect = null; S.armedBin = null; S.stormedOut = 0;
     S.dayScore = 0; S.dayTips = 0; S.servedToday = 0; S.ticketSeq = 1;
@@ -1258,6 +1296,8 @@
     S.daysWorked++;
     const newBest = S.dayScore > S.bestDay;
     if (newBest) S.bestDay = Math.round(S.dayScore);
+    const tilJarGain = Math.round(S.dayTips * 0.1);
+    S.tilJar += tilJarGain;
 
     // shared weekly ladder — engine is display-only/mock, see docs/LEADERBOARD.md
     try {
@@ -1293,6 +1333,7 @@
       ${grinLine}
       <p class="pz-serve-total">⭐ ${Math.round(S.dayScore)}${newBest ? " · new best!" : ""}</p>
       <p class="pz-serve-tip">Tips: 🪙 ${S.dayTips} · XP +${xpGain} · rank: ${rankName(S.xp)}</p>
+      <p class="pz-serve-tip">🫙 Til Jar +${tilJarGain} (${S.tilJar} banked)</p>
       ${unlocks}
       <button type="button" class="pz-btn pz-btn-primary" id="pz-next-day">Start day ${nextDay}</button>
       <button type="button" class="pz-btn pz-btn-ghost" id="pz-to-title">Back to title</button>
@@ -1493,9 +1534,9 @@
     S.ovens.forEach((id, i) => {
       if (!id) return;
       const t = ticketById(id);
-      t.doneness = clamp(t.doneness + dt / BAKE_SECONDS, 0, 1);
+      t.doneness = clamp(t.doneness + dt / bakeSeconds(), 0, 1);
       if (t.order.side === "breadsticks")
-        t.sideDoneness = clamp(t.sideDoneness + (dt * SIDES.breadsticks.speed) / BAKE_SECONDS, 0, 1);
+        t.sideDoneness = clamp(t.sideDoneness + (dt * SIDES.breadsticks.speed) / bakeSeconds(), 0, 1);
       // kitchen fire (v3): left too long past done, small per-second chance
       // to catch fire — cosmetic + a forced pull, no extra score penalty
       // beyond the doneness hit it already has from being overcooked.
@@ -1605,10 +1646,44 @@
     const stats = $("#pz-title-stats");
     if (S.daysWorked > 0) {
       stats.hidden = false;
-      stats.textContent = `Day ${S.day} · ${rankName(S.xp)} · best day ⭐ ${S.bestDay} · lifetime tips 🪙 ${S.lifetimeTips}`;
+      stats.textContent = `Day ${S.day} · ${rankName(S.xp)} · best day ⭐ ${S.bestDay} · lifetime tips 🪙 ${S.lifetimeTips} · 🫙 ${S.tilJar}`;
       $("#pz-start-btn").textContent = `Continue — Day ${S.day}`;
     } else {
       $("#pz-start-btn").textContent = "Start shift";
+    }
+  }
+
+  /* =============================== upgrades ============================= */
+
+  function buyUpgrade(id) {
+    const u = UPGRADES.find(x => x.id === id);
+    if (!u || upgradeOwned(id) || S.tilJar < u.cost) return;
+    if (u.requires && !upgradeOwned(u.requires)) return;
+    S.tilJar -= u.cost;
+    if (ovenLevelIds.includes(id)) S.upgrades.ovenLevel++;
+    else S.upgrades[id] = true;
+    Sfx.coin(3);
+    save();
+    renderUpgrades();
+  }
+
+  function renderUpgrades() {
+    $("#pz-upgrades-balance").textContent = `🫙 ${S.tilJar} banked — 10% of each day's tips`;
+    const list = $("#pz-upgrades-list");
+    list.innerHTML = "";
+    for (const u of UPGRADES) {
+      const owned = upgradeOwned(u.id);
+      const lockedByPrereq = u.requires && !upgradeOwned(u.requires);
+      const row = el("div", "pz-upgrade-row" + (owned ? " is-owned" : ""));
+      row.innerHTML = `<div class="pz-upgrade-info"><strong>${u.name}</strong><span>${u.desc}</span></div>`;
+      const btn = el("button", "pz-btn pz-btn-small");
+      btn.type = "button";
+      if (owned) { btn.textContent = "Owned"; btn.disabled = true; }
+      else if (lockedByPrereq) { btn.textContent = "Locked"; btn.disabled = true; }
+      else { btn.textContent = `🫙 ${u.cost}`; btn.disabled = S.tilJar < u.cost; }
+      btn.addEventListener("click", () => buyUpgrade(u.id));
+      row.appendChild(btn);
+      list.appendChild(row);
     }
   }
 
@@ -1635,6 +1710,8 @@
     $("#pz-start-btn").addEventListener("click", startShift);
     $("#pz-howto-btn").addEventListener("click", () => { $("#pz-howto").hidden = false; });
     $("#pz-howto-close").addEventListener("click", () => { $("#pz-howto").hidden = true; });
+    $("#pz-upgrades-btn").addEventListener("click", () => { renderUpgrades(); $("#pz-upgrades").hidden = false; });
+    $("#pz-upgrades-close").addEventListener("click", () => { $("#pz-upgrades").hidden = true; });
     $("#pz-take-order").addEventListener("click", orderFromCounter);
     $("#pz-sauce-btn").addEventListener("click", () => cycleAmount("sauce"));
     $("#pz-cheese-btn").addEventListener("click", () => cycleAmount("cheese"));
@@ -1697,5 +1774,6 @@
     S, ticketById, switchStation, checkDayEnd, BAKES, TOPPINGS,
     startTrollTell, resolveTrollEvent, applyGrinCombo, GRIN_MAX,
     genOrder, SPECIALTIES, SIDES, tick, fireTrollEvent, buildRoster,
+    UPGRADES, buyUpgrade, upgradeOwned, ovenSlotsCount, bakeSeconds, renderUpgrades,
   };
 })();

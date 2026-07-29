@@ -46,6 +46,7 @@
           <div class="pz-title-actions">
             <button type="button" class="pz-btn pz-btn-primary" id="pz-start-btn">Start shift</button>
             <button type="button" class="pz-btn pz-btn-ghost" id="pz-howto-btn">How to play</button>
+            <button type="button" class="pz-btn pz-btn-ghost" id="pz-upgrades-btn">🫙 Upgrades</button>
           </div>
           <p class="pz-title-stats" id="pz-title-stats" hidden></p>
         </div>
@@ -63,6 +64,16 @@
             <li><strong>Serve</strong> — three meters, one tip. Best day score goes on the weekly ladder.</li>
           </ol>
           <button type="button" class="pz-btn pz-btn-primary" id="pz-howto-close">Got it</button>
+        </div>
+      </div>
+
+      <!-- Upgrades overlay (Til Jar shop) -->
+      <div class="pz-overlay" id="pz-upgrades" hidden>
+        <div class="pz-overlay-card pz-upgrades-card">
+          <h2>🫙 Til Jar upgrades</h2>
+          <p class="pz-upgrades-balance" id="pz-upgrades-balance"></p>
+          <div class="pz-upgrades-list" id="pz-upgrades-list"></div>
+          <button type="button" class="pz-btn pz-btn-primary" id="pz-upgrades-close">Done</button>
         </div>
       </div>
 

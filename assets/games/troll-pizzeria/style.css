@@ -490,6 +490,16 @@ button { cursor: pointer; }
 }
 .pz-overlay-card h2 { font-family: var(--pixel); font-size: 28px; }
 .pz-howto-list { text-align: left; display: grid; gap: 8px; padding-left: 20px; font-size: 14px; line-height: 1.5; }
+.pz-upgrades-balance { font-family: var(--mono); font-size: 14px; color: var(--pz-ink-soft); }
+.pz-upgrades-list { width: 100%; display: grid; gap: 8px; }
+.pz-upgrade-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  border: 1px solid var(--pz-line); border-radius: 10px; padding: 8px 12px; text-align: left;
+}
+.pz-upgrade-row.is-owned { opacity: 0.6; }
+.pz-upgrade-info { display: grid; gap: 2px; }
+.pz-upgrade-info strong { font-family: var(--pixel); font-size: 13px; }
+.pz-upgrade-info span { font-family: var(--mono); font-size: 12px; color: var(--pz-ink-soft); }
 .pz-serve-cust img { height: 110px; width: auto; }
 .pz-serve-cust .pz-fallback { font-size: 74px; }
 .pz-serve-line { font-family: var(--mono); font-size: 13px; color: var(--pz-ink-soft); font-style: italic; }
