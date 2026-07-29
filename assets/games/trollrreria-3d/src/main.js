@@ -17,6 +17,8 @@ const chestPlayerGrid = document.getElementById('tr3-chest-player-grid');
 const tradeList = document.getElementById('tr3-trade-list');
 const questPanel = document.getElementById('tr3-quest-panel');
 const peerCount = document.getElementById('tr3-peer-count');
+const dialogue = document.getElementById('tr3-dialogue');
+const waypointList = document.getElementById('tr3-waypoint-list');
 
 const screenMenu = document.getElementById('tr3-screen-menu');
 const screenPause = document.getElementById('tr3-screen-pause');
@@ -25,7 +27,8 @@ const screenInventory = document.getElementById('tr3-screen-inventory');
 const screenChest = document.getElementById('tr3-screen-chest');
 const screenMerchant = document.getElementById('tr3-screen-merchant');
 const screenCoop = document.getElementById('tr3-screen-coop');
-const allScreens = [screenMenu, screenPause, screenRespawn, screenInventory, screenChest, screenMerchant, screenCoop];
+const screenWaypoints = document.getElementById('tr3-screen-waypoints');
+const allScreens = [screenMenu, screenPause, screenRespawn, screenInventory, screenChest, screenMerchant, screenCoop, screenWaypoints];
 
 const btnStart = document.getElementById('tr3-btn-start');
 const btnContinue = document.getElementById('tr3-btn-continue');
@@ -45,6 +48,8 @@ const btnCoopJoin = document.getElementById('tr3-btn-coop-join');
 const btnCoopLeave = document.getElementById('tr3-btn-coop-leave');
 const coopCode = document.getElementById('tr3-coop-code');
 const coopStatus = document.getElementById('tr3-coop-status');
+const btnWaypoints = document.getElementById('tr3-btn-waypoints');
+const btnWaypointsClose = document.getElementById('tr3-btn-waypoints-close');
 
 const isTouch = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 
@@ -59,6 +64,7 @@ function onStateChange(state) {
   else if (state === 'chest') showScreen(screenChest);
   else if (state === 'merchant') showScreen(screenMerchant);
   else if (state === 'coop') showScreen(screenCoop);
+  else if (state === 'waypoints') showScreen(screenWaypoints);
   else showScreen(null);
   if (touchRoot) touchRoot.hidden = !(isTouch && state === 'running');
 }
@@ -66,7 +72,7 @@ function onStateChange(state) {
 const game = new Game(
   canvas,
   touchRoot,
-  { hud: hudRoot, hpFill, clock, hardmodeBadge, peerCount, hotbar, invGrid, recipeList, armorSlot, chestGrid, chestPlayerGrid, tradeList, questPanel },
+  { hud: hudRoot, hpFill, clock, hardmodeBadge, peerCount, dialogue, waypointList, hotbar, invGrid, recipeList, armorSlot, chestGrid, chestPlayerGrid, tradeList, questPanel },
   { onStateChange },
 );
 
@@ -147,3 +153,6 @@ btnCoopLeave.addEventListener('click', () => {
   game.stopCoop();
   setCoopStatus();
 });
+
+btnWaypoints.addEventListener('click', () => game.toggleWaypoints());
+btnWaypointsClose.addEventListener('click', () => game.closeMenus());

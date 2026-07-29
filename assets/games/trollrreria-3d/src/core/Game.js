@@ -8,9 +8,12 @@ import { Inventory } from '../ui/Inventory.js';
 import { InventoryScreen } from '../ui/InventoryScreen.js';
 import { ChestScreen } from '../ui/ChestScreen.js';
 import { MerchantScreen } from '../ui/MerchantScreen.js';
+import { WaypointsScreen } from '../ui/WaypointsScreen.js';
 import { QuestScreen } from '../ui/QuestScreen.js';
 import { QuestManager } from '../world/QuestManager.js';
 import { Merchant } from '../npc/Merchant.js';
+import { Villager } from '../npc/Villager.js';
+import { VILLAGER_DEFS } from '../world/villagers.js';
 import { DayNightCycle } from './DayNightCycle.js';
 import { MusicManager } from './MusicManager.js';
 import { Net } from '../net/Net.js';
@@ -62,6 +65,9 @@ export class Game {
     this.merchant = null;
     this.quests = new QuestManager(this.inventory);
     this.questScreen = new QuestScreen(hud.questPanel, this.quests);
+    this.villagers = [];
+    this.dialogueTimer = 0;
+    this.waypointsScreen = new WaypointsScreen(hud.waypointList, this);
     this.net = new Net(this);
 
     this.input = new InputManager(canvas, touchRoot, {
@@ -129,6 +135,7 @@ export class Game {
     }
 
     if (this.hud.hardmodeBadge) this.hud.hardmodeBadge.hidden = !this.world.hardmode;
+    this.spawnVillagers();
 
     this.state = 'running';
     this.hud.hud.hidden = false;
@@ -165,11 +172,22 @@ export class Game {
 
   // Escape closes whichever menu screen is open; otherwise it pauses.
   handleEscape() {
-    if (this.state === 'inventory' || this.state === 'chest' || this.state === 'merchant' || this.state === 'coop') {
+    if (['inventory', 'chest', 'merchant', 'coop', 'waypoints'].includes(this.state)) {
       this.closeMenus();
       return;
     }
     this.togglePause();
+  }
+
+  toggleWaypoints() {
+    if (this.state === 'running') {
+      this.state = 'waypoints';
+      this.input.exitPointerLock();
+      this.waypointsScreen.render();
+      this.onStateChange('waypoints');
+    } else if (this.state === 'waypoints') {
+      this.closeMenus();
+    }
   }
 
   toggleCoop() {
@@ -238,7 +256,45 @@ export class Game {
   }
 
   entities() {
-    return this.merchant ? [...this.spawner.enemies, this.merchant] : this.spawner.enemies;
+    const extras = [];
+    if (this.merchant) extras.push(this.merchant);
+    extras.push(...this.villagers);
+    return extras.length ? [...this.spawner.enemies, ...extras] : this.spawner.enemies;
+  }
+
+  spawnVillagers() {
+    for (const v of this.villagers) v.dispose(this.scene);
+    this.villagers = [];
+    if (!this.world.villagePos) return;
+    const { x, z } = this.world.villagePos;
+    const offsets = [[2, -2], [-2, 3], [3, 1]];
+    VILLAGER_DEFS.forEach((def, i) => {
+      const [ox, oz] = offsets[i];
+      const hx = Math.round(x + ox), hz = Math.round(z + oz);
+      const top = this.world.heightMap.get(`${hx},${hz}`);
+      if (top === undefined || top < 0) return;
+      this.villagers.push(new Villager(this.scene, this.world, { x: hx + 0.5, y: top + 1, z: hz + 0.5 }, def.name, def.lines, def.color));
+    });
+  }
+
+  showDialogue(name, line) {
+    if (!this.hud.dialogue) return;
+    this.hud.dialogue.textContent = `${name}: "${line}"`;
+    this.hud.dialogue.hidden = false;
+    this.dialogueTimer = 4;
+  }
+
+  // Known fast-travel points: world spawn (well, the player's own last bed/
+  // spawn point) plus the village, if one generated.
+  waypoints() {
+    const points = [{ name: 'Home', pos: this.player.spawn }];
+    if (this.world.villagePos) points.push({ name: 'Village', pos: this.world.villagePos });
+    return points;
+  }
+
+  travelTo(pos) {
+    Object.assign(this.player.pos, { x: pos.x, y: pos.y + 2, z: pos.z });
+    this.player.vel = { x: 0, y: 0, z: 0 };
   }
 
   // Merchants appear once you've put down a bed — spawned just beside it.
@@ -265,7 +321,7 @@ export class Game {
     const hit = performRaycast(this.world, this.player.eyePos, this.player.forwardVector(), REACH, this.entities());
     if (!hit) return;
     if (hit.type === 'entity') {
-      if (hit.entity === this.merchant) return; // can't be hurt
+      if (hit.entity === this.merchant || this.villagers.includes(hit.entity)) return; // can't be hurt
       if (this.attackCooldownTimer > 0) return;
       const weapon = this.inventory.selectedItem();
       const stats = (weapon && WEAPON_STATS[weapon.id]) || UNARMED;
@@ -290,9 +346,14 @@ export class Game {
     const hit = performRaycast(this.world, this.player.eyePos, this.player.forwardVector(), REACH, this.entities());
     if (!hit) return;
 
-    // Right-clicking the merchant opens the trade screen.
+    // Right-clicking the merchant opens the trade screen; a villager gives
+    // a random one-line greeting instead.
     if (hit.type === 'entity') {
       if (hit.entity === this.merchant) this.openMerchant();
+      else if (this.villagers.includes(hit.entity)) {
+        const line = hit.entity.line[Math.floor(Math.random() * hit.entity.line.length)];
+        this.showDialogue(hit.entity.name, line);
+      }
       return;
     }
     if (hit.type !== 'block') return;
@@ -359,6 +420,12 @@ export class Game {
 
     const move = this.input.moveVector;
     const fellOff = this.player.update(dt, move.x, move.z, this.input.jumpHeld);
+
+    for (const v of this.villagers) v.update(dt);
+    if (this.dialogueTimer > 0) {
+      this.dialogueTimer -= dt;
+      if (this.dialogueTimer <= 0 && this.hud.dialogue) this.hud.dialogue.hidden = true;
+    }
 
     const attackers = this.spawner.update(dt, this.player.pos);
     let died = false;

@@ -1,6 +1,7 @@
 import { Chunk, CHUNK_X, CHUNK_Y, CHUNK_Z } from './Chunk.js';
 import { BLOCKS, MINEABLE } from './blocks.js';
 import { makeFractalNoise2D, makeNoise2D } from './noise.js';
+import { placeVillage } from './Village.js';
 
 const NEIGHBOR_DIRS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 
@@ -32,6 +33,7 @@ export class World {
     this.lamps = new Set(); // "x,y,z" of placed lamps (either state)
     this._inPowerRecompute = false;
     this.hardmode = false;
+    this.villagePos = null;
 
     for (let cx = 0; cx < WORLD_CHUNKS; cx++) {
       for (let cz = 0; cz < WORLD_CHUNKS; cz++) {
@@ -129,7 +131,10 @@ export class World {
       }
     }
 
-    // Pass 3: build meshes now that all chunk data (incl. neighbors) is ready.
+    // Pass 3: a small hut cluster for the fast-travel waypoint + villagers.
+    this.villagePos = placeVillage(this, WORLD_SIZE_X, WORLD_SIZE_Z);
+
+    // Pass 4: build meshes now that all chunk data (incl. neighbors) is ready.
     for (const chunk of this.chunks.values()) chunk.buildMesh(this.scene);
   }
 
