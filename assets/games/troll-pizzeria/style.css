@@ -388,7 +388,7 @@ button { cursor: pointer; }
 .pz-oven-art img { height: 96%; width: auto; max-width: none; }
 .pz-oven-slots {
   position: relative; z-index: 2;
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 150px)); gap: 12px;
+  display: grid; grid-template-columns: repeat(5, minmax(96px, 136px)); gap: 10px;
 }
 .pz-side-doneness { margin-top: -2px; opacity: 0.85; }
 .pz-side-doneness i { background: linear-gradient(90deg, #e0a458, #9c6b2e 72%, #212529 100%); }
@@ -404,6 +404,15 @@ button { cursor: pointer; }
 .pz-oven-slot .slot-pizza { width: 96px; height: 96px; position: relative; }
 .pz-oven-slot.is-empty .slot-pizza { opacity: 0.16; }
 .pz-oven-slot.slot-target { outline: 3px dashed var(--gold); }
+.pz-oven-slot.is-jammed { opacity: 0.55; cursor: not-allowed; outline: 2px dashed #8a5a3a; }
+.pz-rush-banner {
+  position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 5;
+  font-family: var(--pixel); font-size: 14px; letter-spacing: 0.04em;
+  background: linear-gradient(90deg, #ff5f2e, #ff2d55); color: #fff;
+  border-radius: 999px; padding: 6px 18px; box-shadow: 0 4px 14px rgba(255, 60, 60, 0.45);
+  animation: pz-rush-pulse 1s ease-in-out infinite;
+}
+@keyframes pz-rush-pulse { 0%, 100% { transform: translateX(-50%) scale(1); } 50% { transform: translateX(-50%) scale(1.04); } }
 .pz-doneness { width: 92%; height: 10px; border: 1px solid #d9a066; border-radius: 5px; background: #170a04; position: relative; overflow: hidden; }
 .pz-doneness i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #f6d365, #e8590c 72%, #212529 100%); }
 .pz-doneness .tgt { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--green); }

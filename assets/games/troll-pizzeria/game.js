@@ -165,6 +165,8 @@
       gotcha(){ tone(700, 0.06, "square", 0.05, 0, 500); tone(1400, 0.1, "square", 0.045, 0.05); },
       trollHeh(){ [900, 700, 500].forEach((f, i) => tone(f, 0.09, "sawtooth", 0.045, i * 0.06, -80)); },
       grin()  { tone(660, 0.08, "triangle", 0.05, 0, 260); tone(990, 0.14, "triangle", 0.05, 0.07, 260); },
+      alarm() { [0, 0.18, 0.36].forEach(t => { tone(1200, 0.12, "square", 0.05, t); tone(900, 0.12, "square", 0.05, t + 0.09); }); },
+      rush()  { [660, 880, 1046, 1318].forEach((f, i) => tone(f, 0.1, "square", 0.045, i * 0.08)); },
     };
   })();
 
@@ -191,7 +193,10 @@
     // Troll Events + Grin Hunt (docs/TROLL-PIZZERIA-V2.md) — mid-shift
     // sabotage the player can cancel by spotting a hidden grin in time
     troll: { nextIn: 0, active: null, binSwapPair: null, binSwapUntil: 0, pineappleRaidLeft: 0,
-             dialScrambleUntil: 0, quakeUntil: 0, tipBonusNext: 1 },
+             dialScrambleUntil: 0, quakeUntil: 0, tipBonusNext: 1, coldSnapUntil: 0, jamSlot: -1, jamUntil: 0 },
+    // Rush hour (v3): one scripted back-to-back-arrivals window per shift
+    shiftElapsed: 0,
+    rush: { at: 0, active: false, done: false, until: 0, clean: true },
   };
 
   /* Cross-device progress: when logged in, mirrored into the shared
@@ -565,6 +570,7 @@
       build: { sauce: "none", cheese: "none", placed: [] },
       doneness: 0, cutAngles: [],
       sideDoneness: 0, sideDone: false,
+      overCooked: 0, onFire: false,
       state: "building",
       mood: cust.patienceLeft / cust.patience,
     };
@@ -936,11 +942,14 @@
   function renderBake() {
     const slots = $("#pz-oven-slots");
     slots.innerHTML = "";
+    const jammed = (i) => i === S.troll.jamSlot && performance.now() < S.troll.jamUntil;
     S.ovens.forEach((id, i) => {
-      const slot = el("button", "pz-oven-slot" + (id ? "" : " is-empty") + (S.bakeSelect && !id ? " slot-target" : ""));
+      const slot = el("button", "pz-oven-slot" + (id ? "" : " is-empty")
+        + (S.bakeSelect && !id ? " slot-target" : "") + (jammed(i) ? " is-jammed" : ""));
       slot.type = "button";
       const t = id ? ticketById(id) : null;
-      slot.setAttribute("aria-label", t ? `Oven slot ${i + 1}: ${t.cust.name}'s pizza — click to pull out` : `Oven slot ${i + 1}: empty`);
+      slot.setAttribute("aria-label", t ? `Oven slot ${i + 1}: ${t.cust.name}'s pizza — click to pull out`
+        : jammed(i) ? `Oven slot ${i + 1}: jammed` : `Oven slot ${i + 1}: empty`);
       const pie = el("div", "slot-pizza");
       if (t) renderPizza(pie, t);
       slot.appendChild(pie);
@@ -965,7 +974,7 @@
         slot.appendChild(sideBar);
         slot.appendChild(el("span", "pz-slot-label", "🥖 breadsticks"));
       }
-      slot.appendChild(el("span", "pz-slot-label", t ? bakeName(t.order.bake) : "empty"));
+      slot.appendChild(el("span", "pz-slot-label", t ? bakeName(t.order.bake) : jammed(i) ? "🔒 jammed" : "empty"));
       slot.addEventListener("click", () => bakeSlotClick(i));
       slots.appendChild(slot);
     });
@@ -1002,6 +1011,8 @@
       S.cutShelf.push(t.id);
       Sfx.pull();
       renderBake(); renderHud(); renderBadges(); renderCutShelf();
+    } else if (i === S.troll.jamSlot && performance.now() < S.troll.jamUntil) {
+      Sfx.grr();                                        // jammed — can't slot a pie here
     } else if (S.bakeSelect) {                         // slide one in
       const t = ticketById(S.bakeSelect);
       S.builtShelf = S.builtShelf.filter(x => x !== t.id);
@@ -1027,7 +1038,7 @@
       pie.style.width = "100%"; pie.style.height = "100%"; pie.style.position = "relative";
       renderPizza(pie, t);
       b.appendChild(pie);
-      b.appendChild(el("span", "who", t.cust.emoji + " #" + t.id));
+      b.appendChild(el("span", "who", (t.onFire ? "🔥 " : "") + t.cust.emoji + " #" + t.id));
       b.addEventListener("click", () => pickForCut(id));
       row.appendChild(b);
     }
@@ -1197,7 +1208,7 @@
   /* ============================== day flow ============================= */
 
   function buildRoster() {
-    const n = Math.min(3 + S.day, 9);
+    const n = Math.min(3 + S.day, 12);
     const pool = unlockedCustomers(S.day).filter(c => c.quirk !== "critic");
     const roster = [];
     for (let i = 0; i < n; i++) roster.push(Object.assign({}, pool[i % pool.length]));
@@ -1224,6 +1235,9 @@
     scheduleNextTrollEvent();
     S.troll.binSwapPair = null; S.troll.pineappleRaidLeft = 0;
     S.troll.dialScrambleUntil = 0; S.troll.quakeUntil = 0; S.troll.tipBonusNext = 1;
+    S.troll.coldSnapUntil = 0; S.troll.jamSlot = -1; S.troll.jamUntil = 0;
+    S.shiftElapsed = 0;
+    S.rush = { at: rand(20, 45), active: false, done: S.day < 4, until: 0, clean: true, happened: false };
     S.screen = "game";
     $("#pz-title").style.display = "none";
     $("#pz-game").hidden = false;
@@ -1262,6 +1276,8 @@
     const rows = S.tickets.map(t =>
       `<tr><td>${t.cust.emoji} ${t.cust.name}</td><td>${pct(t.result.total)}%</td><td>🪙 ${t.result.tip}</td></tr>`).join("");
     const stormed = S.stormedOut ? `<p class="pz-serve-line">${S.stormedOut} customer${S.stormedOut > 1 ? "s" : ""} stormed out. Trolled.</p>` : "";
+    const rushLine = S.rush.happened
+      ? `<p class="pz-serve-line">Rush hour: ${S.rush.clean ? "survived clean — ⭐ +40" : "a few slipped away"}</p>` : "";
     const grinLine = S.dayMaxGrin
       ? `<p class="pz-serve-line">Best grin combo: ${"🧌".repeat(S.dayMaxGrin)} (×${S.dayMaxGrin * GRIN_BONUS_PER_STAGE * 100}% tips)</p>` : "";
     const unlocks = (newTops.length || newCusts.length)
@@ -1273,6 +1289,7 @@
       <h2>Day ${S.day} complete!</h2>
       <table class="pz-day-table"><tbody>${rows}</tbody></table>
       ${stormed}
+      ${rushLine}
       ${grinLine}
       <p class="pz-serve-total">⭐ ${Math.round(S.dayScore)}${newBest ? " · new best!" : ""}</p>
       <p class="pz-serve-tip">Tips: 🪙 ${S.dayTips} · XP +${xpGain} · rank: ${rankName(S.xp)}</p>
@@ -1298,6 +1315,14 @@
 
   const TROLL_TELL_SECONDS = 2;
   const TROLL_EVENTS = ["problem", "binswap", "pineapple", "dial", "quake", "coupon"];
+  // Tier 2 (v3): meaner events, day 10+ only. "doubletrouble" doesn't do
+  // anything itself — it just queues the next tell almost immediately,
+  // so a missed Grin Hunt is followed by another one before you can breathe.
+  const TROLL_EVENTS_TIER2 = ["coldsnap", "slotjam", "doubletrouble"];
+
+  const LOBBY_CAP_NORMAL = 4;
+  const LOBBY_CAP_RUSH = 6;
+  const lobbyCap = () => (S.rush.active ? LOBBY_CAP_RUSH : LOBBY_CAP_NORMAL);
 
   function scheduleNextTrollEvent() {
     S.troll.nextIn = rand(Math.max(22, 55 - S.day * 1.5), Math.max(34, 80 - S.day * 1.5));
@@ -1305,7 +1330,8 @@
 
   function startTrollTell() {
     // pineapple raid only makes sense once pineapple is unlocked
-    const pool = S.day >= 7 ? TROLL_EVENTS : TROLL_EVENTS.filter(e => e !== "pineapple");
+    let pool = S.day >= 7 ? TROLL_EVENTS : TROLL_EVENTS.filter(e => e !== "pineapple");
+    if (S.day >= 10) pool = pool.concat(TROLL_EVENTS_TIER2);
     const type = pick(pool);
     S.troll.active = { type, tellLeft: TROLL_TELL_SECONDS };
     renderGrinHunt();
@@ -1402,6 +1428,20 @@
       case "coupon":                              // Nana's coupon — next tip x2
         S.troll.tipBonusNext = 2;
         break;
+      case "coldsnap":                            // tier 2: lobby patience drains harder
+        S.troll.coldSnapUntil = performance.now() + 20000;
+        break;
+      case "slotjam": {                           // tier 2: an empty slot locks up for a while
+        const empties = S.ovens.map((id, i) => (id ? -1 : i)).filter(i => i !== -1);
+        if (!empties.length) return;
+        S.troll.jamSlot = pick(empties);
+        S.troll.jamUntil = performance.now() + 25000;
+        if (S.station === "bake") renderBake();
+        break;
+      }
+      case "doubletrouble":                       // tier 2: the next tell comes almost immediately
+        S.troll.nextIn = rand(2, 4);
+        break;
     }
   }
 
@@ -1409,42 +1449,78 @@
 
   function tick(dt) {
     if (S.screen !== "game") return;
+    S.shiftElapsed += dt;
+
+    // rush hour (v3): one telegraphed back-to-back-arrivals window per shift
+    if (!S.rush.done && !S.rush.active && S.shiftElapsed >= S.rush.at) {
+      S.rush.active = true; S.rush.happened = true; S.rush.until = S.shiftElapsed + 45; S.rush.clean = true;
+      Sfx.rush();
+      renderRushBanner();
+    } else if (S.rush.active && S.shiftElapsed >= S.rush.until) {
+      S.rush.active = false; S.rush.done = true;
+      if (S.rush.clean) { S.dayScore += 40; renderHud(); }
+      renderRushBanner();
+    }
+
     // arrivals
-    if (S.arrivalsLeft > 0 && S.lobby.length < 4) {
+    if (S.arrivalsLeft > 0 && S.lobby.length < lobbyCap()) {
       S.nextArrivalIn -= dt;
       if (S.nextArrivalIn <= 0) {
         S.arrivalsLeft--;
-        S.nextArrivalIn = rand(Math.max(8, 22 - S.day * 1.4), Math.max(13, 30 - S.day * 1.4));
+        S.nextArrivalIn = S.rush.active
+          ? rand(3, 6)
+          : rand(Math.max(8, 22 - S.day * 1.4), Math.max(13, 30 - S.day * 1.4));
         spawnCustomer();
         renderBadges();
       }
     }
     // patience: lobby customers can storm out; waiting customers just sulk
+    const coldSnap = performance.now() < S.troll.coldSnapUntil;
     let lobbyChanged = false;
     for (const c of [...S.lobby]) {
-      c.patienceLeft -= dt;
+      c.patienceLeft -= dt * (coldSnap ? 1.6 : 1);
       if (c.patienceLeft <= 0) {
         S.lobby = S.lobby.filter(x => x !== c);
         S.stormedOut++;
         lobbyChanged = true;
+        if (S.rush.active) S.rush.clean = false;
         Sfx.grr();
       }
     }
     for (const c of S.waiting) c.patienceLeft = Math.max(0, c.patienceLeft - dt * 0.5);
     // ovens
-    let baking = false;
-    for (const id of S.ovens) {
-      if (!id) continue;
+    let baking = false, firePulled = false;
+    S.ovens.forEach((id, i) => {
+      if (!id) return;
       const t = ticketById(id);
       t.doneness = clamp(t.doneness + dt / BAKE_SECONDS, 0, 1);
       if (t.order.side === "breadsticks")
         t.sideDoneness = clamp(t.sideDoneness + (dt * SIDES.breadsticks.speed) / BAKE_SECONDS, 0, 1);
+      // kitchen fire (v3): left too long past done, small per-second chance
+      // to catch fire — cosmetic + a forced pull, no extra score penalty
+      // beyond the doneness hit it already has from being overcooked.
+      if (t.doneness >= 1) {
+        t.overCooked += dt;
+        if (t.overCooked > 2 && Math.random() < dt * 0.15) {
+          t.onFire = true;
+          S.ovens[i] = null;
+          t.state = "baked";
+          S.cutShelf.push(t.id);
+          Sfx.alarm();
+          firePulled = true;
+        }
+      }
       baking = true;
+    });
+    if (S.troll.jamUntil && performance.now() > S.troll.jamUntil) {
+      S.troll.jamSlot = -1; S.troll.jamUntil = 0;
+      if (S.station === "bake") renderBake();
     }
     // lightweight re-renders only where things move
     if (lobbyChanged) { renderLobby(); checkDayEnd(); }
     else if (S.lobby.length) updatePatienceBars();
-    if (baking && S.station === "bake") renderBakeBarsOnly();
+    if (firePulled) { renderBake(); renderCutShelf(); renderHud(); }
+    else if (baking && S.station === "bake") renderBakeBarsOnly();
     renderBadges();
 
     // troll events: never before day 3
@@ -1461,6 +1537,12 @@
       S.troll.binSwapPair = null;
       if (S.station === "build") renderBins(activeTicket());
     }
+  }
+
+  function renderRushBanner() {
+    const banner = $("#pz-rush-banner");
+    if (!banner) return;
+    banner.hidden = !S.rush.active;
   }
 
   function updatePatienceBars() {
@@ -1614,6 +1696,6 @@
   window.__pz = {
     S, ticketById, switchStation, checkDayEnd, BAKES, TOPPINGS,
     startTrollTell, resolveTrollEvent, applyGrinCombo, GRIN_MAX,
-    genOrder, SPECIALTIES, SIDES,
+    genOrder, SPECIALTIES, SIDES, tick, fireTrollEvent, buildRoster,
   };
 })();
