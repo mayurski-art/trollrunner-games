@@ -23,8 +23,9 @@ export class InputManager {
     window.addEventListener('keydown', (e) => {
       this.keys.add(e.code);
       if (e.code === 'Space') this.jumpHeld = true;
-      if (e.code === 'Escape') this.callbacks.onPause?.();
-      const digit = e.code.match(/^Digit([1-5])$/);
+      if (e.code === 'Escape') this.callbacks.onEscape?.();
+      if (e.code === 'KeyE') this.callbacks.onInventory?.();
+      const digit = e.code.match(/^Digit([1-9])$/);
       if (digit) this.callbacks.onHotbar?.(Number(digit[1]) - 1);
     });
     window.addEventListener('keyup', (e) => {

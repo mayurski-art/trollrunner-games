@@ -19,6 +19,7 @@ export class World {
     this.oreNoise = makeNoise2D(seed + 907);
     this.chunks = new Map(); // "cx,cz" -> Chunk
     this.heightMap = new Map(); // "x,z" -> topmost solid y (or -1 if void column)
+    this.chests = new Map(); // "x,y,z" -> Array(27) of {id,count}|null
 
     for (let cx = 0; cx < WORLD_CHUNKS; cx++) {
       for (let cz = 0; cz < WORLD_CHUNKS; cz++) {
@@ -130,6 +131,18 @@ export class World {
     return MINEABLE.includes(this.getBlock(x, y, z));
   }
 
+  chestKey(x, y, z) {
+    return `${x},${y},${z}`;
+  }
+
+  // Chest contents are lost if the chest block is mined — acceptable for
+  // this MVP phase (matches "instant-click" simplicity elsewhere).
+  getChest(x, y, z) {
+    const key = this.chestKey(x, y, z);
+    if (!this.chests.has(key)) this.chests.set(key, new Array(27).fill(null));
+    return this.chests.get(key);
+  }
+
   // Edits during play: update the block and remesh the chunk (+ any
   // neighboring chunk whose face-culling depends on this block).
   setBlock(x, y, z, id) {
@@ -137,6 +150,8 @@ export class World {
     const chunk = this.chunkAt(cx, cz);
     if (!chunk) return;
     const lx = x - cx * CHUNK_X, lz = z - cz * CHUNK_Z;
+    const prevId = chunk.getLocal(lx, y, lz);
+    if (prevId === BLOCKS.CHEST && id !== BLOCKS.CHEST) this.chests.delete(this.chestKey(x, y, z));
     chunk.setLocal(lx, y, lz, id);
     chunk.buildMesh(this.scene);
 

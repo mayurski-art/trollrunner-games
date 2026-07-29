@@ -25,6 +25,7 @@
         <div class="tr3-hp-bar"><div id="tr3-hp-fill" class="tr3-hp-fill"></div></div>
       </div>
       <div id="tr3-hotbar" class="tr3-hotbar" role="listbox" aria-label="Block hotbar"></div>
+      <button id="tr3-btn-inventory" class="tr3-inv-btn" type="button" aria-label="Open inventory and crafting">🎒</button>
       <button id="tr3-btn-pause" class="tr3-pause-btn" type="button" aria-label="Pause game">❚❚</button>
     </div>
 
@@ -51,7 +52,8 @@
           <span><kbd>Space</kbd> jump</span>
           <span><kbd>Click</kbd> dig / hit</span>
           <span><kbd>Right-click</kbd> place</span>
-          <span><kbd>1-5</kbd> hotbar</span>
+          <span><kbd>1-9</kbd> hotbar</span>
+          <span><kbd>E</kbd> inventory &amp; crafting</span>
           <span class="tr3-mobile-only">📱 touch controls on-screen</span>
         </div>
         <a class="tr3-menu-back" href="/">← Back to Arcade</a>
@@ -66,6 +68,34 @@
           <button id="tr3-btn-resume" class="tr3-btn-primary" type="button">▶ Resume</button>
           <button id="tr3-btn-exit" class="tr3-btn-ghost" type="button">Exit to Menu</button>
         </div>
+      </div>
+    </section>
+
+    <!-- Inventory & Crafting -->
+    <section id="tr3-screen-inventory" class="tr3-screen" aria-label="Inventory and crafting">
+      <div class="tr3-dialog-panel tr3-panel-wide">
+        <header class="tr3-panel-head">
+          <h2 class="tr3-dialog-title">INVENTORY &amp; CRAFTING</h2>
+          <button id="tr3-btn-inv-close" class="tr3-panel-close" type="button" aria-label="Close">✕</button>
+        </header>
+        <div id="tr3-inv-grid" class="tr3-slot-grid" role="list" aria-label="Inventory slots"></div>
+        <h3 class="tr3-panel-subtitle">Craft</h3>
+        <div id="tr3-recipe-list" class="tr3-recipe-list"></div>
+      </div>
+    </section>
+
+    <!-- Chest -->
+    <section id="tr3-screen-chest" class="tr3-screen" aria-label="Chest">
+      <div class="tr3-dialog-panel tr3-panel-wide">
+        <header class="tr3-panel-head">
+          <h2 class="tr3-dialog-title">CHEST</h2>
+          <button id="tr3-btn-chest-close" class="tr3-panel-close" type="button" aria-label="Close">✕</button>
+        </header>
+        <p class="tr3-panel-hint">Click an item to move it.</p>
+        <h3 class="tr3-panel-subtitle">Chest</h3>
+        <div id="tr3-chest-grid" class="tr3-slot-grid" role="list" aria-label="Chest slots"></div>
+        <h3 class="tr3-panel-subtitle">Your inventory</h3>
+        <div id="tr3-chest-player-grid" class="tr3-slot-grid" role="list" aria-label="Player inventory slots"></div>
       </div>
     </section>
 

@@ -1,0 +1,12 @@
+import { BLOCKS } from './blocks.js';
+
+// Simple click-to-craft recipe list (no crafting-grid layout) — matches the
+// 2D game's original inventory/crafting/chests phase before it later grew
+// a real 3x3 grid.
+export const RECIPES = [
+  { id: 'plank', inputs: [{ id: BLOCKS.WOOD, count: 1 }], output: { id: BLOCKS.PLANK, count: 4 } },
+  { id: 'stick', inputs: [{ id: BLOCKS.PLANK, count: 2 }], output: { id: BLOCKS.STICK, count: 4 } },
+  { id: 'torch', inputs: [{ id: BLOCKS.STICK, count: 1 }, { id: BLOCKS.ORE, count: 1 }], output: { id: BLOCKS.TORCH, count: 2 } },
+  { id: 'chest', inputs: [{ id: BLOCKS.PLANK, count: 4 }], output: { id: BLOCKS.CHEST, count: 1 } },
+  { id: 'stone_brick', inputs: [{ id: BLOCKS.STONE, count: 4 }], output: { id: BLOCKS.STONE_BRICK, count: 4 } },
+];

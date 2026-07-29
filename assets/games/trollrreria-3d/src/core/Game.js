@@ -1,21 +1,23 @@
 import * as THREE from 'three';
 import { InputManager } from './InputManager.js';
 import { World } from '../world/World.js';
-import { Player, EYE_HEIGHT } from '../player/Player.js';
+import { Player } from '../player/Player.js';
 import { Enemy } from '../enemy/Enemy.js';
 import { performRaycast } from '../player/Interaction.js';
 import { Inventory } from '../ui/Inventory.js';
-import { BLOCKS } from '../world/blocks.js';
+import { InventoryScreen } from '../ui/InventoryScreen.js';
+import { ChestScreen } from '../ui/ChestScreen.js';
+import { BLOCKS, PLACEABLE } from '../world/blocks.js';
 
 const REACH = 6;
 const ATTACK_DAMAGE = 12;
 
 // Owns the renderer, scene, world/player/enemy state and the per-frame loop.
-// States: menu | running | paused | respawn.
+// States: menu | running | paused | respawn | inventory | chest.
 export class Game {
   constructor(canvas, touchRoot, hud, { onStateChange } = {}) {
     this.canvas = canvas;
-    this.hud = hud; // { hpFill, hotbar }
+    this.hud = hud; // { hud, hpFill, hotbar, invGrid, recipeList, chestGrid, chestPlayerGrid }
     this.onStateChange = onStateChange || (() => {});
     this.state = 'menu';
 
@@ -40,11 +42,16 @@ export class Game {
     this.enemy = new Enemy(this.scene, { x: spawn.x + 5, y: spawn.y, z: spawn.z + 3 });
 
     this.inventory = new Inventory(hud.hotbar);
+    this.invScreen = new InventoryScreen(hud.invGrid, hud.recipeList, this.inventory);
+    this.chestScreen = new ChestScreen(hud.chestGrid, hud.chestPlayerGrid, this.inventory);
+    this.openChestPos = null;
 
     this.input = new InputManager(canvas, touchRoot, {
       onDig: () => this.handleDig(),
       onPlace: () => this.handlePlace(),
-      onHotbar: (i) => this.inventory.selectByIndex(i),
+      onHotbar: (i) => this.inventory.selectHotbar(i),
+      onEscape: () => this.handleEscape(),
+      onInventory: () => this.toggleInventory(),
       onPause: () => this.togglePause(),
     });
 
@@ -101,6 +108,41 @@ export class Game {
     if (this.state === 'paused') { this.resume(); this.onStateChange('running'); }
   }
 
+  // Escape closes whichever menu screen is open; otherwise it pauses.
+  handleEscape() {
+    if (this.state === 'inventory' || this.state === 'chest') {
+      this.closeMenus();
+      return;
+    }
+    this.togglePause();
+  }
+
+  toggleInventory() {
+    if (this.state === 'running') {
+      this.state = 'inventory';
+      this.input.exitPointerLock();
+      this.invScreen.render();
+      this.onStateChange('inventory');
+    } else if (this.state === 'inventory') {
+      this.closeMenus();
+    }
+  }
+
+  openChest(x, y, z) {
+    this.openChestPos = { x, y, z };
+    this.state = 'chest';
+    this.input.exitPointerLock();
+    this.chestScreen.open(this.world.getChest(x, y, z));
+    this.onStateChange('chest');
+  }
+
+  closeMenus() {
+    this.openChestPos = null;
+    this.state = 'running';
+    this.input.requestPointerLock();
+    this.onStateChange('running');
+  }
+
   respawnPlayer() {
     this.player.respawn();
     this.state = 'running';
@@ -113,7 +155,7 @@ export class Game {
     const hit = performRaycast(this.world, this.player.eyePos, this.player.forwardVector(), REACH, [this.enemy]);
     if (!hit) return;
     if (hit.type === 'entity') {
-      const died = hit.entity.hit(1);
+      hit.entity.hit(1);
       return;
     }
     if (hit.type === 'block' && this.world.isMineable(hit.x, hit.y, hit.z)) {
@@ -129,13 +171,26 @@ export class Game {
     if (this.state !== 'running') return;
     const hit = performRaycast(this.world, this.player.eyePos, this.player.forwardVector(), REACH, [this.enemy]);
     if (!hit || hit.type !== 'block') return;
+
+    // Right-clicking an existing chest opens it instead of placing.
+    if (this.world.getBlock(hit.x, hit.y, hit.z) === BLOCKS.CHEST) {
+      this.openChest(hit.x, hit.y, hit.z);
+      return;
+    }
+
+    const slot = this.inventory.selectedItem();
+    if (!slot || !PLACEABLE.includes(slot.id)) return;
+
     const px = hit.x + hit.normal.x, py = hit.y + hit.normal.y, pz = hit.z + hit.normal.z;
     if (this.world.getBlock(px, py, pz) !== BLOCKS.AIR) return;
     // Don't let the player wall themselves in.
     const p = this.player.pos;
     if (Math.floor(p.x) === px && (Math.floor(p.y) === py || Math.floor(p.y + 1) === py) && Math.floor(p.z) === pz) return;
+
+    const placeId = slot.id;
     if (!this.inventory.consumeSelected()) return;
-    this.world.setBlock(px, py, pz, this.inventory.selected);
+    this.world.setBlock(px, py, pz, placeId);
+    if (placeId === BLOCKS.CHEST) this.world.getChest(px, py, pz);
   }
 
   _loop() {
