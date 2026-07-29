@@ -15,6 +15,8 @@ export const BLOCKS = {
   TORCH: 11,
   CHEST: 12,
   STONE_BRICK: 13,
+  WOOD_SWORD: 14,
+  STONE_SWORD: 15,
 };
 
 // Per-face color so a merged mesh can use vertex colors instead of textures.
@@ -32,6 +34,8 @@ export const BLOCK_COLOR = {
   [BLOCKS.TORCH]: 0xffd166,
   [BLOCKS.CHEST]: 0x9a6a2f,
   [BLOCKS.STONE_BRICK]: 0x6f6f78,
+  [BLOCKS.WOOD_SWORD]: 0xd8a05c,
+  [BLOCKS.STONE_SWORD]: 0xb9b9c2,
 };
 
 export const BLOCK_NAME = {
@@ -47,6 +51,16 @@ export const BLOCK_NAME = {
   [BLOCKS.TORCH]: 'Torch',
   [BLOCKS.CHEST]: 'Chest',
   [BLOCKS.STONE_BRICK]: 'Stone Brick',
+  [BLOCKS.WOOD_SWORD]: 'Wood Sword',
+  [BLOCKS.STONE_SWORD]: 'Stone Sword',
+};
+
+// Melee weapons: held item id -> { damage, cooldown (seconds) }. Anything
+// not listed here (including bare hands) falls back to UNARMED.
+export const UNARMED = { damage: 1, cooldown: 0.5 };
+export const WEAPON_STATS = {
+  [BLOCKS.WOOD_SWORD]: { damage: 2, cooldown: 0.4 },
+  [BLOCKS.STONE_SWORD]: { damage: 4, cooldown: 0.35 },
 };
 
 // World blocks that give a drop when mined (bedrock/air excluded).

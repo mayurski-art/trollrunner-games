@@ -2,15 +2,14 @@ import * as THREE from 'three';
 import { InputManager } from './InputManager.js';
 import { World } from '../world/World.js';
 import { Player } from '../player/Player.js';
-import { Enemy } from '../enemy/Enemy.js';
+import { Spawner } from '../enemy/Spawner.js';
 import { performRaycast } from '../player/Interaction.js';
 import { Inventory } from '../ui/Inventory.js';
 import { InventoryScreen } from '../ui/InventoryScreen.js';
 import { ChestScreen } from '../ui/ChestScreen.js';
-import { BLOCKS, PLACEABLE } from '../world/blocks.js';
+import { BLOCKS, PLACEABLE, UNARMED, WEAPON_STATS } from '../world/blocks.js';
 
 const REACH = 6;
-const ATTACK_DAMAGE = 12;
 
 // Owns the renderer, scene, world/player/enemy state and the per-frame loop.
 // States: menu | running | paused | respawn | inventory | chest.
@@ -39,7 +38,8 @@ export class Game {
 
     const spawn = this.world.findSpawn();
     this.player = new Player(this.world, spawn);
-    this.enemy = new Enemy(this.scene, { x: spawn.x + 5, y: spawn.y, z: spawn.z + 3 });
+    this.spawner = new Spawner(this.scene, this.world);
+    this.attackCooldownTimer = 0;
 
     this.inventory = new Inventory(hud.hotbar);
     this.invScreen = new InventoryScreen(hud.invGrid, hud.recipeList, this.inventory);
@@ -152,10 +152,14 @@ export class Game {
 
   handleDig() {
     if (this.state !== 'running') return;
-    const hit = performRaycast(this.world, this.player.eyePos, this.player.forwardVector(), REACH, [this.enemy]);
+    const hit = performRaycast(this.world, this.player.eyePos, this.player.forwardVector(), REACH, this.spawner.enemies);
     if (!hit) return;
     if (hit.type === 'entity') {
-      hit.entity.hit(1);
+      if (this.attackCooldownTimer > 0) return;
+      const weapon = this.inventory.selectedItem();
+      const stats = (weapon && WEAPON_STATS[weapon.id]) || UNARMED;
+      this.attackCooldownTimer = stats.cooldown;
+      hit.entity.hit(stats.damage, this.player.pos);
       return;
     }
     if (hit.type === 'block' && this.world.isMineable(hit.x, hit.y, hit.z)) {
@@ -169,7 +173,7 @@ export class Game {
 
   handlePlace() {
     if (this.state !== 'running') return;
-    const hit = performRaycast(this.world, this.player.eyePos, this.player.forwardVector(), REACH, [this.enemy]);
+    const hit = performRaycast(this.world, this.player.eyePos, this.player.forwardVector(), REACH, this.spawner.enemies);
     if (!hit || hit.type !== 'block') return;
 
     // Right-clicking an existing chest opens it instead of placing.
@@ -202,15 +206,19 @@ export class Game {
       return;
     }
 
+    if (this.attackCooldownTimer > 0) this.attackCooldownTimer -= dt;
+
     const look = this.input.consumeLook();
     this.player.lookDelta(look.dx, look.dy);
 
     const move = this.input.moveVector;
     const fellOff = this.player.update(dt, move.x, move.z, this.input.jumpHeld);
 
-    const enemyResult = this.enemy.update(dt, this.world, this.player.pos);
+    const attackers = this.spawner.update(dt, this.player.pos);
     let died = false;
-    if (enemyResult === 'attack') died = !!this.player.takeDamage(ATTACK_DAMAGE);
+    for (const attacker of attackers) {
+      if (this.player.takeDamage(attacker.type.damage)) died = true;
+    }
     if (fellOff === 'fell') died = true;
 
     this.hud.hpFill.style.width = `${Math.max(0, (this.player.hp / this.player.maxHp) * 100)}%`;

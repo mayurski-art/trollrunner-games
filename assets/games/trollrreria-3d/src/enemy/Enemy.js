@@ -1,30 +1,27 @@
 import * as THREE from 'three';
 
-const WANDER_SPEED = 1.1;
-const CHASE_SPEED = 2.4;
-const AGGRO_RANGE = 8;
-const ATTACK_RANGE = 1.1;
-const ATTACK_COOLDOWN = 1.1;
-const MAX_HP = 3;
+const KNOCKBACK_DECAY = 6; // per second, exponential-ish falloff
 
-// A single wandering/chasing mob ("Troll Grub") — v1 MVP has exactly one.
-// Player "attacks" it by pointing the crosshair at it and using the same
-// dig/interact button used for mining blocks.
+// A wandering/chasing mob whose stats/behavior come from an EnemyTypes
+// config, so ground mobs and flyers share one implementation. Player
+// "attacks" it by pointing the crosshair at it and using the dig/interact
+// button used for mining blocks (see Game.handleDig).
 export class Enemy {
-  constructor(scene, spawn) {
+  constructor(scene, spawn, type) {
+    this.type = type;
     this.pos = { ...spawn };
-    this.vel = { x: 0, y: 0, z: 0 };
-    this.hp = MAX_HP;
+    this.hp = type.hp;
     this.alive = true;
-    this.radius = 0.5;
+    this.radius = type.radius;
     this.attackCooldown = 0;
     this.wanderTarget = null;
     this.wanderTimer = 0;
+    this.knockbackVel = { x: 0, z: 0 };
 
-    const geo = new THREE.BoxGeometry(0.9, 0.9, 0.9);
-    const mat = new THREE.MeshLambertMaterial({ color: 0x7a2ea6 });
+    const geo = new THREE.BoxGeometry(type.size, type.size, type.size);
+    const mat = new THREE.MeshLambertMaterial({ color: type.color });
     this.mesh = new THREE.Mesh(geo, mat);
-    this.mesh.position.set(spawn.x, spawn.y + 0.45, spawn.z);
+    this.mesh.position.set(spawn.x, spawn.y + type.size / 2, spawn.z);
     scene.add(this.mesh);
   }
 
@@ -32,8 +29,13 @@ export class Enemy {
     return { x: this.mesh.position.x, y: this.mesh.position.y, z: this.mesh.position.z };
   }
 
-  hit(damage = 1) {
+  hit(damage, sourcePos) {
     this.hp -= damage;
+    if (sourcePos) {
+      const dx = this.pos.x - sourcePos.x, dz = this.pos.z - sourcePos.z;
+      const d = Math.hypot(dx, dz) || 1;
+      this.knockbackVel = { x: (dx / d) * 6, z: (dz / d) * 6 };
+    }
     if (this.hp <= 0) this.die();
     return this.hp <= 0;
   }
@@ -43,6 +45,12 @@ export class Enemy {
     this.mesh.visible = false;
   }
 
+  dispose(scene) {
+    scene.remove(this.mesh);
+    this.mesh.geometry.dispose();
+    this.mesh.material.dispose();
+  }
+
   update(dt, world, playerPos) {
     if (!this.alive) return null;
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
@@ -50,10 +58,12 @@ export class Enemy {
     const dx = playerPos.x - this.pos.x;
     const dz = playerPos.z - this.pos.z;
     const distToPlayer = Math.hypot(dx, dz);
+    const t = this.type;
 
-    let moveX = 0, moveZ = 0, speed = WANDER_SPEED;
-    if (distToPlayer < AGGRO_RANGE) {
-      speed = CHASE_SPEED;
+    let moveX = 0, moveZ = 0, speed = t.wanderSpeed;
+    const aggro = distToPlayer < t.aggroRange;
+    if (aggro) {
+      speed = t.chaseSpeed;
       moveX = dx / (distToPlayer || 1);
       moveZ = dz / (distToPlayer || 1);
     } else {
@@ -72,19 +82,31 @@ export class Enemy {
       }
     }
 
-    const nextX = this.pos.x + moveX * speed * dt;
-    const nextZ = this.pos.z + moveZ * speed * dt;
-    const groundY = this.findGround(world, nextX, this.pos.y, nextZ);
-    if (groundY !== null) {
+    const decay = Math.exp(-KNOCKBACK_DECAY * dt);
+    this.knockbackVel.x *= decay;
+    this.knockbackVel.z *= decay;
+
+    const nextX = this.pos.x + moveX * speed * dt + this.knockbackVel.x * dt;
+    const nextZ = this.pos.z + moveZ * speed * dt + this.knockbackVel.z * dt;
+
+    if (t.flies) {
       this.pos.x = nextX;
       this.pos.z = nextZ;
-      this.pos.y = groundY;
+      const targetY = aggro ? playerPos.y + 1 : this.groundHeight(world, nextX, nextZ) + t.hoverHeight;
+      this.pos.y += (targetY - this.pos.y) * Math.min(1, dt * 2);
+    } else {
+      const groundY = this.findGround(world, nextX, this.pos.y, nextZ);
+      if (groundY !== null) {
+        this.pos.x = nextX;
+        this.pos.z = nextZ;
+        this.pos.y = groundY;
+      }
     }
 
-    this.mesh.position.set(this.pos.x, this.pos.y + 0.45, this.pos.z);
+    this.mesh.position.set(this.pos.x, this.pos.y + t.size / 2, this.pos.z);
 
-    if (distToPlayer < ATTACK_RANGE && this.attackCooldown <= 0) {
-      this.attackCooldown = ATTACK_COOLDOWN;
+    if (distToPlayer < t.attackRange && this.attackCooldown <= 0) {
+      this.attackCooldown = t.attackCooldown;
       return 'attack';
     }
     return null;
@@ -99,5 +121,12 @@ export class Enemy {
       return by;
     }
     return by;
+  }
+
+  groundHeight(world, x, z) {
+    for (let y = 40; y >= 0; y--) {
+      if (world.getBlock(Math.floor(x), y, Math.floor(z)) !== 0) return y + 1;
+    }
+    return 14;
   }
 }
