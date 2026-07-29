@@ -25,6 +25,10 @@ export const BLOCKS = {
   STONE_ARMOR: 21,
   GEM_ARMOR: 22,
   BED: 23,
+  LEVER: 24,
+  WIRE: 25,
+  LAMP_OFF: 26,
+  LAMP_ON: 27,
 };
 
 // Per-face color so a merged mesh can use vertex colors instead of textures.
@@ -52,6 +56,10 @@ export const BLOCK_COLOR = {
   [BLOCKS.STONE_ARMOR]: 0x7a7a84,
   [BLOCKS.GEM_ARMOR]: 0xc026d3,
   [BLOCKS.BED]: 0xef4444,
+  [BLOCKS.LEVER]: 0x57534e,
+  [BLOCKS.WIRE]: 0xb91c1c,
+  [BLOCKS.LAMP_OFF]: 0x4b4b52,
+  [BLOCKS.LAMP_ON]: 0xffe066,
 };
 
 export const BLOCK_NAME = {
@@ -77,6 +85,10 @@ export const BLOCK_NAME = {
   [BLOCKS.STONE_ARMOR]: 'Stone Armor',
   [BLOCKS.GEM_ARMOR]: 'Gem Armor',
   [BLOCKS.BED]: 'Bed',
+  [BLOCKS.LEVER]: 'Lever',
+  [BLOCKS.WIRE]: 'Wire',
+  [BLOCKS.LAMP_OFF]: 'Lamp',
+  [BLOCKS.LAMP_ON]: 'Lamp',
 };
 
 // Melee weapons: held item id -> { damage, cooldown (seconds) }. Anything
@@ -100,15 +112,24 @@ export const MINEABLE = [
   BLOCKS.GRASS, BLOCKS.DIRT, BLOCKS.STONE, BLOCKS.WOOD, BLOCKS.ORE,
   BLOCKS.SAND, BLOCKS.LEAVES, BLOCKS.PLANK, BLOCKS.TORCH, BLOCKS.CHEST,
   BLOCKS.STONE_BRICK, BLOCKS.SNOW, BLOCKS.CACTUS, BLOCKS.GEMSTONE, BLOCKS.BED,
+  BLOCKS.LEVER, BLOCKS.WIRE, BLOCKS.LAMP_OFF, BLOCKS.LAMP_ON,
 ];
 
 // Items the player can right-click place as a world block. STICK is
-// craft-only and deliberately excluded.
+// craft-only and deliberately excluded. LAMP_ON is a runtime-only state
+// (see World.recomputePower), never placed directly.
 export const PLACEABLE = [
   BLOCKS.DIRT, BLOCKS.STONE, BLOCKS.WOOD, BLOCKS.SAND, BLOCKS.ORE,
   BLOCKS.LEAVES, BLOCKS.PLANK, BLOCKS.TORCH, BLOCKS.CHEST, BLOCKS.STONE_BRICK,
-  BLOCKS.SNOW, BLOCKS.CACTUS, BLOCKS.BED,
+  BLOCKS.SNOW, BLOCKS.CACTUS, BLOCKS.BED, BLOCKS.LEVER, BLOCKS.WIRE, BLOCKS.LAMP_OFF,
 ];
+
+// Mining these gives back a different item than the block itself (grass ->
+// dirt; a lit lamp always drops its unlit form).
+export const DROP_OVERRIDE = {
+  [BLOCKS.GRASS]: BLOCKS.DIRT,
+  [BLOCKS.LAMP_ON]: BLOCKS.LAMP_OFF,
+};
 
 export const MAX_STACK = 64;
 

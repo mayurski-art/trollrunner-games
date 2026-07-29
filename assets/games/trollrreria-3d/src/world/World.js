@@ -2,6 +2,8 @@ import { Chunk, CHUNK_X, CHUNK_Y, CHUNK_Z } from './Chunk.js';
 import { BLOCKS, MINEABLE } from './blocks.js';
 import { makeFractalNoise2D, makeNoise2D } from './noise.js';
 
+const NEIGHBOR_DIRS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+
 // Small floating island, generated once at load — no infinite chunk
 // streaming for the v1 MVP (see design doc: "small procedurally generated island").
 export const WORLD_CHUNKS = 5; // 5x5 chunks -> 80x80 blocks
@@ -26,6 +28,9 @@ export class World {
     this.heightMap = new Map(); // "x,z" -> topmost solid y (or -1 if void column)
     this.biomeMap = new Map(); // "x,z" -> BIOMES.*
     this.chests = new Map(); // "x,y,z" -> Array(27) of {id,count}|null
+    this.leverStates = new Map(); // "x,y,z" -> boolean (on/off)
+    this.lamps = new Set(); // "x,y,z" of placed lamps (either state)
+    this._inPowerRecompute = false;
 
     for (let cx = 0; cx < WORLD_CHUNKS; cx++) {
       for (let cz = 0; cz < WORLD_CHUNKS; cz++) {
@@ -185,14 +190,14 @@ export class World {
     return MINEABLE.includes(this.getBlock(x, y, z));
   }
 
-  chestKey(x, y, z) {
+  posKey(x, y, z) {
     return `${x},${y},${z}`;
   }
 
   // Chest contents are lost if the chest block is mined — acceptable for
   // this MVP phase (matches "instant-click" simplicity elsewhere).
   getChest(x, y, z) {
-    const key = this.chestKey(x, y, z);
+    const key = this.posKey(x, y, z);
     if (!this.chests.has(key)) this.chests.set(key, new Array(27).fill(null));
     return this.chests.get(key);
   }
@@ -205,7 +210,12 @@ export class World {
     if (!chunk) return;
     const lx = x - cx * CHUNK_X, lz = z - cz * CHUNK_Z;
     const prevId = chunk.getLocal(lx, y, lz);
-    if (prevId === BLOCKS.CHEST && id !== BLOCKS.CHEST) this.chests.delete(this.chestKey(x, y, z));
+    const key = this.posKey(x, y, z); // "x,y,z" — shared key format
+    if (prevId === BLOCKS.CHEST && id !== BLOCKS.CHEST) this.chests.delete(key);
+    if (prevId === BLOCKS.LEVER && id !== BLOCKS.LEVER) this.leverStates.delete(key);
+    if ((prevId === BLOCKS.LAMP_OFF || prevId === BLOCKS.LAMP_ON) && id !== BLOCKS.LAMP_OFF && id !== BLOCKS.LAMP_ON) {
+      this.lamps.delete(key);
+    }
     chunk.setLocal(lx, y, lz, id);
     chunk.buildMesh(this.scene);
 
@@ -213,6 +223,57 @@ export class World {
     if (lx === CHUNK_X - 1) this.chunkAt(cx + 1, cz)?.buildMesh(this.scene);
     if (lz === 0) this.chunkAt(cx, cz - 1)?.buildMesh(this.scene);
     if (lz === CHUNK_Z - 1) this.chunkAt(cx, cz + 1)?.buildMesh(this.scene);
+
+    const isNetworkEdge = prevId === BLOCKS.LEVER || prevId === BLOCKS.WIRE || id === BLOCKS.LEVER || id === BLOCKS.WIRE;
+    if (isNetworkEdge && !this._inPowerRecompute) this.recomputePower();
+  }
+
+  registerLever(x, y, z) {
+    this.leverStates.set(this.posKey(x, y, z), false);
+  }
+
+  registerLamp(x, y, z) {
+    this.lamps.add(this.posKey(x, y, z));
+  }
+
+  toggleLever(x, y, z) {
+    const key = this.posKey(x, y, z);
+    this.leverStates.set(key, !this.leverStates.get(key));
+    this.recomputePower();
+  }
+
+  // Flood-fills power outward from every "on" lever through connected wire,
+  // then lights any lamp adjacent to a powered wire/lever.
+  recomputePower() {
+    this._inPowerRecompute = true;
+    const powered = new Set();
+    const queue = [];
+    for (const [key, on] of this.leverStates) if (on) { powered.add(key); queue.push(key); }
+
+    while (queue.length) {
+      const [x, y, z] = queue.shift().split(',').map(Number);
+      for (const [dx, dy, dz] of NEIGHBOR_DIRS) {
+        const nx = x + dx, ny = y + dy, nz = z + dz;
+        const nkey = `${nx},${ny},${nz}`;
+        if (powered.has(nkey)) continue;
+        if (this.getBlock(nx, ny, nz) === BLOCKS.WIRE) {
+          powered.add(nkey);
+          queue.push(nkey);
+        }
+      }
+    }
+
+    for (const lampKey of this.lamps) {
+      const [x, y, z] = lampKey.split(',').map(Number);
+      let isPowered = false;
+      for (const [dx, dy, dz] of NEIGHBOR_DIRS) {
+        if (powered.has(`${x + dx},${y + dy},${z + dz}`)) { isPowered = true; break; }
+      }
+      const curId = this.getBlock(x, y, z);
+      const wantId = isPowered ? BLOCKS.LAMP_ON : BLOCKS.LAMP_OFF;
+      if (curId !== wantId) this.setBlock(x, y, z, wantId);
+    }
+    this._inPowerRecompute = false;
   }
 
   // Finds a safe spawn point near the island center (topmost solid block + 2,

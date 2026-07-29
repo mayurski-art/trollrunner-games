@@ -12,7 +12,7 @@ import { Merchant } from '../npc/Merchant.js';
 import { DayNightCycle } from './DayNightCycle.js';
 import { MusicManager } from './MusicManager.js';
 import * as Save from '../world/Save.js';
-import { BLOCKS, PLACEABLE, UNARMED, WEAPON_STATS } from '../world/blocks.js';
+import { BLOCKS, PLACEABLE, UNARMED, WEAPON_STATS, DROP_OVERRIDE } from '../world/blocks.js';
 
 const REACH = 6;
 const AUTOSAVE_INTERVAL = 60;
@@ -242,8 +242,7 @@ export class Game {
     if (hit.type === 'block' && this.world.isMineable(hit.x, hit.y, hit.z)) {
       const id = this.world.getBlock(hit.x, hit.y, hit.z);
       this.world.setBlock(hit.x, hit.y, hit.z, BLOCKS.AIR);
-      // Grass top drops dirt (no separate grass hotbar slot); leaves drop nothing.
-      const dropId = id === BLOCKS.GRASS ? BLOCKS.DIRT : id;
+      const dropId = DROP_OVERRIDE[id] ?? id;
       this.inventory.add(dropId, 1);
     }
   }
@@ -270,6 +269,10 @@ export class Game {
       this.useBed(hit.x, hit.y, hit.z);
       return;
     }
+    if (targetId === BLOCKS.LEVER) {
+      this.world.toggleLever(hit.x, hit.y, hit.z);
+      return;
+    }
 
     const slot = this.inventory.selectedItem();
     if (!slot || !PLACEABLE.includes(slot.id)) return;
@@ -285,6 +288,8 @@ export class Game {
     this.world.setBlock(px, py, pz, placeId);
     if (placeId === BLOCKS.CHEST) this.world.getChest(px, py, pz);
     if (placeId === BLOCKS.BED) this.spawnMerchantNear(px, py, pz);
+    if (placeId === BLOCKS.LEVER) this.world.registerLever(px, py, pz);
+    if (placeId === BLOCKS.LAMP_OFF) this.world.registerLamp(px, py, pz);
   }
 
   _loop() {

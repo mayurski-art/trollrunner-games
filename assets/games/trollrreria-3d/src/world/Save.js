@@ -67,6 +67,8 @@ export function saveGame(game) {
   }
   const chests = {};
   for (const [key, slots] of game.world.chests) chests[key] = slots;
+  const levers = {};
+  for (const [key, on] of game.world.leverStates) levers[key] = on;
 
   const data = {
     version: SAVE_VERSION,
@@ -74,6 +76,8 @@ export function saveGame(game) {
     seed: game.world.seed,
     chunks,
     chests,
+    levers,
+    lamps: [...game.world.lamps],
     player: {
       pos: game.player.pos,
       spawn: game.player.spawn,
@@ -122,6 +126,8 @@ export function applyWorldSave(world, saveData) {
     chunk.data = rleDecode(base64ToBytes(b64), CHUNK_LEN);
   }
   world.chests = new Map(Object.entries(saveData.chests || {}).map(([k, v]) => [k, v]));
+  world.leverStates = new Map(Object.entries(saveData.levers || {}));
+  world.lamps = new Set(saveData.lamps || []);
   world.rebuildDerivedMapsFromChunks();
   for (const chunk of world.chunks.values()) chunk.buildMesh(world.scene);
 }
