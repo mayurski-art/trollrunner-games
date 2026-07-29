@@ -4,6 +4,7 @@ const canvas = document.getElementById('tr3-canvas');
 const touchRoot = document.getElementById('tr3-touch');
 const hudRoot = document.getElementById('tr3-hud');
 const hpFill = document.getElementById('tr3-hp-fill');
+const clock = document.getElementById('tr3-clock');
 const hotbar = document.getElementById('tr3-hotbar');
 const invGrid = document.getElementById('tr3-inv-grid');
 const recipeList = document.getElementById('tr3-recipe-list');
@@ -44,7 +45,7 @@ function onStateChange(state) {
 const game = new Game(
   canvas,
   touchRoot,
-  { hud: hudRoot, hpFill, hotbar, invGrid, recipeList, chestGrid, chestPlayerGrid },
+  { hud: hudRoot, hpFill, clock, hotbar, invGrid, recipeList, chestGrid, chestPlayerGrid },
   { onStateChange },
 );
 

@@ -11,14 +11,18 @@ const ISLAND_RADIUS = WORLD_SIZE_X * 0.42;
 const BASE_HEIGHT = 14;
 const AMPLITUDE = 8;
 
+export const BIOMES = { FOREST: 'forest', DESERT: 'desert', SNOW: 'snow' };
+
 export class World {
   constructor(scene, seed = 1337) {
     this.scene = scene;
     this.heightNoise = makeFractalNoise2D(seed);
     this.treeNoise = makeNoise2D(seed + 501);
     this.oreNoise = makeNoise2D(seed + 907);
+    this.biomeNoise = makeNoise2D(seed + 2003);
     this.chunks = new Map(); // "cx,cz" -> Chunk
     this.heightMap = new Map(); // "x,z" -> topmost solid y (or -1 if void column)
+    this.biomeMap = new Map(); // "x,z" -> BIOMES.*
     this.chests = new Map(); // "x,y,z" -> Array(27) of {id,count}|null
 
     for (let cx = 0; cx < WORLD_CHUNKS; cx++) {
@@ -38,6 +42,16 @@ export class World {
 
   worldToChunk(x, z) {
     return { cx: Math.floor(x / CHUNK_X), cz: Math.floor(z / CHUNK_Z) };
+  }
+
+  // Low-frequency regions so biomes read as continuous patches, not noise —
+  // tuned so a handful of full patches fit across the island's ~34-block
+  // radius rather than sampling only a sliver of the noise grid.
+  getBiome(x, z) {
+    const n = this.biomeNoise(x * 0.06, z * 0.06);
+    if (n < 0.35) return BIOMES.DESERT;
+    if (n > 0.65) return BIOMES.SNOW;
+    return BIOMES.FOREST;
   }
 
   columnHeight(x, z) {
@@ -60,16 +74,22 @@ export class World {
         const top = this.columnHeight(x, z);
         this.heightMap.set(`${x},${z}`, top);
         if (top < 0) continue;
+        const biome = this.getBiome(x, z);
+        this.biomeMap.set(`${x},${z}`, biome);
         const { cx, cz } = this.worldToChunk(x, z);
         const chunk = this.chunkAt(cx, cz);
         const lx = x - cx * CHUNK_X;
         const lz = z - cz * CHUNK_Z;
+        const topBlock = top <= 4 ? BLOCKS.SAND
+          : biome === BIOMES.DESERT ? BLOCKS.SAND
+          : biome === BIOMES.SNOW ? BLOCKS.SNOW
+          : BLOCKS.GRASS;
 
         for (let y = 0; y <= top; y++) {
           let id;
           if (y === 0) id = BLOCKS.BEDROCK;
-          else if (y === top) id = top <= 4 ? BLOCKS.SAND : BLOCKS.GRASS;
-          else if (y > top - 3) id = BLOCKS.DIRT;
+          else if (y === top) id = topBlock;
+          else if (y > top - 3) id = biome === BIOMES.DESERT && top > 4 ? BLOCKS.SAND : BLOCKS.DIRT;
           else {
             id = BLOCKS.STONE;
             if (y < top - 5 && this.oreNoise(x * 0.3, (z + y) * 0.3) > 0.82) id = BLOCKS.ORE;
@@ -79,14 +99,23 @@ export class World {
       }
     }
 
-    // Pass 2: sprinkle a few trees on grass columns away from the island edge.
+    // Pass 2: sprinkle vegetation — trees in forest/snow, cacti in desert.
     for (let x = 2; x < WORLD_SIZE_X - 2; x++) {
       for (let z = 2; z < WORLD_SIZE_Z - 2; z++) {
         const top = this.heightMap.get(`${x},${z}`);
         if (top < 6) continue;
-        if (this.getBlock(x, top, z) !== BLOCKS.GRASS) continue;
-        if (this.treeNoise(x * 0.9, z * 0.9) < 0.93) continue;
-        this.placeTree(x, top + 1, z);
+        const biome = this.biomeMap.get(`${x},${z}`);
+        const surface = this.getBlock(x, top, z);
+        if (biome === BIOMES.DESERT) {
+          if (surface !== BLOCKS.SAND) continue;
+          if (this.treeNoise(x * 0.9, z * 0.9) < 0.96) continue;
+          this.placeCactus(x, top + 1, z);
+        } else {
+          const threshold = biome === BIOMES.SNOW ? 0.97 : 0.93;
+          if (surface !== BLOCKS.GRASS && surface !== BLOCKS.SNOW) continue;
+          if (this.treeNoise(x * 0.9, z * 0.9) < threshold) continue;
+          this.placeTree(x, top + 1, z);
+        }
       }
     }
 
@@ -107,6 +136,11 @@ export class World {
         }
       }
     }
+  }
+
+  placeCactus(x, baseY, z) {
+    const h = 2 + Math.floor(this.treeNoise(x * 4, z * 4) * 2);
+    for (let i = 0; i < h; i++) this.setBlockRaw(x, baseY + i, z, BLOCKS.CACTUS);
   }
 
   // Sets data without triggering a remesh — used only during generation.

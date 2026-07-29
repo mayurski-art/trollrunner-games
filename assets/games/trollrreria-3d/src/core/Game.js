@@ -7,6 +7,7 @@ import { performRaycast } from '../player/Interaction.js';
 import { Inventory } from '../ui/Inventory.js';
 import { InventoryScreen } from '../ui/InventoryScreen.js';
 import { ChestScreen } from '../ui/ChestScreen.js';
+import { DayNightCycle } from './DayNightCycle.js';
 import { BLOCKS, PLACEABLE, UNARMED, WEAPON_STATS } from '../world/blocks.js';
 
 const REACH = 6;
@@ -31,7 +32,8 @@ export class Game {
     this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 200);
     this.camera.rotation.order = 'YXZ';
 
-    this._setupLights();
+    const lights = this._setupLights();
+    this.dayNight = new DayNightCycle(this.scene, lights);
 
     this.world = new World(this.scene);
     this.world.generate();
@@ -69,11 +71,12 @@ export class Game {
   _setupLights() {
     const hemi = new THREE.HemisphereLight(0xbfe3ff, 0x9a8262, 1.0);
     this.scene.add(hemi);
-    const sun = new THREE.DirectionalLight(0xfff2d9, 0.7);
-    sun.position.set(40, 60, 20);
-    this.scene.add(sun);
+    const sunLight = new THREE.DirectionalLight(0xfff2d9, 0.7);
+    sunLight.position.set(40, 60, 20);
+    this.scene.add(sunLight);
     const ambient = new THREE.AmbientLight(0xffffff, 0.45);
     this.scene.add(ambient);
+    return { hemi, sunLight, ambient };
   }
 
   resize() {
@@ -207,6 +210,8 @@ export class Game {
     }
 
     if (this.attackCooldownTimer > 0) this.attackCooldownTimer -= dt;
+    this.dayNight.update(dt);
+    if (this.hud.clock) this.hud.clock.textContent = `Day ${this.dayNight.day} · ${this.dayNight.clockString()}`;
 
     const look = this.input.consumeLook();
     this.player.lookDelta(look.dx, look.dy);

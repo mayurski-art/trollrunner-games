@@ -137,6 +137,21 @@ html, body {
   padding: 8px 12px;
 }
 .tr3-hp-label { font-size: 11px; font-weight: 700; opacity: 0.7; }
+
+.tr3-clock {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--tr3-panel);
+  border: 1px solid var(--tr3-border);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
 .tr3-hp-bar {
   width: 120px;
   height: 10px;
