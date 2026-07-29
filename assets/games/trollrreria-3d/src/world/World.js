@@ -31,6 +31,7 @@ export class World {
     this.leverStates = new Map(); // "x,y,z" -> boolean (on/off)
     this.lamps = new Set(); // "x,y,z" of placed lamps (either state)
     this._inPowerRecompute = false;
+    this.hardmode = false;
 
     for (let cx = 0; cx < WORLD_CHUNKS; cx++) {
       for (let cz = 0; cz < WORLD_CHUNKS; cz++) {

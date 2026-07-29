@@ -19,4 +19,6 @@ export const RECIPES = [
   { id: 'lever', inputs: [{ id: BLOCKS.STONE, count: 2 }, { id: BLOCKS.STICK, count: 1 }], output: { id: BLOCKS.LEVER, count: 1 } },
   { id: 'wire', inputs: [{ id: BLOCKS.ORE, count: 1 }], output: { id: BLOCKS.WIRE, count: 8 } },
   { id: 'lamp', inputs: [{ id: BLOCKS.ORE, count: 2 }, { id: BLOCKS.PLANK, count: 1 }], output: { id: BLOCKS.LAMP_OFF, count: 1 } },
+  { id: 'reaper_sword', inputs: [{ id: BLOCKS.REAPER_SHARD, count: 5 }, { id: BLOCKS.STICK, count: 2 }], output: { id: BLOCKS.REAPER_SWORD, count: 1 } },
+  { id: 'reaper_armor', inputs: [{ id: BLOCKS.REAPER_SHARD, count: 8 }], output: { id: BLOCKS.REAPER_ARMOR, count: 1 } },
 ];

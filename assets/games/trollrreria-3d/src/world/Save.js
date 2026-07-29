@@ -78,6 +78,7 @@ export function saveGame(game) {
     chests,
     levers,
     lamps: [...game.world.lamps],
+    hardmode: game.world.hardmode,
     player: {
       pos: game.player.pos,
       spawn: game.player.spawn,
@@ -128,6 +129,7 @@ export function applyWorldSave(world, saveData) {
   world.chests = new Map(Object.entries(saveData.chests || {}).map(([k, v]) => [k, v]));
   world.leverStates = new Map(Object.entries(saveData.levers || {}));
   world.lamps = new Set(saveData.lamps || []);
+  world.hardmode = !!saveData.hardmode;
   world.rebuildDerivedMapsFromChunks();
   for (const chunk of world.chunks.values()) chunk.buildMesh(world.scene);
 }

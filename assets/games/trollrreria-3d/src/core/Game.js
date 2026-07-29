@@ -16,6 +16,7 @@ import { BLOCKS, PLACEABLE, UNARMED, WEAPON_STATS, DROP_OVERRIDE } from '../worl
 
 const REACH = 6;
 const AUTOSAVE_INTERVAL = 60;
+const HARDMODE_TRIGGER_DAY = 5;
 
 // Owns the renderer, scene, world/player/enemy state and the per-frame loop.
 // States: menu | running | paused | respawn | inventory | chest.
@@ -116,6 +117,8 @@ export class Game {
       this.world.generate();
       this.player = new Player(this.world, this.world.findSpawn());
     }
+
+    if (this.hud.hardmodeBadge) this.hud.hardmodeBadge.hidden = !this.world.hardmode;
 
     this.state = 'running';
     this.hud.hud.hidden = false;
@@ -236,7 +239,8 @@ export class Game {
       const weapon = this.inventory.selectedItem();
       const stats = (weapon && WEAPON_STATS[weapon.id]) || UNARMED;
       this.attackCooldownTimer = stats.cooldown;
-      hit.entity.hit(stats.damage, this.player.pos);
+      const died = hit.entity.hit(stats.damage, this.player.pos);
+      if (died && this.world.hardmode && Math.random() < 0.5) this.inventory.add(BLOCKS.REAPER_SHARD, 1);
       return;
     }
     if (hit.type === 'block' && this.world.isMineable(hit.x, hit.y, hit.z)) {
@@ -310,6 +314,10 @@ export class Game {
     this.dayNight.update(dt);
     this.music.setMode(this.dayNight.isNight() ? 'night' : 'day');
     if (this.hud.clock) this.hud.clock.textContent = `Day ${this.dayNight.day} · ${this.dayNight.clockString()}`;
+    if (!this.world.hardmode && this.dayNight.day >= HARDMODE_TRIGGER_DAY) {
+      this.world.hardmode = true;
+      if (this.hud.hardmodeBadge) this.hud.hardmodeBadge.hidden = false;
+    }
 
     const look = this.input.consumeLook();
     this.player.lookDelta(look.dx, look.dy);

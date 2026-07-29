@@ -29,6 +29,9 @@ export const BLOCKS = {
   WIRE: 25,
   LAMP_OFF: 26,
   LAMP_ON: 27,
+  REAPER_SHARD: 28,
+  REAPER_SWORD: 29,
+  REAPER_ARMOR: 30,
 };
 
 // Per-face color so a merged mesh can use vertex colors instead of textures.
@@ -60,6 +63,9 @@ export const BLOCK_COLOR = {
   [BLOCKS.WIRE]: 0xb91c1c,
   [BLOCKS.LAMP_OFF]: 0x4b4b52,
   [BLOCKS.LAMP_ON]: 0xffe066,
+  [BLOCKS.REAPER_SHARD]: 0x1f2937,
+  [BLOCKS.REAPER_SWORD]: 0x374151,
+  [BLOCKS.REAPER_ARMOR]: 0x0f172a,
 };
 
 export const BLOCK_NAME = {
@@ -89,6 +95,9 @@ export const BLOCK_NAME = {
   [BLOCKS.WIRE]: 'Wire',
   [BLOCKS.LAMP_OFF]: 'Lamp',
   [BLOCKS.LAMP_ON]: 'Lamp',
+  [BLOCKS.REAPER_SHARD]: 'Reaper Shard',
+  [BLOCKS.REAPER_SWORD]: 'Reaper Sword',
+  [BLOCKS.REAPER_ARMOR]: 'Reaper Armor',
 };
 
 // Melee weapons: held item id -> { damage, cooldown (seconds) }. Anything
@@ -98,6 +107,7 @@ export const WEAPON_STATS = {
   [BLOCKS.WOOD_SWORD]: { damage: 2, cooldown: 0.4 },
   [BLOCKS.STONE_SWORD]: { damage: 4, cooldown: 0.35 },
   [BLOCKS.GEM_SWORD]: { damage: 7, cooldown: 0.3 },
+  [BLOCKS.REAPER_SWORD]: { damage: 10, cooldown: 0.28 },
 };
 
 // Armor: a single equipped item id -> fraction of incoming damage blocked.
@@ -105,6 +115,7 @@ export const ARMOR_STATS = {
   [BLOCKS.WOOD_ARMOR]: { reduction: 0.15 },
   [BLOCKS.STONE_ARMOR]: { reduction: 0.3 },
   [BLOCKS.GEM_ARMOR]: { reduction: 0.5 },
+  [BLOCKS.REAPER_ARMOR]: { reduction: 0.65 },
 };
 
 // World blocks that give a drop when mined (bedrock/air excluded).

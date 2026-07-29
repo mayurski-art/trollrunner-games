@@ -30,4 +30,21 @@ export const ENEMY_TYPES = {
     flies: true,
     hoverHeight: 2.5,
   },
+  // Only enters the spawn pool once World.hardmode is triggered (see
+  // Spawner.trySpawn) — the "hardmode" phase's tougher escalation mob.
+  TROLL_REAPER: {
+    name: 'Troll Reaper',
+    hp: 10,
+    radius: 0.6,
+    color: 0x111827,
+    size: 1.1,
+    wanderSpeed: 1.5,
+    chaseSpeed: 3.6,
+    aggroRange: 12,
+    attackRange: 1.3,
+    attackCooldown: 0.9,
+    damage: 20,
+    flies: false,
+    hardmodeOnly: true,
+  },
 };
