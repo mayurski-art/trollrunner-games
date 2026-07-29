@@ -15,6 +15,7 @@ const armorSlot = document.getElementById('tr3-armor-slot');
 const chestGrid = document.getElementById('tr3-chest-grid');
 const chestPlayerGrid = document.getElementById('tr3-chest-player-grid');
 const tradeList = document.getElementById('tr3-trade-list');
+const questPanel = document.getElementById('tr3-quest-panel');
 const peerCount = document.getElementById('tr3-peer-count');
 
 const screenMenu = document.getElementById('tr3-screen-menu');
@@ -65,7 +66,7 @@ function onStateChange(state) {
 const game = new Game(
   canvas,
   touchRoot,
-  { hud: hudRoot, hpFill, clock, hardmodeBadge, peerCount, hotbar, invGrid, recipeList, armorSlot, chestGrid, chestPlayerGrid, tradeList },
+  { hud: hudRoot, hpFill, clock, hardmodeBadge, peerCount, hotbar, invGrid, recipeList, armorSlot, chestGrid, chestPlayerGrid, tradeList, questPanel },
   { onStateChange },
 );
 

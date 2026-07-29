@@ -104,6 +104,10 @@ export function saveGame(game) {
       timeOfDay: game.dayNight.timeOfDay,
       day: game.dayNight.day,
     },
+    quests: {
+      index: game.quests.index,
+      kills: game.quests.kills,
+    },
   };
 
   try {

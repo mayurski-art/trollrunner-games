@@ -8,6 +8,8 @@ import { Inventory } from '../ui/Inventory.js';
 import { InventoryScreen } from '../ui/InventoryScreen.js';
 import { ChestScreen } from '../ui/ChestScreen.js';
 import { MerchantScreen } from '../ui/MerchantScreen.js';
+import { QuestScreen } from '../ui/QuestScreen.js';
+import { QuestManager } from '../world/QuestManager.js';
 import { Merchant } from '../npc/Merchant.js';
 import { DayNightCycle } from './DayNightCycle.js';
 import { MusicManager } from './MusicManager.js';
@@ -58,6 +60,8 @@ export class Game {
     this.openChestPos = null;
     this.merchantScreen = new MerchantScreen(hud.tradeList, this.inventory);
     this.merchant = null;
+    this.quests = new QuestManager(this.inventory);
+    this.questScreen = new QuestScreen(hud.questPanel, this.quests);
     this.net = new Net(this);
 
     this.input = new InputManager(canvas, touchRoot, {
@@ -115,6 +119,10 @@ export class Game {
       this.inventory.refresh();
       this.dayNight.timeOfDay = saveData.dayNight.timeOfDay;
       this.dayNight.day = saveData.dayNight.day;
+      if (saveData.quests) {
+        this.quests.index = saveData.quests.index;
+        this.quests.kills = saveData.quests.kills;
+      }
     } else {
       this.world.generate();
       this.player = new Player(this.world, this.world.findSpawn());
@@ -211,6 +219,7 @@ export class Game {
     this.state = 'merchant';
     this.input.exitPointerLock();
     this.merchantScreen.render();
+    this.questScreen.render();
     this.onStateChange('merchant');
   }
 
@@ -262,7 +271,10 @@ export class Game {
       const stats = (weapon && WEAPON_STATS[weapon.id]) || UNARMED;
       this.attackCooldownTimer = stats.cooldown;
       const died = hit.entity.hit(stats.damage, this.player.pos);
-      if (died && this.world.hardmode && Math.random() < 0.5) this.inventory.add(BLOCKS.REAPER_SHARD, 1);
+      if (died) {
+        this.quests.recordKill(hit.entity.type.name);
+        if (this.world.hardmode && Math.random() < 0.5) this.inventory.add(BLOCKS.REAPER_SHARD, 1);
+      }
       return;
     }
     if (hit.type === 'block' && this.world.isMineable(hit.x, hit.y, hit.z)) {
