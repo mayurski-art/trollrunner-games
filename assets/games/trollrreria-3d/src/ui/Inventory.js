@@ -1,4 +1,4 @@
-import { BLOCK_COLOR, BLOCK_NAME } from '../world/blocks.js';
+import { BLOCK_COLOR, BLOCK_NAME, ARMOR_STATS } from '../world/blocks.js';
 import { addToSlots, countInSlots, removeFromSlots } from '../world/Container.js';
 
 const HOTBAR_SIZE = 9;
@@ -12,6 +12,7 @@ export class Inventory {
     this.hotbarEl = hotbarEl;
     this.slots = new Array(TOTAL_SLOTS).fill(null);
     this.selectedHotbar = 0;
+    this.armor = null; // single equipped {id, count:1} item, or null
     this.hotbarSlotEls = [];
     this.onChange = null; // set by InventoryScreen to re-render when open
     this._renderHotbar();
@@ -62,6 +63,31 @@ export class Inventory {
   selectHotbar(i) {
     if (i < 0 || i >= HOTBAR_SIZE) return;
     this.selectedHotbar = i;
+    this._changed();
+  }
+
+  armorReduction() {
+    return this.armor ? (ARMOR_STATS[this.armor.id]?.reduction || 0) : 0;
+  }
+
+  // Equips 1 unit of the armor item at slots[index], swapping any
+  // previously-equipped piece back into the inventory.
+  equipFromSlot(index) {
+    const slot = this.slots[index];
+    if (!slot || !ARMOR_STATS[slot.id]) return false;
+    slot.count -= 1;
+    if (slot.count <= 0) this.slots[index] = null;
+    const previous = this.armor;
+    this.armor = { id: slot.id, count: 1 };
+    if (previous) addToSlots(this.slots, previous.id, 1);
+    this._changed();
+    return true;
+  }
+
+  unequipArmor() {
+    if (!this.armor) return;
+    addToSlots(this.slots, this.armor.id, 1);
+    this.armor = null;
     this._changed();
   }
 

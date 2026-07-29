@@ -19,6 +19,7 @@ export class World {
     this.heightNoise = makeFractalNoise2D(seed);
     this.treeNoise = makeNoise2D(seed + 501);
     this.oreNoise = makeNoise2D(seed + 907);
+    this.gemNoise = makeNoise2D(seed + 1609);
     this.biomeNoise = makeNoise2D(seed + 2003);
     this.chunks = new Map(); // "cx,cz" -> Chunk
     this.heightMap = new Map(); // "x,z" -> topmost solid y (or -1 if void column)
@@ -93,6 +94,8 @@ export class World {
           else {
             id = BLOCKS.STONE;
             if (y < top - 5 && this.oreNoise(x * 0.3, (z + y) * 0.3) > 0.82) id = BLOCKS.ORE;
+            // Gemstone: deeper and rarer than regular ore — the progression tier.
+            if (y < top - 9 && this.gemNoise(x * 0.3, (z + y) * 0.3) > 0.9) id = BLOCKS.GEMSTONE;
           }
           chunk.setLocal(lx, y, lz, id);
         }

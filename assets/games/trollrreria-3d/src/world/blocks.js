@@ -19,6 +19,11 @@ export const BLOCKS = {
   STONE_SWORD: 15,
   SNOW: 16,
   CACTUS: 17,
+  GEMSTONE: 18,
+  GEM_SWORD: 19,
+  WOOD_ARMOR: 20,
+  STONE_ARMOR: 21,
+  GEM_ARMOR: 22,
 };
 
 // Per-face color so a merged mesh can use vertex colors instead of textures.
@@ -40,6 +45,11 @@ export const BLOCK_COLOR = {
   [BLOCKS.STONE_SWORD]: 0xb9b9c2,
   [BLOCKS.SNOW]: 0xf2f7fb,
   [BLOCKS.CACTUS]: 0x4d8a4a,
+  [BLOCKS.GEMSTONE]: 0xd946ef,
+  [BLOCKS.GEM_SWORD]: 0xe879f9,
+  [BLOCKS.WOOD_ARMOR]: 0x9a6a3c,
+  [BLOCKS.STONE_ARMOR]: 0x7a7a84,
+  [BLOCKS.GEM_ARMOR]: 0xc026d3,
 };
 
 export const BLOCK_NAME = {
@@ -59,6 +69,11 @@ export const BLOCK_NAME = {
   [BLOCKS.STONE_SWORD]: 'Stone Sword',
   [BLOCKS.SNOW]: 'Snow',
   [BLOCKS.CACTUS]: 'Cactus',
+  [BLOCKS.GEMSTONE]: 'Gemstone',
+  [BLOCKS.GEM_SWORD]: 'Gem Sword',
+  [BLOCKS.WOOD_ARMOR]: 'Wood Armor',
+  [BLOCKS.STONE_ARMOR]: 'Stone Armor',
+  [BLOCKS.GEM_ARMOR]: 'Gem Armor',
 };
 
 // Melee weapons: held item id -> { damage, cooldown (seconds) }. Anything
@@ -67,13 +82,21 @@ export const UNARMED = { damage: 1, cooldown: 0.5 };
 export const WEAPON_STATS = {
   [BLOCKS.WOOD_SWORD]: { damage: 2, cooldown: 0.4 },
   [BLOCKS.STONE_SWORD]: { damage: 4, cooldown: 0.35 },
+  [BLOCKS.GEM_SWORD]: { damage: 7, cooldown: 0.3 },
+};
+
+// Armor: a single equipped item id -> fraction of incoming damage blocked.
+export const ARMOR_STATS = {
+  [BLOCKS.WOOD_ARMOR]: { reduction: 0.15 },
+  [BLOCKS.STONE_ARMOR]: { reduction: 0.3 },
+  [BLOCKS.GEM_ARMOR]: { reduction: 0.5 },
 };
 
 // World blocks that give a drop when mined (bedrock/air excluded).
 export const MINEABLE = [
   BLOCKS.GRASS, BLOCKS.DIRT, BLOCKS.STONE, BLOCKS.WOOD, BLOCKS.ORE,
   BLOCKS.SAND, BLOCKS.LEAVES, BLOCKS.PLANK, BLOCKS.TORCH, BLOCKS.CHEST,
-  BLOCKS.STONE_BRICK, BLOCKS.SNOW, BLOCKS.CACTUS,
+  BLOCKS.STONE_BRICK, BLOCKS.SNOW, BLOCKS.CACTUS, BLOCKS.GEMSTONE,
 ];
 
 // Items the player can right-click place as a world block. STICK is

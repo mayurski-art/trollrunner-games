@@ -44,7 +44,7 @@ export class Game {
     this.attackCooldownTimer = 0;
 
     this.inventory = new Inventory(hud.hotbar);
-    this.invScreen = new InventoryScreen(hud.invGrid, hud.recipeList, this.inventory);
+    this.invScreen = new InventoryScreen(hud.invGrid, hud.recipeList, hud.armorSlot, this.inventory);
     this.chestScreen = new ChestScreen(hud.chestGrid, hud.chestPlayerGrid, this.inventory);
     this.openChestPos = null;
 
@@ -221,8 +221,10 @@ export class Game {
 
     const attackers = this.spawner.update(dt, this.player.pos);
     let died = false;
+    const reduction = this.inventory.armorReduction();
     for (const attacker of attackers) {
-      if (this.player.takeDamage(attacker.type.damage)) died = true;
+      const dmg = Math.max(1, Math.round(attacker.type.damage * (1 - reduction)));
+      if (this.player.takeDamage(dmg)) died = true;
     }
     if (fellOff === 'fell') died = true;
 

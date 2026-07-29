@@ -244,6 +244,7 @@ html, body {
   margin: 18px 0 10px;
 }
 .tr3-panel-hint { font-size: 13px; opacity: 0.7; margin: 0; }
+.tr3-panel-hint-inline { font-size: 11px; font-weight: 400; text-transform: none; opacity: 0.7; letter-spacing: 0; }
 
 .tr3-slot-grid {
   display: grid;
@@ -263,6 +264,13 @@ html, body {
   min-width: 0;
 }
 .tr3-grid-slot.is-hotbar { border-color: rgba(255,179,0,0.4); }
+.tr3-grid-slot.is-equippable { border-color: rgba(192,38,211,0.6); }
+.tr3-armor-slot {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 14px;
+}
+.tr3-armor-slot.is-empty { border-style: dashed; opacity: 0.5; }
 .tr3-slot-swatch { width: 55%; aspect-ratio: 1; border-radius: 4px; }
 .tr3-slot-count { font-size: 10px; font-family: 'DM Mono', monospace; opacity: 0.85; margin-top: 2px; }
 

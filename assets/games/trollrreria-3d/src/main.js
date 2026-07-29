@@ -8,6 +8,7 @@ const clock = document.getElementById('tr3-clock');
 const hotbar = document.getElementById('tr3-hotbar');
 const invGrid = document.getElementById('tr3-inv-grid');
 const recipeList = document.getElementById('tr3-recipe-list');
+const armorSlot = document.getElementById('tr3-armor-slot');
 const chestGrid = document.getElementById('tr3-chest-grid');
 const chestPlayerGrid = document.getElementById('tr3-chest-player-grid');
 
@@ -45,7 +46,7 @@ function onStateChange(state) {
 const game = new Game(
   canvas,
   touchRoot,
-  { hud: hudRoot, hpFill, clock, hotbar, invGrid, recipeList, chestGrid, chestPlayerGrid },
+  { hud: hudRoot, hpFill, clock, hotbar, invGrid, recipeList, armorSlot, chestGrid, chestPlayerGrid },
   { onStateChange },
 );
 
