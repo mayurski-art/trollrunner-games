@@ -541,3 +541,42 @@ button { cursor: pointer; }
   .pz-hud-chip { font-size: 13px; }
   .pz-bins { grid-template-columns: repeat(3, 1fr); }
 }
+
+/* ---- Kitchen3D mode (docs/TROLL-PIZZERIA-3D.md) --------------------------- */
+/* game.js adds body.k3d-mode once Kitchen3D actually mounts. The 3D room
+   sits behind everything at #pz-3d-mount; the station panels' own painted
+   backdrops (lobby scene, oven brick, build/cut table cards) go transparent
+   so it shows through, while their controls (ticket, bins, buttons, hint
+   text) stay exactly where they are, now floating over the 3D view instead
+   of over a flat backdrop. Nothing here runs in flat/no-WebGL mode — the
+   original 2D game is untouched there. */
+#pz-3d-mount { position: absolute; inset: 0; z-index: -1; }
+#pz-3d-mount:empty { display: none; } /* flat/no-WebGL: never mounted, stays inert */
+
+body.k3d-mode .pz-lobby-scene,
+body.k3d-mode .pz-build,
+body.k3d-mode .pz-bake,
+body.k3d-mode .pz-cut { background: none; }
+body.k3d-mode .pz-lobby-queue { display: none; } /* redundant with the 3D billboards */
+body.k3d-mode .pz-oven-art,
+body.k3d-mode .pz-oven { background: none; }
+body.k3d-mode .pz-build-table,
+body.k3d-mode .pz-cut-table { background: none; border-color: transparent; }
+/* the pie itself renders in 3D now — this div stays empty (p3d().sync()
+   never touches its innerHTML when Kitchen3D is active) but must not
+   intercept clicks meant for the 3D canvas underneath */
+body.k3d-mode #pz-build-pizza,
+body.k3d-mode #pz-cut-pizza { pointer-events: none; }
+
+/* floating-over-a-3D-scene legibility pass: give the control clusters a
+   translucent backing instead of relying on an opaque station backdrop */
+body.k3d-mode .pz-build-ticket,
+body.k3d-mode .pz-bins,
+body.k3d-mode .pz-amount-btns,
+body.k3d-mode .pz-shelf,
+body.k3d-mode .pz-station-controls,
+body.k3d-mode .pz-cut-controls {
+  background: rgba(28, 16, 6, 0.55); border-radius: 12px; padding: 8px;
+  backdrop-filter: blur(3px);
+}
+body.k3d-mode .pz-hint { color: #fff3dd; }

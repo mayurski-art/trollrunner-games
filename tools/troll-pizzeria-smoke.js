@@ -1,9 +1,17 @@
-/* Papa Troll's Pizzeria smoke test: serves the repo statically and drives the
-   full order → build → bake → cut → serve → end-of-day loop in headless
-   Chrome. Run from anywhere after `npm i puppeteer-core` (screenshots land
-   next to this script). External cross-repo scripts (coming-soon gate,
-   accounts, notis, CDN) are blocked so the test is hermetic — the game is
-   required to run without them. */
+/* Papa Troll's Pizzeria smoke test — LEGACY 2D FALLBACK PATH.
+   Kitchen3D (docs/TROLL-PIZZERIA-3D.md) is now the default experience
+   whenever WebGL is available; this file specifically forces ?flat=1 to
+   keep exercising the original 2D DOM game (the fallback for no-WebGL/
+   ?flat=1 players), since that's what its DOM-interaction assumptions
+   (clicking .pz-cust cards, #pz-build-pizza bounding boxes, etc.) require.
+   The 3D-active default path has its own suite: tools/troll-pizzeria-3d-
+   smoke.js (engine) plus manual/spot verification of the game.js wiring.
+   Serves the repo statically and drives the full order → build → bake →
+   cut → serve → end-of-day loop in headless Chrome. Run from anywhere
+   after `npm i puppeteer-core` (screenshots land next to this script).
+   External cross-repo scripts (coming-soon gate, accounts, notis, CDN)
+   are blocked so the test is hermetic — the game is required to run
+   without them. */
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -53,15 +61,24 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
   });
   page.on('pageerror', (e) => consoleIssues.push('pageerror: ' + e.message));
 
-  await page.goto(`http://localhost:${PORT}/troll-pizzeria.html`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`http://localhost:${PORT}/troll-pizzeria.html?flat=1`, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction('window.__pz && window.__pz.S.screen === "title"');
   await page.screenshot({ path: path.join(OUT, 'pz-1-title.png') });
   log(true, 'page loads, boots to title screen');
 
-  // Pizza Cam module should be up (vendored three, so it loads hermetically)
-  await page.waitForFunction('window.TrollPizza3D !== undefined', { timeout: 10000 }).catch(() => {});
-  const p3dOk = await page.evaluate(() => !!(window.TrollPizza3D && window.TrollPizza3D.ok));
-  log(p3dOk, 'Pizza Cam (3D) module initialized');
+  // flat=1 must keep Kitchen3D fully inactive even though the module still
+  // loads/inits (it doesn't know about ?flat=1 itself — game.js's own k3d()
+  // gate is what's supposed to ignore it, and that's the regression this
+  // guards: initKitchen3D() must go through k3d(), not window.TrollKitchen3D
+  // directly, or flat mode silently stops being a real fallback).
+  await page.waitForFunction('window.TrollKitchen3D !== undefined', { timeout: 10000 }).catch(() => {});
+  const k3dInactiveInFlatMode = await page.evaluate(() => !document.body.classList.contains('k3d-mode') && window.__pz.k3d() === null);
+  log(k3dInactiveInFlatMode, 'Kitchen3D stays inactive under ?flat=1 (legacy 2D path used instead)');
+
+  // pizza3d.js (the old Pizza Cam) isn't loaded by this page at all anymore
+  // — Kitchen3D superseded it — so the DOM-pizza path below is the only
+  // path in this file, by construction, not just because of ?flat=1.
+  const p3dOk = false;
 
   // Start the shift
   await page.click('#pz-start-btn');

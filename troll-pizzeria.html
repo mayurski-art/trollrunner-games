@@ -80,6 +80,11 @@
       <!-- ================= SHIFT UI ================= -->
       <div class="pz-game" id="pz-game" hidden>
 
+        <!-- Kitchen3D mounts here when available (game.js's initKitchen3D).
+             Sits behind the HUD/station overlays; empty and inert in flat/
+             no-WebGL mode. -->
+        <div id="pz-3d-mount" aria-hidden="true"></div>
+
         <!-- top HUD -->
         <div class="pz-hud">
           <span class="pz-hud-chip" id="pz-hud-day">Day 1</span>
@@ -200,13 +205,16 @@
   <!-- Leaderboard engine + game -->
   <script src="assets/js/troll-leaderboard.js?v=lb-engine-v1" defer></script>
   <script src="assets/games/troll-pizzeria/leaderboard.js?v=pizzeria-lb-v1" defer></script>
-  <script src="assets/games/troll-pizzeria/game.js?v=pizzeria-3d3" defer></script>
-  <!-- Pizza Cam: 3D pie renderer (vendored Three.js — hermetic, no CDN).
-       Optional: if it fails to load, game.js keeps the DOM pizza. -->
+  <script src="assets/games/troll-pizzeria/game.js?v=pizzeria-3d-integration" defer></script>
+  <!-- Kitchen3D: the full 3D kitchen (vendored Three.js — hermetic, no
+       CDN), supersedes the old Pizza-Cam-in-a-small-canvas experience.
+       Optional: if it fails to load (no WebGL) or ?flat=1 is set, game.js
+       keeps the original 2D DOM game exactly as it always was.
+       Design doc: docs/TROLL-PIZZERIA-3D.md -->
   <script type="importmap">
     { "imports": { "three": "./assets/vendor/three.module.min.js" } }
   </script>
-  <script type="module" src="assets/games/troll-pizzeria/pizza3d.js?v=pz3d-v2"></script>
+  <script type="module" src="assets/games/troll-pizzeria/kitchen3d.js?v=k3d-integration"></script>
 
   <!-- Accounts (XP), site lock, cross-site notifications — arcade standard -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.3" integrity="sha384-uVefCux0Kf6w34gQVv8+jUPUwvwFUdnrcwI1kOJHs7sfPPXdDDucwcrPrppD6oUe" crossorigin="anonymous"></script>

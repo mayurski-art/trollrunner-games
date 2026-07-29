@@ -13,11 +13,22 @@
   const SAVE_KEY = "troll-pizzeria-save-v1";
   const GAME_ID = "troll-pizzeria";
 
-  /* Pizza Cam (pizza3d.js module): big pies render in 3D when the module
-     initialized; everything falls back to the DOM pizza otherwise.
-     ?flat=1 forces the fallback (docs/TROLL-PIZZERIA-V2.md). */
+  /* Pizza Cam (pizza3d.js) / Kitchen3D (kitchen3d.js): big pies render in
+     3D when a 3D module initialized; everything falls back to the DOM
+     pizza otherwise. ?flat=1 forces the fallback (docs/TROLL-PIZZERIA-V2.md,
+     docs/TROLL-PIZZERIA-3D.md). Kitchen3D supersedes the old Pizza-Cam-in-
+     a-small-canvas experience whenever it's available — same WebGL gate,
+     so in practice it's "3D kitchen, or flat DOM," never both. p3d() picks
+     whichever pie backend is actually live for the currently-active
+     station, so all the existing build/cut code that already calls
+     p3d().sync(view), p3d().mount(...), etc. keeps working unchanged. */
   const FLAT_MODE = /[?&]flat=1/.test(location.search);
-  const p3d = () => (!FLAT_MODE && window.TrollPizza3D && window.TrollPizza3D.ok ? window.TrollPizza3D : null);
+  const k3d = () => (!FLAT_MODE && window.TrollKitchen3D && window.TrollKitchen3D.ok ? window.TrollKitchen3D : null);
+  const p3d = () => {
+    const k = k3d();
+    if (k) return k.pieBackend(S.station === "cut" ? "cut" : "build");
+    return (!FLAT_MODE && window.TrollPizza3D && window.TrollPizza3D.ok) ? window.TrollPizza3D : null;
+  };
   const view3d = (t, opts) => ({
     sauce: quantizeCoverage(t.build.sauce), cheese: quantizeCoverage(t.build.cheese), placed: t.build.placed,
     doneness: t.doneness, cutAngles: t.cutAngles, halfGuide: !!(opts && opts.halfGuide),
@@ -770,6 +781,7 @@
   }
 
   function renderLobby() {
+    if (k3d()) k3d().lobby.sync(S.lobby.filter(c => !c.walking).map(c => ({ uid: c.uid, name: c.name, emoji: c.emoji })));
     const q = $("#pz-lobby-queue");
     q.innerHTML = "";
     S.lobby.forEach((c, i) => {
@@ -983,6 +995,7 @@
         // plain click on a bin: toggle armed mode
         S.armedBin = S.armedBin === d.tid ? null : d.tid;
         S.paintTool = null;
+        syncArmedTool();
         renderBuild();
         return;
       }
@@ -991,22 +1004,28 @@
     });
 
     function placeAt(ev, tid, fresh) {
-      const t = activeTicket();
-      if (!t) return false;
       const hit = hitPie(ev);
       if (!hit) return false;
-      const { x, y } = hit;
-      let placeTid = tid || S.armedBin;
-      // troll event: a pineapple raid can hijack the next few fresh drags
-      if (fresh && S.troll.pineappleRaidLeft > 0) {
-        S.troll.pineappleRaidLeft--;
-        if (Math.random() < 0.3 && unlockedToppings(S.day).some(x => x.id === "pineapple")) placeTid = "pineapple";
-      }
-      t.build.placed.push({ tid: placeTid, x: clamp(x, 0.06, 0.94), y: clamp(y, 0.06, 0.94) });
-      Sfx.plop();
-      renderBuild(); renderHud();
-      return true;
+      return commitPlacement(tid, hit.x, hit.y, fresh);
     }
+  }
+
+  /* Shared by the DOM drag path (placeAt, above) and Kitchen3D's
+     onBuildPlace handler (boot(), below) — either way we already have
+     pie-space (x,y), just commit it to the active ticket. */
+  function commitPlacement(tid, x, y, fresh) {
+    const t = activeTicket();
+    if (!t) return false;
+    let placeTid = tid || S.armedBin;
+    // troll event: a pineapple raid can hijack the next few fresh drags
+    if (fresh && S.troll.pineappleRaidLeft > 0) {
+      S.troll.pineappleRaidLeft--;
+      if (Math.random() < 0.3 && unlockedToppings(S.day).some(x => x.id === "pineapple")) placeTid = "pineapple";
+    }
+    t.build.placed.push({ tid: placeTid, x: clamp(x, 0.06, 0.94), y: clamp(y, 0.06, 0.94) });
+    Sfx.plop();
+    renderBuild(); renderHud();
+    return true;
   }
 
   // Paint tool arming (v3): clicking Sauce/Cheese arms a drag-to-paint
@@ -1015,7 +1034,15 @@
     if (!activeTicket()) return;
     S.paintTool = S.paintTool === kind ? null : kind;
     S.armedBin = null;
+    syncArmedTool();
     renderBuild();
+  }
+
+  // Kitchen3D needs to know what's "in hand" to route its own raw pointer
+  // drags on the 3D pie (paint vs. place vs. ignore) — mirrors the DOM
+  // bins/paint-button state game.js already owns.
+  function syncArmedTool() {
+    if (k3d()) k3d().build.setArmedTool(S.paintTool || S.armedBin || null);
   }
 
   function applyPaint(tool, x, y) {
@@ -1041,6 +1068,7 @@
     S.builtShelf.push(t.id);
     S.activeTicketId = null;
     S.armedBin = null;
+    syncArmedTool();
     Sfx.whoosh();
     renderBuild(); renderHud(); renderBadges(); renderBake();
     switchStation("bake");
@@ -1055,6 +1083,16 @@
   const dialPct = (v) => dialScrambled() ? 100 - pct(v) : pct(v);
 
   function renderBake() {
+    if (k3d()) {
+      // Kitchen3D's physical rack is a fixed 5 slots — the 6th-oven-slot
+      // upgrade doesn't have a 3D home yet, so anything past index 4 just
+      // isn't shown there (still fully functional via the DOM overlay).
+      S.ovens.forEach((id, i) => {
+        if (i >= k3d().oven.slotCount) return;
+        k3d().oven.setSlot(i, id ? view3d(ticketById(id)) : null);
+        k3d().oven.setFire(i, !!(id && ticketById(id).onFire));
+      });
+    }
     const slots = $("#pz-oven-slots");
     slots.innerHTML = "";
     const jammed = (i) => i === S.troll.jamSlot && performance.now() < S.troll.jamUntil;
@@ -1344,6 +1382,7 @@
     S.grinInsuranceUsedToday = false;
     S.builtShelf = []; S.cutShelf = [];
     S.activeTicketId = null; S.bakeSelect = null; S.armedBin = null; S.paintTool = null; S.stormedOut = 0;
+    syncArmedTool();
     S.dayScore = 0; S.dayTips = 0; S.servedToday = 0; S.ticketSeq = 1;
     S.cut = { ticketId: null, needed: 0, done: [], sweeping: false, angle: 0, raf: 0 };
     S.grinStage = 0; S.dayMaxGrin = 0;
@@ -1457,6 +1496,7 @@
   }
 
   function renderGrinHunt() {
+    if (k3d()) { k3d().trollEvent.spawnGrinHunt(); return; }
     const stage = $(".pz-stage");
     if (!stage) return;
     let btn = document.getElementById("pz-grin-hunt");
@@ -1480,6 +1520,7 @@
     S.troll.active = null;
     const btn = document.getElementById("pz-grin-hunt");
     if (btn) btn.remove();
+    if (k3d()) k3d().trollEvent.clearGrinHunt();
     if (cancelled) {
       S.dayScore += 15;
       Sfx.gotcha();
@@ -1496,6 +1537,7 @@
     S.troll.active = null;
     const btn = document.getElementById("pz-grin-hunt");
     if (btn) btn.remove();
+    if (k3d()) k3d().trollEvent.clearGrinHunt();
   }
 
   function fireTrollEvent(type) {
@@ -1622,6 +1664,7 @@
         t.overCooked += dt;
         if (t.overCooked > 2 && Math.random() < dt * 0.15) {
           t.onFire = true;
+          if (k3d()) k3d().oven.setFire(i, true);   // one-frame flash at the instant it ignites
           S.ovens[i] = null;
           t.state = "baked";
           S.cutShelf.push(t.id);
@@ -1676,6 +1719,11 @@
   }
 
   function renderBakeBarsOnly() {
+    if (k3d()) {
+      S.ovens.forEach((id, i) => {
+        if (id && i < k3d().oven.slotCount) k3d().oven.setSlot(i, view3d(ticketById(id)));
+      });
+    }
     document.querySelectorAll("#pz-oven-slots .pz-oven-slot").forEach((slot, i) => {
       const id = S.ovens[i];
       if (!id) return;
@@ -1703,9 +1751,23 @@
 
   /* ============================== stations ============================= */
 
-  function switchStation(name) {
+  /* Updates S.station + the DOM/render side of things. Called directly by
+     Kitchen3D's onDockChange (the player walked to a station themselves —
+     the camera is already there, nothing to teleport) and, via
+     switchStation() below, by tab/keyboard/ticket-rack fast travel. Kept
+     separate so fast travel's teleportTo() → dock() → onDockChange loop
+     doesn't recurse back into itself. */
+  function applyStationChange(name) {
+    const prev = S.station;
     S.station = name;
-    if (name !== "build" && name !== "cut" && p3d()) p3d().unmount();  // stop the 3D loop off-station
+    if (k3d()) {
+      // build/cut are independent pies in the room (not one shared canvas
+      // like the old Pizza Cam) — hide whichever one we're leaving.
+      if (prev === "build" && name !== "build") k3d().pieBackend("build").unmount();
+      if (prev === "cut" && name !== "cut") k3d().pieBackend("cut").unmount();
+    } else if (name !== "build" && name !== "cut" && p3d()) {
+      p3d().unmount();  // legacy Pizza Cam: stop the 3D loop off-station
+    }
     document.querySelectorAll(".pz-station").forEach(s => s.classList.remove("is-active"));
     $("#st-" + name).classList.add("is-active");
     document.querySelectorAll(".pz-tab").forEach(t => t.classList.toggle("is-active", t.dataset.station === name));
@@ -1713,6 +1775,17 @@
     if (name === "bake") renderBake();
     if (name === "cut") { renderCutShelf(); renderCutTable(); }
     if (name === "order") renderLobby();
+  }
+
+  function switchStation(name) {
+    applyStationChange(name);
+    // Tab/keyboard/ticket-rack station switches are "fast travel": the
+    // camera walks-and-docks there instantly instead of only toggling a
+    // DOM class (docs/TROLL-PIZZERIA-3D.md decision 1). Free-walking to a
+    // station yourself and interacting reaches the same place, just
+    // without the shortcut — that path calls applyStationChange directly
+    // via onDockChange, not this function, so it never re-teleports.
+    if (k3d()) k3d().teleportTo(name);
   }
 
   /* =============================== title =============================== */
@@ -1832,6 +1905,27 @@
       if (S.screen === "game" && S.station === "build") renderBuild();
     });
 
+    // Kitchen3D (docs/TROLL-PIZZERIA-3D.md) loads async too — mount it and
+    // register handlers as soon as it's ready. game.js keeps owning all
+    // state/scoring; Kitchen3D is a renderer + input source, same boundary
+    // pizza3d.js always had (see kitchen3d.js's own header comment).
+    function initKitchen3D() {
+      const k = k3d();   // respects FLAT_MODE, unlike window.TrollKitchen3D.ok directly
+      if (!k) return;
+      document.body.classList.add("k3d-mode");
+      const mount = $("#pz-3d-mount");
+      if (mount) k.mount(mount);
+      k.setHandlers({
+        onDockChange(id) { if (id) applyStationChange(id); },
+        onBuildPaint: applyPaint,
+        onBuildPlace: (tid, x, y) => commitPlacement(tid, x, y, true),
+        onGrinResolve: resolveTrollEvent,
+      });
+      if (S.screen === "game") { renderLobby(); renderBake(); renderBuild(); renderCutTable(); }
+    }
+    window.addEventListener("kitchen3d:ready", initKitchen3D);
+    initKitchen3D(); // in case the module (and its own ready event) already fired
+
     setupBuildPointer();
     showTitle();
 
@@ -1854,5 +1948,6 @@
     genOrder, SPECIALTIES, SIDES, tick, fireTrollEvent, buildRoster,
     UPGRADES, buyUpgrade, upgradeOwned, ovenSlotsCount, bakeSeconds, renderUpgrades,
     COVERAGE_TARGET, COVERAGE_BAND, coverageScore, applyPaint, armPaint,
+    k3d, p3d, applyStationChange, commitPlacement, syncArmedTool,
   };
 })();
