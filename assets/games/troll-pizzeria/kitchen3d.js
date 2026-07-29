@@ -1,17 +1,20 @@
-/* Papa Troll's Pizzeria — Kitchen3D (phase 1: scaffold + player movement).
-   One persistent Three.js kitchen the player walks around in: order
-   counter, build table, oven, cutting table are physical locations in a
-   single room, not separate DOM sections. game.js (and, later, pizza3d.js)
-   talk to this module only through window.TrollKitchen3D and fall back to
-   the existing 2D DOM game when `ok` is false (no WebGL) or `?flat=1`.
+/* Papa Troll's Pizzeria — Kitchen3D (phase 1-2: scaffold + movement, then
+   build table + oven rack). One persistent Three.js kitchen the player
+   walks around in: order counter, build table, oven, cutting table are
+   physical locations in a single room, not separate DOM sections. game.js
+   talks to this module only through window.TrollKitchen3D and falls back
+   to the existing 2D DOM game when `ok` is false (no WebGL) or `?flat=1`.
    Design doc: docs/TROLL-PIZZERIA-3D.md
 
-   Phase 1 scope: room scaffold, free-walk movement + collision, station
-   trigger zones with an Interact prompt that docks the camera into a
-   locked working view. No real station gameplay is wired in yet — that's
-   phases 2-3. Environment art here is placeholder flat color, replaced in
-   phase 5. */
+   Phase 2 scope: an interactive pie (pieFactory.js, ported from pizza3d.js)
+   sits on the build table — paint/topping-place raycasting works from the
+   docked camera angle — and a multi-slot oven rack shows real baking pies,
+   including a kitchen-fire visual. game.js still isn't wired in (no real
+   tickets/orders yet — that's phase 3); this phase is validated through
+   the __debug handle and the preview page's own demo controls.
+   Environment art here is placeholder flat color, replaced in phase 5. */
 import * as THREE from "three";
+import { createPie } from "./pieFactory.js";
 
 const EYE_HEIGHT = 1.6;
 const PLAYER_R = 0.35;          // collision radius, circle-vs-AABB
@@ -20,6 +23,11 @@ const LOOK_SENS = 0.0022;       // radians per pointer-lock movement px
 const TOUCH_LOOK_SENS = 0.0055;
 const DOCK_TWEEN_MS = 420;
 const PITCH_LIMIT = Math.PI / 2 - 0.08;
+const PIZZA_RADIUS = 0.44;      // matches game.js's placement-bound constant
+const PAINT_STEP = 0.02;
+const BUILD_PIE_SCALE = 0.42;
+const OVEN_SLOTS = 5;
+const OVEN_PIE_SCALE = 0.16;
 
 // Room: back wall (z = -ROOM_BACK) holds the four stations in a row;
 // open floor from there to the front wall gives room to walk. Small on
@@ -39,7 +47,10 @@ const STATIONS = [
   ...s, z: -ROOM_BACK + 0.9,                 // furniture footprint center
   triggerX: s.x, triggerZ: -ROOM_BACK + 2.0, // stand-in-front-of point
   triggerR: 1.4,
-  dock: { x: s.x, y: EYE_HEIGHT * 0.94, z: -ROOM_BACK + 1.35, lookAt: { x: s.x, y: 0.95, z: -ROOM_BACK + 0.9 } },
+  // Standing back far enough that the whole pie/counter is in view, not
+  // a close-up of the crust — comparable to a person's natural distance
+  // from a counter they're working at.
+  dock: { x: s.x, y: EYE_HEIGHT, z: -ROOM_BACK + 1.9, lookAt: { x: s.x, y: 0.85, z: -ROOM_BACK + 0.9 } },
 }));
 
 const K3D = { ok: false, _mountedIn: null };
@@ -62,6 +73,19 @@ let docked = null;              // station id, or null when free-walking
 let dockAnim = null;            // { start, from:{pos,quat}, to:{pos,quat}, ms }
 let freeCamPos = { x: 0, y: EYE_HEIGHT, z: 2.2 }; // camera pose remembered across dock/undock
 let freeCamQuat = new THREE.Quaternion();
+
+/* ------------------------- build table + oven rack ---------------------- */
+// Phase 2: one interactive pie on the build table, N display-only pies in
+// the oven rack. Demo state lives here until phase 3 wires real tickets
+// in from game.js — same shape as a game.js ticket's `.build`/order view
+// so that wiring is a drop-in later, not a reshape.
+const DEMO_TOPPINGS = ["pepperoni", "mushrooms", "olives", "peppers", "sausage", "onions", "basil", "pineapple"];
+let buildPie = null;
+let armedTool = null;           // "sauce" | "cheese" | a topping id | null
+const buildState = { sauce: 0, cheese: 0, placed: [], sauceHits: [], cheeseHits: [] };
+let painting = false;
+const ovenSlots = [];           // { marker, x, y, z, pie: pieInstance|null, fireGroup, fireLight }
+const raycaster = new THREE.Raycaster();
 
 /* --------------------------- collision boxes -------------------------- */
 // Static AABBs: 4 walls + 4 station footprints. Small fixed set, checked
@@ -126,6 +150,31 @@ function buildRoom() {
   }
 }
 
+function setupBuildAndOven() {
+  const build = STATIONS.find(s => s.id === "build");
+  buildPie = createPie({ interactive: true });
+  buildPie.root.scale.setScalar(BUILD_PIE_SCALE);
+  buildPie.root.position.set(build.x, 0.97, build.z + 0.18);
+  scene.add(buildPie.root);
+  buildPie.sync(buildState);
+
+  const bake = STATIONS.find(s => s.id === "bake");
+  const span = STATION_HALF.x * 2 * 0.82;
+  for (let i = 0; i < OVEN_SLOTS; i++) {
+    const x = bake.x - span / 2 + (span / (OVEN_SLOTS - 1)) * i;
+    const marker = new THREE.Mesh(
+      new THREE.RingGeometry(0.16, 0.185, 20),
+      new THREE.MeshBasicMaterial({ color: 0x2a1808, transparent: true, opacity: 0.4, side: THREE.DoubleSide }));
+    marker.rotation.x = -Math.PI / 2;
+    marker.position.set(x, 0.965, bake.z);
+    scene.add(marker);
+    const fireLight = new THREE.PointLight(0xff6a1a, 0, 1.4);
+    fireLight.position.set(x, 1.15, bake.z);
+    scene.add(fireLight);
+    ovenSlots.push({ marker, x, y: 0.97, z: bake.z, pie: null, fireLight, fireGroup: null, firing: false });
+  }
+}
+
 function initScene() {
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setClearColor(0x1a0f08, 1);
@@ -142,6 +191,7 @@ function initScene() {
   scene.add(sun);
 
   buildRoom();
+  setupBuildAndOven();
   clock = new THREE.Clock();
 }
 
@@ -201,6 +251,62 @@ function setupInput(el) {
   };
   el.addEventListener("touchend", endTouch);
   el.addEventListener("touchcancel", endTouch);
+
+  // build-station demo shortcuts (phase 2 only — phase 3 replaces these
+  // with the same DOM buttons the 2D game already uses)
+  window.addEventListener("keydown", (ev) => {
+    if (docked !== "build") return;
+    const k = ev.key.toLowerCase();
+    if (k === "z") armTool("sauce");
+    else if (k === "x") armTool("cheese");
+    else if (k === "c") resetBuild();
+    else if (/^[1-8]$/.test(k)) armTool(DEMO_TOPPINGS[+k - 1]);
+  });
+
+  el.addEventListener("pointerdown", (ev) => {
+    if (docked !== "build" || !armedTool) return;
+    ev.preventDefault();
+    if (armedTool === "sauce" || armedTool === "cheese") { painting = true; paintAt(ev); }
+    else placeToppingAt(ev);
+  });
+  el.addEventListener("pointermove", (ev) => { if (painting) paintAt(ev); });
+  window.addEventListener("pointerup", () => { painting = false; });
+}
+
+function ndcFromEvent(ev) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  return new THREE.Vector2(
+    ((ev.clientX - rect.left) / rect.width) * 2 - 1,
+    -((ev.clientY - rect.top) / rect.height) * 2 + 1);
+}
+
+function armTool(tool) {
+  armedTool = armedTool === tool ? null : tool;
+}
+
+function resetBuild() {
+  buildState.sauce = 0; buildState.cheese = 0;
+  buildState.placed.length = 0; buildState.sauceHits.length = 0; buildState.cheeseHits.length = 0;
+  buildPie.sync(buildState);
+}
+
+function paintAt(ev) {
+  raycaster.setFromCamera(ndcFromEvent(ev), camera);
+  const hit = buildPie.pointFromRay(raycaster);
+  if (!hit) return;
+  const key = armedTool === "sauce" ? "sauce" : "cheese";
+  buildState[key] = Math.min(1, buildState[key] + PAINT_STEP);
+  buildState[key === "sauce" ? "sauceHits" : "cheeseHits"].push({ x: hit.x, y: hit.y });
+  buildPie.sync(buildState);
+}
+
+function placeToppingAt(ev) {
+  raycaster.setFromCamera(ndcFromEvent(ev), camera);
+  const hit = buildPie.pointFromRay(raycaster);
+  if (!hit) return;
+  if (Math.hypot(hit.x - 0.5, hit.y - 0.5) > PIZZA_RADIUS) return;
+  buildState.placed.push({ tid: armedTool, x: hit.x, y: hit.y });
+  buildPie.sync(buildState);
 }
 
 const clampPitch = (p) => Math.max(-PITCH_LIMIT, Math.min(PITCH_LIMIT, p));
@@ -299,6 +405,15 @@ function tick(dt) {
     if (t >= 1) dockAnim = null;
   }
 
+  if (buildPie) buildPie.stepTweens(dt);
+  for (const slot of ovenSlots) {
+    if (slot.pie) slot.pie.stepTweens(dt);
+    if (slot.firing) {
+      const flicker = 1.1 + Math.sin(performance.now() / 45) * 0.35 + (Math.random() - 0.5) * 0.3;
+      slot.fireLight.intensity = Math.max(0, flicker);
+    }
+  }
+
   renderer.render(scene, camera);
 }
 
@@ -361,6 +476,45 @@ K3D.unmount = function () {
 
 K3D.STATIONS = STATIONS.map(s => ({ id: s.id, name: s.name }));
 
+/* Build table (phase 2 demo interface — phase 3 swaps this for real
+   ticket data driven by game.js, same shapes throughout). */
+K3D.build = {
+  armTool,
+  reset: resetBuild,
+  getState: () => JSON.parse(JSON.stringify(buildState)),
+  getArmedTool: () => armedTool,
+};
+
+/* Oven rack: view is the same {sauce,cheese,placed,doneness,cutAngles}
+   shape pizza3d.js's P3D.sync already expects. Passing null clears the
+   slot (pulled/served). */
+K3D.oven = {
+  setSlot(i, view) {
+    const slot = ovenSlots[i];
+    if (!slot) return;
+    if (view === null) {
+      if (slot.pie) { slot.pie.dispose(); slot.pie = null; }
+      slot.firing = false;
+      slot.fireLight.intensity = 0;
+      return;
+    }
+    if (!slot.pie) {
+      slot.pie = createPie({ interactive: false });
+      slot.pie.root.scale.setScalar(OVEN_PIE_SCALE);
+      slot.pie.root.position.set(slot.x, slot.y, slot.z);
+      scene.add(slot.pie.root);
+    }
+    slot.pie.sync(view);
+  },
+  setFire(i, active) {
+    const slot = ovenSlots[i];
+    if (!slot) return;
+    slot.firing = !!active;
+    if (!active) slot.fireLight.intensity = 0;
+  },
+  slotCount: OVEN_SLOTS,
+};
+
 /* ------------------------------- boot ---------------------------------- */
 
 try {
@@ -383,6 +537,30 @@ K3D.__debug = {
   tick: (dt) => tick(dt),
   interact: () => onInteractPressed(),
   stations: STATIONS,
+  // deterministic paint/place hooks for tests — bypass real pointer events
+  paintAtNDC: (ndcX, ndcY, tool) => {
+    armedTool = tool;
+    raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
+    const hit = buildPie.pointFromRay(raycaster);
+    if (hit) {
+      const key = tool === "sauce" ? "sauce" : "cheese";
+      buildState[key] = Math.min(1, buildState[key] + PAINT_STEP);
+      buildState[key === "sauce" ? "sauceHits" : "cheeseHits"].push(hit);
+      buildPie.sync(buildState);
+    }
+    return hit;
+  },
+  placeAtNDC: (ndcX, ndcY, tid) => {
+    raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
+    const hit = buildPie.pointFromRay(raycaster);
+    if (hit && Math.hypot(hit.x - 0.5, hit.y - 0.5) <= PIZZA_RADIUS) {
+      buildState.placed.push({ tid, x: hit.x, y: hit.y });
+      buildPie.sync(buildState);
+    }
+    return hit;
+  },
+  getBuildState: () => JSON.parse(JSON.stringify(buildState)),
+  getOvenSlot: (i) => ({ hasPie: !!ovenSlots[i]?.pie, firing: !!ovenSlots[i]?.firing, fireIntensity: ovenSlots[i]?.fireLight.intensity || 0 }),
 };
 
 window.TrollKitchen3D = K3D;

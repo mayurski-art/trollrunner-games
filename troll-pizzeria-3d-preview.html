@@ -21,27 +21,66 @@
     }
     .k3d-station-label { display: none; } /* projected labels land in phase 3 */
     #k3d-fallback { color: #fff3dd; padding: 40px; font-size: 18px; }
+    #k3d-demo {
+      position: absolute; right: 10px; top: 10px; z-index: 5;
+      background: rgba(0,0,0,0.55); border-radius: 10px; padding: 10px;
+      display: flex; flex-wrap: wrap; gap: 6px; max-width: 220px;
+    }
+    #k3d-demo button {
+      font-size: 12px; padding: 5px 8px; border-radius: 6px; border: 1px solid #fff3dd66;
+      background: #2a1808; color: #fff3dd; cursor: pointer;
+    }
+    #k3d-demo button.armed { background: #cf3b28; }
   </style>
 </head>
 <body>
   <div id="k3d-mount">
     <p id="k3d-fallback">Loading Kitchen3D…</p>
   </div>
+  <!-- outside #k3d-mount: mount() does el.innerHTML="" on its container,
+       which would wipe this out if it lived inside -->
+  <div id="k3d-demo" hidden>
+    <button data-tool="sauce">Sauce</button>
+    <button data-tool="cheese">Cheese</button>
+    <button data-tool="pepperoni">Pepperoni</button>
+    <button data-tool="mushrooms">Mushrooms</button>
+    <button id="k3d-reset">Reset pie</button>
+    <button id="k3d-bake-demo">Bake demo pies</button>
+    <button id="k3d-fire-demo">Fire slot 2</button>
+  </div>
 
   <script type="importmap">
     { "imports": { "three": "./assets/vendor/three.module.min.js" } }
   </script>
-  <script type="module" src="assets/games/troll-pizzeria/kitchen3d.js?v=k3d-phase1"></script>
+  <script type="module" src="assets/games/troll-pizzeria/kitchen3d.js?v=k3d-phase2"></script>
   <script>
     window.addEventListener("kitchen3d:ready", (e) => {
       const mount = document.getElementById("k3d-mount");
       const fb = document.getElementById("k3d-fallback");
-      if (e.detail.ok) {
-        fb.remove();
-        window.TrollKitchen3D.mount(mount);
-      } else {
-        fb.textContent = "WebGL unavailable — Kitchen3D needs a browser with WebGL support.";
-      }
+      const demo = document.getElementById("k3d-demo");
+      if (!e.detail.ok) { fb.textContent = "WebGL unavailable — Kitchen3D needs a browser with WebGL support."; return; }
+      fb.remove();
+      const k3d = window.TrollKitchen3D;
+      k3d.mount(mount);
+      demo.hidden = false;
+
+      demo.querySelectorAll("button[data-tool]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          k3d.build.armTool(btn.dataset.tool);
+          demo.querySelectorAll("button[data-tool]").forEach((b) => b.classList.toggle("armed", b === btn && k3d.build.getArmedTool() === b.dataset.tool));
+        });
+      });
+      document.getElementById("k3d-reset").addEventListener("click", () => k3d.build.reset());
+      document.getElementById("k3d-bake-demo").addEventListener("click", () => {
+        for (let i = 0; i < k3d.oven.slotCount; i++) {
+          k3d.oven.setSlot(i, {
+            sauce: 0.4 + i * 0.1, cheese: 0.5, doneness: i / (k3d.oven.slotCount - 1),
+            placed: [{ tid: "pepperoni", x: 0.4, y: 0.4 }, { tid: "mushrooms", x: 0.6, y: 0.6 }],
+            cutAngles: [],
+          });
+        }
+      });
+      document.getElementById("k3d-fire-demo").addEventListener("click", () => k3d.oven.setFire(2, true));
     });
   </script>
 </body>

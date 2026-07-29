@@ -137,6 +137,70 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
     `interacting docks into the station ("${dockOk.dockedId}") and stepping away undocks (now "${dockOk.afterStepBack}")`);
   await page.screenshot({ path: path.join(OUT, 'k3d-3-docked.png') });
 
+  // --- Phase 2: build table + oven rack ---
+
+  // Dock at the build table, then paint sauce dead-center (build pie sits
+  // at screen center once docked, by construction of the dock look-at).
+  await page.evaluate(() => {
+    const k = window.TrollKitchen3D.__debug;
+    const build = k.stations.find(s => s.id === 'build');
+    k.setPlayer(build.triggerX, build.triggerZ);
+    k.tick(1 / 60);
+    k.interact();
+  });
+  await new Promise(r => setTimeout(r, 500)); // let the dock tween finish
+  await page.screenshot({ path: path.join(OUT, 'k3d-4-build-dock.png') });
+
+  const paintOk = await page.evaluate(() => {
+    const k = window.TrollKitchen3D.__debug;
+    let hit = null;
+    for (let i = 0; i < 20; i++) hit = k.paintAtNDC(0, 0, 'sauce');
+    return { hit, state: k.getBuildState() };
+  });
+  log(!!paintOk.hit && paintOk.state.sauce > 0.1,
+    `painting the build pie raises sauce coverage (sauce=${(paintOk.state.sauce * 100).toFixed(0)}%, hit=${JSON.stringify(paintOk.hit)})`);
+  await page.screenshot({ path: path.join(OUT, 'k3d-5-painted.png') });
+
+  const placeOk = await page.evaluate(() => {
+    const k = window.TrollKitchen3D.__debug;
+    const hit = k.placeAtNDC(0.15, 0, 'pepperoni');
+    return { hit, placedCount: k.getBuildState().placed.length };
+  });
+  log(placeOk.placedCount === 1, `placing a topping adds it to the build state (placed=${placeOk.placedCount})`);
+
+  const resetOk = await page.evaluate(() => {
+    window.TrollKitchen3D.build.reset();
+    return window.TrollKitchen3D.build.getState();
+  });
+  log(resetOk.sauce === 0 && resetOk.placed.length === 0, 'resetting the build clears sauce and toppings');
+
+  // Oven rack: bake a demo pie in slot 0, then clear it; fire slot 2.
+  const ovenOk = await page.evaluate(() => {
+    const k = window.TrollKitchen3D;
+    k.oven.setSlot(0, { sauce: 0.6, cheese: 0.6, doneness: 0.5, placed: [{ tid: 'pepperoni', x: 0.5, y: 0.5 }], cutAngles: [] });
+    const afterBake = k.__debug.getOvenSlot(0);
+    k.oven.setSlot(0, null);
+    const afterClear = k.__debug.getOvenSlot(0);
+    return { afterBake, afterClear };
+  });
+  log(ovenOk.afterBake.hasPie && !ovenOk.afterClear.hasPie,
+    `oven slot shows a pie while baking (${ovenOk.afterBake.hasPie}) and clears when pulled (${ovenOk.afterClear.hasPie})`);
+
+  const fireOk = await page.evaluate(async () => {
+    const k = window.TrollKitchen3D;
+    k.oven.setFire(2, true);
+    for (let i = 0; i < 10; i++) k.__debug.tick(1 / 60);
+    const firing = k.__debug.getOvenSlot(2);
+    k.oven.setFire(2, false);
+    return firing;
+  });
+  log(fireOk.firing && fireOk.fireIntensity > 0, `kitchen fire visual activates on a slot (intensity=${fireOk.fireIntensity.toFixed(2)})`);
+
+  // Step back out to free-walk before wrapping up.
+  await page.evaluate(() => window.TrollKitchen3D.__debug.interact());
+  await new Promise(r => setTimeout(r, 500));
+  await page.screenshot({ path: path.join(OUT, 'k3d-6-oven.png') });
+
   if (consoleIssues.length) {
     console.log('\nConsole issues:');
     consoleIssues.forEach(i => console.log('  ' + i));
