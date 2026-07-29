@@ -1,4 +1,5 @@
 import { Game } from './core/Game.js';
+import { hasSave } from './world/Save.js';
 
 const canvas = document.getElementById('tr3-canvas');
 const touchRoot = document.getElementById('tr3-touch');
@@ -20,6 +21,7 @@ const screenChest = document.getElementById('tr3-screen-chest');
 const allScreens = [screenMenu, screenPause, screenRespawn, screenInventory, screenChest];
 
 const btnStart = document.getElementById('tr3-btn-start');
+const btnContinue = document.getElementById('tr3-btn-continue');
 const btnResume = document.getElementById('tr3-btn-resume');
 const btnExit = document.getElementById('tr3-btn-exit');
 const btnRespawn = document.getElementById('tr3-btn-respawn');
@@ -50,12 +52,26 @@ const game = new Game(
   { onStateChange },
 );
 
-btnStart.addEventListener('click', () => {
+if (hasSave()) {
+  btnContinue.hidden = false;
+  btnStart.textContent = '＋ New Island';
+  btnStart.classList.remove('tr3-btn-primary');
+  btnStart.classList.add('tr3-btn-ghost');
+}
+
+function dropIn(mode) {
   showScreen(null);
   hudRoot.hidden = false;
   if (touchRoot) touchRoot.hidden = !isTouch;
-  game.start();
+  game.start(mode);
+}
+
+btnStart.addEventListener('click', () => {
+  if (hasSave() && !confirm('Start a new island? This deletes your saved island.')) return;
+  dropIn('new');
 });
+
+btnContinue.addEventListener('click', () => dropIn('continue'));
 
 btnResume.addEventListener('click', () => {
   game.resume();

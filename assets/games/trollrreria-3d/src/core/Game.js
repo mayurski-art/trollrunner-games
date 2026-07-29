@@ -8,9 +8,11 @@ import { Inventory } from '../ui/Inventory.js';
 import { InventoryScreen } from '../ui/InventoryScreen.js';
 import { ChestScreen } from '../ui/ChestScreen.js';
 import { DayNightCycle } from './DayNightCycle.js';
+import * as Save from '../world/Save.js';
 import { BLOCKS, PLACEABLE, UNARMED, WEAPON_STATS } from '../world/blocks.js';
 
 const REACH = 6;
+const AUTOSAVE_INTERVAL = 60;
 
 // Owns the renderer, scene, world/player/enemy state and the per-frame loop.
 // States: menu | running | paused | respawn | inventory | chest.
@@ -35,13 +37,14 @@ export class Game {
     const lights = this._setupLights();
     this.dayNight = new DayNightCycle(this.scene, lights);
 
+    // World/player are populated in start() — either procedurally generated
+    // (new island) or restored from a save (continue) — not here, so the
+    // menu can offer both without doing the work twice.
     this.world = new World(this.scene);
-    this.world.generate();
-
-    const spawn = this.world.findSpawn();
-    this.player = new Player(this.world, spawn);
+    this.player = null;
     this.spawner = new Spawner(this.scene, this.world);
     this.attackCooldownTimer = 0;
+    this.autosaveTimer = AUTOSAVE_INTERVAL;
 
     this.inventory = new Inventory(hud.hotbar);
     this.invScreen = new InventoryScreen(hud.invGrid, hud.recipeList, hud.armorSlot, this.inventory);
@@ -64,6 +67,7 @@ export class Game {
     document.addEventListener('pointerlockchange', () => {
       if (document.pointerLockElement !== this.canvas && this.state === 'running') this.pause();
     });
+    window.addEventListener('beforeunload', () => this.saveNow());
 
     this.clock = new THREE.Clock();
   }
@@ -85,13 +89,38 @@ export class Game {
     this.camera.updateProjectionMatrix();
   }
 
-  start() {
+  // mode: 'new' generates a fresh island; 'continue' restores the last save
+  // (falls back to 'new' if there isn't one).
+  start(mode = 'new') {
+    const saveData = mode === 'continue' ? Save.loadSaveData() : null;
+    if (saveData) {
+      Save.applyWorldSave(this.world, saveData);
+      this.player = new Player(this.world, saveData.player.spawn);
+      Object.assign(this.player.pos, saveData.player.pos);
+      this.player.hp = saveData.player.hp;
+      this.player.yaw = saveData.player.yaw;
+      this.player.pitch = saveData.player.pitch;
+      this.inventory.slots = saveData.inventory.slots;
+      this.inventory.armor = saveData.inventory.armor;
+      this.inventory.selectedHotbar = saveData.inventory.selectedHotbar;
+      this.inventory.refresh();
+      this.dayNight.timeOfDay = saveData.dayNight.timeOfDay;
+      this.dayNight.day = saveData.dayNight.day;
+    } else {
+      this.world.generate();
+      this.player = new Player(this.world, this.world.findSpawn());
+    }
+
     this.state = 'running';
-    this.player.respawn();
     this.hud.hud.hidden = false;
     this.input.requestPointerLock();
     this.clock.getDelta();
     this._loop();
+  }
+
+  saveNow() {
+    if (!this.player || this.state === 'menu') return;
+    Save.saveGame(this);
   }
 
   resume() {
@@ -103,6 +132,7 @@ export class Game {
     if (this.state !== 'running') return;
     this.state = 'paused';
     this.input.exitPointerLock();
+    this.saveNow();
     this.onStateChange('paused');
   }
 
@@ -210,6 +240,11 @@ export class Game {
     }
 
     if (this.attackCooldownTimer > 0) this.attackCooldownTimer -= dt;
+    this.autosaveTimer -= dt;
+    if (this.autosaveTimer <= 0) {
+      this.autosaveTimer = AUTOSAVE_INTERVAL;
+      this.saveNow();
+    }
     this.dayNight.update(dt);
     if (this.hud.clock) this.hud.clock.textContent = `Day ${this.dayNight.day} · ${this.dayNight.clockString()}`;
 

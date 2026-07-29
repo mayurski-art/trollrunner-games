@@ -16,6 +16,7 @@ export const BIOMES = { FOREST: 'forest', DESERT: 'desert', SNOW: 'snow' };
 export class World {
   constructor(scene, seed = 1337) {
     this.scene = scene;
+    this.seed = seed;
     this.heightNoise = makeFractalNoise2D(seed);
     this.treeNoise = makeNoise2D(seed + 501);
     this.oreNoise = makeNoise2D(seed + 907);
@@ -124,6 +125,22 @@ export class World {
 
     // Pass 3: build meshes now that all chunk data (incl. neighbors) is ready.
     for (const chunk of this.chunks.values()) chunk.buildMesh(this.scene);
+  }
+
+  // After loading chunk data from a save (which skips procedural
+  // generation), recompute heightMap/biomeMap by scanning the actual
+  // blocks — biome itself is still just a function of position/seed.
+  rebuildDerivedMapsFromChunks() {
+    for (let x = 0; x < WORLD_SIZE_X; x++) {
+      for (let z = 0; z < WORLD_SIZE_Z; z++) {
+        let top = -1;
+        for (let y = CHUNK_Y - 1; y >= 0; y--) {
+          if (this.getBlock(x, y, z) !== BLOCKS.AIR) { top = y; break; }
+        }
+        this.heightMap.set(`${x},${z}`, top);
+        this.biomeMap.set(`${x},${z}`, this.getBiome(x, z));
+      }
+    }
   }
 
   placeTree(x, baseY, z) {
