@@ -24,7 +24,7 @@
   });
 
   const BAKE_SECONDS = 46;          // 0 → 1.0 doneness in the oven
-  const OVEN_SLOTS = 4;
+  const OVEN_SLOTS = 5;              // v3: 5th slot added alongside the sides system
   const PIZZA_RADIUS = 0.44;        // max topping distance from center (0..1)
 
   const AMOUNTS = ["none", "light", "normal", "extra"];
@@ -38,7 +38,36 @@
     { id: "onions",    name: "Onions",       emoji: "🧅", color: "#e1bee7", day: 5 },
     { id: "basil",     name: "Basil",        emoji: "🌿", color: "#43a047", day: 6 },
     { id: "pineapple", name: "Pineapple",    emoji: "🍍", color: "#fbc02d", day: 7 },
+    { id: "bacon",     name: "Bacon",        emoji: "🥓", color: "#a8452f", day: 8 },
+    { id: "jalapeno",  name: "Jalapeño",     emoji: "🌶️", color: "#4c8c2e", day: 9 },
+    { id: "anchovy",   name: "Anchovy",      emoji: "🐟", color: "#6f7f96", day: 10 },
   ];
+
+  /* Specialty tickets (v3): fixed-recipe orders instead of the usual
+     procedural spec. Same order shape as genOrder() output, so scoring
+     and ticket rendering need no special cases — just a flat tip bonus
+     and a badge. Unlocked gradually, chance rises with day. */
+  const SPECIALTIES = [
+    { name: "Meme Special", day: 5, sauce: "normal", cheese: "extra",
+      tops: [{ id: "pepperoni", count: 8, side: "whole" }, { id: "mushrooms", count: 6, side: "whole" }],
+      bake: "regular", cutCount: 8, tipMult: 1.3 },
+    { name: "Trollio's Chaos Pie", day: 6, sauce: "extra", cheese: "light",
+      tops: [{ id: "pineapple", count: 6, side: "left" }, { id: "olives", count: 6, side: "right" }],
+      bake: "regular", cutCount: 6, tipMult: 1.35 },
+    { name: "Grumpy's Grumble", day: 8, sauce: "light", cheese: "normal",
+      tops: [{ id: "anchovy", count: 8, side: "whole" }, { id: "peppers", count: 4, side: "whole" }],
+      bake: "well", cutCount: 8, tipMult: 1.4 },
+  ];
+  const unlockedSpecialties = (day) => SPECIALTIES.filter(s => s.day <= day);
+
+  /* Sides (v3): a light second task riding along on the same ticket.
+     Soda is an instant build-station tap; breadsticks bake in the SAME
+     oven slot as the pizza (shares the slot, doesn't reserve one) on
+     their own doneness clock — the player pulls once for both. */
+  const SIDES = {
+    soda: { name: "Soda", emoji: "🥤" },
+    breadsticks: { name: "Breadsticks", emoji: "🥖", target: 0.5, speed: 1.7 },
+  };
 
   const BAKES = [
     { id: "light",   name: "Light bake",   target: 0.45 },
@@ -270,7 +299,21 @@
 
   /* ============================ order generator ======================== */
 
+  function genSide(day) {
+    if (day < 5 || Math.random() > 0.35) return null;
+    return Math.random() < 0.5 ? "soda" : "breadsticks";
+  }
+
   function genOrder(cust, day) {
+    const specialties = unlockedSpecialties(day);
+    if (specialties.length && Math.random() < clamp(0.1 + day * 0.015, 0.1, 0.3)) {
+      const spec = pick(specialties);
+      return {
+        sauce: spec.sauce, cheese: spec.cheese,
+        tops: spec.tops.map(t => ({ ...t })), bake: spec.bake, cutCount: spec.cutCount,
+        specialtyName: spec.name, tipMult: spec.tipMult, side: genSide(day),
+      };
+    }
     const pool = unlockedToppings(day);
     const bake = cust.quirk === "well" ? BAKES[2] : pick(BAKES);
     const cutCount = cust.quirk === "critic" ? 8 : pick([4, 6, 8, 8]);
@@ -318,7 +361,7 @@
     }
     const sauce = cust.quirk === "light" ? "light" : amount();
     const cheese = cust.quirk === "light" ? "light" : amount();
-    return { sauce, cheese, tops, bake: bake.id, cutCount };
+    return { sauce, cheese, tops, bake: bake.id, cutCount, side: genSide(day) };
   }
 
   /* ============================== scoring ============================= */
@@ -390,11 +433,25 @@
 
   function moodMult(t) { return clamp(0.8 + 0.35 * t.mood, 0.8, 1.15); }
 
+  // Side score is a separate axis from the pizza itself — it nudges the
+  // tip up or down but never touches the headline order/bake/cut total.
+  function scoreSide(t) {
+    const side = t.order.side;
+    if (!side) return null;
+    if (side === "soda") return t.sideDone ? 1 : 0.2;
+    const d = t.sideDoneness;
+    if (d >= 0.95) return 0.15;                        // burnt breadsticks
+    return clamp(1 - Math.abs(d - SIDES.breadsticks.target) / 0.3, 0.05, 1);
+  }
+
   function scoreTicket(t) {
     const order = scoreOrder(t), bake = scoreBake(t), cut = scoreCut(t);
     const total = clamp((order * 0.45 + bake * 0.3 + cut * 0.25) * moodMult(t), 0, 1);
-    const tip = Math.max(1, Math.round(total * t.cust.tip * rand(9, 14)));
-    return { order, bake, cut, total, tip };
+    let tip = Math.max(1, Math.round(total * t.cust.tip * rand(9, 14)));
+    const side = scoreSide(t);
+    if (side !== null) tip = Math.round(tip * (0.9 + 0.2 * side));
+    if (t.order.tipMult) tip = Math.round(tip * t.order.tipMult);
+    return { order, bake, cut, side, total, tip };
   }
 
   /* ============================== grin combo ============================ */
@@ -507,6 +564,7 @@
       order: genOrder(cust, S.day),
       build: { sauce: "none", cheese: "none", placed: [] },
       doneness: 0, cutAngles: [],
+      sideDoneness: 0, sideDone: false,
       state: "building",
       mood: cust.patienceLeft / cust.patience,
     };
@@ -539,7 +597,13 @@
     }
     rows.push(`<li>${bakeName(o.bake)}</li>`);
     rows.push(`<li>${o.cutCount} slices</li>`);
-    return `<h4>${t.cust.emoji} ${t.cust.name} · #${String(t.id).padStart(2, "0")}</h4><ul>${rows.join("")}</ul>`;
+    if (o.side) {
+      const side = SIDES[o.side];
+      const cls = live && o.side === "soda" ? (t.sideDone ? "done" : "") : "";
+      rows.push(`<li class="${cls}">+ ${side.emoji} ${side.name}</li>`);
+    }
+    const badge = o.specialtyName ? `<span class="pz-specialty-badge">⭐ ${o.specialtyName}</span>` : "";
+    return `<h4>${t.cust.emoji} ${t.cust.name} · #${String(t.id).padStart(2, "0")}</h4>${badge}<ul>${rows.join("")}</ul>`;
   }
 
   /* =============================== HUD ================================ */
@@ -710,6 +774,12 @@
     const s = $("#pz-sauce-btn strong"), c = $("#pz-cheese-btn strong");
     s.textContent = t ? t.build.sauce : "—";
     c.textContent = t ? t.build.cheese : "—";
+    const sideBtn = $("#pz-side-btn");
+    sideBtn.hidden = !(t && t.order.side === "soda");
+    if (t && t.order.side === "soda") {
+      sideBtn.textContent = t.sideDone ? "🥤 Soda filled ✓" : "🥤 Fill soda";
+      sideBtn.classList.toggle("is-done", t.sideDone);
+    }
   }
 
   function renderBins(t) {
@@ -884,6 +954,17 @@
       }
       bar.appendChild(fill);
       slot.appendChild(bar);
+      if (t && t.order.side === "breadsticks") {
+        const sideBar = el("div", "pz-doneness pz-side-doneness");
+        const sideFill = el("i");
+        sideFill.style.width = pct(t.sideDoneness) + "%";
+        const sideTgt = el("span", "tgt");
+        sideTgt.style.left = pct(SIDES.breadsticks.target) + "%";
+        sideBar.appendChild(sideTgt);
+        sideBar.appendChild(sideFill);
+        slot.appendChild(sideBar);
+        slot.appendChild(el("span", "pz-slot-label", "🥖 breadsticks"));
+      }
       slot.appendChild(el("span", "pz-slot-label", t ? bakeName(t.order.bake) : "empty"));
       slot.addEventListener("click", () => bakeSlotClick(i));
       slots.appendChild(slot);
@@ -1095,6 +1176,7 @@
       <p class="pz-serve-line">“${t.cust.lines[mood]}”</p>
       <div class="pz-meters">
         ${meter("Order", res.order)}${meter("Bake", res.bake)}${meter("Cut", res.cut)}
+        ${res.side !== null ? meter(SIDES[t.order.side].name, res.side) : ""}
       </div>
       <p class="pz-serve-total">${pct(res.total)}<small>%</small></p>
       <p class="pz-serve-tip">Tip: 🪙 ${res.tip} · mood ×${moodMult(t).toFixed(2)}</p>
@@ -1355,6 +1437,8 @@
       if (!id) continue;
       const t = ticketById(id);
       t.doneness = clamp(t.doneness + dt / BAKE_SECONDS, 0, 1);
+      if (t.order.side === "breadsticks")
+        t.sideDoneness = clamp(t.sideDoneness + (dt * SIDES.breadsticks.speed) / BAKE_SECONDS, 0, 1);
       baking = true;
     }
     // lightweight re-renders only where things move
@@ -1399,6 +1483,10 @@
       if (bar) bar.classList.toggle("pz-dial-scrambled", dialScrambled());
       const fill = slot.querySelector(".pz-doneness i");
       if (fill) fill.style.width = dialPct(t.doneness) + "%";
+      if (t.order.side === "breadsticks") {
+        const sideFill = slot.querySelector(".pz-side-doneness i");
+        if (sideFill) sideFill.style.width = pct(t.sideDoneness) + "%";
+      }
       const burn = Math.max(0, (t.doneness - 0.85) / 0.15);
       const pie = slot.querySelector(".slot-pizza");
       if (pie && t.doneness > 0.05) {
@@ -1468,6 +1556,13 @@
     $("#pz-take-order").addEventListener("click", orderFromCounter);
     $("#pz-sauce-btn").addEventListener("click", () => cycleAmount("sauce"));
     $("#pz-cheese-btn").addEventListener("click", () => cycleAmount("cheese"));
+    $("#pz-side-btn").addEventListener("click", () => {
+      const t = activeTicket();
+      if (!t || t.order.side !== "soda") return;
+      t.sideDone = true;
+      Sfx.plop();
+      updateAmountButtons(t);
+    });
     $("#pz-clear-btn").addEventListener("click", () => {
       const t = activeTicket();
       if (!t) return;
@@ -1519,5 +1614,6 @@
   window.__pz = {
     S, ticketById, switchStation, checkDayEnd, BAKES, TOPPINGS,
     startTrollTell, resolveTrollEvent, applyGrinCombo, GRIN_MAX,
+    genOrder, SPECIALTIES, SIDES,
   };
 })();

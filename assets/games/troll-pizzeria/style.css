@@ -154,6 +154,8 @@ button { cursor: pointer; }
 .pz-btn-ghost { background: transparent; }
 .pz-btn-small { font-size: 15px; padding: 7px 12px; }
 .pz-btn-danger { background: #f6e0d2; }
+.pz-btn-side { background: #dceefb; }
+.pz-btn-side.is-done { background: var(--pz-good); color: #fff; }
 .pz-btn[disabled] { opacity: 0.45; cursor: not-allowed; transform: none; }
 
 .pz-icon-btn {
@@ -303,6 +305,11 @@ button { cursor: pointer; }
 .pz-ticket li.done { color: var(--pz-good); }
 .pz-ticket li.over { color: var(--pz-bad); }
 .pz-ticket .tk-side { color: var(--pz-ink-soft); }
+.pz-specialty-badge {
+  display: inline-block; font-family: var(--mono); font-size: 11px; font-weight: 700;
+  color: #8a5a00; background: rgba(255, 200, 60, 0.35); border: 1px solid rgba(138, 90, 0, 0.35);
+  border-radius: 999px; padding: 1px 8px; margin-bottom: 6px;
+}
 
 /* ---- build station -------------------------------------------------------- */
 .pz-build {
@@ -381,8 +388,10 @@ button { cursor: pointer; }
 .pz-oven-art img { height: 96%; width: auto; max-width: none; }
 .pz-oven-slots {
   position: relative; z-index: 2;
-  display: grid; grid-template-columns: repeat(4, minmax(110px, 150px)); gap: 12px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 150px)); gap: 12px;
 }
+.pz-side-doneness { margin-top: -2px; opacity: 0.85; }
+.pz-side-doneness i { background: linear-gradient(90deg, #e0a458, #9c6b2e 72%, #212529 100%); }
 .pz-oven-slot {
   position: relative; display: grid; justify-items: center; gap: 6px;
   background: radial-gradient(circle at 50% 24%, #2b1608 0%, #170903 78%);
