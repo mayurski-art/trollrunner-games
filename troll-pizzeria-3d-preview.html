@@ -50,48 +50,215 @@
     <button data-tool="pepperoni">Pepperoni</button>
     <button data-tool="mushrooms">Mushrooms</button>
     <button id="k3d-reset">Reset pie</button>
-    <button id="k3d-bake-demo">Bake demo pies</button>
-    <button id="k3d-fire-demo">Fire slot 2</button>
     <button id="k3d-action">Action (F)</button>
     <button id="k3d-grin-hunt">Spawn Grin Hunt</button>
-    <button id="k3d-rush">Trigger rush hour</button>
+    <button id="k3d-rush">Add rush customers</button>
   </div>
 
   <script type="importmap">
     { "imports": { "three": "./assets/vendor/three.module.min.js" } }
   </script>
-  <script type="module" src="assets/games/troll-pizzeria/kitchen3d.js?v=k3d-phase3"></script>
+  <script type="module" src="assets/games/troll-pizzeria/kitchen3d.js?v=k3d-integration"></script>
   <script>
+    /* Demo driver (dev-only reference implementation): drives Kitchen3D
+       through its real handler-based API exactly the way game.js will —
+       this file owns all "ticket" state and business logic; kitchen3d.js
+       owns none. Doubles as the integration test surface (window.__demo)
+       until the real game.js wiring lands. */
     window.addEventListener("kitchen3d:ready", (e) => {
       const mount = document.getElementById("k3d-mount");
       const fb = document.getElementById("k3d-fallback");
-      const demo = document.getElementById("k3d-demo");
+      const demoUi = document.getElementById("k3d-demo");
       if (!e.detail.ok) { fb.textContent = "WebGL unavailable — Kitchen3D needs a browser with WebGL support."; return; }
       fb.remove();
       const k3d = window.TrollKitchen3D;
-      k3d.mount(mount);
-      demo.hidden = false;
 
-      demo.querySelectorAll("button[data-tool]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          k3d.build.armTool(btn.dataset.tool);
-          demo.querySelectorAll("button[data-tool]").forEach((b) => b.classList.toggle("armed", b === btn && k3d.build.getArmedTool() === b.dataset.tool));
+      const DEMO_CUSTOMERS = [
+        { uid: "trollio", name: "Trollio", emoji: "🧌" },
+        { uid: "pepe", name: "Pepe", emoji: "🐸" },
+        { uid: "doge", name: "Doge", emoji: "🐶" },
+      ];
+      const RUSH_CUSTOMERS = [
+        { uid: "wojak", name: "Wojak", emoji: "😔" },
+        { uid: "chad", name: "Chad", emoji: "🗿" },
+      ];
+      const BAKE_SECONDS = 10, CUTS_NEEDED = 4, SWEEP_SPEED = 60;
+      const PIZZA_RADIUS = 0.44;
+
+      let lobby = DEMO_CUSTOMERS.slice();
+      let ticket = null;       // { cust, sauce, cheese, placed, doneness, cutAngles, ovenSlot, stage }
+      let armedTool = null;
+      let currentStation = null;
+      let cutSweeping = false, cutSweepAngle = 0;
+      let grinTally = { caught: 0, missed: 0 };
+      const ovenTickets = [];  // sparse, index = oven slot
+
+      k3d.lobby.sync(lobby);
+
+      function armTool(tool) {
+        armedTool = armedTool === tool ? null : tool;
+        k3d.build.setArmedTool(armedTool);
+        demoUi.querySelectorAll("button[data-tool]").forEach((b) => b.classList.toggle("armed", b.dataset.tool === armedTool));
+      }
+
+      function syncBuildPie() {
+        const view = ticket && ticket.stage === "building" ? ticket : { sauce: 0, cheese: 0, placed: [], doneness: 0, cutAngles: [] };
+        k3d.pieBackend("build").sync(view);
+        k3d.pieBackend("build").mount();
+      }
+
+      function handlePaint(tool, x, y) {
+        if (!ticket || ticket.stage !== "building") return;
+        const key = tool === "sauce" ? "sauce" : "cheese";
+        ticket[key] = Math.min(1, ticket[key] + 0.02);
+        syncBuildPie();
+      }
+      function handlePlace(tid, x, y) {
+        if (!ticket || ticket.stage !== "building") return;
+        if (Math.hypot(x - 0.5, y - 0.5) > PIZZA_RADIUS) return;
+        ticket.placed.push({ tid, x, y });
+        syncBuildPie();
+      }
+      k3d.setHandlers({
+        onDockChange(stationId) { currentStation = stationId; },
+        onBuildPaint: handlePaint,
+        onBuildPlace: handlePlace,
+        onGrinResolve(caught) {
+          if (caught) grinTally.caught++; else grinTally.missed++;
+        },
+      });
+
+      function takeOrder() {
+        if (!lobby.length || ticket) return false;
+        const cust = lobby.shift();
+        k3d.lobby.sync(lobby);
+        ticket = { cust, sauce: 0, cheese: 0, placed: [], doneness: 0, cutAngles: [], ovenSlot: null, stage: "building" };
+        syncBuildPie();
+        return true;
+      }
+      function sendToOven() {
+        if (!ticket || ticket.stage !== "building") return false;
+        const i = ovenTickets.findIndex((t, idx) => !t && idx < k3d.oven.slotCount);
+        const slot = i === -1 ? ovenTickets.length : i;
+        if (slot >= k3d.oven.slotCount) return false;
+        ticket.doneness = 0;
+        ticket.ovenSlot = slot;
+        ticket.stage = "baking";
+        ovenTickets[slot] = ticket;
+        k3d.oven.setSlot(slot, ticket);
+        ticket = null;
+        syncBuildPie();
+        return true;
+      }
+      function pullFromOven() {
+        const t = ovenTickets.find(t => t && t.stage === "baking");
+        if (!t) return false;
+        k3d.oven.setSlot(t.ovenSlot, null);
+        ovenTickets[t.ovenSlot] = null;
+        t.stage = "ready";
+        ticket = t;
+        return true;
+      }
+      function loadCut() {
+        if (!ticket || ticket.stage !== "ready") return false;
+        ticket.cutAngles = [];
+        k3d.pieBackend("cut").sync(ticket);
+        k3d.pieBackend("cut").mount();
+        ticket.stage = "cutting";
+        return true;
+      }
+      function commitCut() {
+        if (!ticket || ticket.stage !== "cutting") return false;
+        if (!cutSweeping) { cutSweeping = true; return true; }
+        ticket.cutAngles.push(cutSweepAngle);
+        k3d.pieBackend("cut").sync(Object.assign({ cutNeeded: CUTS_NEEDED, sweeping: true, sweepAngle: cutSweepAngle }, ticket));
+        if (ticket.cutAngles.length >= CUTS_NEEDED) cutSweeping = false;
+        return true;
+      }
+      function serveTicket() {
+        if (!ticket || ticket.stage !== "cutting" || ticket.cutAngles.length < CUTS_NEEDED) return false;
+        k3d.pieBackend("cut").serveSpin(() => {
+          k3d.pieBackend("cut").unmount();
+          ticket = null;
+          cutSweeping = false; cutSweepAngle = 0;
         });
-      });
-      document.getElementById("k3d-reset").addEventListener("click", () => k3d.build.reset());
-      document.getElementById("k3d-bake-demo").addEventListener("click", () => {
-        for (let i = 0; i < k3d.oven.slotCount; i++) {
-          k3d.oven.setSlot(i, {
-            sauce: 0.4 + i * 0.1, cheese: 0.5, doneness: i / (k3d.oven.slotCount - 1),
-            placed: [{ tid: "pepperoni", x: 0.4, y: 0.4 }, { tid: "mushrooms", x: 0.6, y: 0.6 }],
-            cutAngles: [],
-          });
+        return true;
+      }
+      function action() {
+        if (currentStation === "order") return takeOrder();
+        if (currentStation === "build") return sendToOven();
+        if (currentStation === "bake") return pullFromOven();
+        if (currentStation === "cut") {
+          if (!ticket) return false;
+          if (ticket.stage === "ready") return loadCut();
+          if (ticket.stage === "cutting") return ticket.cutAngles.length >= CUTS_NEEDED ? serveTicket() : commitCut();
         }
+        return false;
+      }
+
+      k3d.mount(mount);
+      demoUi.hidden = false;
+
+      demoUi.querySelectorAll("button[data-tool]").forEach((btn) => btn.addEventListener("click", () => armTool(btn.dataset.tool)));
+      document.getElementById("k3d-reset").addEventListener("click", () => {
+        if (ticket && ticket.stage === "building") { ticket.sauce = 0; ticket.cheese = 0; ticket.placed = []; syncBuildPie(); }
       });
-      document.getElementById("k3d-fire-demo").addEventListener("click", () => k3d.oven.setFire(2, true));
-      document.getElementById("k3d-action").addEventListener("click", () => k3d.demo.action());
+      document.getElementById("k3d-action").addEventListener("click", action);
       document.getElementById("k3d-grin-hunt").addEventListener("click", () => k3d.trollEvent.spawnGrinHunt());
-      document.getElementById("k3d-rush").addEventListener("click", () => k3d.trollEvent.triggerRushHour());
+      function addRushCustomers() {
+        lobby = lobby.concat(RUSH_CUSTOMERS);
+        k3d.lobby.sync(lobby);
+        return RUSH_CUSTOMERS.length;
+      }
+      document.getElementById("k3d-rush").addEventListener("click", addRushCustomers);
+      window.addEventListener("keydown", (ev) => { if (ev.key.toLowerCase() === "f") action(); });
+
+      // driver's own frame loop: oven auto-bake + cut sweep ticking —
+      // exactly what game.js will do for real tickets.
+      let last = performance.now();
+      function frame(now) {
+        const dt = Math.min(0.05, (now - last) / 1000);
+        last = now;
+        for (const t of ovenTickets) {
+          if (t && t.stage === "baking") {
+            t.doneness = Math.min(1, t.doneness + dt / BAKE_SECONDS);
+            k3d.oven.setSlot(t.ovenSlot, t);
+          }
+        }
+        if (cutSweeping) {
+          cutSweepAngle = (cutSweepAngle + SWEEP_SPEED * dt) % 180;
+          k3d.pieBackend("cut").updateSweep(cutSweepAngle);
+        }
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+
+      window.__demo = {
+        getTicket: () => (ticket ? JSON.parse(JSON.stringify(ticket)) : null),
+        getBakingTicket: () => {
+          const t = ovenTickets.find(t => t && t.stage === "baking");
+          return t ? JSON.parse(JSON.stringify(t)) : null;
+        },
+        getLobbyCount: () => lobby.length,
+        getCurrentStation: () => currentStation,
+        getGrinTally: () => ({ ...grinTally }),
+        action,
+        armTool,
+        rush: addRushCustomers,
+        // test-only: paint/place via a known screen NDC point, bypassing
+        // real pointer events (mirrors kitchen3d.__debug's own test hooks)
+        paintAtNDC(ndcX, ndcY, tool) {
+          armTool(tool);
+          const hit = k3d.__debug.paintAtNDC(ndcX, ndcY);
+          if (hit) handlePaint(tool, hit.x, hit.y);
+          return hit;
+        },
+        placeAtNDC(ndcX, ndcY, tid) {
+          const hit = k3d.__debug.paintAtNDC(ndcX, ndcY);
+          if (hit) handlePlace(tid, hit.x, hit.y);
+          return hit;
+        },
+      };
     });
   </script>
 </body>

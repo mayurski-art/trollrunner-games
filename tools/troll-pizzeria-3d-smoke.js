@@ -151,28 +151,11 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
   await new Promise(r => setTimeout(r, 500)); // let the dock tween finish
   await page.screenshot({ path: path.join(OUT, 'k3d-4-build-dock.png') });
 
-  const paintOk = await page.evaluate(() => {
-    const k = window.TrollKitchen3D.__debug;
-    let hit = null;
-    for (let i = 0; i < 20; i++) hit = k.paintAtNDC(0, 0, 'sauce');
-    return { hit, state: k.getBuildState() };
-  });
-  log(!!paintOk.hit && paintOk.state.sauce > 0.1,
-    `painting the build pie raises sauce coverage (sauce=${(paintOk.state.sauce * 100).toFixed(0)}%, hit=${JSON.stringify(paintOk.hit)})`);
-  await page.screenshot({ path: path.join(OUT, 'k3d-5-painted.png') });
-
-  const placeOk = await page.evaluate(() => {
-    const k = window.TrollKitchen3D.__debug;
-    const hit = k.placeAtNDC(0.15, 0, 'pepperoni');
-    return { hit, placedCount: k.getBuildState().placed.length };
-  });
-  log(placeOk.placedCount === 1, `placing a topping adds it to the build state (placed=${placeOk.placedCount})`);
-
-  const resetOk = await page.evaluate(() => {
-    window.TrollKitchen3D.build.reset();
-    return window.TrollKitchen3D.build.getState();
-  });
-  log(resetOk.sauce === 0 && resetOk.placed.length === 0, 'resetting the build clears sauce and toppings');
+  // Raw raycast hit-test (no ticket needed yet — just confirms the pie
+  // surface is where the camera is looking once docked).
+  const rayOk = await page.evaluate(() => window.TrollKitchen3D.__debug.paintAtNDC(0, 0));
+  log(!!rayOk, `build pie raycast hits dead-center once docked (hit=${JSON.stringify(rayOk)})`);
+  await page.evaluate(() => window.TrollKitchen3D.__debug.interact()); // step back before the full loop below
 
   // Oven rack: bake a demo pie in slot 0, then clear it; fire slot 2.
   const ovenOk = await page.evaluate(() => {
@@ -196,12 +179,11 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
   });
   log(fireOk.firing && fireOk.fireIntensity > 0, `kitchen fire visual activates on a slot (intensity=${fireOk.fireIntensity.toFixed(2)})`);
 
-  // Step back from build-dock before starting the phase-3 full-loop test.
-  await page.evaluate(() => window.TrollKitchen3D.__debug.interact());
+  // --- Full demo loop — order -> build -> bake -> cut -> serve, now driven
+  // through the real handler-based API (window.__demo is the reference
+  // driver from the preview page, standing in for game.js). ---
 
-  // --- Phase 3: full demo loop — order -> build -> bake -> cut -> serve ---
-
-  const lobbyBefore = await page.evaluate(() => window.TrollKitchen3D.demo.getLobbyCount());
+  const lobbyBefore = await page.evaluate(() => window.__demo.getLobbyCount());
   log(lobbyBefore > 0, `lobby starts with demo customers waiting (${lobbyBefore})`);
 
   // Order: dock at the counter, take the order.
@@ -211,8 +193,8 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
     k.__debug.setPlayer(order.triggerX, order.triggerZ);
     k.__debug.tick(1 / 60);
     k.__debug.interact();
-    const took = k.demo.action();
-    return { took, ticket: k.demo.getTicket(), lobbyAfter: k.demo.getLobbyCount() };
+    const took = window.__demo.action();
+    return { took, ticket: window.__demo.getTicket(), lobbyAfter: window.__demo.getLobbyCount() };
   });
   log(orderOk.took && orderOk.ticket?.stage === 'building' && orderOk.lobbyAfter === lobbyBefore - 1,
     `taking an order starts a building ticket for ${orderOk.ticket?.cust?.name} (lobby ${lobbyBefore}→${orderOk.lobbyAfter})`);
@@ -231,52 +213,61 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
   });
   await new Promise(r => setTimeout(r, 500));
   const buildOk = await page.evaluate(() => {
-    const k = window.TrollKitchen3D;
-    for (let i = 0; i < 15; i++) k.__debug.paintAtNDC(0, 0, 'sauce');
-    k.__debug.placeAtNDC(0.15, 0, 'pepperoni');
-    const sent = k.demo.action();
-    return { sent, ticket: k.demo.getTicket() };
+    for (let i = 0; i < 15; i++) window.__demo.paintAtNDC(0, 0, 'sauce');
+    window.__demo.placeAtNDC(0.15, 0, 'pepperoni');
+    const beforeSend = window.__demo.getTicket();     // snapshot before it leaves "in hand"
+    const sent = window.__demo.action();
+    // sendToOven nils the "in hand" ticket (it now lives in the oven, not
+    // at the build table) — same as a real ticket changing station, so
+    // the carried-over state is verified via the pre-send snapshot + the
+    // oven actually showing a pie, not via getTicket() after the fact.
+    return { beforeSend, sent, afterSend: window.__demo.getTicket(), oven0: window.TrollKitchen3D.__debug.getOvenSlot(0) };
   });
-  log(buildOk.sent && buildOk.ticket?.stage === 'baking' && buildOk.ticket.sauce > 0.1 && buildOk.ticket.placed.length === 1,
-    `sending the built pie to the oven carries the painted/placed state along (stage=${buildOk.ticket?.stage}, sauce=${(buildOk.ticket?.sauce * 100).toFixed(0)}%)`);
+  log(buildOk.sent && buildOk.afterSend === null && buildOk.oven0.hasPie &&
+    buildOk.beforeSend.sauce > 0.1 && buildOk.beforeSend.placed.length === 1,
+    `sending the built pie to the oven carries the painted/placed state along (pre-send sauce=${(buildOk.beforeSend.sauce * 100).toFixed(0)}%, oven has pie=${buildOk.oven0.hasPie})`);
   await page.evaluate(() => window.TrollKitchen3D.__debug.interact()); // step back
 
-  // Bake: doneness rises automatically while docked elsewhere, then pull it.
+  // Bake: doneness now rises via the demo driver's own real-time rAF loop
+  // (BAKE_SECONDS=10), not kitchen3d's dt-driven tick — matching how
+  // game.js will own its own bake timer exactly like it did with the old
+  // Pizza Cam. Real wait, same reasoning as the grin-hunt expiry below.
+  await new Promise(r => setTimeout(r, 3000));
   const bakeOk = await page.evaluate(() => {
     const k = window.TrollKitchen3D;
-    for (let i = 0; i < 400; i++) k.__debug.tick(1 / 60);   // ~6.7s of bake time
-    const donenessMidbake = k.demo.getTicket().doneness;
+    const donenessMidbake = window.__demo.getBakingTicket().doneness;
     const bake = k.__debug.stations.find(s => s.id === 'bake');
     k.__debug.setPlayer(bake.triggerX, bake.triggerZ);
     k.__debug.tick(1 / 60);
     k.__debug.interact();
-    const pulled = k.demo.action();
-    return { donenessMidbake, pulled, ticket: k.demo.getTicket() };
+    const pulled = window.__demo.action();
+    return { donenessMidbake, pulled, ticket: window.__demo.getTicket() };
   });
   log(bakeOk.donenessMidbake > 0 && bakeOk.pulled && bakeOk.ticket?.stage === 'ready',
     `doneness rises while baking (${(bakeOk.donenessMidbake * 100).toFixed(0)}%) and pulling moves the ticket to "ready"`);
   await page.evaluate(() => window.TrollKitchen3D.__debug.interact()); // step back
 
   // Cut: dock at the cutting table, load, sweep, commit 4 cuts, then serve.
-  const cutOk = await page.evaluate(async () => {
+  // Sweep-angle progression is likewise the driver's own rAF loop now, so
+  // this needs a real wait per cut instead of manual ticks.
+  await page.evaluate(() => {
     const k = window.TrollKitchen3D;
     const cut = k.__debug.stations.find(s => s.id === 'cut');
     k.__debug.setPlayer(cut.triggerX, cut.triggerZ);
     k.__debug.tick(1 / 60);
     k.__debug.interact();
-    const loaded = k.demo.action();                 // ready -> cutting, starts sweep-armed
-    const pieVisible = k.__debug.isCutPieVisible();
-    k.demo.action();                                 // arms the sweep
-    for (let n = 0; n < 4; n++) {
-      for (let i = 0; i < 20; i++) k.__debug.tick(1 / 60);  // let the sweeper move
-      k.demo.action();                               // commit a cut
-    }
-    const ticketAfterCuts = k.demo.getTicket();
-    const served = k.demo.action();                  // now serves
-    return { loaded, pieVisible, cutsCommitted: ticketAfterCuts.cutAngles.length, served };
   });
-  log(cutOk.loaded && cutOk.pieVisible && cutOk.cutsCommitted === 4 && cutOk.served,
-    `cutting table: loads the pulled pie (visible=${cutOk.pieVisible}), takes 4 cuts, and serves`);
+  const loaded = await page.evaluate(() => window.__demo.action());       // ready -> cutting
+  const pieVisible = await page.evaluate(() => window.TrollKitchen3D.__debug.isCutPieVisible());
+  await page.evaluate(() => window.__demo.action());                     // arms the sweep
+  for (let n = 0; n < 4; n++) {
+    await new Promise(r => setTimeout(r, 350));                          // let the sweeper move
+    await page.evaluate(() => window.__demo.action());                   // commit a cut
+  }
+  const ticketAfterCuts = await page.evaluate(() => window.__demo.getTicket());
+  const served = await page.evaluate(() => window.__demo.action());      // now serves
+  log(loaded && pieVisible && ticketAfterCuts.cutAngles.length === 4 && served,
+    `cutting table: loads the pulled pie (visible=${pieVisible}), takes 4 cuts, and serves`);
 
   // Poll rather than a fixed sleep — the serve-spin tween duration is a
   // rendering-feel constant, not a contract; don't let smoke-test timing
@@ -284,7 +275,7 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
   let afterServe = 'pending';
   for (let i = 0; i < 20 && afterServe !== null; i++) {
     await new Promise(r => setTimeout(r, 150));
-    afterServe = await page.evaluate(() => window.TrollKitchen3D.demo.getTicket());
+    afterServe = await page.evaluate(() => window.__demo.getTicket());
   }
   log(afterServe === null, 'serving clears the demo ticket');
   await page.evaluate(() => window.TrollKitchen3D.__debug.interact()); // step back
@@ -298,7 +289,7 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
     const activeAfterSpawn = k.trollEvent.isGrinHuntActive();
     const pos = k.__debug.getGrinPosition();
     const caught = k.__debug.clickCenter(); // crosshair almost certainly misses a random position
-    return { activeAfterSpawn, pos, caught, tally: k.trollEvent.getGrinTally() };
+    return { activeAfterSpawn, pos, caught, tally: window.__demo.getGrinTally() };
   });
   log(grinOk.activeAfterSpawn && !!grinOk.pos, `Grin Hunt spawns somewhere in the room (${JSON.stringify(grinOk.pos)})`);
 
@@ -308,7 +299,7 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
   await new Promise(r => setTimeout(r, 2900));
   const grinMissOk = await page.evaluate(() => {
     const k = window.TrollKitchen3D;
-    return { active: k.trollEvent.isGrinHuntActive(), tally: k.trollEvent.getGrinTally() };
+    return { active: k.trollEvent.isGrinHuntActive(), tally: window.__demo.getGrinTally() };
   });
   log(!grinMissOk.active && grinMissOk.tally.missed >= 1, `an un-caught Grin Hunt expires and counts as missed (tally=${JSON.stringify(grinMissOk.tally)})`);
 
@@ -326,15 +317,14 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
     k.__debug.setPlayer(eyeX, eyeZ, yaw, pitch);
     k.__debug.tick(1 / 60);
     const caught = k.__debug.clickCenter();
-    return { caught, pos, tally: k.trollEvent.getGrinTally() };
+    return { caught, pos, tally: window.__demo.getGrinTally() };
   });
   log(grinCatchOk.caught && grinCatchOk.tally.caught >= 1, `aiming at and clicking the grin catches it (tally=${JSON.stringify(grinCatchOk.tally)})`);
 
   const rushOk = await page.evaluate(() => {
-    const k = window.TrollKitchen3D;
-    const before = k.demo.getLobbyCount();
-    const added = k.trollEvent.triggerRushHour();
-    return { before, added, after: k.demo.getLobbyCount() };
+    const before = window.__demo.getLobbyCount();
+    const added = window.__demo.rush();
+    return { before, added, after: window.__demo.getLobbyCount() };
   });
   log(rushOk.added > 0 && rushOk.after === rushOk.before + rushOk.added,
     `rush hour adds extra customers to the lobby (${rushOk.before}→${rushOk.after})`);
