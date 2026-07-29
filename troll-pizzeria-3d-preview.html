@@ -53,6 +53,8 @@
     <button id="k3d-bake-demo">Bake demo pies</button>
     <button id="k3d-fire-demo">Fire slot 2</button>
     <button id="k3d-action">Action (F)</button>
+    <button id="k3d-grin-hunt">Spawn Grin Hunt</button>
+    <button id="k3d-rush">Trigger rush hour</button>
   </div>
 
   <script type="importmap">
@@ -88,6 +90,8 @@
       });
       document.getElementById("k3d-fire-demo").addEventListener("click", () => k3d.oven.setFire(2, true));
       document.getElementById("k3d-action").addEventListener("click", () => k3d.demo.action());
+      document.getElementById("k3d-grin-hunt").addEventListener("click", () => k3d.trollEvent.spawnGrinHunt());
+      document.getElementById("k3d-rush").addEventListener("click", () => k3d.trollEvent.triggerRushHour());
     });
   </script>
 </body>

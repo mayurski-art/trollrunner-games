@@ -38,6 +38,11 @@ const DEMO_CUSTOMERS = [
   { id: "pepe", name: "Pepe", emoji: "🐸" },
   { id: "doge", name: "Doge", emoji: "🐶" },
 ];
+const RUSH_CUSTOMERS = [
+  { id: "wojak", name: "Wojak", emoji: "😔" },
+  { id: "chad", name: "Chad", emoji: "🗿" },
+];
+const GRIN_HUNT_VISIBLE_MS = 2600;
 
 // Room: back wall (z = -ROOM_BACK) holds the four stations in a row;
 // open floor from there to the front wall gives room to walk. Small on
@@ -128,6 +133,33 @@ let demoTicket = null;          // { cust, sauce, cheese, placed, sauceHits, che
 let cutPie = null;
 let cutSweeping = false;
 let cutSweepAngle = 0;
+
+/* ------------------------- Grin Hunt (v3 parity) -------------------------- */
+// A hidden grin appears somewhere reachable in the room; catching it (a
+// crosshair click while it's up, free-walk only) counts a "caught", missing
+// it counts a "missed" — same shape as the 2D game's troll-event tell,
+// minus the actual sabotage effects (those live in game.js, not rendering).
+let grinHunt = null;            // { sprite, until }
+let grinCaught = 0, grinMissed = 0;
+
+function spawnGrinHunt() {
+  if (grinHunt) return;
+  const mat = new THREE.SpriteMaterial({ map: billboardTexture("🧌") });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(0.4, 0.4, 1);
+  const x = (Math.random() - 0.5) * ROOM_HALF_W * 1.6;
+  const z = -ROOM_BACK + 1.2 + Math.random() * (ROOM_FRONT + ROOM_BACK - 2.0);
+  sprite.position.set(x, 0.9 + Math.random() * 0.8, z);
+  scene.add(sprite);
+  grinHunt = { sprite, until: performance.now() + GRIN_HUNT_VISIBLE_MS };
+}
+
+function resolveGrinHunt(caught) {
+  if (!grinHunt) return;
+  scene.remove(grinHunt.sprite);
+  grinHunt = null;
+  if (caught) grinCaught++; else grinMissed++;
+}
 
 /* --------------------------- collision boxes -------------------------- */
 // Static AABBs: 4 walls + 4 station footprints. Small fixed set, checked
@@ -224,21 +256,32 @@ function setupBuildAndOven() {
   scene.add(cutPie.root);
 }
 
-function spawnLobby() {
+function makeCustomerEntry(cust, i) {
   const order = STATIONS.find(s => s.id === "order");
+  const mat = new THREE.SpriteMaterial({ map: billboardTexture(cust.emoji) });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(0.7, 0.7, 1);
+  sprite.position.set(order.x - 0.5 + i * 0.5, 1.0, order.triggerZ + 0.3 + i * 0.55);
+  lobbyGroup.add(sprite);
+  const labelEl = document.createElement("div");
+  labelEl.className = "k3d-name-label";
+  labelEl.textContent = cust.name;
+  if (container) container.appendChild(labelEl);
+  return { cust, sprite, labelEl };
+}
+
+function spawnLobby() {
   lobbyGroup = new THREE.Group();
   scene.add(lobbyGroup);
-  lobby = DEMO_CUSTOMERS.map((cust, i) => {
-    const mat = new THREE.SpriteMaterial({ map: billboardTexture(cust.emoji) });
-    const sprite = new THREE.Sprite(mat);
-    sprite.scale.set(0.7, 0.7, 1);
-    sprite.position.set(order.x - 0.5 + i * 0.5, 1.0, order.triggerZ + 0.3 + i * 0.55);
-    lobbyGroup.add(sprite);
-    const labelEl = document.createElement("div");
-    labelEl.className = "k3d-name-label";
-    labelEl.textContent = cust.name;
-    return { cust, sprite, labelEl };
-  });
+  lobby = DEMO_CUSTOMERS.map((cust, i) => makeCustomerEntry(cust, i));
+}
+
+/* Rush hour (v3 parity, demo-only here): temporarily crowds the lobby
+   with extra customers, same visual as a real rush would produce. */
+function triggerRushHour() {
+  const extra = RUSH_CUSTOMERS.map((cust, i) => makeCustomerEntry(cust, lobby.length + i));
+  lobby = lobby.concat(extra);
+  return extra.length;
 }
 
 function initScene() {
@@ -332,6 +375,14 @@ function setupInput(el) {
   });
 
   el.addEventListener("pointerdown", (ev) => {
+    // Grin Hunt takes priority: a crosshair click (pointer-locked FPS view
+    // has no visible cursor, so "click" always means "whatever's dead
+    // center") while free-walking and a grin is up.
+    if (!docked && pointerLocked && grinHunt) {
+      raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+      const hit = raycaster.intersectObject(grinHunt.sprite, false);
+      if (hit.length) { resolveGrinHunt(true); return; }
+    }
     if (docked !== "build" || !armedTool) return;
     ev.preventDefault();
     if (armedTool === "sauce" || armedTool === "cheese") { painting = true; paintAt(ev); }
@@ -339,6 +390,10 @@ function setupInput(el) {
   });
   el.addEventListener("pointermove", (ev) => { if (painting) paintAt(ev); });
   window.addEventListener("pointerup", () => { painting = false; });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) stopLoop(); else if (K3D._mountedIn) startLoop();
+  });
 }
 
 function ndcFromEvent(ev) {
@@ -572,6 +627,7 @@ function tick(dt) {
       cutPie.updateSweep(cutSweepAngle);
     }
   }
+  if (grinHunt && performance.now() > grinHunt.until) resolveGrinHunt(false);
 
   updateLabels();
   renderer.render(scene, camera);
@@ -700,6 +756,15 @@ K3D.demo = {
   getLobbyCount: () => lobby.length,
 };
 
+/* Grin Hunt + rush hour (phase 4 — v3 parity, still demo-only: no real
+   score/tip effects, just the 3D presentation proven end to end). */
+K3D.trollEvent = {
+  spawnGrinHunt,
+  isGrinHuntActive: () => !!grinHunt,
+  getGrinTally: () => ({ caught: grinCaught, missed: grinMissed }),
+  triggerRushHour: triggerRushHour,
+};
+
 /* ------------------------------- boot ---------------------------------- */
 
 try {
@@ -714,7 +779,11 @@ try {
 // debug/smoke-test handle, same pattern as game.js's __pz / pizza3d's P3D
 K3D.__debug = {
   getPlayer: () => ({ x: player.x, z: player.z, yaw: player.yaw, pitch: player.pitch }),
-  setPlayer: (x, z) => { player.x = x; player.z = z; },
+  setPlayer: (x, z, yaw, pitch) => {
+    player.x = x; player.z = z;
+    if (yaw !== undefined) player.yaw = yaw;
+    if (pitch !== undefined) player.pitch = pitch;
+  },
   isBlocked: (x, z) => blocked(x, z),
   getNearStation: () => (nearStation ? nearStation.id : null),
   getDocked: () => docked,
@@ -751,6 +820,19 @@ K3D.__debug = {
   getCutSweepAngle: () => cutSweepAngle,
   getLobbyCount: () => lobby.length,
   isCutPieVisible: () => cutPie?.root.visible || false,
+  getGrinPosition: () => (grinHunt ? grinHunt.sprite.position.clone() : null),
+  clickCenter: () => {
+    if (!grinHunt) return false;
+    raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+    const hit = raycaster.intersectObject(grinHunt.sprite, false);
+    if (hit.length) { resolveGrinHunt(true); return true; }
+    return false;
+  },
+  isLoopRunning: () => !!rafId,
+  simulateVisibility: (hidden) => {
+    Object.defineProperty(document, "hidden", { value: hidden, configurable: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+  },
 };
 
 window.TrollKitchen3D = K3D;

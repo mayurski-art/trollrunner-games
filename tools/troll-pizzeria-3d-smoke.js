@@ -290,10 +290,68 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
   await page.evaluate(() => window.TrollKitchen3D.__debug.interact()); // step back
   await page.screenshot({ path: path.join(OUT, 'k3d-7-fullloop.png') });
 
-  // Step back out to free-walk before wrapping up.
-  await page.evaluate(() => window.TrollKitchen3D.__debug.interact());
-  await new Promise(r => setTimeout(r, 500));
-  await page.screenshot({ path: path.join(OUT, 'k3d-6-oven.png') });
+  // --- Phase 4: Grin Hunt + rush hour + perf pass ---
+
+  const grinOk = await page.evaluate(() => {
+    const k = window.TrollKitchen3D;
+    k.trollEvent.spawnGrinHunt();
+    const activeAfterSpawn = k.trollEvent.isGrinHuntActive();
+    const pos = k.__debug.getGrinPosition();
+    const caught = k.__debug.clickCenter(); // crosshair almost certainly misses a random position
+    return { activeAfterSpawn, pos, caught, tally: k.trollEvent.getGrinTally() };
+  });
+  log(grinOk.activeAfterSpawn && !!grinOk.pos, `Grin Hunt spawns somewhere in the room (${JSON.stringify(grinOk.pos)})`);
+
+  // Expiry is wall-clock based (like the dock-camera tween), not dt-driven,
+  // so this needs a real wait — the module's own rAF loop (already running
+  // since mount()) ticks it down in the background.
+  await new Promise(r => setTimeout(r, 2900));
+  const grinMissOk = await page.evaluate(() => {
+    const k = window.TrollKitchen3D;
+    return { active: k.trollEvent.isGrinHuntActive(), tally: k.trollEvent.getGrinTally() };
+  });
+  log(!grinMissOk.active && grinMissOk.tally.missed >= 1, `an un-caught Grin Hunt expires and counts as missed (tally=${JSON.stringify(grinMissOk.tally)})`);
+
+  // Catch one for real: stand a couple units back and aim the camera's
+  // yaw/pitch straight at wherever it spawns, then click dead-center.
+  const grinCatchOk = await page.evaluate(() => {
+    const k = window.TrollKitchen3D;
+    k.trollEvent.spawnGrinHunt();
+    const pos = k.__debug.getGrinPosition();
+    const eyeX = 0, eyeZ = pos.z + 2, eyeY = 1.6; // stand back from the grin's z, facing it
+    const dx = pos.x - eyeX, dz = pos.z - eyeZ, dy = pos.y - eyeY;
+    const yaw = Math.atan2(-dx, -dz);
+    const horizDist = Math.hypot(dx, dz);
+    const pitch = Math.atan2(dy, horizDist);
+    k.__debug.setPlayer(eyeX, eyeZ, yaw, pitch);
+    k.__debug.tick(1 / 60);
+    const caught = k.__debug.clickCenter();
+    return { caught, pos, tally: k.trollEvent.getGrinTally() };
+  });
+  log(grinCatchOk.caught && grinCatchOk.tally.caught >= 1, `aiming at and clicking the grin catches it (tally=${JSON.stringify(grinCatchOk.tally)})`);
+
+  const rushOk = await page.evaluate(() => {
+    const k = window.TrollKitchen3D;
+    const before = k.demo.getLobbyCount();
+    const added = k.trollEvent.triggerRushHour();
+    return { before, added, after: k.demo.getLobbyCount() };
+  });
+  log(rushOk.added > 0 && rushOk.after === rushOk.before + rushOk.added,
+    `rush hour adds extra customers to the lobby (${rushOk.before}→${rushOk.after})`);
+
+  // Perf: the render loop pauses when the tab is backgrounded and resumes
+  // when it's foregrounded again (battery/GPU, not just a visual nicety).
+  const perfOk = await page.evaluate(() => {
+    const k = window.TrollKitchen3D;
+    const runningBefore = k.__debug.isLoopRunning();
+    k.__debug.simulateVisibility(true);
+    const runningHidden = k.__debug.isLoopRunning();
+    k.__debug.simulateVisibility(false);
+    const runningAgain = k.__debug.isLoopRunning();
+    return { runningBefore, runningHidden, runningAgain };
+  });
+  log(perfOk.runningBefore && !perfOk.runningHidden && perfOk.runningAgain,
+    `render loop pauses when backgrounded and resumes when foregrounded (${JSON.stringify(perfOk)})`);
 
   if (consoleIssues.length) {
     console.log('\nConsole issues:');
