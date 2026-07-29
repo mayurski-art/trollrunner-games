@@ -6,13 +6,15 @@
    to the existing 2D DOM game when `ok` is false (no WebGL) or `?flat=1`.
    Design doc: docs/TROLL-PIZZERIA-3D.md
 
-   Phase 2 scope: an interactive pie (pieFactory.js, ported from pizza3d.js)
-   sits on the build table — paint/topping-place raycasting works from the
-   docked camera angle — and a multi-slot oven rack shows real baking pies,
-   including a kitchen-fire visual. game.js still isn't wired in (no real
-   tickets/orders yet — that's phase 3); this phase is validated through
-   the __debug handle and the preview page's own demo controls.
-   Environment art here is placeholder flat color, replaced in phase 5. */
+   Phase 3 scope: billboard customers queue at the order counter with
+   projected name labels; a single demo ticket now flows order → build →
+   bake (auto-ticking doneness) → cut (sweep + cleave, reusing pieFactory)
+   → serve (spin), all inside the one continuous room from phases 1-2.
+   This proves the room/camera/station loop end-to-end with demo data —
+   it is NOT yet wired to game.js's real tickets/scoring/save data, which
+   remains a follow-up integration step once this engine is done (see
+   docs/TROLL-PIZZERIA-3D.md). Environment art is placeholder flat color
+   until phase 5. */
 import * as THREE from "three";
 import { createPie } from "./pieFactory.js";
 
@@ -28,6 +30,14 @@ const PAINT_STEP = 0.02;
 const BUILD_PIE_SCALE = 0.42;
 const OVEN_SLOTS = 5;
 const OVEN_PIE_SCALE = 0.16;
+const CUT_PIE_SCALE = 0.42;
+const DEMO_BAKE_SECONDS = 10;
+const DEMO_CUTS_NEEDED = 4;
+const DEMO_CUSTOMERS = [
+  { id: "trollio", name: "Trollio", emoji: "🧌" },
+  { id: "pepe", name: "Pepe", emoji: "🐸" },
+  { id: "doge", name: "Doge", emoji: "🐶" },
+];
 
 // Room: back wall (z = -ROOM_BACK) holds the four stations in a row;
 // open floor from there to the front wall gives room to walk. Small on
@@ -86,6 +96,38 @@ const buildState = { sauce: 0, cheese: 0, placed: [], sauceHits: [], cheeseHits:
 let painting = false;
 const ovenSlots = [];           // { marker, x, y, z, pie: pieInstance|null, fireGroup, fireLight }
 const raycaster = new THREE.Raycaster();
+
+/* -------------------------- lobby (billboards) --------------------------- */
+// Camera-facing sprites, drawn from an emoji onto a canvas texture — no PNG
+// assets needed for this phase-3 proof; game.js integration later can swap
+// these for the real PixelLab sprites without changing the anchoring/
+// projection approach.
+function makeBillboardTexture(emoji) {
+  const c = document.createElement("canvas");
+  c.width = c.height = 128;
+  const ctx = c.getContext("2d");
+  ctx.font = "88px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(emoji, 64, 70);
+  return new THREE.CanvasTexture(c);
+}
+const billboardTexCache = {};
+function billboardTexture(emoji) {
+  return billboardTexCache[emoji] || (billboardTexCache[emoji] = makeBillboardTexture(emoji));
+}
+
+let lobby = [];                 // { cust, sprite, labelEl }
+let lobbyGroup = null;
+
+/* --------------------------- demo ticket flow ----------------------------- */
+// One ticket in flight at a time: order -> building -> baking -> ready ->
+// cutting -> served. Proves the room/camera loop connects end to end;
+// scoring/persistence stay entirely out of scope here (see file header).
+let demoTicket = null;          // { cust, sauce, cheese, placed, sauceHits, cheeseHits, doneness, ovenSlot, cutAngles }
+let cutPie = null;
+let cutSweeping = false;
+let cutSweepAngle = 0;
 
 /* --------------------------- collision boxes -------------------------- */
 // Static AABBs: 4 walls + 4 station footprints. Small fixed set, checked
@@ -173,6 +215,30 @@ function setupBuildAndOven() {
     scene.add(fireLight);
     ovenSlots.push({ marker, x, y: 0.97, z: bake.z, pie: null, fireLight, fireGroup: null, firing: false });
   }
+
+  const cut = STATIONS.find(s => s.id === "cut");
+  cutPie = createPie({ interactive: true });
+  cutPie.root.scale.setScalar(CUT_PIE_SCALE);
+  cutPie.root.position.set(cut.x, 0.97, cut.z + 0.18);
+  cutPie.root.visible = false;
+  scene.add(cutPie.root);
+}
+
+function spawnLobby() {
+  const order = STATIONS.find(s => s.id === "order");
+  lobbyGroup = new THREE.Group();
+  scene.add(lobbyGroup);
+  lobby = DEMO_CUSTOMERS.map((cust, i) => {
+    const mat = new THREE.SpriteMaterial({ map: billboardTexture(cust.emoji) });
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(0.7, 0.7, 1);
+    sprite.position.set(order.x - 0.5 + i * 0.5, 1.0, order.triggerZ + 0.3 + i * 0.55);
+    lobbyGroup.add(sprite);
+    const labelEl = document.createElement("div");
+    labelEl.className = "k3d-name-label";
+    labelEl.textContent = cust.name;
+    return { cust, sprite, labelEl };
+  });
 }
 
 function initScene() {
@@ -192,6 +258,7 @@ function initScene() {
 
   buildRoom();
   setupBuildAndOven();
+  spawnLobby();
   clock = new THREE.Clock();
 }
 
@@ -255,8 +322,9 @@ function setupInput(el) {
   // build-station demo shortcuts (phase 2 only — phase 3 replaces these
   // with the same DOM buttons the 2D game already uses)
   window.addEventListener("keydown", (ev) => {
-    if (docked !== "build") return;
     const k = ev.key.toLowerCase();
+    if (k === "f") { onActionPressed(); return; }
+    if (docked !== "build") return;
     if (k === "z") armTool("sauce");
     else if (k === "x") armTool("cheese");
     else if (k === "c") resetBuild();
@@ -321,6 +389,85 @@ function updateLookHint() {
 function onInteractPressed() {
   if (docked) { undock(); return; }
   if (nearStation) dock(nearStation);
+}
+
+/* --------------------------- demo ticket flow ----------------------------- */
+
+function takeOrder() {
+  if (!lobby.length) return false;
+  const entry = lobby.shift();
+  lobbyGroup.remove(entry.sprite);
+  entry.labelEl.remove();
+  demoTicket = { cust: entry.cust, sauce: 0, cheese: 0, placed: [], doneness: 0, cutAngles: [], ovenSlot: null, stage: "building" };
+  Object.assign(buildState, { sauce: 0, cheese: 0, placed: [], sauceHits: [], cheeseHits: [] });
+  buildPie.sync(buildState);
+  return true;
+}
+
+function sendToOven() {
+  if (!demoTicket || demoTicket.stage !== "building") return false;
+  const i = ovenSlots.findIndex(s => !s.pie);
+  if (i === -1) return false;
+  demoTicket.sauce = buildState.sauce;
+  demoTicket.cheese = buildState.cheese;
+  demoTicket.placed = buildState.placed.slice();
+  demoTicket.doneness = 0;
+  demoTicket.ovenSlot = i;
+  demoTicket.stage = "baking";
+  K3D.oven.setSlot(i, demoTicket);
+  Object.assign(buildState, { sauce: 0, cheese: 0, placed: [], sauceHits: [], cheeseHits: [] });
+  buildPie.sync(buildState);
+  return true;
+}
+
+function pullFromOven() {
+  if (!demoTicket || demoTicket.stage !== "baking") return false;
+  K3D.oven.setSlot(demoTicket.ovenSlot, null);
+  demoTicket.stage = "ready";
+  return true;
+}
+
+function loadCut() {
+  if (!demoTicket || demoTicket.stage !== "ready") return false;
+  demoTicket.cutAngles = [];
+  cutPie.root.visible = true;
+  cutPie.sync(demoTicket);
+  demoTicket.stage = "cutting";
+  return true;
+}
+
+function commitCut() {
+  if (!demoTicket || demoTicket.stage !== "cutting") return false;
+  if (!cutSweeping) { cutSweeping = true; return true; }
+  demoTicket.cutAngles.push(cutSweepAngle);
+  cutPie.sync(Object.assign({ cutNeeded: DEMO_CUTS_NEEDED, sweeping: true, sweepAngle: cutSweepAngle }, demoTicket));
+  if (demoTicket.cutAngles.length >= DEMO_CUTS_NEEDED) cutSweeping = false;
+  return true;
+}
+
+function serveTicket() {
+  if (!demoTicket || demoTicket.stage !== "cutting" || demoTicket.cutAngles.length < DEMO_CUTS_NEEDED) return false;
+  cutPie.serveSpin(() => {
+    cutPie.root.visible = false;
+    demoTicket = null;
+    cutSweeping = false;
+    cutSweepAngle = 0;
+  });
+  return true;
+}
+
+function onActionPressed() {
+  if (docked === "order") return takeOrder();
+  if (docked === "build") return sendToOven();
+  if (docked === "bake") return pullFromOven();
+  if (docked === "cut") {
+    if (!demoTicket) return false;
+    if (demoTicket.stage === "ready") return loadCut();
+    if (demoTicket.stage === "cutting") {
+      return demoTicket.cutAngles.length >= DEMO_CUTS_NEEDED ? serveTicket() : commitCut();
+    }
+  }
+  return false;
 }
 
 function dock(station) {
@@ -414,7 +561,35 @@ function tick(dt) {
     }
   }
 
+  if (demoTicket && demoTicket.stage === "baking") {
+    demoTicket.doneness = Math.min(1, demoTicket.doneness + dt / DEMO_BAKE_SECONDS);
+    ovenSlots[demoTicket.ovenSlot].pie.sync(demoTicket);
+  }
+  if (cutPie) {
+    cutPie.stepTweens(dt);
+    if (cutSweeping) {
+      cutSweepAngle = (cutSweepAngle + 60 * dt) % 180;
+      cutPie.updateSweep(cutSweepAngle);
+    }
+  }
+
+  updateLabels();
   renderer.render(scene, camera);
+}
+
+function updateLabels() {
+  if (!container) return;
+  const w = renderer.domElement.clientWidth, h = renderer.domElement.clientHeight;
+  if (!w || !h) return;
+  const v = new THREE.Vector3();
+  for (const entry of lobby) {
+    entry.sprite.getWorldPosition(v);
+    v.y += 0.5;
+    v.project(camera);
+    if (v.z > 1) { entry.labelEl.hidden = true; continue; }
+    entry.labelEl.hidden = false;
+    entry.labelEl.style.transform = `translate(${((v.x * 0.5 + 0.5) * w).toFixed(1)}px, ${((-v.y * 0.5 + 0.5) * h).toFixed(1)}px)`;
+  }
 }
 
 function startLoop() {
@@ -446,6 +621,7 @@ K3D.mount = function (el) {
     hint.className = "k3d-look-hint";
     hint.textContent = "Click to look around · WASD to walk · E to interact";
     el.appendChild(hint);
+    for (const entry of lobby) el.appendChild(entry.labelEl);
     K3D._mountedIn = el;
     setupInput(el);
     if (resizeObs) resizeObs.disconnect();
@@ -515,6 +691,15 @@ K3D.oven = {
   slotCount: OVEN_SLOTS,
 };
 
+/* Demo ticket flow (phase 3 — see file header). One action button/key
+   ('F') does the contextual next step for whichever station you're
+   docked at: take order, send to oven, pull from oven, load/cut/serve. */
+K3D.demo = {
+  action: onActionPressed,
+  getTicket: () => (demoTicket ? JSON.parse(JSON.stringify(demoTicket)) : null),
+  getLobbyCount: () => lobby.length,
+};
+
 /* ------------------------------- boot ---------------------------------- */
 
 try {
@@ -561,6 +746,11 @@ K3D.__debug = {
   },
   getBuildState: () => JSON.parse(JSON.stringify(buildState)),
   getOvenSlot: (i) => ({ hasPie: !!ovenSlots[i]?.pie, firing: !!ovenSlots[i]?.firing, fireIntensity: ovenSlots[i]?.fireLight.intensity || 0 }),
+  getDemoTicket: () => (demoTicket ? { ...demoTicket } : null),
+  isCutSweeping: () => cutSweeping,
+  getCutSweepAngle: () => cutSweepAngle,
+  getLobbyCount: () => lobby.length,
+  isCutPieVisible: () => cutPie?.root.visible || false,
 };
 
 window.TrollKitchen3D = K3D;

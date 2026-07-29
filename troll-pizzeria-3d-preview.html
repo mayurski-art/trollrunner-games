@@ -19,7 +19,12 @@
       background: rgba(0,0,0,0.7); color: #fff; padding: 12px 20px; border-radius: 10px;
       font-size: 14px; text-align: center; pointer-events: none;
     }
-    .k3d-station-label { display: none; } /* projected labels land in phase 3 */
+    .k3d-station-label { display: none; } /* not used until phase 5's real environment art */
+    .k3d-name-label {
+      position: absolute; left: 0; top: 0; transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.6); color: #fff3dd; padding: 3px 8px; border-radius: 8px;
+      font-size: 12px; white-space: nowrap; pointer-events: none;
+    }
     #k3d-fallback { color: #fff3dd; padding: 40px; font-size: 18px; }
     #k3d-demo {
       position: absolute; right: 10px; top: 10px; z-index: 5;
@@ -47,12 +52,13 @@
     <button id="k3d-reset">Reset pie</button>
     <button id="k3d-bake-demo">Bake demo pies</button>
     <button id="k3d-fire-demo">Fire slot 2</button>
+    <button id="k3d-action">Action (F)</button>
   </div>
 
   <script type="importmap">
     { "imports": { "three": "./assets/vendor/three.module.min.js" } }
   </script>
-  <script type="module" src="assets/games/troll-pizzeria/kitchen3d.js?v=k3d-phase2"></script>
+  <script type="module" src="assets/games/troll-pizzeria/kitchen3d.js?v=k3d-phase3"></script>
   <script>
     window.addEventListener("kitchen3d:ready", (e) => {
       const mount = document.getElementById("k3d-mount");
@@ -81,6 +87,7 @@
         }
       });
       document.getElementById("k3d-fire-demo").addEventListener("click", () => k3d.oven.setFire(2, true));
+      document.getElementById("k3d-action").addEventListener("click", () => k3d.demo.action());
     });
   </script>
 </body>
