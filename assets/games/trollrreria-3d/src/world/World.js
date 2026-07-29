@@ -146,13 +146,21 @@ export class World {
     if (lz === CHUNK_Z - 1) this.chunkAt(cx, cz + 1)?.buildMesh(this.scene);
   }
 
-  // Finds a safe spawn point near the island center (topmost solid block + 2).
+  // Finds a safe spawn point near the island center (topmost solid block + 2,
+  // skipping columns where a tree trunk/canopy occupies that headroom).
   findSpawn() {
     const cx = Math.floor(WORLD_SIZE_X / 2);
     const cz = Math.floor(WORLD_SIZE_Z / 2);
     for (let r = 0; r < WORLD_SIZE_X / 2; r++) {
-      const top = this.heightMap.get(`${cx + r},${cz}`);
-      if (top >= 0) return { x: cx + r + 0.5, y: top + 2, z: cz + 0.5 };
+      const x = cx + r, z = cz;
+      const top = this.heightMap.get(`${x},${z}`);
+      if (top < 0) continue;
+      let clear = true;
+      for (let dy = 1; dy <= 4; dy++) {
+        if (this.getBlock(x, top + dy, z) !== BLOCKS.AIR) { clear = false; break; }
+      }
+      if (!clear) continue;
+      return { x: x + 0.5, y: top + 2, z: z + 0.5 };
     }
     return { x: cx + 0.5, y: BASE_HEIGHT + 2, z: cz + 0.5 };
   }

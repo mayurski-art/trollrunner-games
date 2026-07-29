@@ -60,11 +60,13 @@ export class Game {
   }
 
   _setupLights() {
-    const hemi = new THREE.HemisphereLight(0xbfe3ff, 0x4a3a2a, 0.9);
+    const hemi = new THREE.HemisphereLight(0xbfe3ff, 0x9a8262, 1.0);
     this.scene.add(hemi);
-    const sun = new THREE.DirectionalLight(0xfff2d9, 1.0);
+    const sun = new THREE.DirectionalLight(0xfff2d9, 0.7);
     sun.position.set(40, 60, 20);
     this.scene.add(sun);
+    const ambient = new THREE.AmbientLight(0xffffff, 0.45);
+    this.scene.add(ambient);
   }
 
   resize() {
@@ -117,7 +119,9 @@ export class Game {
     if (hit.type === 'block' && this.world.isMineable(hit.x, hit.y, hit.z)) {
       const id = this.world.getBlock(hit.x, hit.y, hit.z);
       this.world.setBlock(hit.x, hit.y, hit.z, BLOCKS.AIR);
-      this.inventory.add(id, 1);
+      // Grass top drops dirt (no separate grass hotbar slot); leaves drop nothing.
+      const dropId = id === BLOCKS.GRASS ? BLOCKS.DIRT : id;
+      this.inventory.add(dropId, 1);
     }
   }
 
