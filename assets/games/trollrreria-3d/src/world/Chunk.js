@@ -1,0 +1,108 @@
+import * as THREE from 'three';
+import { BLOCK_COLOR, isSolid } from './blocks.js';
+
+export const CHUNK_X = 16;
+export const CHUNK_Z = 16;
+export const CHUNK_Y = 40;
+
+const tmpColor = new THREE.Color();
+
+// Culled-face mesher: for a small island this is plenty fast and much
+// simpler than true greedy meshing — only exposed faces get triangles,
+// merged into one BufferGeometry per chunk with vertex colors (no textures).
+const FACES = [
+  { dir: [1, 0, 0], corners: [[1,0,0],[1,1,0],[1,1,1],[1,0,1]] },
+  { dir: [-1, 0, 0], corners: [[0,0,1],[0,1,1],[0,1,0],[0,0,0]] },
+  { dir: [0, 1, 0], corners: [[0,1,0],[0,1,1],[1,1,1],[1,1,0]] },
+  { dir: [0, -1, 0], corners: [[0,0,1],[0,0,0],[1,0,0],[1,0,1]] },
+  { dir: [0, 0, 1], corners: [[0,0,1],[1,0,1],[1,1,1],[0,1,1]] },
+  { dir: [0, 0, -1], corners: [[1,0,0],[0,0,0],[0,1,0],[1,1,0]] },
+];
+
+export class Chunk {
+  constructor(cx, cz, world) {
+    this.cx = cx;
+    this.cz = cz;
+    this.world = world;
+    this.data = new Uint8Array(CHUNK_X * CHUNK_Y * CHUNK_Z);
+    this.mesh = null;
+  }
+
+  index(x, y, z) {
+    return (y * CHUNK_Z + z) * CHUNK_X + x;
+  }
+
+  inBounds(x, y, z) {
+    return x >= 0 && x < CHUNK_X && y >= 0 && y < CHUNK_Y && z >= 0 && z < CHUNK_Z;
+  }
+
+  getLocal(x, y, z) {
+    if (!this.inBounds(x, y, z)) return 0;
+    return this.data[this.index(x, y, z)];
+  }
+
+  setLocal(x, y, z, id) {
+    if (!this.inBounds(x, y, z)) return;
+    this.data[this.index(x, y, z)] = id;
+  }
+
+  worldOrigin() {
+    return { wx: this.cx * CHUNK_X, wz: this.cz * CHUNK_Z };
+  }
+
+  buildMesh(scene) {
+    if (this.mesh) {
+      scene.remove(this.mesh);
+      this.mesh.geometry.dispose();
+      this.mesh = null;
+    }
+
+    const positions = [];
+    const normals = [];
+    const colors = [];
+    const indices = [];
+    const { wx, wz } = this.worldOrigin();
+
+    for (let y = 0; y < CHUNK_Y; y++) {
+      for (let z = 0; z < CHUNK_Z; z++) {
+        for (let x = 0; x < CHUNK_X; x++) {
+          const id = this.getLocal(x, y, z);
+          if (!isSolid(id)) continue;
+          const color = BLOCK_COLOR[id] || 0xffffff;
+          tmpColor.setHex(color);
+
+          for (const face of FACES) {
+            const [dx, dy, dz] = face.dir;
+            const nx = x + dx, ny = y + dy, nz = z + dz;
+            const neighbor = this.inBounds(nx, ny, nz)
+              ? this.getLocal(nx, ny, nz)
+              : this.world.getBlock(wx + nx, ny, wz + nz);
+            if (isSolid(neighbor)) continue; // hidden face, skip
+
+            const start = positions.length / 3;
+            for (const [cxo, cyo, czo] of face.corners) {
+              positions.push(x + cxo, y + cyo, z + czo);
+              normals.push(dx, dy, dz);
+              colors.push(tmpColor.r, tmpColor.g, tmpColor.b);
+            }
+            indices.push(start, start + 1, start + 2, start, start + 2, start + 3);
+          }
+        }
+      }
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    geometry.setIndex(indices);
+
+    const material = new THREE.MeshLambertMaterial({ vertexColors: true });
+    this.mesh = new THREE.Mesh(geometry, material);
+    this.mesh.position.set(wx, 0, wz);
+    this.mesh.castShadow = false;
+    this.mesh.receiveShadow = false;
+    scene.add(this.mesh);
+    return this.mesh;
+  }
+}
