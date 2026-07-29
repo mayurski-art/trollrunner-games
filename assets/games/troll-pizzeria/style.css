@@ -557,7 +557,17 @@ body.k3d-mode .pz-lobby-scene,
 body.k3d-mode .pz-build,
 body.k3d-mode .pz-bake,
 body.k3d-mode .pz-cut { background: none; }
+/* .pz-stage itself (the flex container all four station panels sit in) is
+   a plain block that also passes the pointer-events:none-on-.pz-station
+   rule below by, well, not being a .pz-station — it still eats every
+   touch/click outside the panels' own content. */
+body.k3d-mode .pz-stage { pointer-events: none; }
 body.k3d-mode .pz-lobby-queue { display: none; } /* redundant with the 3D billboards */
+/* .pz-lobby-bg and the oven art are real <img> elements game.js appends
+   as children (boot()'s lobbyBg/ovenArt) — a background:none on their
+   *container* doesn't touch them; they need hiding directly. */
+body.k3d-mode .pz-lobby-bg,
+body.k3d-mode .pz-oven-art img { display: none; }
 body.k3d-mode .pz-oven-art,
 body.k3d-mode .pz-oven { background: none; }
 body.k3d-mode .pz-build-table,
@@ -568,8 +578,17 @@ body.k3d-mode .pz-cut-table { background: none; border-color: transparent; }
 body.k3d-mode #pz-build-pizza,
 body.k3d-mode #pz-cut-pizza { pointer-events: none; }
 
+/* the station panels are transparent now (see above) but still full-size
+   DOM elements sitting in front of #pz-3d-mount (which is z-index:-1) —
+   without this, their empty backdrop area eats every touch/click meant
+   for the 3D view underneath (free-walk joystick drag, look-drag, click-
+   to-pointer-lock). Only the panel background gets disabled; the actual
+   controls are re-enabled individually below. */
+body.k3d-mode .pz-station { pointer-events: none; }
+
 /* floating-over-a-3D-scene legibility pass: give the control clusters a
-   translucent backing instead of relying on an opaque station backdrop */
+   translucent backing instead of relying on an opaque station backdrop,
+   and keep them clickable (see pointer-events:none above). */
 body.k3d-mode .pz-build-ticket,
 body.k3d-mode .pz-bins,
 body.k3d-mode .pz-amount-btns,
@@ -578,5 +597,10 @@ body.k3d-mode .pz-station-controls,
 body.k3d-mode .pz-cut-controls {
   background: rgba(28, 16, 6, 0.55); border-radius: 12px; padding: 8px;
   backdrop-filter: blur(3px);
+  pointer-events: auto;
+}
+body.k3d-mode .pz-to-oven,
+body.k3d-mode .pz-oven-slots {
+  pointer-events: auto;
 }
 body.k3d-mode .pz-hint { color: #fff3dd; }

@@ -26,8 +26,11 @@ const TOUCH_LOOK_SENS = 0.0055;
 const DOCK_TWEEN_MS = 420;
 const PITCH_LIMIT = Math.PI / 2 - 0.08;
 const BUILD_PIE_SCALE = 0.42;
-const OVEN_SLOTS = 5;
-const OVEN_PIE_SCALE = 0.16;
+// 6, not 5: matches game.js's max ovenSlotsCount() once the "6th oven
+// slot" upgrade is bought. The 6th marker just sits empty/unused until
+// then, same as any other empty slot.
+const OVEN_SLOTS = 6;
+const OVEN_PIE_SCALE = 0.14;
 const CUT_PIE_SCALE = 0.42;
 const GRIN_HUNT_VISIBLE_MS = 2600;
 
@@ -92,9 +95,23 @@ const ovenSlots = [];           // { marker, x, y, z, pie: pieInstance|null, fir
 const raycaster = new THREE.Raycaster();
 
 /* -------------------------- lobby (billboards) --------------------------- */
-// Camera-facing sprites, drawn from an emoji onto a canvas texture. Good
-// enough for now; swapping in the real PixelLab customer PNGs later is a
-// texture-source change only, not an anchoring/projection change.
+// Camera-facing sprites. Real customers use the same PixelLab PNGs the 2D
+// game's order counter always used (cust.sprite, e.g. "char-trollio.png");
+// anything without one (the Grin Hunt trollface) falls back to an emoji
+// drawn onto a canvas texture. THREE.TextureLoader paints in place once the
+// PNG decodes — no manual swap needed, same non-blocking pattern as the
+// pixel-art room textures (loadPixelTexture).
+const CHAR_ART = "assets/games/troll-pizzeria/art/";
+const charTexCache = {};
+function characterTexture(file) {
+  if (charTexCache[file]) return charTexCache[file];
+  const tex = textureLoader.load(CHAR_ART + file);
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  charTexCache[file] = tex;
+  return tex;
+}
 function makeBillboardTexture(emoji) {
   const c = document.createElement("canvas");
   c.width = c.height = 128;
@@ -109,13 +126,16 @@ const billboardTexCache = {};
 function billboardTexture(emoji) {
   return billboardTexCache[emoji] || (billboardTexCache[emoji] = makeBillboardTexture(emoji));
 }
+function customerTexture(cust) {
+  return cust.sprite ? characterTexture(cust.sprite) : billboardTexture(cust.emoji || "🧌");
+}
 
 let lobby = [];                 // { cust, sprite, labelEl }
 let lobbyGroup = null;
 
 function makeCustomerEntry(cust, i) {
   const order = STATIONS.find(s => s.id === "order");
-  const mat = new THREE.SpriteMaterial({ map: billboardTexture(cust.emoji || "🧌") });
+  const mat = new THREE.SpriteMaterial({ map: customerTexture(cust), transparent: true });
   const sprite = new THREE.Sprite(mat);
   sprite.scale.set(0.7, 0.7, 1);
   sprite.position.set(order.x - 0.5 + i * 0.5, 1.0, order.triggerZ + 0.3 + i * 0.55);
@@ -259,11 +279,11 @@ function setupBuildAndOven() {
   scene.add(buildPie.root);
 
   const bake = STATIONS.find(s => s.id === "bake");
-  const span = STATION_HALF.x * 2 * 0.82;
+  const span = STATION_HALF.x * 2 * 0.9;
   for (let i = 0; i < OVEN_SLOTS; i++) {
     const x = bake.x - span / 2 + (span / (OVEN_SLOTS - 1)) * i;
     const marker = new THREE.Mesh(
-      new THREE.RingGeometry(0.16, 0.185, 20),
+      new THREE.RingGeometry(0.14, 0.16, 20),
       new THREE.MeshBasicMaterial({ color: 0x2a1808, transparent: true, opacity: 0.4, side: THREE.DoubleSide }));
     marker.rotation.x = -Math.PI / 2;
     marker.position.set(x, 0.965, bake.z);
@@ -715,6 +735,10 @@ K3D.__debug = {
   isBlocked: (x, z) => blocked(x, z),
   getNearStation: () => (nearStation ? nearStation.id : null),
   getDocked: () => docked,
+  getStats: () => renderer ? {
+    calls: renderer.info.render.calls, triangles: renderer.info.render.triangles,
+    geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures,
+  } : null,
   setKeys: (arr) => { keys.clear(); for (const k of arr) keys.add(k); },
   tick: (dt) => tick(dt),
   interact: () => onInteractPressed(),
@@ -725,6 +749,11 @@ K3D.__debug = {
   },
   getOvenSlot: (i) => ({ hasPie: !!ovenSlots[i]?.pie, firing: !!ovenSlots[i]?.firing, fireIntensity: ovenSlots[i]?.fireLight.intensity || 0 }),
   getLobbyCount: () => lobby.length,
+  getLobbySprites: () => lobby.map(e => ({
+    name: e.cust.name, sprite: e.cust.sprite, pos: e.sprite.position.toArray(),
+    visible: e.sprite.visible, mapLoaded: !!(e.sprite.material.map && e.sprite.material.map.image),
+    imgW: e.sprite.material.map?.image?.width || 0,
+  })),
   isBuildPieVisible: () => buildPie?.root.visible || false,
   isCutPieVisible: () => cutPie?.root.visible || false,
   getGrinPosition: () => (grinHunt ? grinHunt.sprite.position.clone() : null),

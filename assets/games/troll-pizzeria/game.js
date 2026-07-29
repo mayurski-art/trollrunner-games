@@ -781,7 +781,7 @@
   }
 
   function renderLobby() {
-    if (k3d()) k3d().lobby.sync(S.lobby.filter(c => !c.walking).map(c => ({ uid: c.uid, name: c.name, emoji: c.emoji })));
+    if (k3d()) k3d().lobby.sync(S.lobby.filter(c => !c.walking).map(c => ({ uid: c.uid, name: c.name, emoji: c.emoji, sprite: c.sprite })));
     const q = $("#pz-lobby-queue");
     q.innerHTML = "";
     S.lobby.forEach((c, i) => {
@@ -1084,9 +1084,9 @@
 
   function renderBake() {
     if (k3d()) {
-      // Kitchen3D's physical rack is a fixed 5 slots — the 6th-oven-slot
-      // upgrade doesn't have a 3D home yet, so anything past index 4 just
-      // isn't shown there (still fully functional via the DOM overlay).
+      // Kitchen3D's physical rack has 6 slots, matching ovenSlotsCount()'s
+      // max once the 6th-oven-slot upgrade is bought; the guard below just
+      // protects against a future mismatch, not an expected one today.
       S.ovens.forEach((id, i) => {
         if (i >= k3d().oven.slotCount) return;
         k3d().oven.setSlot(i, id ? view3d(ticketById(id)) : null);
