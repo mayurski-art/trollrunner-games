@@ -19,7 +19,7 @@
   const FLAT_MODE = /[?&]flat=1/.test(location.search);
   const p3d = () => (!FLAT_MODE && window.TrollPizza3D && window.TrollPizza3D.ok ? window.TrollPizza3D : null);
   const view3d = (t, opts) => ({
-    sauce: t.build.sauce, cheese: t.build.cheese, placed: t.build.placed,
+    sauce: quantizeCoverage(t.build.sauce), cheese: quantizeCoverage(t.build.cheese), placed: t.build.placed,
     doneness: t.doneness, cutAngles: t.cutAngles, halfGuide: !!(opts && opts.halfGuide),
   });
 
@@ -28,6 +28,18 @@
   const PIZZA_RADIUS = 0.44;        // max topping distance from center (0..1)
 
   const AMOUNTS = ["none", "light", "normal", "extra"];
+
+  /* Sauce/cheese coverage (v3): tickets still ask in familiar buckets, but
+     the build side is a continuous 0..1 painted amount, not a 4-step
+     cycle. COVERAGE_TARGET anchors the old bucket semantics to a point on
+     that continuum so scoring/tuning didn't need to change shape. */
+  const COVERAGE_TARGET = { light: 0.35, normal: 0.6, extra: 0.85 };
+  const COVERAGE_BAND = 0.12;
+  const PAINT_STEP = 0.02;
+  // Pizza Cam (pizza3d.js) still renders 4 fixed radii — quantize the
+  // continuous coverage down to its nearest bucket rather than reworking
+  // the 3D mesh for a continuum the player mostly judges by eye anyway.
+  const quantizeCoverage = (c) => (c < 0.15 ? "none" : c < 0.475 ? "light" : c < 0.725 ? "normal" : "extra");
 
   const TOPPINGS = [
     { id: "pepperoni", name: "Pepperoni",    emoji: "🍕", color: "#c0392b", day: 1 },
@@ -212,7 +224,7 @@
     builtShelf: [], cutShelf: [],          // ticket ids
     bakeSelect: null,                       // ticket id picked up at bake station
     dayScore: 0, dayTips: 0, servedToday: 0,
-    armedBin: null,
+    armedBin: null, paintTool: null,
     cut: { ticketId: null, needed: 0, done: [], sweeping: false, angle: 0, raf: 0 },
     lastTick: 0, ticketSeq: 1,
     // Grin Combo: chained perfect stations grow tips, any bad station resets it
@@ -344,7 +356,8 @@
     if (specialties.length && Math.random() < clamp(0.1 + day * 0.015, 0.1, 0.3)) {
       const spec = pick(specialties);
       return {
-        sauce: spec.sauce, cheese: spec.cheese,
+        sauce: COVERAGE_TARGET[spec.sauce], sauceBand: COVERAGE_BAND,
+        cheese: COVERAGE_TARGET[spec.cheese], cheeseBand: COVERAGE_BAND,
         tops: spec.tops.map(t => ({ ...t })), bake: spec.bake, cutCount: spec.cutCount,
         specialtyName: spec.name, tipMult: spec.tipMult, side: genSide(day),
       };
@@ -394,21 +407,44 @@
         addTop(pick(pool), pick([4, 6, 8]), maybeHalf(0.15));
         if (Math.random() < 0.4) addTop(pick(pool), pick([4, 6]), maybeHalf(0.15));
     }
-    const sauce = cust.quirk === "light" ? "light" : amount();
-    const cheese = cust.quirk === "light" ? "light" : amount();
-    return { sauce, cheese, tops, bake: bake.id, cutCount, side: genSide(day) };
+    const sauceBucket = cust.quirk === "light" ? "light" : amount();
+    const cheeseBucket = cust.quirk === "light" ? "light" : amount();
+    return {
+      sauce: COVERAGE_TARGET[sauceBucket], sauceBand: COVERAGE_BAND,
+      cheese: COVERAGE_TARGET[cheeseBucket], cheeseBand: COVERAGE_BAND,
+      tops, bake: bake.id, cutCount, side: genSide(day),
+    };
   }
 
   /* ============================== scoring ============================= */
 
   const sideOf = (p) => (p.x < 0.5 ? "left" : "right");
 
+  // Quadrant-variance evenness, 0..1 (1 = perfectly even). Shared shape
+  // with the topping evenness bonus further down.
+  function evenness(hits) {
+    if (!hits || hits.length < 6) return 1;
+    const q = [0, 0, 0, 0];
+    for (const p of hits) q[(p.x < 0.5 ? 0 : 1) + (p.y < 0.5 ? 0 : 2)]++;
+    const mean = hits.length / 4;
+    const varc = q.reduce((s, n) => s + (n - mean) ** 2, 0) / 4;
+    return clamp(1 - Math.sqrt(varc) / (mean + 1), 0, 1);
+  }
+
+  function coverageScore(target, band, build, hits) {
+    const err = Math.abs(build - target);
+    const base = clamp(1 - err / (band * 3), 0, 1);
+    return base * (0.7 + 0.3 * evenness(hits));
+  }
+
   function scoreOrder(t) {
     const o = t.order, b = t.build;
     let parts = 0, total = 0;
-    // sauce + cheese amounts
-    total += 1; parts += o.sauce === b.sauce ? 1 : (Math.abs(AMOUNTS.indexOf(o.sauce) - AMOUNTS.indexOf(b.sauce)) === 1 ? 0.5 : 0);
-    total += 1; parts += o.cheese === b.cheese ? 1 : (Math.abs(AMOUNTS.indexOf(o.cheese) - AMOUNTS.indexOf(b.cheese)) === 1 ? 0.5 : 0);
+    // sauce + cheese coverage: distance from the target band, plus an
+    // evenness penalty for patchy painting (mirrors the topping evenness
+    // bonus below — a splotchy pie scores worse even at the right average)
+    total += 1; parts += coverageScore(o.sauce, o.sauceBand, b.sauce, b.sauceHits);
+    total += 1; parts += coverageScore(o.cheese, o.cheeseBand, b.cheese, b.cheeseHits);
     // toppings: right kind, right count, right side
     const placedByType = {};
     for (const p of b.placed) (placedByType[p.tid] ||= []).push(p);
@@ -546,19 +582,27 @@
     return { fb, img, setOpacity(v) { fb.style.opacity = v; img.style.opacity = v; } };
   }
 
-  const AMOUNT_INSET = { light: 16, normal: 11, extra: 7 };
+  // Continuous coverage → inset%: 0 paint = a sliver at the center,
+  // 1.0 = spread almost to the crust. Anchored so the old light/normal/
+  // extra buckets land close to their pre-v3 fixed insets.
+  const coverageInset = (coverage) => Math.max(2, 22 - 15 * coverage);
 
   function renderPizza(container, t, opts = {}) {
     container.innerHTML = "";
     container.classList.add("pz-pizza");
     // dough
     pizzaLayer(container, "pizza-dough.png", { background: "radial-gradient(circle, #f4d9a4 62%, #e8b96b 78%, #c99a52 100%)", boxShadow: "inset 0 -6px 12px rgba(0,0,0,0.12)" }, 2);
-    // sauce
-    if (t.build.sauce !== "none")
-      pizzaLayer(container, "pizza-sauce.png", { background: "radial-gradient(circle, #d94f36 0%, #cf3b28 82%, #b02e1e 100%)" }, AMOUNT_INSET[t.build.sauce] + 2);
+    // sauce — opacity ramps in with coverage so a thin first pass reads
+    // as a light coat rather than snapping straight to full-strength red
+    if (t.build.sauce > 0.03) {
+      const sauceLayer = pizzaLayer(container, "pizza-sauce.png", { background: "radial-gradient(circle, #d94f36 0%, #cf3b28 82%, #b02e1e 100%)" }, coverageInset(t.build.sauce) + 2);
+      sauceLayer.setOpacity(clamp(0.45 + t.build.sauce * 0.55, 0, 1).toFixed(2));
+    }
     // cheese
-    if (t.build.cheese !== "none")
-      pizzaLayer(container, "pizza-cheese.png", { background: "radial-gradient(circle, #fbe294 0%, #f6d365 78%, #eec14e 100%)" }, AMOUNT_INSET[t.build.cheese] + 4);
+    if (t.build.cheese > 0.03) {
+      const cheeseLayer = pizzaLayer(container, "pizza-cheese.png", { background: "radial-gradient(circle, #fbe294 0%, #f6d365 78%, #eec14e 100%)" }, coverageInset(t.build.cheese) + 4);
+      cheeseLayer.setOpacity(clamp(0.45 + t.build.cheese * 0.55, 0, 1).toFixed(2));
+    }
     // bake overlay: golden cheese art cross-fades in as it bakes
     if (t.doneness > 0.05) {
       const baked = pizzaLayer(container, "pizza-baked.png", { background: "radial-gradient(circle, rgba(214,143,60,0.9) 0%, rgba(190,120,45,0.85) 80%, rgba(150,90,35,0.9) 100%)" }, 4);
@@ -603,7 +647,7 @@
       id: S.ticketSeq++,
       cust,
       order: genOrder(cust, S.day),
-      build: { sauce: "none", cheese: "none", placed: [] },
+      build: { sauce: 0, cheese: 0, sauceHits: [], cheeseHits: [], placed: [] },
       doneness: 0, cutAngles: [],
       sideDoneness: 0, sideDone: false,
       overCooked: 0, onFire: false,
@@ -623,12 +667,15 @@
     const o = t.order;
     const rows = [];
     const b = t.build;
-    const amountRow = (label, want, have) => {
-      const cls = live ? (have === want ? "done" : (AMOUNTS.indexOf(have) > AMOUNTS.indexOf(want) ? "over" : "")) : "";
-      return `<li class="${cls}">${label}: ${want}</li>`;
+    const coverageRow = (label, target, band, build) => {
+      const lo = Math.round(clamp(target - band, 0, 1) * 100), hi = Math.round(clamp(target + band, 0, 1) * 100);
+      const diff = build - target;
+      const cls = live ? (Math.abs(diff) <= band ? "done" : diff > 0 ? "over" : "") : "";
+      const live_pct = live ? ` <span class="tk-side">(${Math.round(build * 100)}%)</span>` : "";
+      return `<li class="${cls}">${label}: ${lo}-${hi}%${live_pct}</li>`;
     };
-    rows.push(amountRow("Sauce", o.sauce, b.sauce));
-    rows.push(amountRow("Cheese", o.cheese, b.cheese));
+    rows.push(coverageRow("Sauce", o.sauce, o.sauceBand, b.sauce));
+    rows.push(coverageRow("Cheese", o.cheese, o.cheeseBand, b.cheese));
     for (const e of o.tops) {
       const top = TOPPINGS.find(x => x.id === e.id);
       let have = 0;
@@ -805,18 +852,22 @@
     } else {
       renderPizza(pizzaBox, t, { halfGuide: hasHalf });
     }
-    $("#pz-build-hint").textContent = hasHalf
+    $("#pz-build-hint").textContent = S.paintTool
+      ? `Painting ${S.paintTool} — drag across the pie, click the button again to stop.`
+      : hasHalf
       ? "Half orders: left half is the LEFT side of the pie as you look at it."
-      : "Drag toppings from the bins — or click a bin, then click the pie.";
+      : "Drag toppings from the bins, or tap Sauce/Cheese and paint the pie.";
     $("#pz-to-oven").disabled = false;
     renderBins(t);
     updateAmountButtons(t);
   }
 
   function updateAmountButtons(t) {
-    const s = $("#pz-sauce-btn strong"), c = $("#pz-cheese-btn strong");
-    s.textContent = t ? t.build.sauce : "—";
-    c.textContent = t ? t.build.cheese : "—";
+    const sauceBtn = $("#pz-sauce-btn"), cheeseBtn = $("#pz-cheese-btn");
+    sauceBtn.querySelector("strong").textContent = t ? Math.round(t.build.sauce * 100) + "%" : "—";
+    cheeseBtn.querySelector("strong").textContent = t ? Math.round(t.build.cheese * 100) + "%" : "—";
+    sauceBtn.classList.toggle("is-armed", S.paintTool === "sauce");
+    cheeseBtn.classList.toggle("is-armed", S.paintTool === "cheese");
     const sideBtn = $("#pz-side-btn");
     sideBtn.hidden = !(t && t.order.side === "soda");
     if (t && t.order.side === "soda") {
@@ -855,6 +906,7 @@
     const bins = $("#pz-bins");
     const pizzaBox = $("#pz-build-pizza");
     let drag = null; // { tid, ghost, fromIdx }
+    let painting = false;
 
     function ghostAt(x, y, tid, emoji) {
       const g = el("div", "pz-drag-ghost");
@@ -864,6 +916,13 @@
       return g;
     }
     const topOf = (tid) => TOPPINGS.find(x => x.id === tid);
+
+    function hitPie(ev) {
+      if (p3d() && p3d().isMounted(pizzaBox)) return p3d().pointToPie(ev.clientX, ev.clientY);
+      const rect = pizzaBox.getBoundingClientRect();
+      const x = (ev.clientX - rect.left) / rect.width, y = (ev.clientY - rect.top) / rect.height;
+      return Math.hypot(x - 0.5, y - 0.5) > PIZZA_RADIUS ? null : { x, y };
+    }
 
     bins.addEventListener("pointerdown", (ev) => {
       const bin = ev.target.closest(".pz-bin");
@@ -875,6 +934,11 @@
     pizzaBox.addEventListener("pointerdown", (ev) => {
       const t = activeTicket();
       if (!t) return;
+      if (S.paintTool) {
+        const hit = hitPie(ev);
+        if (hit) { ev.preventDefault(); painting = true; applyPaint(S.paintTool, hit.x, hit.y); }
+        return;
+      }
       // picking up a topping already on the pie (3D: raycast, DOM: node hit)
       let idx = null;
       if (p3d() && p3d().isMounted(pizzaBox)) {
@@ -896,6 +960,11 @@
     });
 
     document.addEventListener("pointermove", (ev) => {
+      if (painting) {
+        const hit = hitPie(ev);
+        if (hit) applyPaint(S.paintTool, hit.x, hit.y);
+        return;
+      }
       if (!drag) return;
       if (!drag.moved && Math.hypot(ev.clientX - drag.sx, ev.clientY - drag.sy) > 7) {
         drag.moved = true;
@@ -905,6 +974,7 @@
     });
 
     document.addEventListener("pointerup", (ev) => {
+      if (painting) { painting = false; return; }
       if (!drag) return;
       const d = drag; drag = null;
       if (d.ghost) d.ghost.remove();
@@ -912,7 +982,8 @@
       if (!d.moved) {
         // plain click on a bin: toggle armed mode
         S.armedBin = S.armedBin === d.tid ? null : d.tid;
-        renderBins(t);
+        S.paintTool = null;
+        renderBuild();
         return;
       }
       if (t && placeAt(ev, d.tid, !d.repositioning)) return;
@@ -922,18 +993,9 @@
     function placeAt(ev, tid, fresh) {
       const t = activeTicket();
       if (!t) return false;
-      let x, y;
-      if (p3d() && p3d().isMounted(pizzaBox)) {
-        const hit = p3d().pointToPie(ev.clientX, ev.clientY);
-        if (!hit) return false;
-        x = hit.x; y = hit.y;
-      } else {
-        const rect = pizzaBox.getBoundingClientRect();
-        x = (ev.clientX - rect.left) / rect.width;
-        y = (ev.clientY - rect.top) / rect.height;
-      }
-      const dist = Math.hypot(x - 0.5, y - 0.5);
-      if (dist > PIZZA_RADIUS) return false;
+      const hit = hitPie(ev);
+      if (!hit) return false;
+      const { x, y } = hit;
       let placeTid = tid || S.armedBin;
       // troll event: a pineapple raid can hijack the next few fresh drags
       if (fresh && S.troll.pineappleRaidLeft > 0) {
@@ -947,13 +1009,29 @@
     }
   }
 
-  function cycleAmount(kind) {
+  // Paint tool arming (v3): clicking Sauce/Cheese arms a drag-to-paint
+  // tool over the pie, mutually exclusive with an armed topping bin.
+  function armPaint(kind) {
+    if (!activeTicket()) return;
+    S.paintTool = S.paintTool === kind ? null : kind;
+    S.armedBin = null;
+    renderBuild();
+  }
+
+  function applyPaint(tool, x, y) {
     const t = activeTicket();
     if (!t) return;
-    const cur = AMOUNTS.indexOf(t.build[kind]);
-    t.build[kind] = AMOUNTS[(cur + 1) % AMOUNTS.length];
-    Sfx.splat();
-    renderBuild();
+    t.build[tool] = clamp(t.build[tool] + PAINT_STEP, 0, 1);
+    const hits = tool === "sauce" ? t.build.sauceHits : t.build.cheeseHits;
+    hits.push({ x, y });
+    if (hits.length > 80) hits.shift();
+    schedulePaintRender();
+  }
+
+  let paintRaf = null;
+  function schedulePaintRender() {
+    if (paintRaf) return;
+    paintRaf = requestAnimationFrame(() => { paintRaf = null; renderBuild(); renderHud(); });
   }
 
   function sendToOven() {
@@ -1265,7 +1343,7 @@
     S.ovens = Array(ovenSlotsCount()).fill(null);
     S.grinInsuranceUsedToday = false;
     S.builtShelf = []; S.cutShelf = [];
-    S.activeTicketId = null; S.bakeSelect = null; S.armedBin = null; S.stormedOut = 0;
+    S.activeTicketId = null; S.bakeSelect = null; S.armedBin = null; S.paintTool = null; S.stormedOut = 0;
     S.dayScore = 0; S.dayTips = 0; S.servedToday = 0; S.ticketSeq = 1;
     S.cut = { ticketId: null, needed: 0, done: [], sweeping: false, angle: 0, raf: 0 };
     S.grinStage = 0; S.dayMaxGrin = 0;
@@ -1713,8 +1791,8 @@
     $("#pz-upgrades-btn").addEventListener("click", () => { renderUpgrades(); $("#pz-upgrades").hidden = false; });
     $("#pz-upgrades-close").addEventListener("click", () => { $("#pz-upgrades").hidden = true; });
     $("#pz-take-order").addEventListener("click", orderFromCounter);
-    $("#pz-sauce-btn").addEventListener("click", () => cycleAmount("sauce"));
-    $("#pz-cheese-btn").addEventListener("click", () => cycleAmount("cheese"));
+    $("#pz-sauce-btn").addEventListener("click", () => armPaint("sauce"));
+    $("#pz-cheese-btn").addEventListener("click", () => armPaint("cheese"));
     $("#pz-side-btn").addEventListener("click", () => {
       const t = activeTicket();
       if (!t || t.order.side !== "soda") return;
@@ -1725,7 +1803,7 @@
     $("#pz-clear-btn").addEventListener("click", () => {
       const t = activeTicket();
       if (!t) return;
-      t.build = { sauce: "none", cheese: "none", placed: [] };
+      t.build = { sauce: 0, cheese: 0, sauceHits: [], cheeseHits: [], placed: [] };
       Sfx.splat();
       renderBuild(); renderHud();
     });
@@ -1775,5 +1853,6 @@
     startTrollTell, resolveTrollEvent, applyGrinCombo, GRIN_MAX,
     genOrder, SPECIALTIES, SIDES, tick, fireTrollEvent, buildRoster,
     UPGRADES, buyUpgrade, upgradeOwned, ovenSlotsCount, bakeSeconds, renderUpgrades,
+    COVERAGE_TARGET, COVERAGE_BAND, coverageScore, applyPaint, armPaint,
   };
 })();

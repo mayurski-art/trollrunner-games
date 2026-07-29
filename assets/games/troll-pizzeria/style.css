@@ -156,6 +156,7 @@ button { cursor: pointer; }
 .pz-btn-danger { background: #f6e0d2; }
 .pz-btn-side { background: #dceefb; }
 .pz-btn-side.is-done { background: var(--pz-good); color: #fff; }
+.pz-btn-paint.is-armed { outline: 3px solid var(--gold); background: linear-gradient(180deg, #a3b1c6 0%, #6d7a92 100%); color: #fff; }
 .pz-btn[disabled] { opacity: 0.45; cursor: not-allowed; transform: none; }
 
 .pz-icon-btn {

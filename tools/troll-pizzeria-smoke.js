@@ -74,17 +74,34 @@ function log(ok, msg) { results.push((ok ? 'PASS' : 'FAIL') + ' | ' + msg); cons
   await page.click('.pz-cust.at-counter');
   await page.waitForFunction('window.__pz.S.tickets.length === 1');
   const order = await page.evaluate(() => JSON.parse(JSON.stringify(window.__pz.S.tickets[0].order)));
-  log(true, `order taken: sauce=${order.sauce} cheese=${order.cheese} tops=${order.tops.map(t => t.count + 'x' + t.id + '/' + t.side).join(',')} bake=${order.bake} cut=${order.cutCount}`);
+  log(true, `order taken: sauce=${Math.round(order.sauce * 100)}% cheese=${Math.round(order.cheese * 100)}% tops=${order.tops.map(t => t.count + 'x' + t.id + '/' + t.side).join(',')} bake=${order.bake} cut=${order.cutCount}`);
 
-  // Build: cycle sauce + cheese to the ordered amounts
-  const AMOUNTS = ['none', 'light', 'normal', 'extra'];
-  for (let i = 0; i < AMOUNTS.indexOf(order.sauce); i++) await page.click('#pz-sauce-btn');
-  for (let i = 0; i < AMOUNTS.indexOf(order.cheese); i++) await page.click('#pz-cheese-btn');
+  // Build: paint sauce + cheese to the ordered coverage band (v3 replaced
+  // the 4-step amount cycle with a drag-to-paint gesture on the pie).
+  const pizzaBoxEl = await page.$('#pz-build-pizza');
+  const paintTo = async (btnSel, target) => {
+    await page.click(btnSel);                                     // arm the paint tool
+    const box = await pizzaBoxEl.boundingBox();
+    const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+    await page.mouse.move(cx, cy);
+    await page.mouse.down();
+    for (let i = 0; i < 60; i++) {
+      const kind = btnSel === '#pz-sauce-btn' ? 'sauce' : 'cheese';
+      const cur = await page.evaluate((k) => window.__pz.S.tickets[0].build[k], kind);
+      if (cur >= target) break;
+      const a = i * 0.7, r = box.width * 0.08;
+      await page.mouse.move(cx + Math.cos(a) * r, cy + Math.sin(a) * r * 0.5);
+    }
+    await page.mouse.up();
+    await page.click(btnSel);                                     // disarm
+  };
+  await paintTo('#pz-sauce-btn', order.sauce);
+  await paintTo('#pz-cheese-btn', order.cheese);
   const amountsOk = await page.evaluate(() => {
     const b = window.__pz.S.tickets[0].build, o = window.__pz.S.tickets[0].order;
-    return b.sauce === o.sauce && b.cheese === o.cheese;
+    return Math.abs(b.sauce - o.sauce) <= o.sauceBand && Math.abs(b.cheese - o.cheese) <= o.cheeseBand;
   });
-  log(amountsOk, 'sauce + cheese match the ticket');
+  log(amountsOk, 'sauce + cheese painted within the ticket\'s coverage band');
 
   // Toppings: arm each ordered bin, then click sunflower-spread spots on
   // the pie (clicking an existing topping repositions it, so spots must not
