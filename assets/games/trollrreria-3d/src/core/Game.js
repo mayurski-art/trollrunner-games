@@ -8,6 +8,7 @@ import { Inventory } from '../ui/Inventory.js';
 import { InventoryScreen } from '../ui/InventoryScreen.js';
 import { ChestScreen } from '../ui/ChestScreen.js';
 import { DayNightCycle } from './DayNightCycle.js';
+import { MusicManager } from './MusicManager.js';
 import * as Save from '../world/Save.js';
 import { BLOCKS, PLACEABLE, UNARMED, WEAPON_STATS } from '../world/blocks.js';
 
@@ -36,6 +37,7 @@ export class Game {
 
     const lights = this._setupLights();
     this.dayNight = new DayNightCycle(this.scene, lights);
+    this.music = new MusicManager();
 
     // World/player are populated in start() — either procedurally generated
     // (new island) or restored from a save (continue) — not here, so the
@@ -114,6 +116,7 @@ export class Game {
     this.state = 'running';
     this.hud.hud.hidden = false;
     this.input.requestPointerLock();
+    this.music.init(); // first call must happen from this user-gesture handler
     this.clock.getDelta();
     this._loop();
   }
@@ -126,6 +129,7 @@ export class Game {
   resume() {
     this.state = 'running';
     this.input.requestPointerLock();
+    this.music.resumeCtx();
   }
 
   pause() {
@@ -133,6 +137,7 @@ export class Game {
     this.state = 'paused';
     this.input.exitPointerLock();
     this.saveNow();
+    this.music.suspend();
     this.onStateChange('paused');
   }
 
@@ -148,6 +153,10 @@ export class Game {
       return;
     }
     this.togglePause();
+  }
+
+  toggleMusic() {
+    return this.music.toggle();
   }
 
   toggleInventory() {
@@ -246,6 +255,7 @@ export class Game {
       this.saveNow();
     }
     this.dayNight.update(dt);
+    this.music.setMode(this.dayNight.isNight() ? 'night' : 'day');
     if (this.hud.clock) this.hud.clock.textContent = `Day ${this.dayNight.day} · ${this.dayNight.clockString()}`;
 
     const look = this.input.consumeLook();

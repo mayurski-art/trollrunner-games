@@ -27,6 +27,7 @@ const btnExit = document.getElementById('tr3-btn-exit');
 const btnRespawn = document.getElementById('tr3-btn-respawn');
 const btnPause = document.getElementById('tr3-btn-pause');
 const btnInventory = document.getElementById('tr3-btn-inventory');
+const btnMusic = document.getElementById('tr3-btn-music');
 const btnInvClose = document.getElementById('tr3-btn-inv-close');
 const btnChestClose = document.getElementById('tr3-btn-chest-close');
 
@@ -89,5 +90,10 @@ btnRespawn.addEventListener('click', () => {
 });
 
 btnInventory.addEventListener('click', () => game.toggleInventory());
+btnMusic.addEventListener('click', () => {
+  const on = game.toggleMusic();
+  btnMusic.textContent = on ? '🔊' : '🔇';
+  btnMusic.setAttribute('aria-label', on ? 'Mute music' : 'Unmute music');
+});
 btnInvClose.addEventListener('click', () => game.closeMenus());
 btnChestClose.addEventListener('click', () => game.closeMenus());

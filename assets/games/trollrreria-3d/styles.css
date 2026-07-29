@@ -194,7 +194,7 @@ html, body {
 .tr3-hotbar-swatch-empty { background: rgba(255,255,255,0.06); }
 .tr3-hotbar-count { opacity: 0.8; }
 
-.tr3-pause-btn, .tr3-inv-btn {
+.tr3-pause-btn, .tr3-inv-btn, .tr3-music-btn {
   position: absolute;
   top: 16px;
   width: 40px;
@@ -208,7 +208,8 @@ html, body {
   pointer-events: auto;
 }
 .tr3-pause-btn { right: 16px; }
-.tr3-inv-btn { right: 64px; font-size: 18px; }
+.tr3-music-btn { right: 64px; font-size: 16px; }
+.tr3-inv-btn { right: 112px; font-size: 18px; }
 
 /* Inventory / crafting / chest panels */
 .tr3-panel-wide {
