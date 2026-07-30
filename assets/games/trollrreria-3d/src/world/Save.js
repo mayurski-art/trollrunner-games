@@ -3,6 +3,21 @@ import { CHUNK_X, CHUNK_Y, CHUNK_Z } from './Chunk.js';
 const SAVE_KEY = 'tr3-save-v1';
 const SAVE_VERSION = 1;
 const CHUNK_LEN = CHUNK_X * CHUNK_Y * CHUNK_Z;
+const PRESTIGE_KEY = 'tr3-prestige-v1';
+
+// Prestige (New Game+ level) lives in its own key, separate from the main
+// save, so starting a fresh island doesn't reset it.
+export function getPrestige() {
+  try {
+    return Number(localStorage.getItem(PRESTIGE_KEY)) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function setPrestige(level) {
+  try { localStorage.setItem(PRESTIGE_KEY, String(level)); } catch { /* ignore */ }
+}
 
 // Run-length encode a chunk's flat block-id array — mostly-solid terrain
 // compresses very well this way. Runs longer than 255 split into more pairs.
@@ -111,6 +126,7 @@ export function saveGame(game) {
       index: game.quests.index,
       kills: game.quests.kills,
     },
+    difficulty: game.difficulty,
   };
 
   try {

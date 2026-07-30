@@ -22,6 +22,9 @@ export class Spawner {
     this.world = world;
     this.enemies = [];
     this.spawnTimer = 2;
+    // Set by Game.js from difficulty + New Game+ prestige level — stacks
+    // on top of the hardmode scale below rather than replacing it.
+    this.statScale = { hp: 1, damage: 1 };
   }
 
   update(dt, playerPos) {
@@ -63,8 +66,10 @@ export class Spawner {
       if (top === undefined || top < 0) continue;
 
       let kind = pool[Math.floor(Math.random() * pool.length)];
-      if (hardmode && !kind.hardmodeOnly) {
-        kind = { ...kind, hp: Math.round(kind.hp * HARDMODE_STAT_SCALE.hp), damage: Math.round(kind.damage * HARDMODE_STAT_SCALE.damage) };
+      const hpScale = (hardmode && !kind.hardmodeOnly ? HARDMODE_STAT_SCALE.hp : 1) * this.statScale.hp;
+      const dmgScale = (hardmode && !kind.hardmodeOnly ? HARDMODE_STAT_SCALE.damage : 1) * this.statScale.damage;
+      if (hpScale !== 1 || dmgScale !== 1) {
+        kind = { ...kind, hp: Math.round(kind.hp * hpScale), damage: Math.round(kind.damage * dmgScale) };
       }
       const spawnY = kind.flies ? top + 1 + kind.hoverHeight : top + 1;
       this.enemies.push(new Enemy(this.scene, { x: x + 0.5, y: spawnY, z: z + 0.5 }, kind));

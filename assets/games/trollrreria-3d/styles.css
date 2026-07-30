@@ -83,6 +83,20 @@ html, body {
   margin-top: 10px;
 }
 
+.tr3-difficulty-picker { display: flex; gap: 6px; margin-bottom: 14px; }
+.tr3-diff-btn {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--tr3-border);
+  color: rgba(255,255,255,0.7);
+  border-radius: 8px;
+  padding: 8px 4px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.tr3-diff-btn.is-active { border-color: var(--tr3-gold); color: var(--tr3-gold); background: rgba(255,179,0,0.08); }
+
 .tr3-menu-controls {
   display: flex;
   flex-wrap: wrap;
@@ -440,6 +454,8 @@ html, body {
 .tr3-quest-obj { font-size: 13px; font-family: 'DM Mono', monospace; opacity: 0.7; margin-bottom: 4px; }
 .tr3-quest-obj.is-met { opacity: 1; color: var(--tr3-gold); }
 .tr3-quest-claim { width: 100%; margin-top: 10px; }
+.tr3-prestige-btn { width: 100%; margin-top: 8px; }
+.tr3-prestige-hint { margin-top: 8px; font-size: 11px; }
 
 /* Crosshair */
 #tr3-canvas::after { content: ''; }

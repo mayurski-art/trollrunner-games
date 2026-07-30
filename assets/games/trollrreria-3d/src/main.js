@@ -81,6 +81,10 @@ const game = new Game(
   { onStateChange },
 );
 
+if (game.prestigeLevel > 0) {
+  document.querySelector('.tr3-menu-tag').textContent = `New Game+ ${game.prestigeLevel} — enemies are permanently tougher.`;
+}
+
 if (hasSave()) {
   btnContinue.hidden = false;
   btnStart.textContent = '＋ New Island';
@@ -88,11 +92,20 @@ if (hasSave()) {
   btnStart.classList.add('tr3-btn-ghost');
 }
 
+let selectedDifficulty = 'normal';
+const diffButtons = [...document.querySelectorAll('.tr3-diff-btn')];
+diffButtons.forEach((btn) => {
+  btn.addEventListener('click', () => {
+    selectedDifficulty = btn.dataset.diff;
+    diffButtons.forEach((b) => b.classList.toggle('is-active', b === btn));
+  });
+});
+
 function dropIn(mode) {
   showScreen(null);
   hudRoot.hidden = false;
   if (touchRoot) touchRoot.hidden = !isTouch;
-  game.start(mode);
+  game.start(mode, selectedDifficulty);
 }
 
 btnStart.addEventListener('click', () => {

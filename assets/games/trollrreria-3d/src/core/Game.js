@@ -30,6 +30,15 @@ const HUNGER_DRAIN_INTERVAL = 20; // seconds per -1 hunger
 const STARVE_DAMAGE_INTERVAL = 3; // seconds per tick of damage at 0 hunger
 const FOOTSTEP_INTERVAL = 0.38;
 
+// Enemy hp/damage multipliers, stacked with the existing hardmode scale
+// (see Spawner.js). New Game+ prestige adds +15% per level on top of these.
+const DIFFICULTY_SCALE = {
+  easy: { hp: 0.8, damage: 0.6, hunger: 1.4 },
+  normal: { hp: 1, damage: 1, hunger: 1 },
+  hard: { hp: 1.3, damage: 1.5, hunger: 0.7 },
+};
+const PRESTIGE_STAT_STEP = 0.15;
+
 // Owns the renderer, scene, world/player/enemy state and the per-frame loop.
 // States: menu | running | paused | respawn | inventory | chest.
 export class Game {
@@ -66,6 +75,8 @@ export class Game {
     this.hungerDrainTimer = HUNGER_DRAIN_INTERVAL;
     this.starveTimer = STARVE_DAMAGE_INTERVAL;
     this.footstepTimer = 0;
+    this.difficulty = 'normal';
+    this.prestigeLevel = Save.getPrestige();
 
     this.inventory = new Inventory(hud.hotbar);
     this.invScreen = new InventoryScreen(hud.invGrid, hud.recipeList, hud.armorSlot, this.inventory);
@@ -74,7 +85,7 @@ export class Game {
     this.merchantScreen = new MerchantScreen(hud.tradeList, this.inventory);
     this.merchant = null;
     this.quests = new QuestManager(this.inventory);
-    this.questScreen = new QuestScreen(hud.questPanel, this.quests);
+    this.questScreen = new QuestScreen(hud.questPanel, this.quests, this);
     this.questScreen.onClaim = () => this.music.playQuestComplete();
     this.villagers = [];
     this.dialogueTimer = 0;
@@ -120,8 +131,9 @@ export class Game {
   }
 
   // mode: 'new' generates a fresh island; 'continue' restores the last save
-  // (falls back to 'new' if there isn't one).
-  start(mode = 'new') {
+  // (falls back to 'new' if there isn't one). difficulty only applies to
+  // 'new' — continuing restores whatever the save was started with.
+  start(mode = 'new', difficulty = 'normal') {
     const saveData = mode === 'continue' ? Save.loadSaveData() : null;
     if (saveData) {
       Save.applyWorldSave(this.world, saveData);
@@ -137,14 +149,17 @@ export class Game {
       this.inventory.refresh();
       this.dayNight.timeOfDay = saveData.dayNight.timeOfDay;
       this.dayNight.day = saveData.dayNight.day;
+      this.difficulty = saveData.difficulty || 'normal';
       if (saveData.quests) {
         this.quests.index = saveData.quests.index;
         this.quests.kills = saveData.quests.kills;
       }
     } else {
+      this.difficulty = DIFFICULTY_SCALE[difficulty] ? difficulty : 'normal';
       this.world.generate();
       this.player = new Player(this.world, this.world.findSpawn());
     }
+    this._applyStatScale();
 
     if (this.hud.hardmodeBadge) this.hud.hardmodeBadge.hidden = !this.world.hardmode;
     this.spawnVillagers();
@@ -156,6 +171,30 @@ export class Game {
     this.music.init(); // first call must happen from this user-gesture handler
     this.clock.getDelta();
     this._loop();
+    // Redundant (but harmless) when called from the main menu, which already
+    // hides its own screen — necessary when start() is called mid-game, e.g.
+    // Game.prestige() firing while the merchant/quest screen is still open.
+    this.onStateChange('running');
+  }
+
+  _applyStatScale() {
+    const diff = DIFFICULTY_SCALE[this.difficulty] || DIFFICULTY_SCALE.normal;
+    const prestigeMult = 1 + PRESTIGE_STAT_STEP * this.prestigeLevel;
+    this.spawner.statScale = { hp: diff.hp * prestigeMult, damage: diff.damage * prestigeMult };
+  }
+
+  // New Game+: available once the questline is fully done. Bumps the
+  // persistent prestige level (survives "New Island", unlike everything
+  // else) and starts a completely fresh island at the same difficulty.
+  prestige() {
+    if (!this.quests.done) return false;
+    this.prestigeLevel += 1;
+    Save.setPrestige(this.prestigeLevel);
+    Save.clearSave();
+    this.quests.index = 0;
+    this.quests.kills = {};
+    this.start('new', this.difficulty);
+    return true;
   }
 
   saveNow() {
@@ -298,6 +337,15 @@ export class Game {
   // villagers, mob state isn't part of the save file, so clearing the ruins
   // doesn't stay cleared between sessions (same trade-off as everywhere else
   // enemies aren't persisted).
+  // Difficulty + prestige scaling for enemies spawned outside the normal
+  // random pool (bosses, ruin guardians) — Spawner.trySpawn applies the
+  // same statScale to everything else.
+  _scaledKind(kind) {
+    const { hp, damage } = this.spawner.statScale;
+    if (hp === 1 && damage === 1) return kind;
+    return { ...kind, hp: Math.round(kind.hp * hp), damage: Math.round(kind.damage * damage) };
+  }
+
   spawnRuinsGuardians() {
     if (!this.world.dungeonPos) return;
     const { x, z } = this.world.dungeonPos;
@@ -305,7 +353,7 @@ export class Game {
       const gx = Math.round(x + ox), gz = Math.round(z + oz);
       const top = this.world.heightMap.get(`${gx},${gz}`);
       if (top === undefined || top < 0) continue;
-      this.spawner.enemies.push(new Enemy(this.scene, { x: gx + 0.5, y: top + 1, z: gz + 0.5 }, ENEMY_TYPES.TROLL_REAPER));
+      this.spawner.enemies.push(new Enemy(this.scene, { x: gx + 0.5, y: top + 1, z: gz + 0.5 }, this._scaledKind(ENEMY_TYPES.TROLL_REAPER)));
     }
   }
 
@@ -319,7 +367,7 @@ export class Game {
     const x = Math.round(this.player.pos.x + forward.x * 5);
     const z = Math.round(this.player.pos.z + forward.z * 5);
     const top = this.world.heightMap.get(`${x},${z}`) ?? Math.floor(this.player.pos.y);
-    this.spawner.enemies.push(new Enemy(this.scene, { x: x + 0.5, y: top + 1, z: z + 0.5 }, kind));
+    this.spawner.enemies.push(new Enemy(this.scene, { x: x + 0.5, y: top + 1, z: z + 0.5 }, this._scaledKind(kind)));
   }
 
   showDialogue(name, line) {
@@ -495,7 +543,7 @@ export class Game {
 
     this.hungerDrainTimer -= dt;
     if (this.hungerDrainTimer <= 0) {
-      this.hungerDrainTimer = HUNGER_DRAIN_INTERVAL;
+      this.hungerDrainTimer = HUNGER_DRAIN_INTERVAL * (DIFFICULTY_SCALE[this.difficulty] || DIFFICULTY_SCALE.normal).hunger;
       this.player.hunger = Math.max(0, this.player.hunger - 1);
     }
     let died = false;
