@@ -1844,6 +1844,15 @@
     load();
     void initCloudSync();
 
+    // .pizzeria-cabinet is sized to 100vh so the game fills the browser
+    // window (style.css); the sticky header above it isn't part of that
+    // viewport unit, so without this it'd push the cabinet's bottom (the
+    // station tab bar) off-screen by exactly the header's height.
+    const header = document.querySelector(".site-header");
+    const setHeaderH = () => document.documentElement.style.setProperty("--pz-header-h", header.offsetHeight + "px");
+    setHeaderH();
+    window.addEventListener("resize", setHeaderH);
+
     // title chef sprite + lobby backdrop + oven art (all with fallbacks)
     $("#pz-title-chef").appendChild(sprite("char-chef.png", "🧌"));
     const lobbyBg = new Image();

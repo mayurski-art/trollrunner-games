@@ -86,18 +86,23 @@ button { cursor: pointer; }
   background: rgba(255, 216, 77, 0.1); outline: none;
 }
 
-.arcade-shell { width: min(1200px, 100%); margin: 0 auto; padding: clamp(12px, 2.2vw, 28px); }
+/* no side margins/max-width — the cabinet below sizes itself to the full
+   viewport independently of this wrapper. */
+.arcade-shell { width: 100%; margin: 0; padding: 0; }
 
 /* ---- cabinet frame ------------------------------------------------------ */
+/* sized to the browser viewport itself (not just "as big as its content"),
+   so the game fills the screen; the weekly-ladder section below it is
+   reached by scrolling, same as any viewport-filling hero section. */
 .pizzeria-cabinet {
   position: relative;
   width: 100%;
-  min-height: clamp(540px, 78vh, 860px);
-  border: 1px solid rgba(255, 216, 77, 0.28);
-  border-radius: 18px;
+  height: calc(100vh - var(--pz-header-h, 67px));
+  height: calc(100dvh - var(--pz-header-h, 67px));
+  border: none;
+  border-radius: 0;
   overflow: hidden;
   background: var(--pz-wall);
-  box-shadow: var(--shadow), 0 0 44px rgba(255, 216, 77, 0.08);
   display: flex;
   flex-direction: column;
 }
@@ -534,7 +539,6 @@ button { cursor: pointer; }
   .pz-oven-slots { grid-template-columns: repeat(2, minmax(110px, 150px)); }
   .pz-cut-layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
   .pz-cut-shelf { order: 2; }
-  .pizzeria-cabinet { min-height: 88vh; }
 }
 @media (max-width: 560px) {
   .pz-tab { flex-direction: column; gap: 2px; font-size: 12px; }
