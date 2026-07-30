@@ -115,6 +115,17 @@ function placeFarm(world, cx, cz) {
 const BASE_WORLD_SIZE = 80;
 const MAIN_OFFSETS = [[10, 10], [-14, 8], [12, -12], [-10, -14], [16, 2]];
 const OUTPOST_OFFSETS = [[-16, -6], [16, -16], [-6, 16], [18, 14], [-18, -2]];
+// Reach much farther out than the two main settlements — now that the
+// world has no hard edge to worry about (see World.js MIN_FALLOFF), these
+// are meant to land near the far reaches of the map, so there's still
+// something new to find well past where the two main settlements are.
+// Each inner array is a handful of candidate spots for ONE camp (tried in
+// order, first one that clears terrain/distance checks wins).
+const CAMP_OFFSET_SETS = [
+  [[34, -30], [30, -34], [-34, -28]],
+  [[-32, 26], [-28, 30], [32, 24]],
+  [[8, 36], [4, 38], [-6, 36]],
+];
 const MIN_DIST_FROM_OTHER_VILLAGE = 18;
 
 // Places a hut cluster on flat-ish ground, away from the island edge and
@@ -133,12 +144,10 @@ export function placeVillage(world, worldSizeX, worldSizeZ, { avoidPos = null, o
   const allHutOffsets = [[0, 0], [9, 4], [-9, 4], [-5, 10], [5, 10]];
   const hutOffsets = allHutOffsets.slice(0, hutCount);
 
+  const avoidList = (Array.isArray(avoidPos) ? avoidPos : [avoidPos]).filter(Boolean);
   for (const [ox, oz] of offsets) {
     const centerX = Math.round(cx + ox * scale), centerZ = Math.round(cz + oz * scale);
-    if (avoidPos) {
-      const d = Math.hypot(centerX - avoidPos.x, centerZ - avoidPos.z);
-      if (d < minDist) continue;
-    }
+    if (avoidList.some((p) => Math.hypot(centerX - p.x, centerZ - p.z) < minDist)) continue;
     const top = world.heightMap.get(`${centerX},${centerZ}`);
     if (top === undefined || top < 3) continue;
 
@@ -164,4 +173,4 @@ export function placeVillage(world, worldSizeX, worldSizeZ, { avoidPos = null, o
   return null;
 }
 
-export { OUTPOST_OFFSETS };
+export { OUTPOST_OFFSETS, CAMP_OFFSET_SETS };

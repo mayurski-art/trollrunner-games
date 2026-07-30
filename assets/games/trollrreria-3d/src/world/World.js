@@ -1,32 +1,47 @@
 import { Chunk, CHUNK_X, CHUNK_Y, CHUNK_Z } from './Chunk.js';
 import { BLOCKS, MINEABLE } from './blocks.js';
 import { makeFractalNoise2D, makeNoise2D } from './noise.js';
-import { placeVillage, OUTPOST_OFFSETS } from './Village.js';
+import { placeVillage, OUTPOST_OFFSETS, CAMP_OFFSET_SETS } from './Village.js';
 import { placeDungeon } from './Dungeon.js';
 import { placeVault } from './Vault.js';
 
 const NEIGHBOR_DIRS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 
-// Floating island, generated once at load — no infinite chunk streaming.
-// Went 5x5 (80x80, original MVP) -> 9x9 (144x144) -> still felt small on
-// playtest, so bumped again to 25x25 (400x400, ~25x the original area).
-// Chunk.buildMesh skips fully-empty chunks (the square grid's corners
-// outside the island's circular falloff) so this doesn't cost a draw call
-// per empty chunk — verified via headless FPS sampling before landing on
-// this size (33x33 measurably worse, 25x25 held up fine).
-export const WORLD_CHUNKS = 25; // 25x25 chunks -> 400x400 blocks
+// One big fixed terrain grid generated at load — no infinite chunk
+// streaming (true Minecraft-style infinite terrain would need chunk-by-
+// chunk generation as the player walks, plus reworking structure
+// placement/roads/minimap/saves to not assume a known bounded world —
+// a much bigger change, tracked separately, not what this constant fixes).
+// Sizing history: 5x5 (80x80, original MVP) -> 9x9 (144x144) -> 25x25
+// (400x400) -> still read as small/bounded on playtest even at 400x400,
+// traced to two compounding causes fixed alongside this bump: (1) the
+// terrain used to be a "floating island" that fell all the way to a void
+// past a radius — no matter how big that radius got, walking toward any
+// edge meant hitting visible nothing, which reads as small regardless of
+// the raw number; MIN_FALLOFF below removes that, so the terrain now
+// blends into lower rolling land instead of stopping anywhere within this
+// grid. (2) Chunk.buildMesh's empty-chunk skip (see there) means a
+// continuous-terrain world doesn't get that draw-call savings anymore
+// (every chunk now has geometry, not just the ~79% inside the old circular
+// falloff) — re-verified FPS headroom at this size with that factored in.
+// Landed on 21x21 (336x336): 100% of it is walkable now (no void), which
+// is MORE total usable area than 25x25's old ~79%-circular-usable 400x400
+// despite the smaller nominal grid, at comparable relative performance.
+export const WORLD_CHUNKS = 21; // 21x21 chunks -> 336x336 blocks, fully walkable
 export const WORLD_SIZE_X = WORLD_CHUNKS * CHUNK_X;
 export const WORLD_SIZE_Z = WORLD_CHUNKS * CHUNK_Z;
 const ISLAND_RADIUS = WORLD_SIZE_X * 0.42;
-// Raised from 14/8 — the falloff multiplier (0 at the edge, 1 only at the
-// exact center) means MOST of the island ends up far shorter than the raw
-// BASE_HEIGHT±AMPLITUDE range suggests (measured avg surface height was
-// only ~5 blocks above bedrock at the old values — barely enough room for
-// a cave anywhere except the small central peak). This gives real
-// mountains near the center and enough vertical room for caves/ore veins
-// to exist across a meaningful fraction of the map, not just a sliver.
-const BASE_HEIGHT = 18;
-const AMPLITUDE = 12;
+// The floor under the center-falloff multiplier (see columnHeight) — below
+// this, terrain no longer drops toward a void; it settles into lower
+// rolling hills instead of a hard edge. 0 would restore the old
+// "floating island" behavior.
+const MIN_FALLOFF = 0.4;
+// Raised from 14/8 (then 18/12) — the falloff multiplier means most
+// terrain ends up shorter than the raw BASE_HEIGHT±AMPLITUDE range
+// suggests. This keeps real mountains near the center and enough vertical
+// room for caves/ore veins across a meaningful fraction of the map.
+const BASE_HEIGHT = 20;
+const AMPLITUDE = 14;
 const CROP_GROWTH_SECONDS = 45;
 
 export const BIOMES = { FOREST: 'forest', DESERT: 'desert', SNOW: 'snow' };
@@ -39,7 +54,7 @@ export class World {
     this.treeNoise = makeNoise2D(seed + 501);
     this.biomeNoise = makeNoise2D(seed + 2003);
     this.chunks = new Map(); // "cx,cz" -> Chunk
-    this.heightMap = new Map(); // "x,z" -> topmost solid y (or -1 if void column)
+    this.heightMap = new Map(); // "x,z" -> topmost solid y (every column has terrain now — see MIN_FALLOFF)
     this.biomeMap = new Map(); // "x,z" -> BIOMES.*
     this.chests = new Map(); // "x,y,z" -> Array(27) of {id,count}|null
     this.leverStates = new Map(); // "x,y,z" -> boolean (on/off)
@@ -50,6 +65,7 @@ export class World {
     this.outpostPos = null;
     this.dungeonPos = null;
     this.vaultPos = null;
+    this.campPositions = []; // small far-out single-hut camps — found by exploring, not fast-travel waypoints
     this.crops = new Map(); // "x,y,z" -> seconds remaining until WHEAT_CROP_MATURE
     this.lightSources = new Set(); // "x,y,z" of every placed TORCH/LAVA block
     this.lightMap = new Map(); // "x,y,z" -> 0-15 propagated light level (see recomputeLight)
@@ -91,9 +107,13 @@ export class World {
     const dz = z - WORLD_SIZE_Z / 2;
     const dist = Math.sqrt(dx * dx + dz * dz);
     let falloff = 1 - dist / ISLAND_RADIUS;
-    falloff = Math.max(0, Math.min(1, falloff));
+    // Floored, not clamped to 0 — this used to drop all the way to a void
+    // (a floating island with a hard edge, surrounded by nothing). A
+    // floor means the "island" is really just where the terrain gets
+    // tall/mountainous; everywhere past that blends into lower rolling
+    // land instead of stopping — no edge to ever walk into.
+    falloff = Math.max(MIN_FALLOFF, Math.min(1, falloff));
     falloff = falloff * falloff * (3 - 2 * falloff); // smoothstep edge
-    if (falloff <= 0.02) return -1; // void column, no island here
     const n = this.heightNoise(x, z); // 0..1
     const h = Math.round((BASE_HEIGHT + (n - 0.5) * AMPLITUDE * 2) * falloff);
     return Math.max(2, Math.min(CHUNK_Y - 6, h));
@@ -176,19 +196,44 @@ export class World {
     // reached by digging down) and better loot than the open-air Ruins.
     this.vaultPos = placeVault(this, WORLD_SIZE_X, WORLD_SIZE_Z, [this.villagePos, this.outpostPos, this.dungeonPos]);
 
-    // Pass 3d: a road network — every landmark gets a straight dirt-path
-    // road back to spawn, so the island reads as connected infrastructure
-    // rather than a scatter of unrelated structures dropped at random.
+    // Pass 3d: small single-hut "camps" scattered much farther out than
+    // the two main settlements — reachable now that the world has no hard
+    // edge, and there so exploring past the main cluster of landmarks
+    // still keeps turning up something new instead of empty terrain.
+    // Not fast-travel waypoints on purpose — these are meant to be found,
+    // not looked up.
+    this.campPositions = [];
+    const placedSoFar = [this.villagePos, this.outpostPos, this.dungeonPos, this.vaultPos];
+    for (const offsetSet of CAMP_OFFSET_SETS) {
+      const pos = placeVillage(this, WORLD_SIZE_X, WORLD_SIZE_Z, {
+        avoidPos: [...placedSoFar, ...this.campPositions],
+        offsets: offsetSet,
+        hutCount: 1,
+      });
+      if (pos) {
+        this.campPositions.push(pos);
+        const cx = Math.round(pos.x), cz = Math.round(pos.z), cy = Math.round(pos.y);
+        this.setBlockRaw(cx + 2, cy, cz, BLOCKS.CHEST);
+        const slots = this.getChest(cx + 2, cy, cz);
+        slots[0] = { id: BLOCKS.BREAD, count: 2 };
+        slots[1] = { id: BLOCKS.GEMSTONE, count: Math.random() < 0.5 ? 2 : 0 };
+      }
+    }
+
+    // Pass 3e: a road network — every landmark (incl. camps) gets a
+    // straight dirt-path road back to spawn, so the island reads as
+    // connected infrastructure rather than a scatter of unrelated
+    // structures dropped at random.
     const spawn = this.findSpawn();
-    for (const dest of [this.villagePos, this.outpostPos, this.dungeonPos, this.vaultPos]) {
+    for (const dest of [this.villagePos, this.outpostPos, this.dungeonPos, this.vaultPos, ...this.campPositions]) {
       if (dest) this.layRoad(Math.round(spawn.x), Math.round(spawn.z), Math.round(dest.x), Math.round(dest.z));
     }
 
-    // Pass 3e: collect every torch baked into a structure above as a light
+    // Pass 3f: collect every torch baked into a structure above as a light
     // source (only near the known structure sites, not a blind full-map
     // scan — torches only ever come from those at gen time), then
     // propagate light from all of them before the first mesh build.
-    for (const site of [this.villagePos, this.outpostPos, this.dungeonPos, this.vaultPos]) {
+    for (const site of [this.villagePos, this.outpostPos, this.dungeonPos, this.vaultPos, ...this.campPositions]) {
       if (site) this.scanLightSourcesNear(Math.round(site.x), Math.round(site.z), 20);
     }
     this.recomputeLight();

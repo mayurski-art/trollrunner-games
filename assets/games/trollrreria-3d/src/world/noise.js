@@ -27,12 +27,16 @@ export function makeNoise2D(seed = 1337) {
   };
 }
 
-// Fractal sum of a couple octaves for a less uniform-looking island.
+// Fractal sum of a few octaves for a less uniform-looking terrain — the
+// broad two (0.05/0.15) shape the overall hills/valleys, a third finer one
+// (0.4) adds rougher, more "real mountain" detail on top instead of
+// perfectly smooth slopes everywhere.
 export function makeFractalNoise2D(seed) {
   const n1 = makeNoise2D(seed);
   const n2 = makeNoise2D(seed + 91);
+  const n3 = makeNoise2D(seed + 733);
   return function fractal(x, y) {
-    return n1(x * 0.05, y * 0.05) * 0.7 + n2(x * 0.15, y * 0.15) * 0.3;
+    return n1(x * 0.05, y * 0.05) * 0.62 + n2(x * 0.15, y * 0.15) * 0.28 + n3(x * 0.4, y * 0.4) * 0.1;
   };
 }
 
