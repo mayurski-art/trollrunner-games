@@ -52,4 +52,13 @@ export const QUESTS = [
     ],
     reward: { items: [{ id: BLOCKS.REAPER_SHARD, count: 8 }], announce: 'Quest complete: The Troll King is dethroned. Wear that crown with pride.' },
   },
+  {
+    id: 'archtroll',
+    title: 'The Dark Totem',
+    intro: "There's something worse than the King out there — something that wears crowns as trophies. Bring me its head, if you've got the shards to spare for the totem.",
+    objectives: [
+      { type: 'defeat', kind: 'Archtroll', n: 1, label: 'Defeat the Archtroll' },
+    ],
+    reward: { items: [{ id: BLOCKS.REAPER_ARMOR, count: 1 }], announce: 'Quest complete: The Dark Totem — the Archtroll falls. Take this armor, you earned it.' },
+  },
 ];

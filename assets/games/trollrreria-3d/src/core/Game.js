@@ -13,6 +13,7 @@ import { QuestScreen } from '../ui/QuestScreen.js';
 import { QuestManager } from '../world/QuestManager.js';
 import { Merchant } from '../npc/Merchant.js';
 import { Villager } from '../npc/Villager.js';
+import { Animal, BREED_COOLDOWN } from '../npc/Animal.js';
 import { VILLAGER_DEFS } from '../world/villagers.js';
 import { DayNightCycle } from './DayNightCycle.js';
 import { MusicManager } from './MusicManager.js';
@@ -88,6 +89,7 @@ export class Game {
     this.questScreen = new QuestScreen(hud.questPanel, this.quests, this);
     this.questScreen.onClaim = () => this.music.playQuestComplete();
     this.villagers = [];
+    this.animals = [];
     this.dialogueTimer = 0;
     this.waypointsScreen = new WaypointsScreen(hud.waypointList, this);
     this.net = new Net(this);
@@ -164,6 +166,7 @@ export class Game {
     if (this.hud.hardmodeBadge) this.hud.hardmodeBadge.hidden = !this.world.hardmode;
     this.spawnVillagers();
     this.spawnRuinsGuardians();
+    this.spawnAnimals();
 
     this.state = 'running';
     this.hud.hud.hidden = false;
@@ -314,7 +317,7 @@ export class Game {
   entities() {
     const extras = [];
     if (this.merchant) extras.push(this.merchant);
-    extras.push(...this.villagers);
+    extras.push(...this.villagers, ...this.animals);
     return extras.length ? [...this.spawner.enemies, ...extras] : this.spawner.enemies;
   }
 
@@ -331,6 +334,53 @@ export class Game {
       if (top === undefined || top < 0) return;
       this.villagers.push(new Villager(this.scene, this.world, { x: hx + 0.5, y: top + 1, z: hz + 0.5 }, def.name, def.lines, def.sprite));
     });
+  }
+
+  // A small wild herd near the village — grazing on any nearby grass tile
+  // (not tied to the village center precisely, just biased toward it).
+  spawnAnimals() {
+    for (const a of this.animals) a.dispose(this.scene);
+    this.animals = [];
+    const center = this.world.villagePos || this.player?.spawn;
+    if (!center) return;
+    for (let i = 0; i < 5; i++) {
+      for (let attempt = 0; attempt < 6; attempt++) {
+        const ax = Math.round(center.x + (Math.random() - 0.5) * 30);
+        const az = Math.round(center.z + (Math.random() - 0.5) * 30);
+        const top = this.world.heightMap.get(`${ax},${az}`);
+        if (top === undefined || top < 0) continue;
+        if (this.world.getBlock(ax, top, az) !== BLOCKS.GRASS) continue;
+        this.animals.push(new Animal(this.scene, this.world, { x: ax + 0.5, y: top + 1, z: az + 0.5 }));
+        break;
+      }
+    }
+  }
+
+  // Pairs up two nearby `fed` animals (not on cooldown) into a new baby —
+  // the "husbandry" half of the loop; killing animals for guaranteed meat
+  // is the other half (see handleDig).
+  _tickAnimalBreeding(dt) {
+    for (const a of this.animals) {
+      if (a.breedCooldown > 0) a.breedCooldown -= dt;
+    }
+    for (let i = 0; i < this.animals.length; i++) {
+      const a = this.animals[i];
+      if (!a.alive || !a.fed || a.breedCooldown > 0) continue;
+      for (let j = i + 1; j < this.animals.length; j++) {
+        const b = this.animals[j];
+        if (!b.alive || !b.fed || b.breedCooldown > 0) continue;
+        const dist = Math.hypot(a.pos.x - b.pos.x, a.pos.z - b.pos.z);
+        if (dist > 3) continue;
+        a.fed = false; b.fed = false;
+        a.breedCooldown = BREED_COOLDOWN; b.breedCooldown = BREED_COOLDOWN;
+        const bx = Math.round((a.pos.x + b.pos.x) / 2), bz = Math.round((a.pos.z + b.pos.z) / 2);
+        const top = this.world.heightMap.get(`${bx},${bz}`);
+        if (top !== undefined && top >= 0) {
+          this.animals.push(new Animal(this.scene, this.world, { x: bx + 0.5, y: top + 1, z: bz + 0.5 }));
+        }
+        break;
+      }
+    }
   }
 
   // Two guardians posted at the ruins on every load — like the merchant and
@@ -420,6 +470,14 @@ export class Game {
       const weapon = this.inventory.selectedItem();
       const stats = (weapon && WEAPON_STATS[weapon.id]) || UNARMED;
       this.attackCooldownTimer = stats.cooldown;
+
+      if (this.animals.includes(hit.entity)) {
+        const animalDied = hit.entity.hit(stats.damage);
+        this.music.playHit();
+        if (animalDied) this.inventory.add(BLOCKS.TROLL_MEAT, 2); // guaranteed — the husbandry payoff
+        return;
+      }
+
       const died = hit.entity.hit(stats.damage, this.player.pos);
       this.music.playHit();
       if (died) {
@@ -453,12 +511,18 @@ export class Game {
     if (!hit) return;
 
     // Right-clicking the merchant opens the trade screen; a villager gives
-    // a random one-line greeting instead.
+    // a random one-line greeting; an animal gets fed if you're holding wheat.
     if (hit.type === 'entity') {
       if (hit.entity === this.merchant) this.openMerchant();
       else if (this.villagers.includes(hit.entity)) {
         const line = hit.entity.line[Math.floor(Math.random() * hit.entity.line.length)];
         this.showDialogue(hit.entity.name, line);
+      } else if (this.animals.includes(hit.entity)) {
+        const slot = this.inventory.selectedItem();
+        if (slot && slot.id === BLOCKS.WHEAT && this.inventory.consumeSelected()) {
+          hit.entity.feed();
+          this.music.playPickup();
+        }
       }
       return;
     }
@@ -583,6 +647,12 @@ export class Game {
     }
 
     for (const v of this.villagers) v.update(dt);
+    this.animals = this.animals.filter((a) => {
+      if (a.alive) { a.update(dt); return true; }
+      a.dispose(this.scene);
+      return false;
+    });
+    this._tickAnimalBreeding(dt);
     if (this.dialogueTimer > 0) {
       this.dialogueTimer -= dt;
       if (this.dialogueTimer <= 0 && this.hud.dialogue) this.hud.dialogue.hidden = true;
