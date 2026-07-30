@@ -18,13 +18,15 @@ import { DayNightCycle } from './DayNightCycle.js';
 import { MusicManager } from './MusicManager.js';
 import { Net } from '../net/Net.js';
 import * as Save from '../world/Save.js';
-import { BLOCKS, PLACEABLE, UNARMED, WEAPON_STATS, DROP_OVERRIDE, SUMMON_ITEMS } from '../world/blocks.js';
+import { BLOCKS, PLACEABLE, UNARMED, WEAPON_STATS, DROP_OVERRIDE, SUMMON_ITEMS, FOOD_STATS } from '../world/blocks.js';
 import { Enemy } from '../enemy/Enemy.js';
 import { ENEMY_TYPES } from '../enemy/EnemyTypes.js';
 
 const REACH = 6;
 const AUTOSAVE_INTERVAL = 60;
 const HARDMODE_TRIGGER_DAY = 5;
+const HUNGER_DRAIN_INTERVAL = 20; // seconds per -1 hunger
+const STARVE_DAMAGE_INTERVAL = 3; // seconds per tick of damage at 0 hunger
 
 // Owns the renderer, scene, world/player/enemy state and the per-frame loop.
 // States: menu | running | paused | respawn | inventory | chest.
@@ -58,6 +60,8 @@ export class Game {
     this.spawner = new Spawner(this.scene, this.world);
     this.attackCooldownTimer = 0;
     this.autosaveTimer = AUTOSAVE_INTERVAL;
+    this.hungerDrainTimer = HUNGER_DRAIN_INTERVAL;
+    this.starveTimer = STARVE_DAMAGE_INTERVAL;
 
     this.inventory = new Inventory(hud.hotbar);
     this.invScreen = new InventoryScreen(hud.invGrid, hud.recipeList, hud.armorSlot, this.inventory);
@@ -119,6 +123,7 @@ export class Game {
       this.player = new Player(this.world, saveData.player.spawn);
       Object.assign(this.player.pos, saveData.player.pos);
       this.player.hp = saveData.player.hp;
+      this.player.hunger = saveData.player.hunger ?? this.player.maxHunger;
       this.player.yaw = saveData.player.yaw;
       this.player.pitch = saveData.player.pitch;
       this.inventory.slots = saveData.inventory.slots;
@@ -254,7 +259,11 @@ export class Game {
   // way it sets your respawn point here (Terraria-style).
   useBed(x, y, z) {
     this.player.spawn = { x: x + 0.5, y: y + 1, z: z + 0.5 };
-    if (this.dayNight.isNight()) this.dayNight.timeOfDay = 0.28;
+    if (this.dayNight.isNight()) {
+      this.dayNight.timeOfDay = 0.28;
+      this.player.hp = this.player.maxHp;
+      this.player.eat(30);
+    }
   }
 
   entities() {
@@ -350,6 +359,7 @@ export class Game {
         } else if (this.world.hardmode && Math.random() < 0.5) {
           this.inventory.add(BLOCKS.REAPER_SHARD, 1);
         }
+        if (hit.entity.type.name === 'Troll Grub' && Math.random() < 0.4) this.inventory.add(BLOCKS.TROLL_MEAT, 1);
       }
       return;
     }
@@ -402,13 +412,27 @@ export class Game {
       this.summonBoss(SUMMON_ITEMS[slot.id]);
       return;
     }
-    if (!PLACEABLE.includes(slot.id)) return;
+    if (FOOD_STATS[slot.id]) {
+      const food = FOOD_STATS[slot.id];
+      if (!this.inventory.consumeSelected()) return;
+      this.player.eat(food.hunger);
+      if (food.heal) this.player.hp = Math.min(this.player.maxHp, this.player.hp + food.heal);
+      return;
+    }
 
     const px = hit.x + hit.normal.x, py = hit.y + hit.normal.y, pz = hit.z + hit.normal.z;
     if (this.world.getBlock(px, py, pz) !== BLOCKS.AIR) return;
     // Don't let the player wall themselves in.
     const p = this.player.pos;
     if (Math.floor(p.x) === px && (Math.floor(p.y) === py || Math.floor(p.y + 1) === py) && Math.floor(p.z) === pz) return;
+
+    if (slot.id === BLOCKS.WHEAT_SEED) {
+      if (targetId !== BLOCKS.GRASS && targetId !== BLOCKS.DIRT) return;
+      if (!this.inventory.consumeSelected()) return;
+      this.world.plantCrop(px, py, pz);
+      return;
+    }
+    if (!PLACEABLE.includes(slot.id)) return;
 
     const placeId = slot.id;
     if (!this.inventory.consumeSelected()) return;
@@ -434,6 +458,25 @@ export class Game {
       this.autosaveTimer = AUTOSAVE_INTERVAL;
       this.saveNow();
     }
+    this.world.tickCrops(dt);
+
+    this.hungerDrainTimer -= dt;
+    if (this.hungerDrainTimer <= 0) {
+      this.hungerDrainTimer = HUNGER_DRAIN_INTERVAL;
+      this.player.hunger = Math.max(0, this.player.hunger - 1);
+    }
+    let died = false;
+    if (this.player.hunger <= 0) {
+      this.starveTimer -= dt;
+      if (this.starveTimer <= 0) {
+        this.starveTimer = STARVE_DAMAGE_INTERVAL;
+        if (this.player.takeDamage(3)) died = true;
+      }
+    } else {
+      this.starveTimer = STARVE_DAMAGE_INTERVAL;
+    }
+    if (this.hud.hungerFill) this.hud.hungerFill.style.width = `${Math.max(0, (this.player.hunger / this.player.maxHunger) * 100)}%`;
+
     this.dayNight.update(dt);
     this.music.setMode(this.dayNight.isNight() ? 'night' : 'day');
     if (this.hud.clock) this.hud.clock.textContent = `Day ${this.dayNight.day} · ${this.dayNight.clockString()}`;
@@ -455,7 +498,6 @@ export class Game {
     }
 
     const attackers = this.spawner.update(dt, this.player.pos);
-    let died = false;
     const reduction = this.inventory.armorReduction();
     for (const attacker of attackers) {
       const dmg = Math.max(1, Math.round(attacker.type.damage * (1 - reduction)));

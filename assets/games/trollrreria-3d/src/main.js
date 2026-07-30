@@ -6,6 +6,7 @@ const canvas = document.getElementById('tr3-canvas');
 const touchRoot = document.getElementById('tr3-touch');
 const hudRoot = document.getElementById('tr3-hud');
 const hpFill = document.getElementById('tr3-hp-fill');
+const hungerFill = document.getElementById('tr3-hunger-fill');
 const clock = document.getElementById('tr3-clock');
 const hardmodeBadge = document.getElementById('tr3-hardmode-badge');
 const hotbar = document.getElementById('tr3-hotbar');
@@ -75,7 +76,7 @@ function onStateChange(state) {
 const game = new Game(
   canvas,
   touchRoot,
-  { hud: hudRoot, hpFill, clock, hardmodeBadge, peerCount, dialogue, waypointList, bossBar, bossName, bossFill, hotbar, invGrid, recipeList, armorSlot, chestGrid, chestPlayerGrid, tradeList, questPanel },
+  { hud: hudRoot, hpFill, hungerFill, clock, hardmodeBadge, peerCount, dialogue, waypointList, bossBar, bossName, bossFill, hotbar, invGrid, recipeList, armorSlot, chestGrid, chestPlayerGrid, tradeList, questPanel },
   { onStateChange },
 );
 

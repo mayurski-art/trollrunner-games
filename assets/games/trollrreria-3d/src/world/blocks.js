@@ -34,6 +34,13 @@ export const BLOCKS = {
   REAPER_ARMOR: 30,
   SUMMONING_HORN: 31,
   TROLL_CROWN: 32,
+  WHEAT_SEED: 33,
+  WHEAT_CROP: 34,
+  WHEAT_CROP_MATURE: 35,
+  WHEAT: 36,
+  BREAD: 37,
+  TROLL_MEAT: 38,
+  COOKED_MEAT: 39,
 };
 
 // Per-face color so a merged mesh can use vertex colors instead of textures.
@@ -70,6 +77,13 @@ export const BLOCK_COLOR = {
   [BLOCKS.REAPER_ARMOR]: 0x0f172a,
   [BLOCKS.SUMMONING_HORN]: 0xea580c,
   [BLOCKS.TROLL_CROWN]: 0xfacc15,
+  [BLOCKS.WHEAT_SEED]: 0xa3b18a,
+  [BLOCKS.WHEAT_CROP]: 0x84a35c,
+  [BLOCKS.WHEAT_CROP_MATURE]: 0xe3c46a,
+  [BLOCKS.WHEAT]: 0xe9d18b,
+  [BLOCKS.BREAD]: 0xc99a53,
+  [BLOCKS.TROLL_MEAT]: 0xc0645a,
+  [BLOCKS.COOKED_MEAT]: 0x8a4a2f,
 };
 
 export const BLOCK_NAME = {
@@ -104,6 +118,22 @@ export const BLOCK_NAME = {
   [BLOCKS.REAPER_ARMOR]: 'Reaper Armor',
   [BLOCKS.SUMMONING_HORN]: 'Summoning Horn',
   [BLOCKS.TROLL_CROWN]: 'Troll Crown',
+  [BLOCKS.WHEAT_SEED]: 'Wheat Seed',
+  [BLOCKS.WHEAT_CROP]: 'Wheat (growing)',
+  [BLOCKS.WHEAT_CROP_MATURE]: 'Wheat (ripe)',
+  [BLOCKS.WHEAT]: 'Wheat',
+  [BLOCKS.BREAD]: 'Bread',
+  [BLOCKS.TROLL_MEAT]: 'Troll Meat',
+  [BLOCKS.COOKED_MEAT]: 'Cooked Troll Meat',
+};
+
+// Consumable food: held item id -> { hunger, heal? }. Eaten via right-click
+// when nothing else is interactable, same "use item" flow as the horn.
+export const FOOD_STATS = {
+  [BLOCKS.WHEAT]: { hunger: 8 },
+  [BLOCKS.BREAD]: { hunger: 25 },
+  [BLOCKS.TROLL_MEAT]: { hunger: 10 },
+  [BLOCKS.COOKED_MEAT]: { hunger: 30, heal: 5 },
 };
 
 // Consumable items that summon a world boss when used (right-click with no
@@ -136,6 +166,7 @@ export const MINEABLE = [
   BLOCKS.SAND, BLOCKS.LEAVES, BLOCKS.PLANK, BLOCKS.TORCH, BLOCKS.CHEST,
   BLOCKS.STONE_BRICK, BLOCKS.SNOW, BLOCKS.CACTUS, BLOCKS.GEMSTONE, BLOCKS.BED,
   BLOCKS.LEVER, BLOCKS.WIRE, BLOCKS.LAMP_OFF, BLOCKS.LAMP_ON, BLOCKS.TROLL_CROWN,
+  BLOCKS.WHEAT_CROP, BLOCKS.WHEAT_CROP_MATURE,
 ];
 
 // Items the player can right-click place as a world block. STICK is
@@ -153,6 +184,8 @@ export const PLACEABLE = [
 export const DROP_OVERRIDE = {
   [BLOCKS.GRASS]: BLOCKS.DIRT,
   [BLOCKS.LAMP_ON]: BLOCKS.LAMP_OFF,
+  [BLOCKS.WHEAT_CROP]: BLOCKS.WHEAT_SEED, // harvested early -> just get the seed back
+  [BLOCKS.WHEAT_CROP_MATURE]: BLOCKS.WHEAT,
 };
 
 export const MAX_STACK = 64;

@@ -13,6 +13,7 @@ export const WORLD_SIZE_Z = WORLD_CHUNKS * CHUNK_Z;
 const ISLAND_RADIUS = WORLD_SIZE_X * 0.42;
 const BASE_HEIGHT = 14;
 const AMPLITUDE = 8;
+const CROP_GROWTH_SECONDS = 45;
 
 export const BIOMES = { FOREST: 'forest', DESERT: 'desert', SNOW: 'snow' };
 
@@ -34,6 +35,7 @@ export class World {
     this._inPowerRecompute = false;
     this.hardmode = false;
     this.villagePos = null;
+    this.crops = new Map(); // "x,y,z" -> seconds remaining until WHEAT_CROP_MATURE
 
     for (let cx = 0; cx < WORLD_CHUNKS; cx++) {
       for (let cz = 0; cz < WORLD_CHUNKS; cz++) {
@@ -208,6 +210,25 @@ export class World {
     return this.chests.get(key);
   }
 
+  plantCrop(x, y, z) {
+    this.setBlock(x, y, z, BLOCKS.WHEAT_CROP);
+    this.crops.set(this.posKey(x, y, z), CROP_GROWTH_SECONDS);
+  }
+
+  // Advances every planted crop; matures it once its timer runs out. Growth
+  // progress isn't part of the save file (only the block itself is) — a
+  // reload just restarts a still-growing crop's timer, which is an
+  // acceptable trade-off for the scope here.
+  tickCrops(dt) {
+    for (const [key, remaining] of this.crops) {
+      const next = remaining - dt;
+      if (next > 0) { this.crops.set(key, next); continue; }
+      this.crops.delete(key);
+      const [x, y, z] = key.split(',').map(Number);
+      if (this.getBlock(x, y, z) === BLOCKS.WHEAT_CROP) this.setBlock(x, y, z, BLOCKS.WHEAT_CROP_MATURE);
+    }
+  }
+
   // Edits during play: update the block and remesh the chunk (+ any
   // neighboring chunk whose face-culling depends on this block).
   setBlock(x, y, z, id) {
@@ -222,6 +243,7 @@ export class World {
     if ((prevId === BLOCKS.LAMP_OFF || prevId === BLOCKS.LAMP_ON) && id !== BLOCKS.LAMP_OFF && id !== BLOCKS.LAMP_ON) {
       this.lamps.delete(key);
     }
+    if (prevId === BLOCKS.WHEAT_CROP && id !== BLOCKS.WHEAT_CROP) this.crops.delete(key);
     chunk.setLocal(lx, y, lz, id);
     chunk.buildMesh(this.scene);
 

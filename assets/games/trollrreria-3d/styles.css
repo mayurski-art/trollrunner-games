@@ -138,6 +138,25 @@ html, body {
 }
 .tr3-hp-label { font-size: 11px; font-weight: 700; opacity: 0.7; }
 
+.tr3-hunger-wrap {
+  position: absolute;
+  top: 64px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--tr3-panel);
+  border: 1px solid var(--tr3-border);
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+.tr3-hunger-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #a8672e, #ffd166);
+  transition: width 0.2s ease;
+}
+
 .tr3-clock {
   position: absolute;
   top: 16px;

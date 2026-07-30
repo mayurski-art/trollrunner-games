@@ -93,6 +93,7 @@ export function saveGame(game) {
       pos: game.player.pos,
       spawn: game.player.spawn,
       hp: game.player.hp,
+      hunger: game.player.hunger,
       yaw: game.player.yaw,
       pitch: game.player.pitch,
     },

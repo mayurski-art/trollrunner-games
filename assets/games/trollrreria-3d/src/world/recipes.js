@@ -22,4 +22,7 @@ export const RECIPES = [
   { id: 'reaper_sword', inputs: [{ id: BLOCKS.REAPER_SHARD, count: 5 }, { id: BLOCKS.STICK, count: 2 }], output: { id: BLOCKS.REAPER_SWORD, count: 1 } },
   { id: 'reaper_armor', inputs: [{ id: BLOCKS.REAPER_SHARD, count: 8 }], output: { id: BLOCKS.REAPER_ARMOR, count: 1 } },
   { id: 'summoning_horn', inputs: [{ id: BLOCKS.REAPER_SHARD, count: 10 }, { id: BLOCKS.GEMSTONE, count: 5 }], output: { id: BLOCKS.SUMMONING_HORN, count: 1 } },
+  { id: 'wheat_seed', inputs: [{ id: BLOCKS.LEAVES, count: 2 }], output: { id: BLOCKS.WHEAT_SEED, count: 1 } },
+  { id: 'bread', inputs: [{ id: BLOCKS.WHEAT, count: 3 }], output: { id: BLOCKS.BREAD, count: 1 } },
+  { id: 'cooked_meat', inputs: [{ id: BLOCKS.TROLL_MEAT, count: 1 }], output: { id: BLOCKS.COOKED_MEAT, count: 1 } },
 ];
