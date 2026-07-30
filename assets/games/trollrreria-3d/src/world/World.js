@@ -2,6 +2,7 @@ import { Chunk, CHUNK_X, CHUNK_Y, CHUNK_Z } from './Chunk.js';
 import { BLOCKS, MINEABLE } from './blocks.js';
 import { makeFractalNoise2D, makeNoise2D } from './noise.js';
 import { placeVillage } from './Village.js';
+import { placeDungeon } from './Dungeon.js';
 
 const NEIGHBOR_DIRS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 
@@ -35,6 +36,7 @@ export class World {
     this._inPowerRecompute = false;
     this.hardmode = false;
     this.villagePos = null;
+    this.dungeonPos = null;
     this.crops = new Map(); // "x,y,z" -> seconds remaining until WHEAT_CROP_MATURE
 
     for (let cx = 0; cx < WORLD_CHUNKS; cx++) {
@@ -135,6 +137,9 @@ export class World {
 
     // Pass 3: a small hut cluster for the fast-travel waypoint + villagers.
     this.villagePos = placeVillage(this, WORLD_SIZE_X, WORLD_SIZE_Z);
+
+    // Pass 3b: a ruined chamber with guarded loot, away from the village.
+    this.dungeonPos = placeDungeon(this, WORLD_SIZE_X, WORLD_SIZE_Z, this.villagePos);
 
     // Pass 4: build meshes now that all chunk data (incl. neighbors) is ready.
     for (const chunk of this.chunks.values()) chunk.buildMesh(this.scene);

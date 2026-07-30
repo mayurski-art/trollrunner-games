@@ -143,6 +143,7 @@ export class Game {
 
     if (this.hud.hardmodeBadge) this.hud.hardmodeBadge.hidden = !this.world.hardmode;
     this.spawnVillagers();
+    this.spawnRuinsGuardians();
 
     this.state = 'running';
     this.hud.hud.hidden = false;
@@ -288,6 +289,21 @@ export class Game {
     });
   }
 
+  // Two guardians posted at the ruins on every load — like the merchant and
+  // villagers, mob state isn't part of the save file, so clearing the ruins
+  // doesn't stay cleared between sessions (same trade-off as everywhere else
+  // enemies aren't persisted).
+  spawnRuinsGuardians() {
+    if (!this.world.dungeonPos) return;
+    const { x, z } = this.world.dungeonPos;
+    for (const [ox, oz] of [[-2, 0], [2, 0]]) {
+      const gx = Math.round(x + ox), gz = Math.round(z + oz);
+      const top = this.world.heightMap.get(`${gx},${gz}`);
+      if (top === undefined || top < 0) continue;
+      this.spawner.enemies.push(new Enemy(this.scene, { x: gx + 0.5, y: top + 1, z: gz + 0.5 }, ENEMY_TYPES.TROLL_REAPER));
+    }
+  }
+
   // Spawns a world boss a few blocks in front of the player. Bosses live in
   // spawner.enemies like any other mob (raycast/cleanup/attack handling all
   // shared) but never enter the random spawn pool — see EnemyTypes.TROLL_KING.
@@ -313,6 +329,7 @@ export class Game {
   waypoints() {
     const points = [{ name: 'Home', pos: this.player.spawn }];
     if (this.world.villagePos) points.push({ name: 'Village', pos: this.world.villagePos });
+    if (this.world.dungeonPos) points.push({ name: 'Ruins', pos: this.world.dungeonPos });
     return points;
   }
 
