@@ -456,6 +456,27 @@ html, body {
   z-index: 11;
 }
 
+.tr3-rain {
+  position: absolute;
+  inset: -20px;
+  pointer-events: none;
+  z-index: 9;
+  background-image: repeating-linear-gradient(
+    115deg,
+    rgba(200, 220, 255, 0.35) 0px,
+    rgba(200, 220, 255, 0.35) 1px,
+    transparent 1px,
+    transparent 14px
+  );
+  background-size: 100% 140px;
+  animation: tr3-rain-fall 0.35s linear infinite;
+  opacity: 0.5;
+}
+@keyframes tr3-rain-fall {
+  from { background-position: 0 -140px; }
+  to { background-position: 40px 0; }
+}
+
 /* Touch controls */
 #tr3-touch { position: absolute; inset: 0; z-index: 15; }
 .tr3-joystick {

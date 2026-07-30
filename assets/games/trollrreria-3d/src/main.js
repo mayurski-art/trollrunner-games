@@ -20,6 +20,7 @@ const questPanel = document.getElementById('tr3-quest-panel');
 const peerCount = document.getElementById('tr3-peer-count');
 const dialogue = document.getElementById('tr3-dialogue');
 const waypointList = document.getElementById('tr3-waypoint-list');
+const rainOverlay = document.getElementById('tr3-rain');
 const bossBar = document.getElementById('tr3-boss-bar');
 const bossName = document.getElementById('tr3-boss-name');
 const bossFill = document.getElementById('tr3-boss-fill');
@@ -76,7 +77,7 @@ function onStateChange(state) {
 const game = new Game(
   canvas,
   touchRoot,
-  { hud: hudRoot, hpFill, hungerFill, clock, hardmodeBadge, peerCount, dialogue, waypointList, bossBar, bossName, bossFill, hotbar, invGrid, recipeList, armorSlot, chestGrid, chestPlayerGrid, tradeList, questPanel },
+  { hud: hudRoot, hpFill, hungerFill, clock, hardmodeBadge, peerCount, dialogue, waypointList, bossBar, bossName, bossFill, hotbar, invGrid, recipeList, armorSlot, chestGrid, chestPlayerGrid, tradeList, questPanel, rainOverlay },
   { onStateChange },
 );
 

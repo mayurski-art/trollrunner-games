@@ -16,6 +16,7 @@ import { Villager } from '../npc/Villager.js';
 import { VILLAGER_DEFS } from '../world/villagers.js';
 import { DayNightCycle } from './DayNightCycle.js';
 import { MusicManager } from './MusicManager.js';
+import { Weather } from './Weather.js';
 import { Net } from '../net/Net.js';
 import * as Save from '../world/Save.js';
 import { BLOCKS, PLACEABLE, UNARMED, WEAPON_STATS, DROP_OVERRIDE, SUMMON_ITEMS, FOOD_STATS } from '../world/blocks.js';
@@ -27,6 +28,7 @@ const AUTOSAVE_INTERVAL = 60;
 const HARDMODE_TRIGGER_DAY = 5;
 const HUNGER_DRAIN_INTERVAL = 20; // seconds per -1 hunger
 const STARVE_DAMAGE_INTERVAL = 3; // seconds per tick of damage at 0 hunger
+const FOOTSTEP_INTERVAL = 0.38;
 
 // Owns the renderer, scene, world/player/enemy state and the per-frame loop.
 // States: menu | running | paused | respawn | inventory | chest.
@@ -51,6 +53,7 @@ export class Game {
     const lights = this._setupLights();
     this.dayNight = new DayNightCycle(this.scene, lights);
     this.music = new MusicManager();
+    this.weather = new Weather(this.scene, hud.rainOverlay);
 
     // World/player are populated in start() — either procedurally generated
     // (new island) or restored from a save (continue) — not here, so the
@@ -62,6 +65,7 @@ export class Game {
     this.autosaveTimer = AUTOSAVE_INTERVAL;
     this.hungerDrainTimer = HUNGER_DRAIN_INTERVAL;
     this.starveTimer = STARVE_DAMAGE_INTERVAL;
+    this.footstepTimer = 0;
 
     this.inventory = new Inventory(hud.hotbar);
     this.invScreen = new InventoryScreen(hud.invGrid, hud.recipeList, hud.armorSlot, this.inventory);
@@ -71,6 +75,7 @@ export class Game {
     this.merchant = null;
     this.quests = new QuestManager(this.inventory);
     this.questScreen = new QuestScreen(hud.questPanel, this.quests);
+    this.questScreen.onClaim = () => this.music.playQuestComplete();
     this.villagers = [];
     this.dialogueTimer = 0;
     this.waypointsScreen = new WaypointsScreen(hud.waypointList, this);
@@ -368,6 +373,7 @@ export class Game {
       const stats = (weapon && WEAPON_STATS[weapon.id]) || UNARMED;
       this.attackCooldownTimer = stats.cooldown;
       const died = hit.entity.hit(stats.damage, this.player.pos);
+      this.music.playHit();
       if (died) {
         this.quests.recordKill(hit.entity.type.name);
         if (hit.entity.type.name === 'Archtroll') {
@@ -389,6 +395,7 @@ export class Game {
       this.world.setBlock(hit.x, hit.y, hit.z, BLOCKS.AIR);
       const dropId = DROP_OVERRIDE[id] ?? id;
       this.inventory.add(dropId, 1);
+      this.music.playMine();
     }
   }
 
@@ -431,6 +438,7 @@ export class Game {
     if (SUMMON_ITEMS[slot.id]) {
       this.inventory.consumeSelected();
       this.summonBoss(SUMMON_ITEMS[slot.id]);
+      this.music.playBossRoar();
       return;
     }
     if (FOOD_STATS[slot.id]) {
@@ -438,6 +446,7 @@ export class Game {
       if (!this.inventory.consumeSelected()) return;
       this.player.eat(food.hunger);
       if (food.heal) this.player.hp = Math.min(this.player.maxHp, this.player.hp + food.heal);
+      this.music.playPickup();
       return;
     }
 
@@ -451,6 +460,7 @@ export class Game {
       if (targetId !== BLOCKS.GRASS && targetId !== BLOCKS.DIRT) return;
       if (!this.inventory.consumeSelected()) return;
       this.world.plantCrop(px, py, pz);
+      this.music.playPlace();
       return;
     }
     if (!PLACEABLE.includes(slot.id)) return;
@@ -462,6 +472,7 @@ export class Game {
     if (placeId === BLOCKS.BED) this.spawnMerchantNear(px, py, pz);
     if (placeId === BLOCKS.LEVER) this.world.registerLever(px, py, pz);
     if (placeId === BLOCKS.LAMP_OFF) this.world.registerLamp(px, py, pz);
+    this.music.playPlace();
   }
 
   _loop() {
@@ -479,7 +490,8 @@ export class Game {
       this.autosaveTimer = AUTOSAVE_INTERVAL;
       this.saveNow();
     }
-    this.world.tickCrops(dt);
+    this.weather.update(dt);
+    this.world.tickCrops(dt, this.weather.cropGrowthMultiplier());
 
     this.hungerDrainTimer -= dt;
     if (this.hungerDrainTimer <= 0) {
@@ -512,6 +524,16 @@ export class Game {
     const move = this.input.moveVector;
     const fellOff = this.player.update(dt, move.x, move.z, this.input.jumpHeld);
 
+    if (this.player.grounded && (move.x !== 0 || move.z !== 0)) {
+      this.footstepTimer -= dt;
+      if (this.footstepTimer <= 0) {
+        this.footstepTimer = FOOTSTEP_INTERVAL;
+        this.music.playFootstep();
+      }
+    } else {
+      this.footstepTimer = 0;
+    }
+
     for (const v of this.villagers) v.update(dt);
     if (this.dialogueTimer > 0) {
       this.dialogueTimer -= dt;
@@ -523,6 +545,7 @@ export class Game {
     for (const attacker of attackers) {
       const dmg = Math.max(1, Math.round(attacker.effectiveDamage() * (1 - reduction)));
       if (this.player.takeDamage(dmg)) died = true;
+      else this.music.playHurt();
       if (attacker.type.isBoss) {
         const dx = this.player.pos.x - attacker.pos.x, dz = this.player.pos.z - attacker.pos.z;
         const d = Math.hypot(dx, dz) || 1;

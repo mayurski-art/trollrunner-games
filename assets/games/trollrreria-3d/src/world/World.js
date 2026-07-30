@@ -224,9 +224,9 @@ export class World {
   // progress isn't part of the save file (only the block itself is) — a
   // reload just restarts a still-growing crop's timer, which is an
   // acceptable trade-off for the scope here.
-  tickCrops(dt) {
+  tickCrops(dt, speedMult = 1) {
     for (const [key, remaining] of this.crops) {
-      const next = remaining - dt;
+      const next = remaining - dt * speedMult;
       if (next > 0) { this.crops.set(key, next); continue; }
       this.crops.delete(key);
       const [x, y, z] = key.split(',').map(Number);
