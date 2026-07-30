@@ -34,20 +34,30 @@ function placeHut(world, cx, cz) {
   return { x: cx + 0.5, y: baseY, z: cz + 0.5 };
 }
 
-// Places a small 3-hut cluster on flat-ish forest ground, away from the
-// island edge and not right on top of spawn. Returns the village center
-// (used for the fast-travel waypoint) or null if no suitable spot found.
-export function placeVillage(world, worldSizeX, worldSizeZ) {
+const MAIN_OFFSETS = [[10, 10], [-14, 8], [12, -12], [-10, -14], [16, 2]];
+const OUTPOST_OFFSETS = [[-16, -6], [16, -16], [-6, 16], [18, 14], [-18, -2]];
+const MIN_DIST_FROM_OTHER_VILLAGE = 18;
+
+// Places a hut cluster on flat-ish ground, away from the island edge and
+// not right on top of spawn (or another settlement, if avoidPos is given).
+// Returns the settlement center (used for the fast-travel waypoint) or
+// null if no suitable spot found. hutCount=2 gives the second "outpost"
+// settlement a visibly smaller footprint than the 3-hut main village.
+export function placeVillage(world, worldSizeX, worldSizeZ, { avoidPos = null, offsets = MAIN_OFFSETS, hutCount = 3 } = {}) {
   const cx = Math.floor(worldSizeX / 2);
   const cz = Math.floor(worldSizeZ / 2);
-  const offsets = [[10, 10], [-14, 8], [12, -12], [-10, -14], [16, 2]];
+  const allHutOffsets = [[0, 0], [7, 3], [-3, 7]];
+  const hutOffsets = allHutOffsets.slice(0, hutCount);
 
   for (const [ox, oz] of offsets) {
     const centerX = cx + ox, centerZ = cz + oz;
+    if (avoidPos) {
+      const d = Math.hypot(centerX - avoidPos.x, centerZ - avoidPos.z);
+      if (d < MIN_DIST_FROM_OTHER_VILLAGE) continue;
+    }
     const top = world.heightMap.get(`${centerX},${centerZ}`);
     if (top === undefined || top < 3) continue;
 
-    const hutOffsets = [[0, 0], [7, 3], [-3, 7]];
     const placed = [];
     for (const [hx, hz] of hutOffsets) {
       const pos = placeHut(world, centerX + hx, centerZ + hz);
@@ -59,3 +69,5 @@ export function placeVillage(world, worldSizeX, worldSizeZ) {
   }
   return null;
 }
+
+export { OUTPOST_OFFSETS };

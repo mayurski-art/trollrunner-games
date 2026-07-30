@@ -14,7 +14,7 @@ import { QuestManager } from '../world/QuestManager.js';
 import { Merchant } from '../npc/Merchant.js';
 import { Villager } from '../npc/Villager.js';
 import { Animal, BREED_COOLDOWN } from '../npc/Animal.js';
-import { VILLAGER_DEFS } from '../world/villagers.js';
+import { VILLAGER_DEFS, OUTPOST_VILLAGER_DEFS } from '../world/villagers.js';
 import { DayNightCycle } from './DayNightCycle.js';
 import { MusicManager } from './MusicManager.js';
 import { Weather } from './Weather.js';
@@ -324,10 +324,15 @@ export class Game {
   spawnVillagers() {
     for (const v of this.villagers) v.dispose(this.scene);
     this.villagers = [];
-    if (!this.world.villagePos) return;
-    const { x, z } = this.world.villagePos;
     const offsets = [[2, -2], [-2, 3], [3, 1]];
-    VILLAGER_DEFS.forEach((def, i) => {
+    this._spawnVillagerSet(this.world.villagePos, VILLAGER_DEFS, offsets);
+    this._spawnVillagerSet(this.world.outpostPos, OUTPOST_VILLAGER_DEFS, offsets);
+  }
+
+  _spawnVillagerSet(center, defs, offsets) {
+    if (!center) return;
+    const { x, z } = center;
+    defs.forEach((def, i) => {
       const [ox, oz] = offsets[i];
       const hx = Math.round(x + ox), hz = Math.round(z + oz);
       const top = this.world.heightMap.get(`${hx},${hz}`);
@@ -467,6 +472,7 @@ export class Game {
   waypoints() {
     const points = [{ name: 'Home', pos: this.player.spawn }];
     if (this.world.villagePos) points.push({ name: 'Village', pos: this.world.villagePos });
+    if (this.world.outpostPos) points.push({ name: 'Outpost', pos: this.world.outpostPos });
     if (this.world.dungeonPos) points.push({ name: 'Ruins', pos: this.world.dungeonPos });
     return points;
   }

@@ -16,3 +16,17 @@ export const VILLAGER_DEFS = [
     "I'm the village guard, technically. Please don't make me prove it.",
   ] },
 ];
+
+// The smaller second settlement — reuses the same sprite art (no new
+// generations for a 2-hut outpost) but distinct names/dialogue/roles so it
+// still reads as its own place rather than a copy-pasted village.
+export const OUTPOST_VILLAGER_DEFS = [
+  { name: 'Outpost Farmhand', role: 'farmer', sprite: { file: 'weathered-troll.png', w: 64, h: 80 }, lines: [
+    "We split off from the main village years back. Better soil out here.",
+    'Mind your own crops and I\'ll mind mine.',
+  ] },
+  { name: 'Outpost Watcher', role: 'guard', sprite: { file: 'nervous-troll.png', w: 64, h: 80 }, lines: [
+    "Out here it's just us. No merchant, no crowd. I like it that way.",
+    "Anything gets close, I handle it. Mostly.",
+  ] },
+];

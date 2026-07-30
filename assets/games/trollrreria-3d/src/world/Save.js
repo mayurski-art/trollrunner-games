@@ -95,6 +95,7 @@ export function buildWorldSnapshot(world) {
     lamps: [...world.lamps],
     hardmode: world.hardmode,
     villagePos: world.villagePos,
+    outpostPos: world.outpostPos,
     dungeonPos: world.dungeonPos,
   };
 }
@@ -163,6 +164,7 @@ export function applyWorldSave(world, saveData) {
   world.lamps = new Set(saveData.lamps || []);
   world.hardmode = !!saveData.hardmode;
   world.villagePos = saveData.villagePos || null;
+  world.outpostPos = saveData.outpostPos || null;
   world.dungeonPos = saveData.dungeonPos || null;
   world.rebuildDerivedMapsFromChunks();
   for (const chunk of world.chunks.values()) chunk.buildMesh(world.scene);

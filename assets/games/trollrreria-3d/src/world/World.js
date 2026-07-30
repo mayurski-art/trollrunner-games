@@ -1,7 +1,7 @@
 import { Chunk, CHUNK_X, CHUNK_Y, CHUNK_Z } from './Chunk.js';
 import { BLOCKS, MINEABLE } from './blocks.js';
 import { makeFractalNoise2D, makeNoise2D } from './noise.js';
-import { placeVillage } from './Village.js';
+import { placeVillage, OUTPOST_OFFSETS } from './Village.js';
 import { placeDungeon } from './Dungeon.js';
 
 const NEIGHBOR_DIRS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
@@ -36,6 +36,7 @@ export class World {
     this._inPowerRecompute = false;
     this.hardmode = false;
     this.villagePos = null;
+    this.outpostPos = null;
     this.dungeonPos = null;
     this.crops = new Map(); // "x,y,z" -> seconds remaining until WHEAT_CROP_MATURE
 
@@ -138,8 +139,13 @@ export class World {
     // Pass 3: a small hut cluster for the fast-travel waypoint + villagers.
     this.villagePos = placeVillage(this, WORLD_SIZE_X, WORLD_SIZE_Z);
 
-    // Pass 3b: a ruined chamber with guarded loot, away from the village.
-    this.dungeonPos = placeDungeon(this, WORLD_SIZE_X, WORLD_SIZE_Z, this.villagePos);
+    // Pass 3a: a second, smaller settlement elsewhere on the island.
+    this.outpostPos = placeVillage(this, WORLD_SIZE_X, WORLD_SIZE_Z, {
+      avoidPos: this.villagePos, offsets: OUTPOST_OFFSETS, hutCount: 2,
+    });
+
+    // Pass 3b: a ruined chamber with guarded loot, away from both settlements.
+    this.dungeonPos = placeDungeon(this, WORLD_SIZE_X, WORLD_SIZE_Z, [this.villagePos, this.outpostPos]);
 
     // Pass 4: build meshes now that all chunk data (incl. neighbors) is ready.
     for (const chunk of this.chunks.values()) chunk.buildMesh(this.scene);

@@ -53,19 +53,17 @@ function fillLoot(world, chestPositions) {
   lootB[1] = { id: BLOCKS.STONE_ARMOR, count: 1 };
 }
 
-// Placed far enough from the village that the two landmarks read as
+// Placed far enough from both settlements that all three landmarks read as
 // separate points of interest rather than crowding one corner of the island.
-export function placeDungeon(world, worldSizeX, worldSizeZ, villagePos) {
+export function placeDungeon(world, worldSizeX, worldSizeZ, avoidPositions = []) {
   const cx = Math.floor(worldSizeX / 2);
   const cz = Math.floor(worldSizeZ / 2);
   const offsets = [[-16, -16], [16, 16], [-18, 12], [18, -12], [0, -20]];
+  const avoid = avoidPositions.filter(Boolean);
 
   for (const [ox, oz] of offsets) {
     const centerX = cx + ox, centerZ = cz + oz;
-    if (villagePos) {
-      const d = Math.hypot(centerX - villagePos.x, centerZ - villagePos.z);
-      if (d < MIN_DIST_FROM_VILLAGE) continue;
-    }
+    if (avoid.some((p) => Math.hypot(centerX - p.x, centerZ - p.z) < MIN_DIST_FROM_VILLAGE)) continue;
     const result = buildChamber(world, centerX, centerZ);
     if (result) {
       fillLoot(world, result.chestPositions);
