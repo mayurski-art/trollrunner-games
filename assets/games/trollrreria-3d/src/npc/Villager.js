@@ -8,16 +8,19 @@ const SPRITE_HEIGHT = 1.7;
 // greeting on interact (see Game.handlePlace). Unlike Enemy, never chases
 // or attacks the player; stays near its home point around the village.
 export class Villager {
-  constructor(scene, world, home, name, line, sprite) {
+  constructor(scene, world, home, name, line, sprite, role = null) {
     this.world = world;
     this.home = { ...home };
     this.pos = { ...home };
     this.name = name;
     this.line = line;
+    this.role = role; // 'farmer' | 'guard' | null — see Game._tickFarmerVillager/_tickGuardVillager
     this.radius = 0.5;
     this.alive = true; // performRaycast's entity filter requires this
     this.wanderTarget = null;
     this.wanderTimer = Math.random() * 2;
+    this.directedTarget = null; // set externally by role behavior; overrides wander when present
+    this.attackCooldown = 0;
 
     this.mesh = createBillboard(sprite.file, sprite.w, sprite.h, SPRITE_HEIGHT);
     this.mesh.position.set(home.x, home.y, home.z);
@@ -33,15 +36,20 @@ export class Villager {
   }
 
   update(dt) {
-    this.wanderTimer -= dt;
-    if (this.wanderTimer <= 0) {
-      const angle = Math.random() * Math.PI * 2;
-      const dist = Math.random() * LEASH_RADIUS;
-      this.wanderTarget = { x: this.home.x + Math.cos(angle) * dist, z: this.home.z + Math.sin(angle) * dist };
-      this.wanderTimer = 3 + Math.random() * 4;
+    if (this.attackCooldown > 0) this.attackCooldown -= dt;
+
+    if (!this.directedTarget) {
+      this.wanderTimer -= dt;
+      if (this.wanderTimer <= 0) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = Math.random() * LEASH_RADIUS;
+        this.wanderTarget = { x: this.home.x + Math.cos(angle) * dist, z: this.home.z + Math.sin(angle) * dist };
+        this.wanderTimer = 3 + Math.random() * 4;
+      }
     }
-    if (this.wanderTarget) {
-      const dx = this.wanderTarget.x - this.pos.x, dz = this.wanderTarget.z - this.pos.z;
+    const target = this.directedTarget || this.wanderTarget;
+    if (target) {
+      const dx = target.x - this.pos.x, dz = target.z - this.pos.z;
       const d = Math.hypot(dx, dz);
       if (d > 0.2) {
         const nextX = this.pos.x + (dx / d) * WANDER_SPEED * dt;

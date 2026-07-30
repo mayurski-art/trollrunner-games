@@ -1,16 +1,18 @@
-// Flavor data for the village's townspeople — purely cosmetic dialogue,
-// no quests/trades of their own (that's still the merchant's job).
+// Flavor data for the village's townspeople. Most are cosmetic dialogue
+// only, but two have a real role (see Game._tickFarmerVillager /
+// _tickGuardVillager): Weathered Troll tends nearby crops, Nervous Troll
+// (badly) defends the village from anything that wanders too close.
 export const VILLAGER_DEFS = [
-  { name: 'Weathered Troll', sprite: { file: 'weathered-troll.png', w: 64, h: 80 }, lines: [
+  { name: 'Weathered Troll', role: 'farmer', sprite: { file: 'weathered-troll.png', w: 64, h: 80 }, lines: [
     "Been here since before the grubs showed up. Don't ask what that grin used to look like.",
-    'Mind the bats after dark. They bite harder than they look.',
+    "I keep an eye on the crops. Don't touch my wheat.",
   ] },
-  { name: 'Sleepy Troll', sprite: { file: 'sleepy-troll.png', w: 64, h: 80 }, lines: [
+  { name: 'Sleepy Troll', role: null, sprite: { file: 'sleepy-troll.png', w: 64, h: 80 }, lines: [
     'Five more minutes...',
     "You didn't hear it from me, but there's gemstone under the hills.",
   ] },
-  { name: 'Nervous Troll', sprite: { file: 'nervous-troll.png', w: 64, h: 80 }, lines: [
+  { name: 'Nervous Troll', role: 'guard', sprite: { file: 'nervous-troll.png', w: 64, h: 80 }, lines: [
     'Is it hardmode yet? Please say no.',
-    "The merchant overcharges for wire, but don't tell him I said that.",
+    "I'm the village guard, technically. Please don't make me prove it.",
   ] },
 ];

@@ -332,7 +332,7 @@ export class Game {
       const hx = Math.round(x + ox), hz = Math.round(z + oz);
       const top = this.world.heightMap.get(`${hx},${hz}`);
       if (top === undefined || top < 0) return;
-      this.villagers.push(new Villager(this.scene, this.world, { x: hx + 0.5, y: top + 1, z: hz + 0.5 }, def.name, def.lines, def.sprite));
+      this.villagers.push(new Villager(this.scene, this.world, { x: hx + 0.5, y: top + 1, z: hz + 0.5 }, def.name, def.lines, def.sprite, def.role));
     });
   }
 
@@ -353,6 +353,41 @@ export class Game {
         this.animals.push(new Animal(this.scene, this.world, { x: ax + 0.5, y: top + 1, z: az + 0.5 }));
         break;
       }
+    }
+  }
+
+  // Farmer villager: walks to the nearest planted crop within range and
+  // tends it, tripling its natural growth rate while standing close.
+  _tickFarmerVillager(v) {
+    let nearestKey = null, nearestDist = 10;
+    for (const key of this.world.crops.keys()) {
+      const [x, , z] = key.split(',').map(Number);
+      const d = Math.hypot(x + 0.5 - v.pos.x, z + 0.5 - v.pos.z);
+      if (d < nearestDist) { nearestDist = d; nearestKey = key; }
+    }
+    if (!nearestKey) { v.directedTarget = null; return; }
+    const [cx, , cz] = nearestKey.split(',').map(Number);
+    v.directedTarget = { x: cx + 0.5, z: cz + 0.5 };
+    if (nearestDist < 1.5) {
+      const remaining = this.world.crops.get(nearestKey);
+      if (remaining !== undefined) this.world.crops.set(nearestKey, Math.max(0, remaining - 0.05));
+    }
+  }
+
+  // Guard villager: engages the nearest live enemy within range, dealing
+  // modest melee damage on contact — a real (if fragile) village defender.
+  _tickGuardVillager(v) {
+    let nearest = null, nearestDist = 9;
+    for (const e of this.spawner.enemies) {
+      if (!e.alive) continue;
+      const d = Math.hypot(e.pos.x - v.pos.x, e.pos.z - v.pos.z);
+      if (d < nearestDist) { nearestDist = d; nearest = e; }
+    }
+    if (!nearest) { v.directedTarget = null; return; }
+    v.directedTarget = { x: nearest.pos.x, z: nearest.pos.z };
+    if (nearestDist < 1.4 && v.attackCooldown <= 0) {
+      v.attackCooldown = 1.0;
+      nearest.hit(3, v.pos);
     }
   }
 
@@ -646,7 +681,11 @@ export class Game {
       this.footstepTimer = 0;
     }
 
-    for (const v of this.villagers) v.update(dt);
+    for (const v of this.villagers) {
+      if (v.role === 'farmer') this._tickFarmerVillager(v);
+      else if (v.role === 'guard') this._tickGuardVillager(v);
+      v.update(dt);
+    }
     this.animals = this.animals.filter((a) => {
       if (a.alive) { a.update(dt); return true; }
       a.dispose(this.scene);
