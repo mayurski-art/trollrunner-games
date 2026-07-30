@@ -19,9 +19,10 @@ import { DayNightCycle } from './DayNightCycle.js';
 import { MusicManager } from './MusicManager.js';
 import { Weather } from './Weather.js';
 import { Minimap } from '../ui/Minimap.js';
+import { HeldItem } from '../render/HeldItem.js';
 import { Net } from '../net/Net.js';
 import * as Save from '../world/Save.js';
-import { BLOCKS, PLACEABLE, UNARMED, WEAPON_STATS, DROP_OVERRIDE, SUMMON_ITEMS, FOOD_STATS, MINE_TIER, TOOL_STATS, BLOCK_NAME } from '../world/blocks.js';
+import { BLOCKS, PLACEABLE, UNARMED, WEAPON_STATS, DROP_OVERRIDE, SUMMON_ITEMS, FOOD_STATS, MINE_TIER, TOOL_STATS, BLOCK_NAME, mineSeconds, ICON_MAP } from '../world/blocks.js';
 import { Enemy } from '../enemy/Enemy.js';
 import { ENEMY_TYPES } from '../enemy/EnemyTypes.js';
 
@@ -65,6 +66,11 @@ export class Game {
 
     this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 300);
     this.camera.rotation.order = 'YXZ';
+    // The held-item viewmodel is parented to the camera (see HeldItem.js) —
+    // for that child to actually render, the camera itself needs to be in
+    // the scene graph the renderer traverses, not just passed to render().
+    this.scene.add(this.camera);
+    this.heldItem = new HeldItem(this.camera);
 
     const lights = this._setupLights();
     this.dayNight = new DayNightCycle(this.scene, lights);
@@ -79,6 +85,8 @@ export class Game {
     this.minimap = new Minimap(hud.minimapCanvas, this.world);
     this.spawner = new Spawner(this.scene, this.world);
     this.attackCooldownTimer = 0;
+    this.mineTarget = null;
+    this.mineProgress = 0;
     this.autosaveTimer = AUTOSAVE_INTERVAL;
     this.hungerDrainTimer = HUNGER_DRAIN_INTERVAL;
     this.starveTimer = STARVE_DAMAGE_INTERVAL;
@@ -604,6 +612,7 @@ export class Game {
       const weapon = this.inventory.selectedItem();
       const stats = (weapon && WEAPON_STATS[weapon.id]) || UNARMED;
       this.attackCooldownTimer = stats.cooldown;
+      this.heldItem.triggerSwing();
 
       if (this.animals.includes(hit.entity)) {
         const animalDied = hit.entity.hit(stats.damage);
@@ -633,29 +642,62 @@ export class Game {
       }
       return;
     }
-    if (hit.type === 'block' && this.world.isMineable(hit.x, hit.y, hit.z)) {
-      const id = this.world.getBlock(hit.x, hit.y, hit.z);
-      const requiredTier = MINE_TIER[id];
-      if (requiredTier) {
-        const held = this.inventory.selectedItem();
-        const tool = held && TOOL_STATS[held.id];
-        if (!tool || tool.kind !== 'pickaxe' || tool.tier < requiredTier) {
+    // Block breaking is handled by _tickMining (hold-to-break with
+    // progress, see below) — this handler only covers entity attacks now.
+  }
+
+  // Hold-to-break mining, Minecraft-style: called every frame while
+  // input.digHeld is true. Progress accumulates against whatever block is
+  // currently under the crosshair; looking away or releasing resets it.
+  _tickMining(dt) {
+    if (!this.input.digHeld || this.state !== 'running') { this._resetMining(); return; }
+    const hit = performRaycast(this.world, this.player.eyePos, this.player.forwardVector(), REACH, this.entities());
+    if (!hit || hit.type !== 'block' || !this.world.isMineable(hit.x, hit.y, hit.z)) { this._resetMining(); return; }
+
+    const id = this.world.getBlock(hit.x, hit.y, hit.z);
+    const held = this.inventory.selectedItem();
+    const requiredTier = MINE_TIER[id];
+    if (requiredTier) {
+      const tool = held && TOOL_STATS[held.id];
+      if (!tool || tool.kind !== 'pickaxe' || tool.tier < requiredTier) {
+        this._resetMining();
+        if (Date.now() - (this._lastToolDeniedAt || 0) > 2000) {
+          this._lastToolDeniedAt = Date.now();
           this.showDialogue('Tool needed', `Needs a better pickaxe to mine ${BLOCK_NAME[id] || 'this'}.`);
-          return;
         }
+        return;
       }
+    }
+
+    const key = `${hit.x},${hit.y},${hit.z}`;
+    if (this.mineTarget !== key) {
+      this.mineTarget = key;
+      this.mineProgress = 0;
+    }
+    this.mineProgress += dt / mineSeconds(id, held?.id);
+    if (this.heldItem.swingT <= 0) this.heldItem.triggerSwing(); // repeating chop while held down
+    if (this.hud.mineProgress) {
+      this.hud.mineProgress.hidden = false;
+      this.hud.mineProgress.style.setProperty('--mine-progress', String(Math.min(1, this.mineProgress)));
+    }
+
+    if (this.mineProgress >= 1) {
       this.world.setBlock(hit.x, hit.y, hit.z, BLOCKS.AIR);
       const dropId = DROP_OVERRIDE[id] ?? id;
-      const held = this.inventory.selectedItem();
-      const axe = held && TOOL_STATS[held.id];
-      // A wood/leaves bonus drop is the axe's whole purpose here — mining
-      // is otherwise a single instant hit for everything, so there's no
-      // "faster chopping" to model like Minecraft's real speed system.
-      const bonus = (id === BLOCKS.WOOD || id === BLOCKS.LEAVES) && axe && axe.kind === 'axe' ? 1 : 0;
+      const tool = held && TOOL_STATS[held.id];
+      // A wood/leaves bonus drop is the axe's whole purpose beyond speed.
+      const bonus = (id === BLOCKS.WOOD || id === BLOCKS.LEAVES) && tool && tool.kind === 'axe' ? 1 : 0;
       this.inventory.add(dropId, 1 + bonus);
       this.music.playMine();
       this.stats.blocksMined += 1;
+      this._resetMining();
     }
+  }
+
+  _resetMining() {
+    this.mineTarget = null;
+    this.mineProgress = 0;
+    if (this.hud.mineProgress) this.hud.mineProgress.hidden = true;
   }
 
   handlePlace() {
@@ -750,6 +792,7 @@ export class Game {
     }
 
     if (this.attackCooldownTimer > 0) this.attackCooldownTimer -= dt;
+    this._tickMining(dt);
     this.autosaveTimer -= dt;
     if (this.autosaveTimer <= 0) {
       this.autosaveTimer = AUTOSAVE_INTERVAL;
@@ -883,6 +926,9 @@ export class Game {
     const eye = this.player.eyePos;
     this.camera.position.set(eye.x, eye.y, eye.z);
     this.camera.rotation.set(this.player.pitch, this.player.yaw, 0);
+
+    this.heldItem.setItem(this.inventory.selectedItem()?.id ?? null);
+    this.heldItem.update(dt, this.player.grounded && (move.x !== 0 || move.z !== 0));
 
     this.minimap.update(this.player.pos, this.player.yaw);
     this.renderer.render(this.scene, this.camera);

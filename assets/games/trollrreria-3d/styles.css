@@ -514,6 +514,24 @@ html, body {
   z-index: 11;
 }
 
+/* Mining progress ring — fills clockwise around the crosshair while
+   holding down the dig button, Minecraft-style hold-to-break feedback. */
+.tr3-mine-progress {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 11;
+  --mine-progress: 0;
+  background: conic-gradient(rgba(255,255,255,0.95) calc(var(--mine-progress) * 360deg), rgba(255,255,255,0.15) 0deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+}
+
 .tr3-rain {
   position: absolute;
   inset: -20px;

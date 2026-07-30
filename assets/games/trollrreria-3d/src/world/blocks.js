@@ -186,6 +186,12 @@ export const ICON_MAP = {
   [BLOCKS.ARCANE_DUST]: 'arcane-dust.png',
   [BLOCKS.ENCHANTED_SWORD]: 'enchanted-sword.png',
   [BLOCKS.ENCHANTED_ARMOR]: 'enchanted-armor.png',
+  [BLOCKS.WOOD_PICKAXE]: 'wood-pickaxe.png',
+  [BLOCKS.STONE_PICKAXE]: 'stone-pickaxe.png',
+  [BLOCKS.GEM_PICKAXE]: 'gem-pickaxe.png',
+  [BLOCKS.WOOD_AXE]: 'wood-axe.png',
+  [BLOCKS.STONE_AXE]: 'stone-axe.png',
+  [BLOCKS.GEM_AXE]: 'gem-axe.png',
 };
 
 // Consumable food: held item id -> { hunger, heal? }. Eaten via right-click
@@ -250,6 +256,40 @@ export const MINE_TIER = {
   [BLOCKS.STONE_BRICK]: 1,
   [BLOCKS.ORE]: 2,
 };
+
+// Base seconds to break a block bare-handed — mining is now Minecraft-style
+// hold-to-break-with-progress (see Game._tickMining) instead of an instant
+// single click. Anything not listed falls back to DEFAULT_HARDNESS.
+export const MINE_HARDNESS = {
+  [BLOCKS.GRASS]: 0.4, [BLOCKS.DIRT]: 0.4, [BLOCKS.SAND]: 0.4, [BLOCKS.SNOW]: 0.4,
+  [BLOCKS.LEAVES]: 0.3, [BLOCKS.WOOD]: 0.8, [BLOCKS.PLANK]: 0.6,
+  [BLOCKS.STONE]: 1.2, [BLOCKS.STONE_BRICK]: 1.2,
+  [BLOCKS.ORE]: 2.0, [BLOCKS.GEMSTONE]: 2.5,
+  [BLOCKS.CACTUS]: 0.5, [BLOCKS.PATH]: 0.4,
+  [BLOCKS.TORCH]: 0.15, [BLOCKS.CHEST]: 0.6, [BLOCKS.BED]: 0.6,
+  [BLOCKS.LEVER]: 0.3, [BLOCKS.WIRE]: 0.2, [BLOCKS.LAMP_OFF]: 0.4, [BLOCKS.LAMP_ON]: 0.4,
+  [BLOCKS.TROLL_CROWN]: 0.3,
+  [BLOCKS.WHEAT_CROP]: 0.2, [BLOCKS.WHEAT_CROP_MATURE]: 0.2,
+};
+const DEFAULT_HARDNESS = 0.5;
+
+// Tier multiplier applied when the held tool's kind matches the block's
+// material family (pickaxe -> stone family, axe -> wood family) — same
+// wood<stone<gem progression MINE_TIER already gates existence on, just
+// applied to speed too now instead of only an all-or-nothing gate.
+const TOOL_SPEED_MULT = { 1: 2, 2: 3.2, 3: 4.5 };
+const STONE_FAMILY = new Set([BLOCKS.STONE, BLOCKS.STONE_BRICK, BLOCKS.ORE, BLOCKS.GEMSTONE]);
+const WOOD_FAMILY = new Set([BLOCKS.WOOD, BLOCKS.LEAVES, BLOCKS.PLANK]);
+
+// Seconds to break `id` with `heldItemId` currently selected (undefined/
+// unrecognized = bare hands, multiplier 1).
+export function mineSeconds(id, heldItemId) {
+  const hardness = MINE_HARDNESS[id] ?? DEFAULT_HARDNESS;
+  const tool = TOOL_STATS[heldItemId];
+  if (!tool) return hardness;
+  const matches = (tool.kind === 'pickaxe' && STONE_FAMILY.has(id)) || (tool.kind === 'axe' && WOOD_FAMILY.has(id));
+  return matches ? hardness / (TOOL_SPEED_MULT[tool.tier] || 1) : hardness;
+}
 
 // World blocks that give a drop when mined (bedrock/air excluded).
 export const MINEABLE = [
