@@ -285,7 +285,7 @@ export class Game {
       const hx = Math.round(x + ox), hz = Math.round(z + oz);
       const top = this.world.heightMap.get(`${hx},${hz}`);
       if (top === undefined || top < 0) return;
-      this.villagers.push(new Villager(this.scene, this.world, { x: hx + 0.5, y: top + 1, z: hz + 0.5 }, def.name, def.lines, def.color));
+      this.villagers.push(new Villager(this.scene, this.world, { x: hx + 0.5, y: top + 1, z: hz + 0.5 }, def.name, def.lines, def.sprite));
     });
   }
 
@@ -370,7 +370,11 @@ export class Game {
       const died = hit.entity.hit(stats.damage, this.player.pos);
       if (died) {
         this.quests.recordKill(hit.entity.type.name);
-        if (hit.entity.type.isBoss) {
+        if (hit.entity.type.name === 'Archtroll') {
+          this.inventory.add(BLOCKS.REAPER_SHARD, 15);
+          this.inventory.add(BLOCKS.TROLL_CROWN, 1); // sustains the totem->crown->totem loop
+          this.inventory.add(BLOCKS.REAPER_ARMOR, 1);
+        } else if (hit.entity.type.isBoss) {
           this.inventory.add(BLOCKS.REAPER_SHARD, 10);
           this.inventory.add(BLOCKS.TROLL_CROWN, 1);
         } else if (this.world.hardmode && Math.random() < 0.5) {
@@ -517,7 +521,7 @@ export class Game {
     const attackers = this.spawner.update(dt, this.player.pos);
     const reduction = this.inventory.armorReduction();
     for (const attacker of attackers) {
-      const dmg = Math.max(1, Math.round(attacker.type.damage * (1 - reduction)));
+      const dmg = Math.max(1, Math.round(attacker.effectiveDamage() * (1 - reduction)));
       if (this.player.takeDamage(dmg)) died = true;
       if (attacker.type.isBoss) {
         const dx = this.player.pos.x - attacker.pos.x, dz = this.player.pos.z - attacker.pos.z;

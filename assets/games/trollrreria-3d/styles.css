@@ -396,6 +396,12 @@ html, body {
 .tr3-armor-slot.is-empty { border-style: dashed; opacity: 0.5; }
 .tr3-slot-swatch { width: 55%; aspect-ratio: 1; border-radius: 4px; }
 .tr3-slot-count { font-size: 10px; font-family: 'DM Mono', monospace; opacity: 0.85; margin-top: 2px; }
+.tr3-slot-icon {
+  background: none;
+  object-fit: contain;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
 
 .tr3-recipe-list { display: flex; flex-direction: column; gap: 8px; }
 .tr3-recipe-row {

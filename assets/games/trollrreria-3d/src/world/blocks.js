@@ -41,6 +41,7 @@ export const BLOCKS = {
   BREAD: 37,
   TROLL_MEAT: 38,
   COOKED_MEAT: 39,
+  DARK_TOTEM: 40,
 };
 
 // Per-face color so a merged mesh can use vertex colors instead of textures.
@@ -84,6 +85,7 @@ export const BLOCK_COLOR = {
   [BLOCKS.BREAD]: 0xc99a53,
   [BLOCKS.TROLL_MEAT]: 0xc0645a,
   [BLOCKS.COOKED_MEAT]: 0x8a4a2f,
+  [BLOCKS.DARK_TOTEM]: 0x4c1d95,
 };
 
 export const BLOCK_NAME = {
@@ -125,6 +127,29 @@ export const BLOCK_NAME = {
   [BLOCKS.BREAD]: 'Bread',
   [BLOCKS.TROLL_MEAT]: 'Troll Meat',
   [BLOCKS.COOKED_MEAT]: 'Cooked Troll Meat',
+  [BLOCKS.DARK_TOTEM]: 'Dark Totem',
+};
+
+// Icon art for the UI (hotbar/inventory/crafting/trade/quest swatches) —
+// item id -> filename under art/icons/. Anything not listed here falls back
+// to a flat color swatch (BLOCK_COLOR) — most raw terrain blocks never got
+// dedicated icon art, only equipment/key items did.
+export const ICON_MAP = {
+  [BLOCKS.WOOD_SWORD]: 'wood-sword.png',
+  [BLOCKS.STONE_SWORD]: 'stone-sword.png',
+  [BLOCKS.GEM_SWORD]: 'gem-sword.png',
+  [BLOCKS.REAPER_SWORD]: 'reaper-sword.png',
+  [BLOCKS.WOOD_ARMOR]: 'wood-armor.png',
+  [BLOCKS.STONE_ARMOR]: 'stone-armor.png',
+  [BLOCKS.GEM_ARMOR]: 'gem-armor.png',
+  [BLOCKS.REAPER_ARMOR]: 'reaper-armor.png',
+  [BLOCKS.GEMSTONE]: 'gemstone.png',
+  [BLOCKS.REAPER_SHARD]: 'reaper-shard.png',
+  [BLOCKS.TROLL_CROWN]: 'troll-crown.png',
+  [BLOCKS.BREAD]: 'bread.png',
+  [BLOCKS.COOKED_MEAT]: 'cooked-meat.png',
+  [BLOCKS.SUMMONING_HORN]: 'summoning-horn.png',
+  [BLOCKS.DARK_TOTEM]: 'dark-totem.png',
 };
 
 // Consumable food: held item id -> { hunger, heal? }. Eaten via right-click
@@ -140,6 +165,7 @@ export const FOOD_STATS = {
 // other interaction target) — see Game.handlePlace.
 export const SUMMON_ITEMS = {
   [BLOCKS.SUMMONING_HORN]: 'TROLL_KING',
+  [BLOCKS.DARK_TOTEM]: 'ARCHTROLL',
 };
 
 // Melee weapons: held item id -> { damage, cooldown (seconds) }. Anything

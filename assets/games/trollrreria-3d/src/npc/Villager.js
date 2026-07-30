@@ -1,13 +1,14 @@
-import * as THREE from 'three';
+import { createBillboard } from '../render/SpriteTextures.js';
 
 const WANDER_SPEED = 0.7;
 const LEASH_RADIUS = 4; // won't wander farther than this from home
+const SPRITE_HEIGHT = 1.7;
 
 // A gently-wandering, non-hostile townsperson — cosmetic + a one-line
 // greeting on interact (see Game.handlePlace). Unlike Enemy, never chases
 // or attacks the player; stays near its home point around the village.
 export class Villager {
-  constructor(scene, world, home, name, line, color) {
+  constructor(scene, world, home, name, line, sprite) {
     this.world = world;
     this.home = { ...home };
     this.pos = { ...home };
@@ -18,15 +19,13 @@ export class Villager {
     this.wanderTarget = null;
     this.wanderTimer = Math.random() * 2;
 
-    const geo = new THREE.CapsuleGeometry(0.3, 1.0, 4, 8);
-    const mat = new THREE.MeshLambertMaterial({ color });
-    this.mesh = new THREE.Mesh(geo, mat);
-    this.mesh.position.set(home.x, home.y + 0.8, home.z);
+    this.mesh = createBillboard(sprite.file, sprite.w, sprite.h, SPRITE_HEIGHT);
+    this.mesh.position.set(home.x, home.y, home.z);
     scene.add(this.mesh);
   }
 
   centerPos() {
-    return { x: this.mesh.position.x, y: this.mesh.position.y, z: this.mesh.position.z };
+    return { x: this.mesh.position.x, y: this.mesh.position.y + SPRITE_HEIGHT / 2, z: this.mesh.position.z };
   }
 
   hit() {
@@ -55,7 +54,7 @@ export class Villager {
         }
       }
     }
-    this.mesh.position.set(this.pos.x, this.pos.y + 0.8, this.pos.z);
+    this.mesh.position.set(this.pos.x, this.pos.y, this.pos.z);
   }
 
   findGround(x, z) {
@@ -69,8 +68,6 @@ export class Villager {
   }
 
   dispose(scene) {
-    scene.remove(this.mesh);
-    this.mesh.geometry.dispose();
-    this.mesh.material.dispose();
+    scene.remove(this.mesh); // material/texture are shared+cached — don't dispose here
   }
 }

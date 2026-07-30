@@ -25,4 +25,7 @@ export const RECIPES = [
   { id: 'wheat_seed', inputs: [{ id: BLOCKS.LEAVES, count: 2 }], output: { id: BLOCKS.WHEAT_SEED, count: 1 } },
   { id: 'bread', inputs: [{ id: BLOCKS.WHEAT, count: 3 }], output: { id: BLOCKS.BREAD, count: 1 } },
   { id: 'cooked_meat', inputs: [{ id: BLOCKS.TROLL_MEAT, count: 1 }], output: { id: BLOCKS.COOKED_MEAT, count: 1 } },
+  // Requires a Troll Crown, so this is gated behind having already beaten
+  // the first boss — Archtroll is the tougher, post-Troll-King superboss.
+  { id: 'dark_totem', inputs: [{ id: BLOCKS.TROLL_CROWN, count: 1 }, { id: BLOCKS.REAPER_SHARD, count: 8 }], output: { id: BLOCKS.DARK_TOTEM, count: 1 } },
 ];

@@ -1,32 +1,35 @@
-import * as THREE from 'three';
+import { createBillboard } from '../render/SpriteTextures.js';
 
 const KNOCKBACK_DECAY = 6; // per second, exponential-ish falloff
 
 // A wandering/chasing mob whose stats/behavior come from an EnemyTypes
 // config, so ground mobs and flyers share one implementation. Player
 // "attacks" it by pointing the crosshair at it and using the dig/interact
-// button used for mining blocks (see Game.handleDig).
+// button used for mining blocks (see Game.handleDig). Rendered as a
+// camera-facing PixelLab billboard sprite rather than a 3D model — see
+// render/SpriteTextures.js for why (this is a voxel-mesh world, not a
+// textured one).
 export class Enemy {
   constructor(scene, spawn, type) {
     this.type = type;
     this.pos = { ...spawn };
     this.hp = type.hp;
+    this.maxHp = type.hp;
     this.alive = true;
     this.radius = type.radius;
     this.attackCooldown = 0;
     this.wanderTarget = null;
     this.wanderTimer = 0;
     this.knockbackVel = { x: 0, z: 0 };
+    this.enraged = false;
 
-    const geo = new THREE.BoxGeometry(type.size, type.size, type.size);
-    const mat = new THREE.MeshLambertMaterial({ color: type.color });
-    this.mesh = new THREE.Mesh(geo, mat);
-    this.mesh.position.set(spawn.x, spawn.y + type.size / 2, spawn.z);
+    this.mesh = createBillboard(type.sprite.file, type.sprite.w, type.sprite.h, type.size);
+    this.mesh.position.set(spawn.x, spawn.y, spawn.z);
     scene.add(this.mesh);
   }
 
   centerPos() {
-    return { x: this.mesh.position.x, y: this.mesh.position.y, z: this.mesh.position.z };
+    return { x: this.mesh.position.x, y: this.mesh.position.y + this.type.size / 2, z: this.mesh.position.z };
   }
 
   hit(damage, sourcePos) {
@@ -45,25 +48,29 @@ export class Enemy {
     this.mesh.visible = false;
   }
 
+  effectiveDamage() {
+    return this.enraged ? Math.round(this.type.damage * this.type.enrageDamageMult) : this.type.damage;
+  }
+
   dispose(scene) {
-    scene.remove(this.mesh);
-    this.mesh.geometry.dispose();
-    this.mesh.material.dispose();
+    scene.remove(this.mesh); // material/texture are shared+cached — don't dispose here
   }
 
   update(dt, world, playerPos) {
     if (!this.alive) return null;
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
 
+    const t = this.type;
+    if (t.enrageAt && !this.enraged && this.hp / this.maxHp <= t.enrageAt) this.enraged = true;
+
     const dx = playerPos.x - this.pos.x;
     const dz = playerPos.z - this.pos.z;
     const distToPlayer = Math.hypot(dx, dz);
-    const t = this.type;
 
     let moveX = 0, moveZ = 0, speed = t.wanderSpeed;
     const aggro = distToPlayer < t.aggroRange;
     if (aggro) {
-      speed = t.chaseSpeed;
+      speed = this.enraged ? t.chaseSpeed * t.enrageSpeedMult : t.chaseSpeed;
       moveX = dx / (distToPlayer || 1);
       moveZ = dz / (distToPlayer || 1);
     } else {
@@ -103,7 +110,7 @@ export class Enemy {
       }
     }
 
-    this.mesh.position.set(this.pos.x, this.pos.y + t.size / 2, this.pos.z);
+    this.mesh.position.set(this.pos.x, this.pos.y, this.pos.z);
 
     if (distToPlayer < t.attackRange && this.attackCooldown <= 0) {
       this.attackCooldown = t.attackCooldown;

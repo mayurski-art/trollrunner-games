@@ -1,10 +1,6 @@
-import { BLOCK_COLOR, BLOCK_NAME, ARMOR_STATS } from '../world/blocks.js';
+import { BLOCK_NAME, ARMOR_STATS } from '../world/blocks.js';
 import { RECIPES } from '../world/recipes.js';
-
-function swatchHtml(id, count) {
-  const color = BLOCK_COLOR[id] || 0x333333;
-  return `<div class="tr3-slot-swatch" style="background:#${color.toString(16).padStart(6, '0')}"></div><span class="tr3-slot-count">${count}</span>`;
-}
+import { swatchHtml } from './itemIcon.js';
 
 // The "E" screen: the player's 36-slot inventory grid (items auto-stack via
 // Inventory.add — no drag-and-drop needed), an equipped-armor slot, and a

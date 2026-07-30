@@ -1,5 +1,7 @@
-import { BLOCK_COLOR, BLOCK_NAME, ARMOR_STATS } from '../world/blocks.js';
+import { ICON_MAP, BLOCK_COLOR, BLOCK_NAME, ARMOR_STATS } from '../world/blocks.js';
 import { addToSlots, countInSlots, removeFromSlots } from '../world/Container.js';
+
+const ICON_BASE = 'assets/games/trollrreria-3d/art/icons/';
 
 const HOTBAR_SIZE = 9;
 const TOTAL_SLOTS = 36; // 0-8 hotbar, 9-35 main grid (3x9)
@@ -120,9 +122,14 @@ export class Inventory {
       const slot = this.slots[i];
       el.classList.toggle('is-active', i === this.selectedHotbar);
       if (slot) {
-        const color = BLOCK_COLOR[slot.id];
-        el.style.setProperty('--swatch', `#${(color || 0x333333).toString(16).padStart(6, '0')}`);
-        el.innerHTML = `<div class="tr3-hotbar-swatch" style="background:var(--swatch)"></div><span class="tr3-hotbar-count">${slot.count}</span>`;
+        const icon = ICON_MAP[slot.id];
+        if (icon) {
+          el.innerHTML = `<img class="tr3-hotbar-swatch tr3-slot-icon" src="${ICON_BASE}${icon}" alt="" draggable="false"><span class="tr3-hotbar-count">${slot.count}</span>`;
+        } else {
+          const color = BLOCK_COLOR[slot.id];
+          el.style.setProperty('--swatch', `#${(color || 0x333333).toString(16).padStart(6, '0')}`);
+          el.innerHTML = `<div class="tr3-hotbar-swatch" style="background:var(--swatch)"></div><span class="tr3-hotbar-count">${slot.count}</span>`;
+        }
         el.setAttribute('aria-label', `${BLOCK_NAME[slot.id] || 'Item'} x${slot.count}`);
       } else {
         el.innerHTML = '<div class="tr3-hotbar-swatch tr3-hotbar-swatch-empty"></div><span class="tr3-hotbar-count"></span>';
