@@ -15,6 +15,14 @@ export const VILLAGER_DEFS = [
     'Is it hardmode yet? Please say no.',
     "I'm the village guard, technically. Please don't make me prove it.",
   ] },
+  { name: 'Old Troll', role: null, sprite: { file: 'weathered-troll.png', w: 64, h: 80 }, lines: [
+    "The well's been dry longer than I've been alive. Still nice to look at.",
+    "That big house in the middle? Built it myself. Don't ask how long it took.",
+  ] },
+  { name: 'Wandering Troll', role: null, sprite: { file: 'sleepy-troll.png', w: 64, h: 80 }, lines: [
+    "Just passing through, honestly. Nice little village you've got here.",
+    "Watch the path at night — the grubs like it too.",
+  ] },
 ];
 
 // The smaller second settlement — reuses the same sprite art (no new

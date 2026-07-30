@@ -9,6 +9,7 @@ export const RECIPES = [
   { id: 'torch', inputs: [{ id: BLOCKS.STICK, count: 1 }, { id: BLOCKS.ORE, count: 1 }], output: { id: BLOCKS.TORCH, count: 2 } },
   { id: 'chest', inputs: [{ id: BLOCKS.PLANK, count: 4 }], output: { id: BLOCKS.CHEST, count: 1 } },
   { id: 'stone_brick', inputs: [{ id: BLOCKS.STONE, count: 4 }], output: { id: BLOCKS.STONE_BRICK, count: 4 } },
+  { id: 'path', inputs: [{ id: BLOCKS.DIRT, count: 1 }, { id: BLOCKS.SAND, count: 1 }], output: { id: BLOCKS.PATH, count: 4 } },
   { id: 'wood_sword', inputs: [{ id: BLOCKS.PLANK, count: 3 }, { id: BLOCKS.STICK, count: 2 }], output: { id: BLOCKS.WOOD_SWORD, count: 1 } },
   { id: 'stone_sword', inputs: [{ id: BLOCKS.STONE, count: 3 }, { id: BLOCKS.STICK, count: 2 }], output: { id: BLOCKS.STONE_SWORD, count: 1 } },
   { id: 'gem_sword', inputs: [{ id: BLOCKS.GEMSTONE, count: 3 }, { id: BLOCKS.STICK, count: 2 }], output: { id: BLOCKS.GEM_SWORD, count: 1 } },

@@ -51,6 +51,7 @@ export const BLOCKS = {
   WOOD_AXE: 47,
   STONE_AXE: 48,
   GEM_AXE: 49,
+  PATH: 50,
 };
 
 // Per-face color so a merged mesh can use vertex colors instead of textures.
@@ -104,6 +105,7 @@ export const BLOCK_COLOR = {
   [BLOCKS.WOOD_AXE]: 0xb5854a,
   [BLOCKS.STONE_AXE]: 0x86868f,
   [BLOCKS.GEM_AXE]: 0xd946ef,
+  [BLOCKS.PATH]: 0xb8a06a,
 };
 
 export const BLOCK_NAME = {
@@ -155,6 +157,7 @@ export const BLOCK_NAME = {
   [BLOCKS.WOOD_AXE]: 'Wood Axe',
   [BLOCKS.STONE_AXE]: 'Stone Axe',
   [BLOCKS.GEM_AXE]: 'Gem Axe',
+  [BLOCKS.PATH]: 'Path',
 };
 
 // Icon art for the UI (hotbar/inventory/crafting/trade/quest swatches) —
@@ -251,7 +254,7 @@ export const MINEABLE = [
   BLOCKS.SAND, BLOCKS.LEAVES, BLOCKS.PLANK, BLOCKS.TORCH, BLOCKS.CHEST,
   BLOCKS.STONE_BRICK, BLOCKS.SNOW, BLOCKS.CACTUS, BLOCKS.GEMSTONE, BLOCKS.BED,
   BLOCKS.LEVER, BLOCKS.WIRE, BLOCKS.LAMP_OFF, BLOCKS.LAMP_ON, BLOCKS.TROLL_CROWN,
-  BLOCKS.WHEAT_CROP, BLOCKS.WHEAT_CROP_MATURE,
+  BLOCKS.WHEAT_CROP, BLOCKS.WHEAT_CROP_MATURE, BLOCKS.PATH,
 ];
 
 // Items the player can right-click place as a world block. STICK is
@@ -261,7 +264,7 @@ export const PLACEABLE = [
   BLOCKS.DIRT, BLOCKS.STONE, BLOCKS.WOOD, BLOCKS.SAND, BLOCKS.ORE,
   BLOCKS.LEAVES, BLOCKS.PLANK, BLOCKS.TORCH, BLOCKS.CHEST, BLOCKS.STONE_BRICK,
   BLOCKS.SNOW, BLOCKS.CACTUS, BLOCKS.BED, BLOCKS.LEVER, BLOCKS.WIRE, BLOCKS.LAMP_OFF,
-  BLOCKS.TROLL_CROWN,
+  BLOCKS.TROLL_CROWN, BLOCKS.PATH,
 ];
 
 // Mining these gives back a different item than the block itself (grass ->

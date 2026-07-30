@@ -386,7 +386,7 @@ export class Game {
   spawnVillagers() {
     for (const v of this.villagers) v.dispose(this.scene);
     this.villagers = [];
-    const offsets = [[2, -2], [-2, 3], [3, 1]];
+    const offsets = [[2, -2], [-2, 3], [3, 1], [-6, 5], [6, 5]];
     this._spawnVillagerSet(this.world.villagePos, VILLAGER_DEFS, offsets);
     this._spawnVillagerSet(this.world.outpostPos, OUTPOST_VILLAGER_DEFS, offsets);
   }

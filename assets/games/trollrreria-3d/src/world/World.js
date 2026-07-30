@@ -7,9 +7,10 @@ import { placeVault } from './Vault.js';
 
 const NEIGHBOR_DIRS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 
-// Small floating island, generated once at load — no infinite chunk
-// streaming for the v1 MVP (see design doc: "small procedurally generated island").
-export const WORLD_CHUNKS = 5; // 5x5 chunks -> 80x80 blocks
+// Floating island, generated once at load — no infinite chunk streaming.
+// Bumped from 5x5 (80x80, the original MVP size) to 9x9 after playtest
+// feedback that the island felt cramped — ~3.2x the explorable area.
+export const WORLD_CHUNKS = 9; // 9x9 chunks -> 144x144 blocks
 export const WORLD_SIZE_X = WORLD_CHUNKS * CHUNK_X;
 export const WORLD_SIZE_Z = WORLD_CHUNKS * CHUNK_Z;
 const ISLAND_RADIUS = WORLD_SIZE_X * 0.42;

@@ -12,7 +12,12 @@ const MIN_DIST_FROM_LANDMARKS = 15;
 // challenge for the better loot inside, not just a reskinned Ruins.
 function buildVault(world, cx, cz) {
   const top = world.heightMap.get(`${cx},${cz}`);
-  if (top === undefined || top < SHAFT_DEPTH_BELOW_SURFACE + 4) return null;
+  // Needs enough clearance for the shaft AND the full chamber height below
+  // it with 2 blocks to spare above bedrock — the old "+4" threshold let
+  // through spots where chamberBaseY went negative and the whole thing
+  // silently failed to place (only ever masked by luck on the smaller
+  // original island, where enough candidates happened to be tall enough).
+  if (top === undefined || top < SHAFT_DEPTH_BELOW_SURFACE + CHAMBER_HEIGHT + 2) return null;
   const chamberTopY = top - SHAFT_DEPTH_BELOW_SURFACE;
   const chamberBaseY = chamberTopY - CHAMBER_HEIGHT;
   if (chamberBaseY < 2) return null;
@@ -67,19 +72,31 @@ function fillLoot(world, chestPositions) {
   });
 }
 
+// Requires taller terrain than the Ruins/Village (it's buried, not
+// ground-level), so a fixed hand-tuned offset list tends to run dry on
+// bigger islands — rings of candidates at increasing radius, scaled
+// natively to the actual world size, cover it far more reliably.
+function ringCandidates(worldSizeX) {
+  const candidates = [];
+  const maxR = worldSizeX * 0.32;
+  for (let r = worldSizeX * 0.08; r <= maxR; r += worldSizeX * 0.06) {
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 6) {
+      candidates.push([Math.round(Math.cos(a) * r), Math.round(Math.sin(a) * r)]);
+    }
+  }
+  return candidates;
+}
+
 export function placeVault(world, worldSizeX, worldSizeZ, avoidPositions = []) {
   const cx = Math.floor(worldSizeX / 2);
   const cz = Math.floor(worldSizeZ / 2);
-  const offsets = [
-    [8, -22], [-8, 22], [22, 8], [-22, -8], [26, -2],
-    [0, -14], [-14, 0], [0, 14], [14, 0], [-10, -10], [10, -10], [-10, 10], [10, 10],
-    [4, -6], [-4, 6], [6, 4], [-6, -4],
-  ];
+  const minDist = MIN_DIST_FROM_LANDMARKS * (worldSizeX / 80);
+  const offsets = ringCandidates(worldSizeX);
   const avoid = avoidPositions.filter(Boolean);
 
   for (const [ox, oz] of offsets) {
-    const centerX = cx + ox, centerZ = cz + oz;
-    if (avoid.some((p) => Math.hypot(centerX - p.x, centerZ - p.z) < MIN_DIST_FROM_LANDMARKS)) continue;
+    const centerX = Math.round(cx + ox), centerZ = Math.round(cz + oz);
+    if (avoid.some((p) => Math.hypot(centerX - p.x, centerZ - p.z) < minDist)) continue;
     const result = buildVault(world, centerX, centerZ);
     if (result) {
       fillLoot(world, result.chestPositions);
