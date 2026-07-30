@@ -78,6 +78,8 @@ export class Game {
     this.footstepTimer = 0;
     this.difficulty = 'normal';
     this.prestigeLevel = Save.getPrestige();
+    this.stats = { blocksMined: 0, bossKills: 0 };
+    this._recorded = { blocksMined: 0, bossKills: 0 };
 
     this.inventory = new Inventory(hud.hotbar);
     this.invScreen = new InventoryScreen(hud.invGrid, hud.recipeList, hud.armorSlot, this.inventory);
@@ -228,6 +230,7 @@ export class Game {
 
   // Escape closes whichever menu screen is open; otherwise it pauses.
   handleEscape() {
+    if (this.state === 'leaderboard') { this.toggleLeaderboard(); return; }
     if (['inventory', 'chest', 'merchant', 'coop', 'waypoints'].includes(this.state)) {
       this.closeMenus();
       return;
@@ -302,6 +305,39 @@ export class Game {
     this.state = 'running';
     this.input.requestPointerLock();
     this.onStateChange('running');
+  }
+
+  toggleLeaderboard() {
+    if (this.state === 'leaderboard') {
+      this.state = this._leaderboardReturnState;
+      if (this.state === 'running') this.input.requestPointerLock();
+      this.onStateChange(this.state);
+      return;
+    }
+    if (['running', 'menu', 'paused'].includes(this.state)) {
+      this._leaderboardReturnState = this.state;
+      this.state = 'leaderboard';
+      this.input.exitPointerLock();
+      this.onStateChange('leaderboard');
+    }
+  }
+
+  // Report session progress to the shared arcade leaderboard (deltas, like
+  // every other game — see assets/js/troll-leaderboard.js).
+  recordProgress(reason) {
+    const lb = window.TrollLeaderboard;
+    if (!lb || !lb.record) return;
+    const s = this.stats;
+    const ev = {
+      day: Math.max(0, Math.round(this.dayNight ? this.dayNight.day : 0)),
+      blocks: Math.max(0, s.blocksMined - this._recorded.blocksMined),
+      bossKills: Math.max(0, s.bossKills - this._recorded.bossKills),
+    };
+    try { lb.record('trollrreria-3d', ev); } catch (e) { /* engine hiccups are non-fatal */ }
+    this._recorded = { blocksMined: s.blocksMined, bossKills: s.bossKills };
+    void window.TrollrunnerAccounts?.reportGameResult?.('trollrreria-3d', ev.day, {
+      blocksMined: s.blocksMined, bossKills: s.bossKills, reason,
+    });
   }
 
   // Right-clicking a bed: at night it skips straight to morning; either
@@ -541,9 +577,11 @@ export class Game {
           this.inventory.add(BLOCKS.TROLL_CROWN, 1); // sustains the totem->crown->totem loop
           this.inventory.add(BLOCKS.REAPER_ARMOR, 1);
           this.inventory.add(BLOCKS.ARCANE_DUST, 2); // premium boss loot toward enchanting
+          this.stats.bossKills += 1;
         } else if (hit.entity.type.isBoss) {
           this.inventory.add(BLOCKS.REAPER_SHARD, 10);
           this.inventory.add(BLOCKS.TROLL_CROWN, 1);
+          this.stats.bossKills += 1;
         } else if (this.world.hardmode && Math.random() < 0.5) {
           this.inventory.add(BLOCKS.REAPER_SHARD, 1);
         }
@@ -557,6 +595,7 @@ export class Game {
       const dropId = DROP_OVERRIDE[id] ?? id;
       this.inventory.add(dropId, 1);
       this.music.playMine();
+      this.stats.blocksMined += 1;
     }
   }
 
@@ -656,6 +695,7 @@ export class Game {
     if (this.autosaveTimer <= 0) {
       this.autosaveTimer = AUTOSAVE_INTERVAL;
       this.saveNow();
+      this.recordProgress('autosave');
     }
     this.weather.update(dt);
     this.world.tickCrops(dt, this.weather.cropGrowthMultiplier());
@@ -750,6 +790,7 @@ export class Game {
       this.state = 'respawn';
       this.input.exitPointerLock();
       this.onStateChange('respawn');
+      this.recordProgress('death');
     }
 
     const eye = this.player.eyePos;
