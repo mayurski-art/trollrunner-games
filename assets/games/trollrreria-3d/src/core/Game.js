@@ -30,6 +30,8 @@ const AUTOSAVE_INTERVAL = 60;
 const HARDMODE_TRIGGER_DAY = 5;
 const HUNGER_DRAIN_INTERVAL = 20; // seconds per -1 hunger
 const STARVE_DAMAGE_INTERVAL = 3; // seconds per tick of damage at 0 hunger
+const LAVA_DAMAGE_INTERVAL = 0.5; // seconds per tick of damage while touching lava
+const LAVA_DAMAGE = 8;
 const FOOTSTEP_INTERVAL = 0.38;
 
 // Enemy hp/damage multipliers, stacked with the existing hardmode scale
@@ -80,6 +82,7 @@ export class Game {
     this.autosaveTimer = AUTOSAVE_INTERVAL;
     this.hungerDrainTimer = HUNGER_DRAIN_INTERVAL;
     this.starveTimer = STARVE_DAMAGE_INTERVAL;
+    this.lavaTimer = LAVA_DAMAGE_INTERVAL;
     this.footstepTimer = 0;
     this.difficulty = 'normal';
     this.prestigeLevel = Save.getPrestige();
@@ -771,6 +774,25 @@ export class Game {
     } else {
       this.starveTimer = STARVE_DAMAGE_INTERVAL;
     }
+
+    // Lava contact — checks the block the player's feet/body occupy, not
+    // just what they're standing on, so wading into a pool from the side
+    // hurts too, not just standing on top of it.
+    const p = this.player.pos;
+    const inLava = this.world.getBlock(Math.floor(p.x), Math.floor(p.y), Math.floor(p.z)) === BLOCKS.LAVA
+      || this.world.getBlock(Math.floor(p.x), Math.floor(p.y + 1), Math.floor(p.z)) === BLOCKS.LAVA;
+    if (inLava) {
+      this.lavaTimer -= dt;
+      if (this.lavaTimer <= 0) {
+        this.lavaTimer = LAVA_DAMAGE_INTERVAL;
+        const reduction = this.inventory.armorReduction();
+        if (this.player.takeDamage(Math.max(1, Math.round(LAVA_DAMAGE * (1 - reduction))))) died = true;
+        else this.music.playHurt();
+      }
+    } else {
+      this.lavaTimer = LAVA_DAMAGE_INTERVAL;
+    }
+
     if (this.hud.hungerFill) this.hud.hungerFill.style.width = `${Math.max(0, (this.player.hunger / this.player.maxHunger) * 100)}%`;
 
     this.dayNight.update(dt);

@@ -5,6 +5,9 @@ import { atlasTexture, uvRectFor } from '../render/TextureAtlas.js';
 export const CHUNK_X = 16;
 export const CHUNK_Z = 16;
 export const CHUNK_Y = 40;
+// Underground faces never go fully black — dark enough that you genuinely
+// need a torch to see, but not a literal void that reads as a rendering bug.
+const MIN_UNDERGROUND_LIGHT = 0.04;
 
 // Culled-face mesher: for a small island this is plenty fast and much
 // simpler than true greedy meshing — only exposed faces get triangles,
@@ -74,6 +77,7 @@ export class Chunk {
           const id = this.getLocal(x, y, z);
           if (!isSolid(id)) continue;
           const { u0, v0, u1, v1 } = uvRectFor(id);
+          const underground = this.world.isUnderground(wx + x, y, wz + z);
 
           for (const face of FACES) {
             const [dx, dy, dz] = face.dir;
@@ -83,11 +87,21 @@ export class Chunk {
               : this.world.getBlock(wx + nx, ny, wz + nz);
             if (isSolid(neighbor)) continue; // hidden face, skip
 
+            // Underground faces are lit by the propagated torch/lava
+            // lightmap instead of the normal day/night scene lighting —
+            // sampled from the exposed (air) side of the face, same as
+            // Minecraft's own block-light model. Surface faces are
+            // untouched (light === 1) so nothing changes above ground.
+            const light = underground
+              ? Math.max(MIN_UNDERGROUND_LIGHT, this.world.getLightLevel(wx + nx, ny, wz + nz) / 15)
+              : 1;
+            const shade = face.tint * light;
+
             const start = positions.length / 3;
             face.corners.forEach(([cxo, cyo, czo], i) => {
               positions.push(x + cxo, y + cyo, z + czo);
               normals.push(dx, dy, dz);
-              colors.push(face.tint, face.tint, face.tint);
+              colors.push(shade, shade, shade);
               const [fu, fv] = FACE_UVS[i];
               uvs.push(fu === 0 ? u0 : u1, fv === 0 ? v0 : v1);
             });

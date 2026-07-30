@@ -1,4 +1,5 @@
 import { createBillboard } from '../render/SpriteTextures.js';
+import { CHUNK_Y } from '../world/Chunk.js';
 
 const KNOCKBACK_DECAY = 6; // per second, exponential-ish falloff
 
@@ -114,7 +115,7 @@ export class Enemy {
     if (t.flies) {
       this.pos.x = nextX;
       this.pos.z = nextZ;
-      const targetY = aggro ? playerPos.y + 1 : this.groundHeight(world, nextX, nextZ) + t.hoverHeight;
+      const targetY = aggro ? playerPos.y + 1 : this.groundHeight(world, nextX, nextZ, this.pos.y) + t.hoverHeight;
       this.pos.y += (targetY - this.pos.y) * Math.min(1, dt * 2);
     } else {
       const groundY = this.findGround(world, nextX, this.pos.y, nextZ);
@@ -146,8 +147,20 @@ export class Enemy {
     return by;
   }
 
-  groundHeight(world, x, z) {
-    for (let y = 40; y >= 0; y--) {
+  // Bounded local search around the mob's current height first, so a bat
+  // wandering in a cave hovers near the cave floor/ceiling around it
+  // rather than trying to fly all the way up to the distant outdoor
+  // surface (there's no collision check on flying movement, so that would
+  // otherwise mean levitating straight through solid rock). Falls back to
+  // the old always-hits-something full downward scan if nothing's found
+  // nearby (e.g. genuinely floating in open outdoor air).
+  groundHeight(world, x, z, nearY = 40) {
+    const startY = Math.min(CHUNK_Y - 1, Math.round(nearY) + 6);
+    const endY = Math.max(0, Math.round(nearY) - 20);
+    for (let y = startY; y >= endY; y--) {
+      if (world.getBlock(Math.floor(x), y, Math.floor(z)) !== 0) return y + 1;
+    }
+    for (let y = CHUNK_Y - 1; y >= 0; y--) {
       if (world.getBlock(Math.floor(x), y, Math.floor(z)) !== 0) return y + 1;
     }
     return 14;

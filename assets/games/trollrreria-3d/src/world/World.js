@@ -18,8 +18,15 @@ export const WORLD_CHUNKS = 25; // 25x25 chunks -> 400x400 blocks
 export const WORLD_SIZE_X = WORLD_CHUNKS * CHUNK_X;
 export const WORLD_SIZE_Z = WORLD_CHUNKS * CHUNK_Z;
 const ISLAND_RADIUS = WORLD_SIZE_X * 0.42;
-const BASE_HEIGHT = 14;
-const AMPLITUDE = 8;
+// Raised from 14/8 — the falloff multiplier (0 at the edge, 1 only at the
+// exact center) means MOST of the island ends up far shorter than the raw
+// BASE_HEIGHT±AMPLITUDE range suggests (measured avg surface height was
+// only ~5 blocks above bedrock at the old values — barely enough room for
+// a cave anywhere except the small central peak). This gives real
+// mountains near the center and enough vertical room for caves/ore veins
+// to exist across a meaningful fraction of the map, not just a sliver.
+const BASE_HEIGHT = 18;
+const AMPLITUDE = 12;
 const CROP_GROWTH_SECONDS = 45;
 
 export const BIOMES = { FOREST: 'forest', DESERT: 'desert', SNOW: 'snow' };
@@ -30,8 +37,6 @@ export class World {
     this.seed = seed;
     this.heightNoise = makeFractalNoise2D(seed);
     this.treeNoise = makeNoise2D(seed + 501);
-    this.oreNoise = makeNoise2D(seed + 907);
-    this.gemNoise = makeNoise2D(seed + 1609);
     this.biomeNoise = makeNoise2D(seed + 2003);
     this.chunks = new Map(); // "cx,cz" -> Chunk
     this.heightMap = new Map(); // "x,z" -> topmost solid y (or -1 if void column)
@@ -46,6 +51,8 @@ export class World {
     this.dungeonPos = null;
     this.vaultPos = null;
     this.crops = new Map(); // "x,y,z" -> seconds remaining until WHEAT_CROP_MATURE
+    this.lightSources = new Set(); // "x,y,z" of every placed TORCH/LAVA block
+    this.lightMap = new Map(); // "x,y,z" -> 0-15 propagated light level (see recomputeLight)
 
     for (let cx = 0; cx < WORLD_CHUNKS; cx++) {
       for (let cz = 0; cz < WORLD_CHUNKS; cz++) {
@@ -115,16 +122,24 @@ export class World {
           if (y === 0) id = BLOCKS.BEDROCK;
           else if (y === top) id = topBlock;
           else if (y > top - 3) id = biome === BIOMES.DESERT && top > 4 ? BLOCKS.SAND : BLOCKS.DIRT;
-          else {
-            id = BLOCKS.STONE;
-            if (y < top - 5 && this.oreNoise(x * 0.3, (z + y) * 0.3) > 0.82) id = BLOCKS.ORE;
-            // Gemstone: deeper and rarer than regular ore — the progression tier.
-            if (y < top - 9 && this.gemNoise(x * 0.3, (z + y) * 0.3) > 0.9) id = BLOCKS.GEMSTONE;
-          }
+          else id = BLOCKS.STONE; // ore/gemstone come later as veins (placeOreVeins), not per-block noise
           chunk.setLocal(lx, y, lz, id);
         }
       }
     }
+
+    // Pass 1a: ore/gemstone veins — clustered blobs instead of independent
+    // per-block noise, so mining actually means finding and following a
+    // deposit rather than a single lucky block. Runs before cave carving
+    // so tunnels can cut through and expose veins on their walls.
+    this.placeOreVeins();
+
+    // Pass 1b: cave tunnels — a worm-style random walk carves winding
+    // tunnels through the solid stone mass, occasionally dropping a small
+    // lava pool at the bottom once it's deep enough. Runs before every
+    // structure placement pass below so village/dungeon/vault carving
+    // always has the last word and can't be undermined by a cave.
+    this.carveCaves();
 
     // Pass 2: sprinkle vegetation — trees in forest/snow, cacti in desert.
     for (let x = 2; x < WORLD_SIZE_X - 2; x++) {
@@ -169,6 +184,15 @@ export class World {
       if (dest) this.layRoad(Math.round(spawn.x), Math.round(spawn.z), Math.round(dest.x), Math.round(dest.z));
     }
 
+    // Pass 3e: collect every torch baked into a structure above as a light
+    // source (only near the known structure sites, not a blind full-map
+    // scan — torches only ever come from those at gen time), then
+    // propagate light from all of them before the first mesh build.
+    for (const site of [this.villagePos, this.outpostPos, this.dungeonPos, this.vaultPos]) {
+      if (site) this.scanLightSourcesNear(Math.round(site.x), Math.round(site.z), 20);
+    }
+    this.recomputeLight();
+
     // Pass 4: build meshes now that all chunk data (incl. neighbors) is ready.
     for (const chunk of this.chunks.values()) chunk.buildMesh(this.scene);
   }
@@ -187,6 +211,186 @@ export class World {
         this.biomeMap.set(`${x},${z}`, this.getBiome(x, z));
       }
     }
+  }
+
+  // Scatters ore/gemstone as vein clusters (a short random walk of a
+  // handful of blocks, replacing STONE only) rather than one block at a
+  // time — mining now means noticing a vein and following it, not just
+  // getting individually lucky. Count scales with island area.
+  placeOreVeins() {
+    // Attempt count and depth requirements are tuned against this island's
+    // ACTUAL height distribution, not the raw BASE_HEIGHT±AMPLITUDE range —
+    // the falloff multiplier means most columns end up far shorter than
+    // that range suggests (measured: avg surface height only ~6 above
+    // bedrock, with just ~23% of columns reaching 10+). Gating on top>=12
+    // like an early draft did meant ~85% of attempts wasted on columns too
+    // short to ever qualify. Lower requirements + more attempts compensate.
+    const veinCount = Math.floor((WORLD_SIZE_X * WORLD_SIZE_Z) / 600);
+    for (let i = 0; i < veinCount; i++) {
+      const x = Math.floor(Math.random() * WORLD_SIZE_X);
+      const z = Math.floor(Math.random() * WORLD_SIZE_Z);
+      const top = this.heightMap.get(`${x},${z}`);
+      if (top === undefined || top < 8) continue;
+      const isGem = Math.random() < 0.28; // gemstone is the deeper, rarer tier
+      const minBelowSurface = isGem ? 6 : 3;
+      const range = top - minBelowSurface - 2;
+      if (range < 1) continue;
+      const y = 2 + Math.floor(Math.random() * range);
+      const size = isGem ? 3 + Math.floor(Math.random() * 3) : 4 + Math.floor(Math.random() * 5);
+      this.carveVein(x, y, z, isGem ? BLOCKS.GEMSTONE : BLOCKS.ORE, size);
+    }
+  }
+
+  carveVein(cx, cy, cz, blockId, size) {
+    let x = cx, y = cy, z = cz;
+    for (let i = 0; i < size; i++) {
+      const bx = Math.round(x), by = Math.round(y), bz = Math.round(z);
+      if (this.getBlock(bx, by, bz) === BLOCKS.STONE) this.setBlockRaw(bx, by, bz, blockId);
+      x += Math.random() * 2 - 1;
+      y += (Math.random() * 2 - 1) * 0.6;
+      z += Math.random() * 2 - 1;
+    }
+  }
+
+  // Worm-style cave carving: random-walks a handful of tunnels through the
+  // solid stone mass, carving a small sphere of air at every step (radius
+  // drifts a little each step so tunnels don't read as perfectly uniform
+  // pipes). Stays well below the surface and away from bedrock so it never
+  // breaches into open air or the world floor. Occasionally drops a small
+  // lava pool once deep enough — cave hazard, not just empty tunnels.
+  carveCaves() {
+    // Same recalibration as placeOreVeins — top>=16 (an early draft's
+    // guess against the raw BASE_HEIGHT±AMPLITUDE range) meant only ~1%
+    // of columns on the real, falloff-shortened island ever qualified,
+    // so caves only ever existed in a sliver near the exact center. top>=9
+    // matches the actual distribution far better, and the attempt count
+    // is upped to compensate for shallower (shorter, still real) tunnels.
+    const wormCount = Math.floor((WORLD_SIZE_X * WORLD_SIZE_Z) / 1000);
+    for (let w = 0; w < wormCount; w++) {
+      let x = Math.floor(Math.random() * WORLD_SIZE_X);
+      let z = Math.floor(Math.random() * WORLD_SIZE_Z);
+      const top = this.heightMap.get(`${x},${z}`);
+      if (top === undefined || top < 9) continue;
+      let y = 2 + Math.random() * Math.max(1, top - 8);
+      let dx = Math.random() * 2 - 1, dy = (Math.random() * 2 - 1) * 0.3, dz = Math.random() * 2 - 1;
+      let len = Math.hypot(dx, dy, dz) || 1;
+      dx /= len; dy /= len; dz /= len;
+      let radius = 1.5 + Math.random() * 1.5;
+      const steps = 40 + Math.floor(Math.random() * 90);
+
+      for (let s = 0; s < steps; s++) {
+        this.carveBlob(x, y, z, radius);
+        if (y < 8 && Math.random() < 0.04) this.placeLavaSplash(Math.round(x), Math.round(y), Math.round(z));
+
+        dx += (Math.random() * 2 - 1) * 0.3;
+        dy += (Math.random() * 2 - 1) * 0.15;
+        dz += (Math.random() * 2 - 1) * 0.3;
+        len = Math.hypot(dx, dy, dz) || 1;
+        dx /= len; dy /= len; dz /= len;
+        x += dx; y += dy; z += dz;
+        radius = Math.max(1, Math.min(3, radius + (Math.random() * 2 - 1) * 0.2));
+
+        const colTop = this.heightMap.get(`${Math.round(x)},${Math.round(z)}`);
+        if (colTop === undefined || colTop < 0) break; // wandered off the island
+        if (y < 2 || y > colTop - 4) break; // never breach bedrock or the surface
+      }
+    }
+  }
+
+  carveBlob(cx, cy, cz, radius) {
+    const r = Math.ceil(radius);
+    const r2 = radius * radius;
+    for (let dx = -r; dx <= r; dx++) {
+      for (let dy = -r; dy <= r; dy++) {
+        for (let dz = -r; dz <= r; dz++) {
+          if (dx * dx + dy * dy + dz * dz > r2) continue;
+          const x = Math.round(cx + dx), y = Math.round(cy + dy), z = Math.round(cz + dz);
+          if (y < 2) continue; // never touch bedrock
+          const id = this.getBlock(x, y, z);
+          if (id === BLOCKS.AIR || id === BLOCKS.BEDROCK) continue;
+          this.setBlockRaw(x, y, z, BLOCKS.AIR);
+        }
+      }
+    }
+  }
+
+  // A small puddle of lava at the bottom of a deep cave pocket — real
+  // hazard, not just decoration (see Game._loop's lava contact-damage
+  // check). Sparse and low-elevation-only so it never turns up somewhere
+  // the player can stumble into blind on their first trip underground.
+  placeLavaSplash(cx, cy, cz) {
+    for (const [dx, dz] of [[0, 0], [1, 0], [-1, 0], [0, 1]]) {
+      const x = cx + dx, y = cy - 1, z = cz + dz;
+      if (this.getBlock(x, y, z) === BLOCKS.AIR && this.getBlock(x, y - 1, z) !== BLOCKS.AIR) {
+        this.setBlockRaw(x, y, z, BLOCKS.LAVA);
+        this.lightSources.add(this.posKey(x, y, z)); // registered directly — scattered across the whole map, not near any single structure site scanLightSourcesNear covers
+      }
+    }
+  }
+
+  // Scans a bounded region around one structure site for the TORCH blocks
+  // it baked in (village/ruins/vault each place a handful) — bounded
+  // rather than a blind full-map scan, since structure torches only ever
+  // exist near a known site (cave lava registers itself directly instead,
+  // see placeLavaSplash, since it's scattered across the whole map).
+  scanLightSourcesNear(cx, cz, radius) {
+    for (let x = Math.max(0, cx - radius); x <= Math.min(WORLD_SIZE_X - 1, cx + radius); x++) {
+      for (let z = Math.max(0, cz - radius); z <= Math.min(WORLD_SIZE_Z - 1, cz + radius); z++) {
+        const top = this.heightMap.get(`${x},${z}`);
+        if (top === undefined || top < 0) continue;
+        for (let y = 1; y <= Math.min(top + 6, CHUNK_Y - 1); y++) {
+          if (this.getBlock(x, y, z) === BLOCKS.TORCH) this.lightSources.add(this.posKey(x, y, z));
+        }
+      }
+    }
+  }
+
+  // Standard voxel light propagation (BFS from every source, -1 per air
+  // block traveled through, blocked by anything solid) — same technique
+  // Minecraft's own block-light system uses, just recomputed from scratch
+  // each time rather than incrementally, which is fine given how few light
+  // sources typically exist. Only underground blocks actually consult this
+  // at render time (see Chunk.buildMesh) — the surface stays lit by the
+  // normal day/night scene lighting regardless of what this computes.
+  recomputeLight() {
+    this.lightMap.clear();
+    const queue = [];
+    for (const key of this.lightSources) {
+      const [x, y, z] = key.split(',').map(Number);
+      const level = this.getBlock(x, y, z) === BLOCKS.LAVA ? 12 : 14;
+      this.lightMap.set(key, level);
+      queue.push(key);
+    }
+    let head = 0;
+    while (head < queue.length) {
+      const key = queue[head++];
+      const level = this.lightMap.get(key);
+      if (level <= 1) continue;
+      const [x, y, z] = key.split(',').map(Number);
+      for (const [dx, dy, dz] of NEIGHBOR_DIRS) {
+        const nx = x + dx, ny = y + dy, nz = z + dz;
+        const nid = this.getBlock(nx, ny, nz);
+        if (nid !== BLOCKS.AIR) continue; // light only travels through open air
+        const nkey = `${nx},${ny},${nz}`;
+        const next = level - 1;
+        if ((this.lightMap.get(nkey) || 0) >= next) continue;
+        this.lightMap.set(nkey, next);
+        queue.push(nkey);
+      }
+    }
+  }
+
+  getLightLevel(x, y, z) {
+    return this.lightMap.get(this.posKey(x, y, z)) || 0;
+  }
+
+  // A block counts as "underground" once it's a few cells below its
+  // column's surface — keeps the visible topsoil layer lit normally by
+  // the day/night cycle instead of going dark the instant you're one
+  // block under grass.
+  isUnderground(x, y, z) {
+    const top = this.heightMap.get(`${x},${z}`);
+    return top !== undefined && top >= 0 && y < top - 2;
   }
 
   placeTree(x, baseY, z) {
@@ -295,18 +499,43 @@ export class World {
       this.lamps.delete(key);
     }
     if (prevId === BLOCKS.WHEAT_CROP && id !== BLOCKS.WHEAT_CROP) this.crops.delete(key);
-    chunk.setLocal(lx, y, lz, id);
-    chunk.buildMesh(this.scene);
 
-    if (lx === 0) this.chunkAt(cx - 1, cz)?.buildMesh(this.scene);
-    if (lx === CHUNK_X - 1) this.chunkAt(cx + 1, cz)?.buildMesh(this.scene);
-    if (lz === 0) this.chunkAt(cx, cz - 1)?.buildMesh(this.scene);
-    if (lz === CHUNK_Z - 1) this.chunkAt(cx, cz + 1)?.buildMesh(this.scene);
+    // Torches are the only player-placeable/mineable light source (lava
+    // isn't placeable or mineable) — track it and recompute the lightmap
+    // BEFORE meshing so the rebuild below already reflects the new light.
+    const wasLightSource = prevId === BLOCKS.TORCH;
+    const isLightSource = id === BLOCKS.TORCH;
+    if (wasLightSource !== isLightSource) {
+      if (isLightSource) this.lightSources.add(key); else this.lightSources.delete(key);
+      this.recomputeLight();
+    }
+
+    chunk.setLocal(lx, y, lz, id);
+
+    if (wasLightSource !== isLightSource) {
+      // Light can reach ~14 blocks — rebuild everything in that radius,
+      // not just the edited block's own chunk.
+      this._rebuildChunksNear(x, z, 16);
+    } else {
+      chunk.buildMesh(this.scene);
+      if (lx === 0) this.chunkAt(cx - 1, cz)?.buildMesh(this.scene);
+      if (lx === CHUNK_X - 1) this.chunkAt(cx + 1, cz)?.buildMesh(this.scene);
+      if (lz === 0) this.chunkAt(cx, cz - 1)?.buildMesh(this.scene);
+      if (lz === CHUNK_Z - 1) this.chunkAt(cx, cz + 1)?.buildMesh(this.scene);
+    }
 
     const isNetworkEdge = prevId === BLOCKS.LEVER || prevId === BLOCKS.WIRE || id === BLOCKS.LEVER || id === BLOCKS.WIRE;
     if (isNetworkEdge && !this._inPowerRecompute) this.recomputePower();
 
     this.onEdit?.(x, y, z, id); // hooked by Net.js to broadcast to co-op peers
+  }
+
+  _rebuildChunksNear(x, z, radius) {
+    const { cx: cx0, cz: cz0 } = this.worldToChunk(x - radius, z - radius);
+    const { cx: cx1, cz: cz1 } = this.worldToChunk(x + radius, z + radius);
+    for (let cx = cx0; cx <= cx1; cx++) {
+      for (let cz = cz0; cz <= cz1; cz++) this.chunkAt(cx, cz)?.buildMesh(this.scene);
+    }
   }
 
   registerLever(x, y, z) {

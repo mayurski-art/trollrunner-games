@@ -7,9 +7,11 @@ const TILE_PX = 64;
 const SIZE = GRID * TILE_PX; // 512 — power-of-two, avoids any NPOT texture quirks
 
 // Every block id that can actually appear in Chunk.data. MINEABLE already
-// covers all player-facing world blocks; BEDROCK is the one addition (it's
-// never mined, so it isn't in that list).
-const WORLD_BLOCK_IDS = [...new Set([...MINEABLE, BLOCKS.BEDROCK])];
+// covers all player-facing world blocks; BEDROCK and LAVA are the two
+// additions — neither is mineable, but both are real world blocks that
+// need their own atlas cell (without this, LAVA would silently fall back
+// to whatever occupies cell 0 — grass — instead of looking like lava).
+const WORLD_BLOCK_IDS = [...new Set([...MINEABLE, BLOCKS.BEDROCK, BLOCKS.LAVA])];
 
 // Real PixelLab tile art for the blocks that cover the most visible surface
 // area. Anything else in WORLD_BLOCK_IDS (chest, bed, wiring, crops, ...)
