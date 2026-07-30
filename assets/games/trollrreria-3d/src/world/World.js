@@ -3,6 +3,7 @@ import { BLOCKS, MINEABLE } from './blocks.js';
 import { makeFractalNoise2D, makeNoise2D } from './noise.js';
 import { placeVillage, OUTPOST_OFFSETS } from './Village.js';
 import { placeDungeon } from './Dungeon.js';
+import { placeVault } from './Vault.js';
 
 const NEIGHBOR_DIRS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 
@@ -38,6 +39,7 @@ export class World {
     this.villagePos = null;
     this.outpostPos = null;
     this.dungeonPos = null;
+    this.vaultPos = null;
     this.crops = new Map(); // "x,y,z" -> seconds remaining until WHEAT_CROP_MATURE
 
     for (let cx = 0; cx < WORLD_CHUNKS; cx++) {
@@ -146,6 +148,10 @@ export class World {
 
     // Pass 3b: a ruined chamber with guarded loot, away from both settlements.
     this.dungeonPos = placeDungeon(this, WORLD_SIZE_X, WORLD_SIZE_Z, [this.villagePos, this.outpostPos]);
+
+    // Pass 3c: a second, buried structure — different silhouette (enclosed,
+    // reached by digging down) and better loot than the open-air Ruins.
+    this.vaultPos = placeVault(this, WORLD_SIZE_X, WORLD_SIZE_Z, [this.villagePos, this.outpostPos, this.dungeonPos]);
 
     // Pass 4: build meshes now that all chunk data (incl. neighbors) is ready.
     for (const chunk of this.chunks.values()) chunk.buildMesh(this.scene);

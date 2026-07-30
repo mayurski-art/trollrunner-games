@@ -166,6 +166,7 @@ export class Game {
     if (this.hud.hardmodeBadge) this.hud.hardmodeBadge.hidden = !this.world.hardmode;
     this.spawnVillagers();
     this.spawnRuinsGuardians();
+    this.spawnVaultGuardians();
     this.spawnAnimals();
 
     this.state = 'running';
@@ -447,6 +448,17 @@ export class Game {
     }
   }
 
+  // The Vault is buried (vaultPos is the chamber floor, not a surface
+  // point), so guardians spawn directly there rather than via heightMap —
+  // one more guardian than the Ruins, matching its better loot.
+  spawnVaultGuardians() {
+    if (!this.world.vaultPos) return;
+    const { x, y, z } = this.world.vaultPos;
+    for (const [ox, oz] of [[-1.5, -1], [1.5, -1], [0, 1.5]]) {
+      this.spawner.enemies.push(new Enemy(this.scene, { x: x + ox, y, z: z + oz }, this._scaledKind(ENEMY_TYPES.TROLL_REAPER)));
+    }
+  }
+
   // Spawns a world boss a few blocks in front of the player. Bosses live in
   // spawner.enemies like any other mob (raycast/cleanup/attack handling all
   // shared) but never enter the random spawn pool — see EnemyTypes.TROLL_KING.
@@ -474,6 +486,7 @@ export class Game {
     if (this.world.villagePos) points.push({ name: 'Village', pos: this.world.villagePos });
     if (this.world.outpostPos) points.push({ name: 'Outpost', pos: this.world.outpostPos });
     if (this.world.dungeonPos) points.push({ name: 'Ruins', pos: this.world.dungeonPos });
+    if (this.world.vaultPos) points.push({ name: 'Vault', pos: this.world.vaultPos });
     return points;
   }
 

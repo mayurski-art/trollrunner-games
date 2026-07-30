@@ -97,6 +97,7 @@ export function buildWorldSnapshot(world) {
     villagePos: world.villagePos,
     outpostPos: world.outpostPos,
     dungeonPos: world.dungeonPos,
+    vaultPos: world.vaultPos,
   };
 }
 
@@ -166,6 +167,7 @@ export function applyWorldSave(world, saveData) {
   world.villagePos = saveData.villagePos || null;
   world.outpostPos = saveData.outpostPos || null;
   world.dungeonPos = saveData.dungeonPos || null;
+  world.vaultPos = saveData.vaultPos || null;
   world.rebuildDerivedMapsFromChunks();
   for (const chunk of world.chunks.values()) chunk.buildMesh(world.scene);
 }
