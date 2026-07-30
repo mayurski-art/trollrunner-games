@@ -18,6 +18,7 @@ import { VILLAGER_DEFS, OUTPOST_VILLAGER_DEFS } from '../world/villagers.js';
 import { DayNightCycle } from './DayNightCycle.js';
 import { MusicManager } from './MusicManager.js';
 import { Weather } from './Weather.js';
+import { Minimap } from '../ui/Minimap.js';
 import { Net } from '../net/Net.js';
 import * as Save from '../world/Save.js';
 import { BLOCKS, PLACEABLE, UNARMED, WEAPON_STATS, DROP_OVERRIDE, SUMMON_ITEMS, FOOD_STATS, MINE_TIER, TOOL_STATS, BLOCK_NAME } from '../world/blocks.js';
@@ -55,9 +56,12 @@ export class Game {
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x9fd6ff);
-    this.scene.fog = new THREE.Fog(0x9fd6ff, 30, 90);
+    // Pushed out from the original (30, 90)/far=200 now that the island is
+    // 400x400 — a bigger map doesn't read as bigger if fog still caps
+    // visibility at the same distance as the old small one.
+    this.scene.fog = new THREE.Fog(0x9fd6ff, 60, 220);
 
-    this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 200);
+    this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 300);
     this.camera.rotation.order = 'YXZ';
 
     const lights = this._setupLights();
@@ -70,6 +74,7 @@ export class Game {
     // menu can offer both without doing the work twice.
     this.world = new World(this.scene);
     this.player = null;
+    this.minimap = new Minimap(hud.minimapCanvas, this.world);
     this.spawner = new Spawner(this.scene, this.world);
     this.attackCooldownTimer = 0;
     this.autosaveTimer = AUTOSAVE_INTERVAL;
@@ -169,6 +174,7 @@ export class Game {
       this.player = new Player(this.world, this.world.findSpawn());
     }
     this._applyStatScale();
+    this.minimap.reset();
     this.spawner.enemies.forEach((e) => e.dispose(this.scene));
     this.spawner.enemies = [];
     this.spawner.spawnTimer = this.spawner.graceTimer = SPAWN_GRACE_SECONDS;
@@ -177,6 +183,16 @@ export class Game {
     if (this.hud.safestartBadge) {
       this.hud.safestartBadge.hidden = false;
       this.hud.safestartBadge.style.opacity = '1';
+    }
+    if (this.hud.cursorHint) {
+      this.hud.cursorHint.hidden = false;
+      this.hud.cursorHint.style.opacity = '1';
+      clearTimeout(this._cursorHintTimer);
+      this._cursorHintTimer = setTimeout(() => {
+        if (!this.hud.cursorHint) return;
+        this.hud.cursorHint.style.opacity = '0';
+        setTimeout(() => { this.hud.cursorHint.hidden = true; }, 600);
+      }, 12000);
     }
     this.spawnVillagers();
     this.spawnRuinsGuardians();
@@ -846,6 +862,7 @@ export class Game {
     this.camera.position.set(eye.x, eye.y, eye.z);
     this.camera.rotation.set(this.player.pitch, this.player.yaw, 0);
 
+    this.minimap.update(this.player.pos, this.player.yaw);
     this.renderer.render(this.scene, this.camera);
   }
 }

@@ -2,13 +2,16 @@ import { createBillboard } from '../render/SpriteTextures.js';
 
 const KNOCKBACK_DECAY = 6; // per second, exponential-ish falloff
 
-// A wandering/chasing mob whose stats/behavior come from an EnemyTypes
-// config, so ground mobs and flyers share one implementation. Player
-// "attacks" it by pointing the crosshair at it and using the dig/interact
-// button used for mining blocks (see Game.handleDig). Rendered as a
-// camera-facing PixelLab billboard sprite rather than a 3D model — see
-// render/SpriteTextures.js for why (this is a voxel-mesh world, not a
-// textured one).
+// A wandering mob whose stats/behavior come from an EnemyTypes config, so
+// ground mobs and flyers share one implementation. Neutral by default —
+// it only chases/attacks once the player has hit it at least once (see
+// `provoked`); until then it just wanders harmlessly, matching
+// Minecraft/Terraria's "you start it" convention rather than aggroing on
+// sight. Player "attacks" it by pointing the crosshair at it and using the
+// dig/interact button used for mining blocks (see Game.handleDig).
+// Rendered as a camera-facing PixelLab billboard sprite rather than a 3D
+// model — see render/SpriteTextures.js for why (this is a voxel-mesh
+// world, not a textured one).
 export class Enemy {
   constructor(scene, spawn, type) {
     this.type = type;
@@ -22,6 +25,12 @@ export class Enemy {
     this.wanderTimer = 0;
     this.knockbackVel = { x: 0, z: 0 };
     this.enraged = false;
+    // Neutral until the player attacks it — mobs wander harmlessly and
+    // never approach/attack on their own, only after being hit at least
+    // once (bosses are the one exception: summoning one is provocation
+    // enough by itself). Persists until it dies; leaving aggroRange just
+    // makes it give up the chase, not forget the grudge.
+    this.provoked = false;
 
     this.mesh = createBillboard(type.sprite.file, type.sprite.w, type.sprite.h, type.size);
     this.mesh.position.set(spawn.x, spawn.y, spawn.z);
@@ -33,6 +42,7 @@ export class Enemy {
   }
 
   hit(damage, sourcePos) {
+    this.provoked = true;
     this.hp -= damage;
     if (sourcePos) {
       const dx = this.pos.x - sourcePos.x, dz = this.pos.z - sourcePos.z;
@@ -68,10 +78,12 @@ export class Enemy {
     const distToPlayer = Math.hypot(dx, dz);
 
     let moveX = 0, moveZ = 0, speed = t.wanderSpeed;
-    // Bosses are summoned deliberately, never subject to the spawn-in grace
-    // window — everything else stays passive (wanders, won't chase or hit)
-    // until it expires, so a fresh drop-in isn't immediately under attack.
-    const aggro = (!peaceful || t.isBoss) && distToPlayer < t.aggroRange;
+    // Neutral-mob model: only a provoked (already-attacked) mob or a boss
+    // ever chases/attacks — plain proximity never triggers it. `peaceful`
+    // (the post-spawn-in grace window) additionally suppresses even a
+    // provoked non-boss mob, covering the edge case of a save/continue
+    // where something was already provoked before the window started.
+    const aggro = (this.provoked || t.isBoss) && !(peaceful && !t.isBoss) && distToPlayer < t.aggroRange;
     if (aggro) {
       speed = this.enraged ? t.chaseSpeed * t.enrageSpeedMult : t.chaseSpeed;
       moveX = dx / (distToPlayer || 1);
@@ -115,7 +127,7 @@ export class Enemy {
 
     this.mesh.position.set(this.pos.x, this.pos.y, this.pos.z);
 
-    const canAttack = !peaceful || t.isBoss;
+    const canAttack = (this.provoked || t.isBoss) && !(peaceful && !t.isBoss);
     if (canAttack && distToPlayer < t.attackRange && this.attackCooldown <= 0) {
       this.attackCooldown = t.attackCooldown;
       return 'attack';

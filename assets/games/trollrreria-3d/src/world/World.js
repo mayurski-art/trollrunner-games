@@ -8,9 +8,13 @@ import { placeVault } from './Vault.js';
 const NEIGHBOR_DIRS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 
 // Floating island, generated once at load — no infinite chunk streaming.
-// Bumped from 5x5 (80x80, the original MVP size) to 9x9 after playtest
-// feedback that the island felt cramped — ~3.2x the explorable area.
-export const WORLD_CHUNKS = 9; // 9x9 chunks -> 144x144 blocks
+// Went 5x5 (80x80, original MVP) -> 9x9 (144x144) -> still felt small on
+// playtest, so bumped again to 25x25 (400x400, ~25x the original area).
+// Chunk.buildMesh skips fully-empty chunks (the square grid's corners
+// outside the island's circular falloff) so this doesn't cost a draw call
+// per empty chunk — verified via headless FPS sampling before landing on
+// this size (33x33 measurably worse, 25x25 held up fine).
+export const WORLD_CHUNKS = 25; // 25x25 chunks -> 400x400 blocks
 export const WORLD_SIZE_X = WORLD_CHUNKS * CHUNK_X;
 export const WORLD_SIZE_Z = WORLD_CHUNKS * CHUNK_Z;
 const ISLAND_RADIUS = WORLD_SIZE_X * 0.42;
@@ -63,10 +67,13 @@ export class World {
   }
 
   // Low-frequency regions so biomes read as continuous patches, not noise —
-  // tuned so a handful of full patches fit across the island's ~34-block
-  // radius rather than sampling only a sliver of the noise grid.
+  // tuned so a handful of full patches fit across the island's ~168-block
+  // radius (400x400 world) rather than sampling only a sliver of the noise
+  // grid. Scales down from the original 0.06 (tuned for an ~34-radius
+  // island) by the same ~5x the radius grew, so biome regions stay a
+  // believably large, walkable size instead of shrinking into confetti.
   getBiome(x, z) {
-    const n = this.biomeNoise(x * 0.06, z * 0.06);
+    const n = this.biomeNoise(x * 0.012, z * 0.012);
     if (n < 0.35) return BIOMES.DESERT;
     if (n > 0.65) return BIOMES.SNOW;
     return BIOMES.FOREST;
@@ -154,6 +161,14 @@ export class World {
     // reached by digging down) and better loot than the open-air Ruins.
     this.vaultPos = placeVault(this, WORLD_SIZE_X, WORLD_SIZE_Z, [this.villagePos, this.outpostPos, this.dungeonPos]);
 
+    // Pass 3d: a road network — every landmark gets a straight dirt-path
+    // road back to spawn, so the island reads as connected infrastructure
+    // rather than a scatter of unrelated structures dropped at random.
+    const spawn = this.findSpawn();
+    for (const dest of [this.villagePos, this.outpostPos, this.dungeonPos, this.vaultPos]) {
+      if (dest) this.layRoad(Math.round(spawn.x), Math.round(spawn.z), Math.round(dest.x), Math.round(dest.z));
+    }
+
     // Pass 4: build meshes now that all chunk data (incl. neighbors) is ready.
     for (const chunk of this.chunks.values()) chunk.buildMesh(this.scene);
   }
@@ -186,6 +201,24 @@ export class World {
           if (this.getBlock(bx, by, bz) === BLOCKS.AIR) this.setBlockRaw(bx, by, bz, BLOCKS.LEAVES);
         }
       }
+    }
+  }
+
+  // Straight-line dirt-path road at ground level between two points — the
+  // same technique Village.js uses for its internal paths, just over a
+  // much longer distance. Deliberately naive (no pathfinding around water/
+  // hills): Minecraft village paths are similarly straight-line, and at
+  // this scale a perfectly planned road reads less "organic" anyway.
+  layRoad(x0, z0, x1, z1) {
+    const dx = x1 - x0, dz = z1 - z0;
+    const steps = Math.max(Math.abs(dx), Math.abs(dz));
+    if (steps < 1) return;
+    for (let i = 0; i <= steps; i++) {
+      const px = Math.round(x0 + (dx * i) / steps);
+      const pz = Math.round(z0 + (dz * i) / steps);
+      const top = this.heightMap.get(`${px},${pz}`);
+      if (top === undefined || top < 0) continue; // void gap — leave it
+      this.setBlockRaw(px, top, pz, BLOCKS.PATH);
     }
   }
 

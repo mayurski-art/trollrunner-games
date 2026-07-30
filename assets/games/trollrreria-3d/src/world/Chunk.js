@@ -97,6 +97,13 @@ export class Chunk {
       }
     }
 
+    // Chunks entirely outside the island's circular falloff (the corners of
+    // the square chunk grid) have no solid blocks at all — skip adding a
+    // mesh/draw call for those rather than rendering an empty one every
+    // frame. Meaningful savings on a big island: a circle inscribed in a
+    // square only covers ~79% of the grid, so ~21% of chunks are pure void.
+    if (positions.length === 0) return null;
+
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
