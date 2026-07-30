@@ -42,6 +42,9 @@ export const BLOCKS = {
   TROLL_MEAT: 38,
   COOKED_MEAT: 39,
   DARK_TOTEM: 40,
+  ARCANE_DUST: 41,
+  ENCHANTED_SWORD: 42,
+  ENCHANTED_ARMOR: 43,
 };
 
 // Per-face color so a merged mesh can use vertex colors instead of textures.
@@ -86,6 +89,9 @@ export const BLOCK_COLOR = {
   [BLOCKS.TROLL_MEAT]: 0xc0645a,
   [BLOCKS.COOKED_MEAT]: 0x8a4a2f,
   [BLOCKS.DARK_TOTEM]: 0x4c1d95,
+  [BLOCKS.ARCANE_DUST]: 0x60a5fa,
+  [BLOCKS.ENCHANTED_SWORD]: 0x38bdf8,
+  [BLOCKS.ENCHANTED_ARMOR]: 0x0ea5e9,
 };
 
 export const BLOCK_NAME = {
@@ -128,6 +134,9 @@ export const BLOCK_NAME = {
   [BLOCKS.TROLL_MEAT]: 'Troll Meat',
   [BLOCKS.COOKED_MEAT]: 'Cooked Troll Meat',
   [BLOCKS.DARK_TOTEM]: 'Dark Totem',
+  [BLOCKS.ARCANE_DUST]: 'Arcane Dust',
+  [BLOCKS.ENCHANTED_SWORD]: 'Enchanted Sword',
+  [BLOCKS.ENCHANTED_ARMOR]: 'Enchanted Armor',
 };
 
 // Icon art for the UI (hotbar/inventory/crafting/trade/quest swatches) —
@@ -150,6 +159,9 @@ export const ICON_MAP = {
   [BLOCKS.COOKED_MEAT]: 'cooked-meat.png',
   [BLOCKS.SUMMONING_HORN]: 'summoning-horn.png',
   [BLOCKS.DARK_TOTEM]: 'dark-totem.png',
+  [BLOCKS.ARCANE_DUST]: 'arcane-dust.png',
+  [BLOCKS.ENCHANTED_SWORD]: 'enchanted-sword.png',
+  [BLOCKS.ENCHANTED_ARMOR]: 'enchanted-armor.png',
 };
 
 // Consumable food: held item id -> { hunger, heal? }. Eaten via right-click
@@ -176,6 +188,7 @@ export const WEAPON_STATS = {
   [BLOCKS.STONE_SWORD]: { damage: 4, cooldown: 0.35 },
   [BLOCKS.GEM_SWORD]: { damage: 7, cooldown: 0.3 },
   [BLOCKS.REAPER_SWORD]: { damage: 10, cooldown: 0.28 },
+  [BLOCKS.ENCHANTED_SWORD]: { damage: 14, cooldown: 0.22 },
 };
 
 // Armor: a single equipped item id -> fraction of incoming damage blocked.
@@ -184,6 +197,7 @@ export const ARMOR_STATS = {
   [BLOCKS.STONE_ARMOR]: { reduction: 0.3 },
   [BLOCKS.GEM_ARMOR]: { reduction: 0.5 },
   [BLOCKS.REAPER_ARMOR]: { reduction: 0.65 },
+  [BLOCKS.ENCHANTED_ARMOR]: { reduction: 0.78 },
 };
 
 // World blocks that give a drop when mined (bedrock/air excluded).

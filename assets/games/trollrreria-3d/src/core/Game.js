@@ -527,6 +527,7 @@ export class Game {
           this.inventory.add(BLOCKS.REAPER_SHARD, 15);
           this.inventory.add(BLOCKS.TROLL_CROWN, 1); // sustains the totem->crown->totem loop
           this.inventory.add(BLOCKS.REAPER_ARMOR, 1);
+          this.inventory.add(BLOCKS.ARCANE_DUST, 2); // premium boss loot toward enchanting
         } else if (hit.entity.type.isBoss) {
           this.inventory.add(BLOCKS.REAPER_SHARD, 10);
           this.inventory.add(BLOCKS.TROLL_CROWN, 1);

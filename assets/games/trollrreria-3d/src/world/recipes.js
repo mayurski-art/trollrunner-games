@@ -28,4 +28,10 @@ export const RECIPES = [
   // Requires a Troll Crown, so this is gated behind having already beaten
   // the first boss — Archtroll is the tougher, post-Troll-King superboss.
   { id: 'dark_totem', inputs: [{ id: BLOCKS.TROLL_CROWN, count: 1 }, { id: BLOCKS.REAPER_SHARD, count: 8 }], output: { id: BLOCKS.DARK_TOTEM, count: 1 } },
+  { id: 'arcane_dust', inputs: [{ id: BLOCKS.REAPER_SHARD, count: 4 }, { id: BLOCKS.GEMSTONE, count: 4 }], output: { id: BLOCKS.ARCANE_DUST, count: 1 } },
+  // Enchanting: consumes the base weapon/armor itself plus dust, rather
+  // than a dedicated table/UI — same click-to-craft flow as everything
+  // else, themed as an upgrade instead of a fresh craft.
+  { id: 'enchant_sword', inputs: [{ id: BLOCKS.REAPER_SWORD, count: 1 }, { id: BLOCKS.ARCANE_DUST, count: 3 }], output: { id: BLOCKS.ENCHANTED_SWORD, count: 1 } },
+  { id: 'enchant_armor', inputs: [{ id: BLOCKS.REAPER_ARMOR, count: 1 }, { id: BLOCKS.ARCANE_DUST, count: 3 }], output: { id: BLOCKS.ENCHANTED_ARMOR, count: 1 } },
 ];
