@@ -10,6 +10,11 @@ const HARDMODE_INTERVAL_SCALE = 0.6; // faster spawns once hardmode hits
 const MIN_SPAWN_DIST = 10;
 const MAX_SPAWN_DIST = 28;
 const HARDMODE_STAT_SCALE = { hp: 1.5, damage: 1.4 };
+// A calm window at the start of every run (both "New Island" and
+// "Continue") — Minecraft/Terraria both spare a fresh spawn from instant
+// hostile pressure. No mobs spawn AND no existing mob can aggro while this
+// is counting down, so the player gets their bearings first.
+export const SPAWN_GRACE_SECONDS = 25;
 
 const KIND_LIST = Object.values(ENEMY_TYPES).filter((k) => !k.summonOnly);
 
@@ -21,7 +26,8 @@ export class Spawner {
     this.scene = scene;
     this.world = world;
     this.enemies = [];
-    this.spawnTimer = 2;
+    this.spawnTimer = SPAWN_GRACE_SECONDS;
+    this.graceTimer = SPAWN_GRACE_SECONDS;
     // Set by Game.js from difficulty + New Game+ prestige level — stacks
     // on top of the hardmode scale below rather than replacing it.
     this.statScale = { hp: 1, damage: 1 };
@@ -36,14 +42,17 @@ export class Spawner {
       return false;
     });
 
+    if (this.graceTimer > 0) this.graceTimer -= dt;
+    const peaceful = this.graceTimer > 0;
+
     const attackers = [];
     for (const enemy of this.enemies) {
-      if (enemy.update(dt, this.world, playerPos) === 'attack') attackers.push(enemy);
+      if (enemy.update(dt, this.world, playerPos, peaceful) === 'attack') attackers.push(enemy);
     }
 
     const cap = this.world.hardmode ? MAX_ENEMIES_HARDMODE : MAX_ENEMIES;
     this.spawnTimer -= dt;
-    if (this.spawnTimer <= 0 && this.enemies.length < cap) {
+    if (!peaceful && this.spawnTimer <= 0 && this.enemies.length < cap) {
       this.trySpawn(playerPos);
       const scale = this.world.hardmode ? HARDMODE_INTERVAL_SCALE : 1;
       this.spawnTimer = (SPAWN_INTERVAL_MIN + Math.random() * (SPAWN_INTERVAL_MAX - SPAWN_INTERVAL_MIN)) * scale;

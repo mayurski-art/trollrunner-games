@@ -45,6 +45,12 @@ export const BLOCKS = {
   ARCANE_DUST: 41,
   ENCHANTED_SWORD: 42,
   ENCHANTED_ARMOR: 43,
+  WOOD_PICKAXE: 44,
+  STONE_PICKAXE: 45,
+  GEM_PICKAXE: 46,
+  WOOD_AXE: 47,
+  STONE_AXE: 48,
+  GEM_AXE: 49,
 };
 
 // Per-face color so a merged mesh can use vertex colors instead of textures.
@@ -92,6 +98,12 @@ export const BLOCK_COLOR = {
   [BLOCKS.ARCANE_DUST]: 0x60a5fa,
   [BLOCKS.ENCHANTED_SWORD]: 0x38bdf8,
   [BLOCKS.ENCHANTED_ARMOR]: 0x0ea5e9,
+  [BLOCKS.WOOD_PICKAXE]: 0xc79a5f,
+  [BLOCKS.STONE_PICKAXE]: 0x9a9aa2,
+  [BLOCKS.GEM_PICKAXE]: 0xe879f9,
+  [BLOCKS.WOOD_AXE]: 0xb5854a,
+  [BLOCKS.STONE_AXE]: 0x86868f,
+  [BLOCKS.GEM_AXE]: 0xd946ef,
 };
 
 export const BLOCK_NAME = {
@@ -137,6 +149,12 @@ export const BLOCK_NAME = {
   [BLOCKS.ARCANE_DUST]: 'Arcane Dust',
   [BLOCKS.ENCHANTED_SWORD]: 'Enchanted Sword',
   [BLOCKS.ENCHANTED_ARMOR]: 'Enchanted Armor',
+  [BLOCKS.WOOD_PICKAXE]: 'Wood Pickaxe',
+  [BLOCKS.STONE_PICKAXE]: 'Stone Pickaxe',
+  [BLOCKS.GEM_PICKAXE]: 'Gem Pickaxe',
+  [BLOCKS.WOOD_AXE]: 'Wood Axe',
+  [BLOCKS.STONE_AXE]: 'Stone Axe',
+  [BLOCKS.GEM_AXE]: 'Gem Axe',
 };
 
 // Icon art for the UI (hotbar/inventory/crafting/trade/quest swatches) —
@@ -198,6 +216,33 @@ export const ARMOR_STATS = {
   [BLOCKS.GEM_ARMOR]: { reduction: 0.5 },
   [BLOCKS.REAPER_ARMOR]: { reduction: 0.65 },
   [BLOCKS.ENCHANTED_ARMOR]: { reduction: 0.78 },
+};
+
+// Tools: held item id -> { kind: 'pickaxe'|'axe', tier: 1/2/3 }. Tier gates
+// which MINE_TIER blocks below can be broken at all (Minecraft's
+// wood<stone<gem progression) rather than just changing speed, since mining
+// here is already an instant single hit. Axes don't gate anything — they
+// just give a bonus wood drop (see Game.handleDig).
+export const TOOL_STATS = {
+  [BLOCKS.WOOD_PICKAXE]: { kind: 'pickaxe', tier: 1 },
+  [BLOCKS.STONE_PICKAXE]: { kind: 'pickaxe', tier: 2 },
+  [BLOCKS.GEM_PICKAXE]: { kind: 'pickaxe', tier: 3 },
+  [BLOCKS.WOOD_AXE]: { kind: 'axe', tier: 1 },
+  [BLOCKS.STONE_AXE]: { kind: 'axe', tier: 2 },
+  [BLOCKS.GEM_AXE]: { kind: 'axe', tier: 3 },
+};
+
+// Blocks that require a pickaxe of at least this tier to break — mining
+// without one (or with too low a tier) does nothing, same as Minecraft's
+// tool-tier gate. Anything not listed here can always be mined bare-handed
+// (dirt, wood, sand, plants, ...). Gemstone is deliberately NOT gated here:
+// it's the material the tier-3 (gem) pickaxe itself is crafted from, so
+// gating it behind that same pickaxe would be a softlock — a stone
+// pickaxe (tier 2) is enough to reach it, same as ore.
+export const MINE_TIER = {
+  [BLOCKS.STONE]: 1,
+  [BLOCKS.STONE_BRICK]: 1,
+  [BLOCKS.ORE]: 2,
 };
 
 // World blocks that give a drop when mined (bedrock/air excluded).

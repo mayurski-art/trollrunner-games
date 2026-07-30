@@ -56,7 +56,7 @@ export class Enemy {
     scene.remove(this.mesh); // material/texture are shared+cached — don't dispose here
   }
 
-  update(dt, world, playerPos) {
+  update(dt, world, playerPos, peaceful = false) {
     if (!this.alive) return null;
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
 
@@ -68,7 +68,10 @@ export class Enemy {
     const distToPlayer = Math.hypot(dx, dz);
 
     let moveX = 0, moveZ = 0, speed = t.wanderSpeed;
-    const aggro = distToPlayer < t.aggroRange;
+    // Bosses are summoned deliberately, never subject to the spawn-in grace
+    // window — everything else stays passive (wanders, won't chase or hit)
+    // until it expires, so a fresh drop-in isn't immediately under attack.
+    const aggro = (!peaceful || t.isBoss) && distToPlayer < t.aggroRange;
     if (aggro) {
       speed = this.enraged ? t.chaseSpeed * t.enrageSpeedMult : t.chaseSpeed;
       moveX = dx / (distToPlayer || 1);
@@ -112,7 +115,8 @@ export class Enemy {
 
     this.mesh.position.set(this.pos.x, this.pos.y, this.pos.z);
 
-    if (distToPlayer < t.attackRange && this.attackCooldown <= 0) {
+    const canAttack = !peaceful || t.isBoss;
+    if (canAttack && distToPlayer < t.attackRange && this.attackCooldown <= 0) {
       this.attackCooldown = t.attackCooldown;
       return 'attack';
     }

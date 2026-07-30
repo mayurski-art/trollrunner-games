@@ -21,10 +21,15 @@ export class InputManager {
 
   _bindKeyboard() {
     window.addEventListener('keydown', (e) => {
+      const alreadyHeld = this.keys.has(e.code);
       this.keys.add(e.code);
       if (e.code === 'Space') this.jumpHeld = true;
       if (e.code === 'Escape') this.callbacks.onEscape?.();
       if (e.code === 'KeyE') this.callbacks.onInventory?.();
+      // Edge-triggered (ignore OS key-repeat) — frees the mouse cursor to
+      // click HUD buttons (backpack, map, etc.) without opening the pause
+      // menu; pressing it again (or clicking the canvas) re-locks it.
+      if ((e.code === 'ShiftLeft' || e.code === 'ShiftRight') && !alreadyHeld) this.callbacks.onToggleCursor?.();
       const digit = e.code.match(/^Digit([1-9])$/);
       if (digit) this.callbacks.onHotbar?.(Number(digit[1]) - 1);
     });

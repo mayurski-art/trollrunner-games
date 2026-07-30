@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { InputManager } from './InputManager.js';
 import { World } from '../world/World.js';
 import { Player } from '../player/Player.js';
-import { Spawner } from '../enemy/Spawner.js';
+import { Spawner, SPAWN_GRACE_SECONDS } from '../enemy/Spawner.js';
 import { performRaycast } from '../player/Interaction.js';
 import { Inventory } from '../ui/Inventory.js';
 import { InventoryScreen } from '../ui/InventoryScreen.js';
@@ -20,7 +20,7 @@ import { MusicManager } from './MusicManager.js';
 import { Weather } from './Weather.js';
 import { Net } from '../net/Net.js';
 import * as Save from '../world/Save.js';
-import { BLOCKS, PLACEABLE, UNARMED, WEAPON_STATS, DROP_OVERRIDE, SUMMON_ITEMS, FOOD_STATS } from '../world/blocks.js';
+import { BLOCKS, PLACEABLE, UNARMED, WEAPON_STATS, DROP_OVERRIDE, SUMMON_ITEMS, FOOD_STATS, MINE_TIER, TOOL_STATS, BLOCK_NAME } from '../world/blocks.js';
 import { Enemy } from '../enemy/Enemy.js';
 import { ENEMY_TYPES } from '../enemy/EnemyTypes.js';
 
@@ -103,6 +103,7 @@ export class Game {
       onEscape: () => this.handleEscape(),
       onInventory: () => this.toggleInventory(),
       onPause: () => this.togglePause(),
+      onToggleCursor: () => this.toggleCursorLock(),
     });
 
     window.addEventListener('resize', () => this.resize());
@@ -110,7 +111,11 @@ export class Game {
       if (document.hidden && this.state === 'running') this.pause();
     });
     document.addEventListener('pointerlockchange', () => {
-      if (document.pointerLockElement !== this.canvas && this.state === 'running') this.pause();
+      if (document.pointerLockElement === this.canvas) return;
+      // toggleCursorLock()'s own exit shouldn't trip this safety pause —
+      // only an unexpected loss (native Escape, alt-tab, ...) should.
+      if (this._cursorFreedIntentionally) { this._cursorFreedIntentionally = false; return; }
+      if (this.state === 'running') this.pause();
     });
     window.addEventListener('beforeunload', () => { this.saveNow(); this.net.stop(); });
 
@@ -164,8 +169,15 @@ export class Game {
       this.player = new Player(this.world, this.world.findSpawn());
     }
     this._applyStatScale();
+    this.spawner.enemies.forEach((e) => e.dispose(this.scene));
+    this.spawner.enemies = [];
+    this.spawner.spawnTimer = this.spawner.graceTimer = SPAWN_GRACE_SECONDS;
 
     if (this.hud.hardmodeBadge) this.hud.hardmodeBadge.hidden = !this.world.hardmode;
+    if (this.hud.safestartBadge) {
+      this.hud.safestartBadge.hidden = false;
+      this.hud.safestartBadge.style.opacity = '1';
+    }
     this.spawnVillagers();
     this.spawnRuinsGuardians();
     this.spawnVaultGuardians();
@@ -226,6 +238,19 @@ export class Game {
   togglePause() {
     if (this.state === 'running') { this.pause(); return; }
     if (this.state === 'paused') { this.resume(); this.onStateChange('running'); }
+  }
+
+  // Frees/re-locks the mouse cursor without pausing the sim — lets the
+  // player click HUD icons (backpack, waypoints) mid-run instead of having
+  // to go through the full pause menu just to move the mouse.
+  toggleCursorLock() {
+    if (this.state !== 'running') return;
+    if (document.pointerLockElement === this.canvas) {
+      this._cursorFreedIntentionally = true;
+      this.input.exitPointerLock();
+    } else {
+      this.input.requestPointerLock();
+    }
   }
 
   // Escape closes whichever menu screen is open; otherwise it pauses.
@@ -591,9 +616,24 @@ export class Game {
     }
     if (hit.type === 'block' && this.world.isMineable(hit.x, hit.y, hit.z)) {
       const id = this.world.getBlock(hit.x, hit.y, hit.z);
+      const requiredTier = MINE_TIER[id];
+      if (requiredTier) {
+        const held = this.inventory.selectedItem();
+        const tool = held && TOOL_STATS[held.id];
+        if (!tool || tool.kind !== 'pickaxe' || tool.tier < requiredTier) {
+          this.showDialogue('Tool needed', `Needs a better pickaxe to mine ${BLOCK_NAME[id] || 'this'}.`);
+          return;
+        }
+      }
       this.world.setBlock(hit.x, hit.y, hit.z, BLOCKS.AIR);
       const dropId = DROP_OVERRIDE[id] ?? id;
-      this.inventory.add(dropId, 1);
+      const held = this.inventory.selectedItem();
+      const axe = held && TOOL_STATS[held.id];
+      // A wood/leaves bonus drop is the axe's whole purpose here — mining
+      // is otherwise a single instant hit for everything, so there's no
+      // "faster chopping" to model like Minecraft's real speed system.
+      const bonus = (id === BLOCKS.WOOD || id === BLOCKS.LEAVES) && axe && axe.kind === 'axe' ? 1 : 0;
+      this.inventory.add(dropId, 1 + bonus);
       this.music.playMine();
       this.stats.blocksMined += 1;
     }
@@ -723,6 +763,15 @@ export class Game {
     if (!this.world.hardmode && this.dayNight.day >= HARDMODE_TRIGGER_DAY) {
       this.world.hardmode = true;
       if (this.hud.hardmodeBadge) this.hud.hardmodeBadge.hidden = false;
+    }
+    if (this.hud.safestartBadge && !this.hud.safestartBadge.hidden) {
+      const remaining = Math.ceil(this.spawner.graceTimer);
+      if (remaining > 0) {
+        if (this.hud.safestartTimer) this.hud.safestartTimer.textContent = String(remaining);
+      } else if (this.hud.safestartBadge.style.opacity !== '0') {
+        this.hud.safestartBadge.style.opacity = '0';
+        setTimeout(() => { this.hud.safestartBadge.hidden = true; }, 600);
+      }
     }
 
     const look = this.input.consumeLook();

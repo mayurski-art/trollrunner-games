@@ -12,6 +12,15 @@ export const RECIPES = [
   { id: 'wood_sword', inputs: [{ id: BLOCKS.PLANK, count: 3 }, { id: BLOCKS.STICK, count: 2 }], output: { id: BLOCKS.WOOD_SWORD, count: 1 } },
   { id: 'stone_sword', inputs: [{ id: BLOCKS.STONE, count: 3 }, { id: BLOCKS.STICK, count: 2 }], output: { id: BLOCKS.STONE_SWORD, count: 1 } },
   { id: 'gem_sword', inputs: [{ id: BLOCKS.GEMSTONE, count: 3 }, { id: BLOCKS.STICK, count: 2 }], output: { id: BLOCKS.GEM_SWORD, count: 1 } },
+  // Pickaxes: wood needs no tool (bare-handed dig), so it's the first
+  // rung — unlocks mining Stone. Stone pickaxe unlocks Ore/Gemstone. Gem
+  // pickaxe is the end-tier flavor upgrade (nothing further is gated behind it).
+  { id: 'wood_pickaxe', inputs: [{ id: BLOCKS.PLANK, count: 3 }, { id: BLOCKS.STICK, count: 2 }], output: { id: BLOCKS.WOOD_PICKAXE, count: 1 } },
+  { id: 'stone_pickaxe', inputs: [{ id: BLOCKS.STONE, count: 3 }, { id: BLOCKS.STICK, count: 2 }], output: { id: BLOCKS.STONE_PICKAXE, count: 1 } },
+  { id: 'gem_pickaxe', inputs: [{ id: BLOCKS.GEMSTONE, count: 3 }, { id: BLOCKS.STICK, count: 2 }], output: { id: BLOCKS.GEM_PICKAXE, count: 1 } },
+  { id: 'wood_axe', inputs: [{ id: BLOCKS.PLANK, count: 3 }, { id: BLOCKS.STICK, count: 2 }], output: { id: BLOCKS.WOOD_AXE, count: 1 } },
+  { id: 'stone_axe', inputs: [{ id: BLOCKS.STONE, count: 3 }, { id: BLOCKS.STICK, count: 2 }], output: { id: BLOCKS.STONE_AXE, count: 1 } },
+  { id: 'gem_axe', inputs: [{ id: BLOCKS.GEMSTONE, count: 3 }, { id: BLOCKS.STICK, count: 2 }], output: { id: BLOCKS.GEM_AXE, count: 1 } },
   { id: 'wood_armor', inputs: [{ id: BLOCKS.PLANK, count: 6 }], output: { id: BLOCKS.WOOD_ARMOR, count: 1 } },
   { id: 'stone_armor', inputs: [{ id: BLOCKS.STONE, count: 6 }], output: { id: BLOCKS.STONE_ARMOR, count: 1 } },
   { id: 'gem_armor', inputs: [{ id: BLOCKS.GEMSTONE, count: 6 }], output: { id: BLOCKS.GEM_ARMOR, count: 1 } },

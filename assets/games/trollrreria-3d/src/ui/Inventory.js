@@ -13,7 +13,7 @@ export class Inventory {
   constructor(hotbarEl) {
     this.hotbarEl = hotbarEl;
     this.slots = new Array(TOTAL_SLOTS).fill(null);
-    this.selectedHotbar = 0;
+    this.selectedHotbar = 0; // -1 means empty hand (deselected)
     this.armor = null; // single equipped {id, count:1} item, or null
     this.hotbarSlotEls = [];
     this.onChange = null; // set by InventoryScreen to re-render when open
@@ -48,12 +48,13 @@ export class Inventory {
   }
 
   selectedItem() {
-    return this.slots[this.selectedHotbar];
+    return this.selectedHotbar < 0 ? null : this.slots[this.selectedHotbar];
   }
 
   // Consumes one unit from the exact selected hotbar slot (not just any
   // matching stack) so placing always reflects what's actually selected.
   consumeSelected() {
+    if (this.selectedHotbar < 0) return false;
     const slot = this.slots[this.selectedHotbar];
     if (!slot || slot.count <= 0) return false;
     slot.count -= 1;
@@ -62,9 +63,12 @@ export class Inventory {
     return true;
   }
 
+  // Clicking (or number-keying) the already-selected slot again empties the
+  // hand instead of re-selecting it — same "deselect" convention as
+  // Minecraft/Terraria's hotbar.
   selectHotbar(i) {
-    if (i < 0 || i >= HOTBAR_SIZE) return;
-    this.selectedHotbar = i;
+    if (i < -1 || i >= HOTBAR_SIZE) return;
+    this.selectedHotbar = i === this.selectedHotbar ? -1 : i;
     this._changed();
   }
 
