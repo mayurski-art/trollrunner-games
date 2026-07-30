@@ -11,7 +11,7 @@ const MIN_SPAWN_DIST = 10;
 const MAX_SPAWN_DIST = 28;
 const HARDMODE_STAT_SCALE = { hp: 1.5, damage: 1.4 };
 
-const KIND_LIST = Object.values(ENEMY_TYPES);
+const KIND_LIST = Object.values(ENEMY_TYPES).filter((k) => !k.summonOnly);
 
 // Owns the live mob list: periodic spawning up to a cap, per-frame update,
 // and cleanup of dead mobs. Game.js just calls update() and reads

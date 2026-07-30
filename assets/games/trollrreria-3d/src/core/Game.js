@@ -18,7 +18,9 @@ import { DayNightCycle } from './DayNightCycle.js';
 import { MusicManager } from './MusicManager.js';
 import { Net } from '../net/Net.js';
 import * as Save from '../world/Save.js';
-import { BLOCKS, PLACEABLE, UNARMED, WEAPON_STATS, DROP_OVERRIDE } from '../world/blocks.js';
+import { BLOCKS, PLACEABLE, UNARMED, WEAPON_STATS, DROP_OVERRIDE, SUMMON_ITEMS } from '../world/blocks.js';
+import { Enemy } from '../enemy/Enemy.js';
+import { ENEMY_TYPES } from '../enemy/EnemyTypes.js';
 
 const REACH = 6;
 const AUTOSAVE_INTERVAL = 60;
@@ -277,6 +279,19 @@ export class Game {
     });
   }
 
+  // Spawns a world boss a few blocks in front of the player. Bosses live in
+  // spawner.enemies like any other mob (raycast/cleanup/attack handling all
+  // shared) but never enter the random spawn pool — see EnemyTypes.TROLL_KING.
+  summonBoss(kindName) {
+    const kind = ENEMY_TYPES[kindName];
+    if (!kind) return;
+    const forward = this.player.forwardVector();
+    const x = Math.round(this.player.pos.x + forward.x * 5);
+    const z = Math.round(this.player.pos.z + forward.z * 5);
+    const top = this.world.heightMap.get(`${x},${z}`) ?? Math.floor(this.player.pos.y);
+    this.spawner.enemies.push(new Enemy(this.scene, { x: x + 0.5, y: top + 1, z: z + 0.5 }, kind));
+  }
+
   showDialogue(name, line) {
     if (!this.hud.dialogue) return;
     this.hud.dialogue.textContent = `${name}: "${line}"`;
@@ -329,7 +344,12 @@ export class Game {
       const died = hit.entity.hit(stats.damage, this.player.pos);
       if (died) {
         this.quests.recordKill(hit.entity.type.name);
-        if (this.world.hardmode && Math.random() < 0.5) this.inventory.add(BLOCKS.REAPER_SHARD, 1);
+        if (hit.entity.type.isBoss) {
+          this.inventory.add(BLOCKS.REAPER_SHARD, 10);
+          this.inventory.add(BLOCKS.TROLL_CROWN, 1);
+        } else if (this.world.hardmode && Math.random() < 0.5) {
+          this.inventory.add(BLOCKS.REAPER_SHARD, 1);
+        }
       }
       return;
     }
@@ -375,7 +395,14 @@ export class Game {
     }
 
     const slot = this.inventory.selectedItem();
-    if (!slot || !PLACEABLE.includes(slot.id)) return;
+    if (!slot) return;
+
+    if (SUMMON_ITEMS[slot.id]) {
+      this.inventory.consumeSelected();
+      this.summonBoss(SUMMON_ITEMS[slot.id]);
+      return;
+    }
+    if (!PLACEABLE.includes(slot.id)) return;
 
     const px = hit.x + hit.normal.x, py = hit.y + hit.normal.y, pz = hit.z + hit.normal.z;
     if (this.world.getBlock(px, py, pz) !== BLOCKS.AIR) return;
@@ -433,6 +460,12 @@ export class Game {
     for (const attacker of attackers) {
       const dmg = Math.max(1, Math.round(attacker.type.damage * (1 - reduction)));
       if (this.player.takeDamage(dmg)) died = true;
+      if (attacker.type.isBoss) {
+        const dx = this.player.pos.x - attacker.pos.x, dz = this.player.pos.z - attacker.pos.z;
+        const d = Math.hypot(dx, dz) || 1;
+        this.player.moveAxis('x', (dx / d) * 3);
+        this.player.moveAxis('z', (dz / d) * 3);
+      }
     }
     if (fellOff === 'fell') died = true;
 
@@ -440,6 +473,15 @@ export class Game {
     if (this.hud.peerCount) this.hud.peerCount.textContent = this.net.active ? `🌐 ${this.net.peerCount}` : '';
 
     this.hud.hpFill.style.width = `${Math.max(0, (this.player.hp / this.player.maxHp) * 100)}%`;
+
+    if (this.hud.bossBar) {
+      const boss = this.spawner.enemies.find((e) => e.type.isBoss);
+      this.hud.bossBar.hidden = !boss;
+      if (boss) {
+        this.hud.bossName.textContent = boss.type.name;
+        this.hud.bossFill.style.width = `${Math.max(0, (boss.hp / boss.type.hp) * 100)}%`;
+      }
+    }
 
     if (died) {
       this.state = 'respawn';

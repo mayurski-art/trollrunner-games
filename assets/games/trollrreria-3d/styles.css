@@ -250,6 +250,39 @@ html, body {
   text-align: center;
 }
 
+.tr3-boss-bar {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 46px;
+  width: min(70vw, 420px);
+  text-align: center;
+}
+.tr3-boss-name {
+  display: block;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #ff4d4d;
+  margin-bottom: 4px;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+}
+.tr3-boss-track {
+  height: 10px;
+  background: rgba(0,0,0,0.5);
+  border: 1px solid rgba(255,77,77,0.4);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.tr3-boss-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #7c2d12, #ff4d4d);
+  transition: width 0.2s ease;
+}
+
 .tr3-waypoint-list { display: flex; flex-direction: column; gap: 10px; }
 .tr3-waypoint-row {
   font-family: 'DM Sans', sans-serif;

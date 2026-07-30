@@ -43,4 +43,13 @@ export const QUESTS = [
     ],
     reward: { items: [{ id: BLOCKS.REAPER_SHARD, count: 4 }], announce: 'Quest complete: The Reaping — bonus Reaper Shards.' },
   },
+  {
+    id: 'trollKing',
+    title: 'The Troll King',
+    intro: "There's an old summoning horn recipe if you're brave enough — 10 Reaper Shards, 5 Gemstone. Use it, and don't come back if you lose.",
+    objectives: [
+      { type: 'defeat', kind: 'Troll King', n: 1, label: 'Defeat the Troll King' },
+    ],
+    reward: { items: [{ id: BLOCKS.REAPER_SHARD, count: 8 }], announce: 'Quest complete: The Troll King is dethroned. Wear that crown with pride.' },
+  },
 ];

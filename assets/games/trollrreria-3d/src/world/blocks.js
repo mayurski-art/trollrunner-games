@@ -32,6 +32,8 @@ export const BLOCKS = {
   REAPER_SHARD: 28,
   REAPER_SWORD: 29,
   REAPER_ARMOR: 30,
+  SUMMONING_HORN: 31,
+  TROLL_CROWN: 32,
 };
 
 // Per-face color so a merged mesh can use vertex colors instead of textures.
@@ -66,6 +68,8 @@ export const BLOCK_COLOR = {
   [BLOCKS.REAPER_SHARD]: 0x1f2937,
   [BLOCKS.REAPER_SWORD]: 0x374151,
   [BLOCKS.REAPER_ARMOR]: 0x0f172a,
+  [BLOCKS.SUMMONING_HORN]: 0xea580c,
+  [BLOCKS.TROLL_CROWN]: 0xfacc15,
 };
 
 export const BLOCK_NAME = {
@@ -98,6 +102,14 @@ export const BLOCK_NAME = {
   [BLOCKS.REAPER_SHARD]: 'Reaper Shard',
   [BLOCKS.REAPER_SWORD]: 'Reaper Sword',
   [BLOCKS.REAPER_ARMOR]: 'Reaper Armor',
+  [BLOCKS.SUMMONING_HORN]: 'Summoning Horn',
+  [BLOCKS.TROLL_CROWN]: 'Troll Crown',
+};
+
+// Consumable items that summon a world boss when used (right-click with no
+// other interaction target) — see Game.handlePlace.
+export const SUMMON_ITEMS = {
+  [BLOCKS.SUMMONING_HORN]: 'TROLL_KING',
 };
 
 // Melee weapons: held item id -> { damage, cooldown (seconds) }. Anything
@@ -123,7 +135,7 @@ export const MINEABLE = [
   BLOCKS.GRASS, BLOCKS.DIRT, BLOCKS.STONE, BLOCKS.WOOD, BLOCKS.ORE,
   BLOCKS.SAND, BLOCKS.LEAVES, BLOCKS.PLANK, BLOCKS.TORCH, BLOCKS.CHEST,
   BLOCKS.STONE_BRICK, BLOCKS.SNOW, BLOCKS.CACTUS, BLOCKS.GEMSTONE, BLOCKS.BED,
-  BLOCKS.LEVER, BLOCKS.WIRE, BLOCKS.LAMP_OFF, BLOCKS.LAMP_ON,
+  BLOCKS.LEVER, BLOCKS.WIRE, BLOCKS.LAMP_OFF, BLOCKS.LAMP_ON, BLOCKS.TROLL_CROWN,
 ];
 
 // Items the player can right-click place as a world block. STICK is
@@ -133,6 +145,7 @@ export const PLACEABLE = [
   BLOCKS.DIRT, BLOCKS.STONE, BLOCKS.WOOD, BLOCKS.SAND, BLOCKS.ORE,
   BLOCKS.LEAVES, BLOCKS.PLANK, BLOCKS.TORCH, BLOCKS.CHEST, BLOCKS.STONE_BRICK,
   BLOCKS.SNOW, BLOCKS.CACTUS, BLOCKS.BED, BLOCKS.LEVER, BLOCKS.WIRE, BLOCKS.LAMP_OFF,
+  BLOCKS.TROLL_CROWN,
 ];
 
 // Mining these gives back a different item than the block itself (grass ->

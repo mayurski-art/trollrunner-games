@@ -47,4 +47,23 @@ export const ENEMY_TYPES = {
     flies: false,
     hardmodeOnly: true,
   },
+  // Never enters the random spawn pool — only appears via the Summoning
+  // Horn (see blocks.SUMMON_ITEMS / Game.summonBoss). Slam attack also
+  // knocks the player back (see Game._loop's attacker handling).
+  TROLL_KING: {
+    name: 'Troll King',
+    hp: 60,
+    radius: 1.1,
+    color: 0x7c2d12,
+    size: 2.2,
+    wanderSpeed: 1.0,
+    chaseSpeed: 2.8,
+    aggroRange: 20,
+    attackRange: 1.8,
+    attackCooldown: 1.3,
+    damage: 26,
+    flies: false,
+    isBoss: true,
+    summonOnly: true,
+  },
 };
