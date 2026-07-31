@@ -172,7 +172,7 @@ export class Game {
   // mode: 'new' generates a fresh island; 'continue' restores the last save
   // (falls back to 'new' if there isn't one). difficulty only applies to
   // 'new' — continuing restores whatever the save was started with.
-  start(mode = 'new', difficulty = 'normal') {
+  start(mode = 'new', difficulty = 'normal', worldModifier = 'normal') {
     const saveData = mode === 'continue' ? Save.loadSaveData() : null;
     if (saveData) {
       Save.applyWorldSave(this.world, saveData);
@@ -195,6 +195,10 @@ export class Game {
       }
     } else {
       this.difficulty = DIFFICULTY_SCALE[difficulty] ? difficulty : 'normal';
+      // A real random seed per "New Island" (previously always the
+      // constructor's fixed default — every new game generated an
+      // identical world). See World.WORLD_MODIFIERS for the preset list.
+      this.world.setSeed(Math.floor(Math.random() * 2 ** 31), worldModifier);
       this.world.generateHomeRegion();
       this.player = new Player(this.world, this.world.spawnPoint);
     }

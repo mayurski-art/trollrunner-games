@@ -104,7 +104,7 @@ if (hasSave()) {
 }
 
 let selectedDifficulty = 'normal';
-const diffButtons = [...document.querySelectorAll('.tr3-diff-btn')];
+const diffButtons = [...document.querySelectorAll('#tr3-difficulty-picker .tr3-diff-btn')];
 diffButtons.forEach((btn) => {
   btn.addEventListener('click', () => {
     selectedDifficulty = btn.dataset.diff;
@@ -112,11 +112,23 @@ diffButtons.forEach((btn) => {
   });
 });
 
+// Phase 7 — world seeds/modifiers: a second, independent picker (same
+// button styling, scoped separately so its clicks never toggle the
+// difficulty picker's active state or vice versa).
+let selectedWorldModifier = 'normal';
+const worldButtons = [...document.querySelectorAll('#tr3-world-picker .tr3-world-btn')];
+worldButtons.forEach((btn) => {
+  btn.addEventListener('click', () => {
+    selectedWorldModifier = btn.dataset.world;
+    worldButtons.forEach((b) => b.classList.toggle('is-active', b === btn));
+  });
+});
+
 function dropIn(mode) {
   showScreen(null);
   hudRoot.hidden = false;
   if (touchRoot) touchRoot.hidden = !isTouch;
-  game.start(mode, selectedDifficulty);
+  game.start(mode, selectedDifficulty, selectedWorldModifier);
 }
 
 btnStart.addEventListener('click', () => {

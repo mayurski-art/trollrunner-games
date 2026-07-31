@@ -22,18 +22,12 @@ export const CHUNK_LOAD_RADIUS = 8; // chunks kept generated+meshed around the p
 export const CHUNK_UNLOAD_RADIUS = 11; // farther than this, a chunk's mesh gets dropped (data kept)
 const MAX_NEW_CHUNKS_PER_TICK = 4; // throttled so fast movement/teleport doesn't stutter
 
-const BASE_HEIGHT = 20;
-const AMPLITUDE = 14;
 const CROP_GROWTH_SECONDS = 45;
 
-// Phase 3 — water: any column whose noise-height surface falls below this
-// gets filled with WATER from just above the surface up to sea level.
-// Static only (no flow/waves) per the roadmap's own scoping — the point is
-// beaches/lakes/rivers existing at all, not a flow simulation. Deliberately
-// well below BASE_HEIGHT so most of the map stays dry land with water
-// pooling only in the noise's low spots (lakes/rivers), not a single flat
-// ocean plane everywhere.
-const SEA_LEVEL = 12;
+// Base height/amplitude/sea-level and biome thresholds all moved to
+// instance fields (this.baseHeight etc, set from WORLD_MODIFIERS — see
+// below) so phase 7's world modifiers can scale them per-world. Water is
+// still static-only (no flow/waves) per the roadmap's phase 3 scoping.
 
 // Phase 1 — region-based settlements: the infinite world outside the home
 // region is divided into fixed-size chunk "regions"; each region gets ONE
@@ -62,14 +56,52 @@ const HOME_REGION_RADIUS = 130; // covers the vault's farthest ring candidate (1
 
 export const BIOMES = { FOREST: 'forest', DESERT: 'desert', SNOW: 'snow' };
 
+// Phase 7 — world seeds/modifiers: named presets that scale the SAME
+// generation parameters normal worlds use (amplitude/base height/sea
+// level/biome thresholds), rather than new generation systems. Applied via
+// World.setModifier() before the first chunk generates. desertMax/snowMin
+// are the getBiome() noise thresholds — forcing desertMax to 1 (or
+// snowMin to 0) makes that biome cover the entire world.
+export const WORLD_MODIFIERS = {
+  normal: { label: 'Normal', amplitude: 14, baseHeight: 20, seaLevel: 12, desertMax: 0.35, snowMin: 0.65 },
+  giant: { label: 'Giant World', amplitude: 26, baseHeight: 24, seaLevel: 10, desertMax: 0.35, snowMin: 0.65 },
+  tiny_islands: { label: 'Tiny Islands', amplitude: 10, baseHeight: 14, seaLevel: 15, desertMax: 0.35, snowMin: 0.65 },
+  endless_winter: { label: 'Endless Winter', amplitude: 14, baseHeight: 20, seaLevel: 12, desertMax: 0, snowMin: 0 },
+  desert_planet: { label: 'Desert Planet', amplitude: 12, baseHeight: 20, seaLevel: 6, desertMax: 1, snowMin: 1.01 },
+};
+
 export class World {
-  constructor(scene, seed = 1337) {
+  constructor(scene, seed = 1337, modifierKey = 'normal') {
     this.scene = scene;
+    this.modifierKey = WORLD_MODIFIERS[modifierKey] ? modifierKey : 'normal';
+    this._applyModifierParams();
+    this.setSeed(seed);
+    this._resetState();
+  }
+
+  // Reads this.modifierKey into plain instance fields consumed by
+  // columnHeight/_generateChunkTerrain/getBiome/water-fill — call before
+  // any generation happens (constructor, or setModifier()).
+  _applyModifierParams() {
+    const m = WORLD_MODIFIERS[this.modifierKey] || WORLD_MODIFIERS.normal;
+    this.amplitude = m.amplitude;
+    this.baseHeight = m.baseHeight;
+    this.seaLevel = m.seaLevel;
+    this.biomeDesertMax = m.desertMax;
+    this.biomeSnowMin = m.snowMin;
+  }
+
+  // Changes the seed and/or modifier for a NOT-YET-GENERATED world (fresh
+  // "New Island", or restoring a save's own seed — see Save.applyWorldSave)
+  // — rebuilds the noise functions so terrain generated from here on
+  // actually reflects the new seed instead of the constructor's original.
+  setSeed(seed, modifierKey = this.modifierKey) {
     this.seed = seed;
+    this.modifierKey = WORLD_MODIFIERS[modifierKey] ? modifierKey : 'normal';
+    this._applyModifierParams();
     this.heightNoise = makeFractalNoise2D(seed);
     this.treeNoise = makeNoise2D(seed + 501);
     this.biomeNoise = makeNoise2D(seed + 2003);
-    this._resetState();
   }
 
   // Clears every chunk/derived-map/structure-position back to a blank
@@ -125,8 +157,8 @@ export class World {
   // Low-frequency regions so biomes read as continuous patches, not noise.
   getBiome(x, z) {
     const n = this.biomeNoise(x * 0.012, z * 0.012);
-    if (n < 0.35) return BIOMES.DESERT;
-    if (n > 0.65) return BIOMES.SNOW;
+    if (n < this.biomeDesertMax) return BIOMES.DESERT;
+    if (n > this.biomeSnowMin) return BIOMES.SNOW;
     return BIOMES.FOREST;
   }
 
@@ -136,7 +168,7 @@ export class World {
   // not from a "closer to the center = taller" shape.
   columnHeight(x, z) {
     const n = this.heightNoise(x, z); // 0..1
-    const h = Math.round(BASE_HEIGHT + (n - 0.5) * AMPLITUDE * 2);
+    const h = Math.round(this.baseHeight + (n - 0.5) * this.amplitude * 2);
     return Math.max(2, Math.min(CHUNK_Y - 6, h));
   }
 
@@ -217,7 +249,7 @@ export class World {
     }
 
     const anchorTop = this.heightMap.get(`${anchorX},${anchorZ}`);
-    if (anchorTop === undefined || anchorTop < SEA_LEVEL) return; // don't found a village on/under water — see phase 4 for a coastal variant
+    if (anchorTop === undefined || anchorTop < this.seaLevel) return; // don't found a village on/under water — see phase 4 for a coastal variant
 
     const avoidPos = [
       this.villagePos, this.outpostPos, this.dungeonPos, this.vaultPos,
@@ -282,7 +314,7 @@ export class World {
         // A shore band gets sand even outside the DESERT biome, same as the
         // existing "top <= 4" case — just extended a couple blocks above
         // sea level so beaches read as a transition, not a hard line.
-        const isShore = top <= SEA_LEVEL + 2;
+        const isShore = top <= this.seaLevel + 2;
         const topBlock = (top <= 4 || isShore) ? BLOCKS.SAND
           : biome === BIOMES.DESERT ? BLOCKS.SAND
           : biome === BIOMES.SNOW ? BLOCKS.SNOW
@@ -296,7 +328,7 @@ export class World {
           else id = BLOCKS.STONE; // ore/gemstone come from placeOreVeins, not per-block noise
           chunk.setLocal(lx, y, lz, id);
         }
-        for (let y = top + 1; y <= SEA_LEVEL; y++) chunk.setLocal(lx, y, lz, BLOCKS.WATER);
+        for (let y = top + 1; y <= this.seaLevel; y++) chunk.setLocal(lx, y, lz, BLOCKS.WATER);
       }
     }
   }
@@ -408,7 +440,7 @@ export class World {
       for (let lz = 0; lz < CHUNK_Z; lz++) {
         const x = wx + lx, z = wz + lz;
         const top = this.heightMap.get(`${x},${z}`);
-        if (top === undefined || top < 6 || top < SEA_LEVEL) continue; // submerged column — see SEA_LEVEL
+        if (top === undefined || top < 6 || top < this.seaLevel) continue; // submerged column — see this.seaLevel
         const biome = this.biomeMap.get(`${x},${z}`);
         const surface = this.getBlock(x, top, z);
         if (biome === BIOMES.DESERT) {
@@ -838,6 +870,6 @@ export class World {
       if (!clear) continue;
       return { x: x + 0.5, y: top + 2, z: z + 0.5 };
     }
-    return { x: cx + 0.5, y: BASE_HEIGHT + 2, z: cz + 0.5 };
+    return { x: cx + 0.5, y: this.baseHeight + 2, z: cz + 0.5 };
   }
 }

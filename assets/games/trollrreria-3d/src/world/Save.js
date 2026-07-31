@@ -90,6 +90,7 @@ export function buildWorldSnapshot(world) {
   return {
     version: SAVE_VERSION,
     seed: world.seed,
+    modifierKey: world.modifierKey,
     chunks,
     chests,
     levers,
@@ -167,6 +168,11 @@ export function applyWorldSave(world, saveData) {
   // reused across the page session, so any chunks streamed in during a
   // prior playthrough (without a page reload in between) shouldn't leak
   // into a freshly-loaded save.
+  // Restores the seed/modifier BEFORE resetting state — the noise
+  // functions it rebuilds are what any not-yet-saved chunk streamed in
+  // later will generate from, so they need to match what originally
+  // produced the saved chunks (see World.setSeed).
+  world.setSeed(saveData.seed ?? world.seed, saveData.modifierKey);
   world._resetState();
   for (const [key, b64] of Object.entries(saveData.chunks)) {
     const [cx, cz] = key.split(',').map(Number);
