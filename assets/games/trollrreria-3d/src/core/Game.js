@@ -21,6 +21,7 @@ import { Weather } from './Weather.js';
 import { Minimap } from '../ui/Minimap.js';
 import { HeldItem } from '../render/HeldItem.js';
 import { Net } from '../net/Net.js';
+import * as CloudSave from '../net/CloudSave.js';
 import * as Save from '../world/Save.js';
 import { BLOCKS, PLACEABLE, UNARMED, WEAPON_STATS, DROP_OVERRIDE, SUMMON_ITEMS, FOOD_STATS, MINE_TIER, TOOL_STATS, BLOCK_NAME, mineSeconds, ICON_MAP } from '../world/blocks.js';
 import { Enemy } from '../enemy/Enemy.js';
@@ -301,11 +302,46 @@ export class Game {
   // Escape closes whichever menu screen is open; otherwise it pauses.
   handleEscape() {
     if (this.state === 'leaderboard') { this.toggleLeaderboard(); return; }
+    if (this.state === 'cloud') { this.toggleCloudSave(); return; }
     if (['inventory', 'chest', 'merchant', 'coop', 'waypoints'].includes(this.state)) {
       this.closeMenus();
       return;
     }
     this.togglePause();
+  }
+
+  // Phase 9 — cloud saves. Same open/close pattern as toggleLeaderboard
+  // (reachable from paused/menu, not just running, since there's usually
+  // no reason to cloud-save mid-fight).
+  toggleCloudSave() {
+    if (this.state === 'cloud') {
+      this.state = this._cloudReturnState;
+      if (this.state === 'running') this.input.requestPointerLock();
+      this.onStateChange(this.state);
+      return;
+    }
+    if (['running', 'menu', 'paused'].includes(this.state)) {
+      this._cloudReturnState = this.state;
+      this.state = 'cloud';
+      this.input.exitPointerLock();
+      this.onStateChange('cloud');
+    }
+  }
+
+  // Returns true/false. Only callable once a world actually exists (i.e.
+  // not from the main menu before "Drop In").
+  async cloudSaveGame(code) {
+    if (!this.player) return false;
+    return CloudSave.cloudSaveGame(this, code);
+  }
+
+  // Fetches a cloud save and writes it into the local save slot — caller
+  // (main.js) still needs to actually restart into it via
+  // game.start('continue', ...), same as clicking "Continue Island".
+  async cloudLoadGame(code) {
+    const data = await CloudSave.cloudLoadGame(code);
+    if (!data) return false;
+    return Save.writeRawSaveData(data);
   }
 
   toggleWaypoints() {

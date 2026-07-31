@@ -62,6 +62,21 @@ function base64ToBytes(b64) {
   return bytes;
 }
 
+// Writes a raw save-data object (already in the same shape saveGame()
+// produces) directly into the local save slot — used by the phase-9
+// cloud-load flow to hand a fetched cloud save to the exact same
+// 'continue' restore path a local save already uses, instead of
+// duplicating that restore logic.
+export function writeRawSaveData(data) {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    return true;
+  } catch (err) {
+    console.warn('Trollrreria 3D: writing cloud save locally failed', err);
+    return false;
+  }
+}
+
 export function hasSave() {
   try {
     return localStorage.getItem(SAVE_KEY) !== null;
@@ -108,10 +123,12 @@ export function buildWorldSnapshot(world) {
   };
 }
 
-// Captures everything needed to resume: terrain (per-chunk RLE), chests,
-// player state, inventory, and the day/night clock.
-export function saveGame(game) {
-  const data = {
+// Everything needed to resume: terrain (per-chunk RLE), chests, player
+// state, inventory, and the day/night clock. Shared by the local
+// localStorage save below AND CloudSave.js's phase-9 cloud save — same
+// payload shape either way, just a different destination.
+export function buildFullSaveData(game) {
+  return {
     ...buildWorldSnapshot(game.world),
     savedAt: Date.now(),
     player: {
@@ -137,7 +154,10 @@ export function saveGame(game) {
     },
     difficulty: game.difficulty,
   };
+}
 
+export function saveGame(game) {
+  const data = buildFullSaveData(game);
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     return true;

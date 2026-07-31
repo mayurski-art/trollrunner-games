@@ -1,6 +1,7 @@
 import { Game } from './core/Game.js';
 import { hasSave } from './world/Save.js';
 import { Net } from './net/Net.js';
+import * as CloudSave from './net/CloudSave.js';
 
 const canvas = document.getElementById('tr3-canvas');
 const touchRoot = document.getElementById('tr3-touch');
@@ -39,7 +40,8 @@ const screenMerchant = document.getElementById('tr3-screen-merchant');
 const screenCoop = document.getElementById('tr3-screen-coop');
 const screenWaypoints = document.getElementById('tr3-screen-waypoints');
 const screenLeaderboard = document.getElementById('tr3-screen-leaderboard');
-const allScreens = [screenMenu, screenPause, screenRespawn, screenInventory, screenChest, screenMerchant, screenCoop, screenWaypoints, screenLeaderboard];
+const screenCloud = document.getElementById('tr3-screen-cloud');
+const allScreens = [screenMenu, screenPause, screenRespawn, screenInventory, screenChest, screenMerchant, screenCoop, screenWaypoints, screenLeaderboard, screenCloud];
 
 const btnStart = document.getElementById('tr3-btn-start');
 const btnContinue = document.getElementById('tr3-btn-continue');
@@ -64,6 +66,13 @@ const btnWaypointsClose = document.getElementById('tr3-btn-waypoints-close');
 const btnLeaderboardMenu = document.getElementById('tr3-btn-leaderboard-menu');
 const btnLeaderboard = document.getElementById('tr3-btn-leaderboard');
 const btnLeaderboardClose = document.getElementById('tr3-btn-leaderboard-close');
+const btnCloud = document.getElementById('tr3-btn-cloud');
+const btnCloudClose = document.getElementById('tr3-btn-cloud-close');
+const btnCloudNewCode = document.getElementById('tr3-btn-cloud-new-code');
+const btnCloudSave = document.getElementById('tr3-btn-cloud-save');
+const btnCloudLoad = document.getElementById('tr3-btn-cloud-load');
+const cloudCode = document.getElementById('tr3-cloud-code');
+const cloudStatus = document.getElementById('tr3-cloud-status');
 
 const isTouch = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 
@@ -80,6 +89,7 @@ function onStateChange(state) {
   else if (state === 'coop') showScreen(screenCoop);
   else if (state === 'waypoints') showScreen(screenWaypoints);
   else if (state === 'leaderboard') showScreen(screenLeaderboard);
+  else if (state === 'cloud') showScreen(screenCloud);
   else if (state === 'menu') showScreen(screenMenu);
   else showScreen(null);
   if (touchRoot) touchRoot.hidden = !(isTouch && state === 'running');
@@ -202,3 +212,25 @@ btnWaypointsClose.addEventListener('click', () => game.closeMenus());
 btnLeaderboardMenu.addEventListener('click', () => game.toggleLeaderboard());
 btnLeaderboard.addEventListener('click', () => game.toggleLeaderboard());
 btnLeaderboardClose.addEventListener('click', () => game.toggleLeaderboard());
+
+btnCloud.addEventListener('click', () => game.toggleCloudSave());
+btnCloudClose.addEventListener('click', () => game.toggleCloudSave());
+btnCloudNewCode.addEventListener('click', () => { cloudCode.value = CloudSave.makeCloudCode(); });
+
+btnCloudSave.addEventListener('click', async () => {
+  const code = cloudCode.value.trim();
+  if (code.length !== 5) { cloudStatus.textContent = 'Enter or generate a 5-letter code first.'; return; }
+  cloudStatus.textContent = 'Saving…';
+  const ok = await game.cloudSaveGame(code);
+  cloudStatus.textContent = ok ? `Saved under code ${code.toUpperCase()}. Write it down!` : 'Cloud save failed — try again.';
+});
+
+btnCloudLoad.addEventListener('click', async () => {
+  const code = cloudCode.value.trim();
+  if (code.length !== 5) { cloudStatus.textContent = 'Enter the 5-letter save code first.'; return; }
+  cloudStatus.textContent = 'Loading…';
+  const ok = await game.cloudLoadGame(code);
+  if (!ok) { cloudStatus.textContent = 'No save found for that code.'; return; }
+  cloudStatus.textContent = 'Loaded — dropping back in…';
+  dropIn('continue');
+});

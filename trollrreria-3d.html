@@ -102,8 +102,26 @@
         <h2 class="tr3-dialog-title">PAUSED</h2>
         <div class="tr3-dialog-actions">
           <button id="tr3-btn-resume" class="tr3-btn-primary" type="button">▶ Resume</button>
+          <button id="tr3-btn-cloud" class="tr3-btn-ghost" type="button">☁ Cloud Save</button>
           <button id="tr3-btn-leaderboard" class="tr3-btn-ghost" type="button">🏆 Weekly Ladder</button>
           <button id="tr3-btn-exit" class="tr3-btn-ghost" type="button">Exit to Menu</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Cloud save -->
+    <section id="tr3-screen-cloud" class="tr3-screen" aria-label="Cloud save">
+      <div class="tr3-dialog-panel">
+        <header class="tr3-panel-head">
+          <h2 class="tr3-dialog-title">CLOUD SAVE</h2>
+          <button id="tr3-btn-cloud-close" class="tr3-panel-close" type="button" aria-label="Close">✕</button>
+        </header>
+        <p id="tr3-cloud-status" class="tr3-panel-hint">Save or load your island with a code — no account needed. Anyone with the code can load it, so keep it to yourself.</p>
+        <input id="tr3-cloud-code" class="tr3-coop-input" type="text" maxlength="5" placeholder="SAVE CODE" autocomplete="off" autocapitalize="characters">
+        <div class="tr3-dialog-actions">
+          <button id="tr3-btn-cloud-new-code" class="tr3-btn-ghost" type="button">🎲 New Code</button>
+          <button id="tr3-btn-cloud-save" class="tr3-btn-primary" type="button">☁ Save to Cloud</button>
+          <button id="tr3-btn-cloud-load" class="tr3-btn-ghost" type="button">⤓ Load from Cloud</button>
         </div>
       </div>
     </section>
