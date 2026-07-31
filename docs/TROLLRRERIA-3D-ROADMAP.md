@@ -224,12 +224,16 @@ works).
 
 ## Phase 11 — 3D characters
 
-Explicitly last. Current mobs and (presumably) the player render as
-PixelLab billboard sprites (`SpriteTextures.js`, confirmed for `Enemy.js`
-on this branch) — this is a deliberate style choice, not a placeholder, per
-[[feedback-sprites-must-match-trollface-style]]. Only revisit if billboard
-sprites become a demonstrated problem (e.g. readability in combat at
-certain angles), not on aesthetic grounds alone.
+**Evaluated when this phase started; no change made.** Confirmed mobs still
+render as PixelLab billboard sprites (`Enemy.js` via `SpriteTextures.js`)
+and this is a deliberate style choice, not a placeholder, per
+[[feedback-sprites-must-match-trollface-style]]. The roadmap's own
+condition for touching this — "only if billboard sprites become a
+demonstrated problem" — was never met during phases 1-10 (no readability
+or gameplay complaint surfaced), and a real 3D character conversion needs
+actual rigged 3D assets that don't exist for this game, not just an engine
+change. Revisit only if a concrete problem shows up in play, not on
+aesthetic grounds alone.
 
 ---
 
