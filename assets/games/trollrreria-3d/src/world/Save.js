@@ -1,4 +1,5 @@
-import { CHUNK_X, CHUNK_Y, CHUNK_Z } from './Chunk.js';
+import { Chunk, CHUNK_X, CHUNK_Y, CHUNK_Z } from './Chunk.js';
+import { BLOCKS } from './blocks.js';
 
 const SAVE_KEY = 'tr3-save-v1';
 const SAVE_VERSION = 1;
@@ -98,6 +99,7 @@ export function buildWorldSnapshot(world) {
     outpostPos: world.outpostPos,
     dungeonPos: world.dungeonPos,
     vaultPos: world.vaultPos,
+    campPositions: world.campPositions,
   };
 }
 
@@ -151,13 +153,24 @@ export function loadSaveData() {
   }
 }
 
-// Populates an already-constructed World's chunks from saved data instead
-// of procedurally generating them. Caller still needs to build meshes and
-// rebuild heightMap/biomeMap/chests afterward.
+// Populates a World's chunks from saved data instead of procedurally
+// generating them — creates each saved chunk fresh rather than assuming it
+// already exists, since chunks are no longer pre-created upfront (see
+// World.js's chunk-streaming rewrite). Caller still needs to build meshes
+// (rebuildDerivedMapsFromChunks + this function's own mesh pass do that).
 export function applyWorldSave(world, saveData) {
+  // Same defensive reset generateHomeRegion() does — the World instance is
+  // reused across the page session, so any chunks streamed in during a
+  // prior playthrough (without a page reload in between) shouldn't leak
+  // into a freshly-loaded save.
+  world._resetState();
   for (const [key, b64] of Object.entries(saveData.chunks)) {
-    const chunk = world.chunks.get(key);
-    if (!chunk) continue;
+    const [cx, cz] = key.split(',').map(Number);
+    let chunk = world.chunks.get(key);
+    if (!chunk) {
+      chunk = new Chunk(cx, cz, world);
+      world.chunks.set(key, chunk);
+    }
     chunk.data = rleDecode(base64ToBytes(b64), CHUNK_LEN);
   }
   world.chests = new Map(Object.entries(saveData.chests || {}).map(([k, v]) => [k, v]));
@@ -168,6 +181,30 @@ export function applyWorldSave(world, saveData) {
   world.outpostPos = saveData.outpostPos || null;
   world.dungeonPos = saveData.dungeonPos || null;
   world.vaultPos = saveData.vaultPos || null;
+  world.campPositions = saveData.campPositions || [];
+  world.spawnPoint = saveData.player?.spawn || null;
   world.rebuildDerivedMapsFromChunks();
-  for (const chunk of world.chunks.values()) chunk.buildMesh(world.scene);
+  // Lights/lava placed underground need their propagated levels BEFORE the
+  // one real mesh build below (Chunk.buildMesh reads light per-face), same
+  // as a fresh generateHomeRegion() would.
+  world.lightSources.clear();
+  for (const chunk of world.chunks.values()) {
+    const wx = chunk.cx * CHUNK_X, wz = chunk.cz * CHUNK_Z;
+    for (let lx = 0; lx < CHUNK_X; lx++) {
+      for (let lz = 0; lz < CHUNK_Z; lz++) {
+        for (let y = 1; y < CHUNK_Y; y++) {
+          const id = chunk.getLocal(lx, y, lz);
+          if (id === BLOCKS.TORCH || id === BLOCKS.LAVA) {
+            world.lightSources.add(world.posKey(wx + lx, y, wz + lz));
+          }
+        }
+      }
+    }
+  }
+  world.recomputeLight();
+  for (const chunk of world.chunks.values()) {
+    chunk.buildMesh(world.scene);
+    world.meshedChunks.add(world.key(chunk.cx, chunk.cz));
+    world.generatedChunks.add(world.key(chunk.cx, chunk.cz));
+  }
 }

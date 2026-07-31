@@ -1,13 +1,3 @@
-import { WORLD_SIZE_X, WORLD_SIZE_Z } from '../world/World.js';
-
-// The terrain grid is still finite (no infinite chunk streaming — see
-// World.js) even though it no longer falls off to a void within its
-// bounds. Right at the literal edge of that grid there's still a real
-// cliff into nothing, since out-of-bounds columns are air with no floor.
-// A soft margin here stops the player before they'd ever see it, the same
-// way Minecraft's own invisible world-border does for a bounded map.
-const WORLD_EDGE_MARGIN = 6;
-
 const HALF_W = 0.3;
 const HEIGHT = 1.7;
 const EYE_HEIGHT = 1.55;
@@ -101,12 +91,10 @@ export class Player {
 
     this.moveAxis('x', this.vel.x * dt);
     this.moveAxis('z', this.vel.z * dt);
-    this.pos.x = Math.max(WORLD_EDGE_MARGIN, Math.min(WORLD_SIZE_X - WORLD_EDGE_MARGIN, this.pos.x));
-    this.pos.z = Math.max(WORLD_EDGE_MARGIN, Math.min(WORLD_SIZE_Z - WORLD_EDGE_MARGIN, this.pos.z));
     this.grounded = false;
     this.moveAxis('y', this.vel.y * dt);
 
-    // Fell off the island into the void.
+    // Fell into a cave/pit deep enough to be unrecoverable.
     if (this.pos.y < -20) return 'fell';
     return null;
   }

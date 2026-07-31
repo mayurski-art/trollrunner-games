@@ -53,23 +53,20 @@ function fillLoot(world, chestPositions) {
   lootB[1] = { id: BLOCKS.STONE_ARMOR, count: 1 };
 }
 
-// Offsets tuned for the original 80x80 island — scaled by actual world size
-// so the ruins land proportionally farther out on a bigger map instead of
-// clustering near the center with everything else.
-const BASE_WORLD_SIZE = 80;
+// Fixed absolute offsets around the home region's origin (see Village.js —
+// same reasoning: the world is unbounded now, nothing left to scale against).
 
 // Placed far enough from both settlements that all three landmarks read as
 // separate points of interest rather than crowding one corner of the island.
-export function placeDungeon(world, worldSizeX, worldSizeZ, avoidPositions = []) {
-  const cx = Math.floor(worldSizeX / 2);
-  const cz = Math.floor(worldSizeZ / 2);
-  const scale = worldSizeX / BASE_WORLD_SIZE;
-  const minDist = MIN_DIST_FROM_VILLAGE * scale;
+export function placeDungeon(world, originX, originZ, avoidPositions = []) {
+  const cx = originX;
+  const cz = originZ;
+  const minDist = MIN_DIST_FROM_VILLAGE;
   const offsets = [[-16, -16], [16, 16], [-18, 12], [18, -12], [0, -20]];
   const avoid = avoidPositions.filter(Boolean);
 
   for (const [ox, oz] of offsets) {
-    const centerX = Math.round(cx + ox * scale), centerZ = Math.round(cz + oz * scale);
+    const centerX = cx + ox, centerZ = cz + oz;
     if (avoid.some((p) => Math.hypot(centerX - p.x, centerZ - p.z) < minDist)) continue;
     const result = buildChamber(world, centerX, centerZ);
     if (result) {

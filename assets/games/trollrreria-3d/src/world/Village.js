@@ -109,10 +109,10 @@ function placeFarm(world, cx, cz) {
   }
 }
 
-// Base offsets tuned for the original 80x80 island — scaled by the actual
-// world size below so landmarks spread proportionally on a bigger map
-// instead of all clustering within a small radius of the center.
-const BASE_WORLD_SIZE = 80;
+// Fixed absolute offsets around the home region's origin — the world
+// itself is unbounded/infinite now (see World.js), so there's no "world
+// size" left to scale these against; the home region is just a fixed-size
+// cluster wherever the origin is, same absolute spread regardless.
 const MAIN_OFFSETS = [[10, 10], [-14, 8], [12, -12], [-10, -14], [16, 2]];
 const OUTPOST_OFFSETS = [[-16, -6], [16, -16], [-6, 16], [18, 14], [-18, -2]];
 // Reach much farther out than the two main settlements — now that the
@@ -133,20 +133,16 @@ const MIN_DIST_FROM_OTHER_VILLAGE = 18;
 // Returns the settlement center (used for the fast-travel waypoint) or
 // null if no suitable spot found. hutCount=2 gives the second "outpost"
 // settlement a visibly smaller footprint than the main village.
-export function placeVillage(world, worldSizeX, worldSizeZ, { avoidPos = null, offsets = MAIN_OFFSETS, hutCount = 5 } = {}) {
-  const cx = Math.floor(worldSizeX / 2);
-  const cz = Math.floor(worldSizeZ / 2);
-  const scale = worldSizeX / BASE_WORLD_SIZE;
-  const minDist = MIN_DIST_FROM_OTHER_VILLAGE * scale;
-  // Hut layout stays at a fixed, human "walkable village" scale regardless
-  // of island size — only WHERE the whole settlement sits on the island
-  // scales, not the spacing between buildings inside it.
+export function placeVillage(world, originX, originZ, { avoidPos = null, offsets = MAIN_OFFSETS, hutCount = 5 } = {}) {
+  const cx = originX;
+  const cz = originZ;
+  const minDist = MIN_DIST_FROM_OTHER_VILLAGE;
   const allHutOffsets = [[0, 0], [9, 4], [-9, 4], [-5, 10], [5, 10]];
   const hutOffsets = allHutOffsets.slice(0, hutCount);
 
   const avoidList = (Array.isArray(avoidPos) ? avoidPos : [avoidPos]).filter(Boolean);
   for (const [ox, oz] of offsets) {
-    const centerX = Math.round(cx + ox * scale), centerZ = Math.round(cz + oz * scale);
+    const centerX = cx + ox, centerZ = cz + oz;
     if (avoidList.some((p) => Math.hypot(centerX - p.x, centerZ - p.z) < minDist)) continue;
     const top = world.heightMap.get(`${centerX},${centerZ}`);
     if (top === undefined || top < 3) continue;

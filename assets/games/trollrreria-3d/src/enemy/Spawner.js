@@ -1,6 +1,5 @@
 import { Enemy } from './Enemy.js';
 import { ENEMY_TYPES } from './EnemyTypes.js';
-import { WORLD_SIZE_X, WORLD_SIZE_Z } from '../world/World.js';
 import { CHUNK_Y } from '../world/Chunk.js';
 import { BLOCKS } from '../world/blocks.js';
 
@@ -82,7 +81,6 @@ export class Spawner {
       const dist = minDist + Math.random() * (maxDist - minDist);
       const x = Math.floor(playerPos.x + Math.cos(angle) * dist);
       const z = Math.floor(playerPos.z + Math.sin(angle) * dist);
-      if (x < 1 || x >= WORLD_SIZE_X - 1 || z < 1 || z >= WORLD_SIZE_Z - 1) continue;
 
       let kind = pool[Math.floor(Math.random() * pool.length)];
       const hpScale = (hardmode && !kind.hardmodeOnly ? HARDMODE_STAT_SCALE.hp : 1) * this.statScale.hp;

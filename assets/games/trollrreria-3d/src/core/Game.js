@@ -181,8 +181,8 @@ export class Game {
       }
     } else {
       this.difficulty = DIFFICULTY_SCALE[difficulty] ? difficulty : 'normal';
-      this.world.generate();
-      this.player = new Player(this.world, this.world.findSpawn());
+      this.world.generateHomeRegion();
+      this.player = new Player(this.world, this.world.spawnPoint);
     }
     this._applyStatScale();
     this.minimap.reset();
@@ -854,6 +854,12 @@ export class Game {
         setTimeout(() => { this.hud.safestartBadge.hidden = true; }, 600);
       }
     }
+
+    // Keeps terrain generated+meshed in a radius around the player and
+    // drops the mesh (not the data) for anything too far away — called
+    // before movement so the ground the player is about to step onto is
+    // never one frame behind having been generated.
+    this.world.streamChunks(this.player.pos.x, this.player.pos.z);
 
     const look = this.input.consumeLook();
     this.player.lookDelta(look.dx, look.dy);

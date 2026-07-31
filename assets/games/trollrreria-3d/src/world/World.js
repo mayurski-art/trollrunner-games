@@ -7,42 +7,31 @@ import { placeVault } from './Vault.js';
 
 const NEIGHBOR_DIRS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 
-// One big fixed terrain grid generated at load — no infinite chunk
-// streaming (true Minecraft-style infinite terrain would need chunk-by-
-// chunk generation as the player walks, plus reworking structure
-// placement/roads/minimap/saves to not assume a known bounded world —
-// a much bigger change, tracked separately, not what this constant fixes).
-// Sizing history: 5x5 (80x80, original MVP) -> 9x9 (144x144) -> 25x25
-// (400x400) -> still read as small/bounded on playtest even at 400x400,
-// traced to two compounding causes fixed alongside this bump: (1) the
-// terrain used to be a "floating island" that fell all the way to a void
-// past a radius — no matter how big that radius got, walking toward any
-// edge meant hitting visible nothing, which reads as small regardless of
-// the raw number; MIN_FALLOFF below removes that, so the terrain now
-// blends into lower rolling land instead of stopping anywhere within this
-// grid. (2) Chunk.buildMesh's empty-chunk skip (see there) means a
-// continuous-terrain world doesn't get that draw-call savings anymore
-// (every chunk now has geometry, not just the ~79% inside the old circular
-// falloff) — re-verified FPS headroom at this size with that factored in.
-// Landed on 21x21 (336x336): 100% of it is walkable now (no void), which
-// is MORE total usable area than 25x25's old ~79%-circular-usable 400x400
-// despite the smaller nominal grid, at comparable relative performance.
-export const WORLD_CHUNKS = 21; // 21x21 chunks -> 336x336 blocks, fully walkable
-export const WORLD_SIZE_X = WORLD_CHUNKS * CHUNK_X;
-export const WORLD_SIZE_Z = WORLD_CHUNKS * CHUNK_Z;
-const ISLAND_RADIUS = WORLD_SIZE_X * 0.42;
-// The floor under the center-falloff multiplier (see columnHeight) — below
-// this, terrain no longer drops toward a void; it settles into lower
-// rolling hills instead of a hard edge. 0 would restore the old
-// "floating island" behavior.
-const MIN_FALLOFF = 0.4;
-// Raised from 14/8 (then 18/12) — the falloff multiplier means most
-// terrain ends up shorter than the raw BASE_HEIGHT±AMPLITUDE range
-// suggests. This keeps real mountains near the center and enough vertical
-// room for caves/ore veins across a meaningful fraction of the map.
+// True infinite terrain: chunks generate on demand as the player walks
+// (streamChunks, called from Game._loop) and their MESH gets dropped once
+// far enough away — block data is kept forever once generated so an edit
+// persists and walking back doesn't regenerate differently. This replaced
+// an earlier "one big fixed grid" approach (5x5 -> 9x9 -> 25x25 -> 21x21)
+// that kept reading as small/bounded no matter how big the grid got: it
+// was still finite, so there was always an edge to eventually walk into.
+export const CHUNK_LOAD_RADIUS = 6; // chunks kept generated+meshed around the player
+export const CHUNK_UNLOAD_RADIUS = 9; // farther than this, a chunk's mesh gets dropped (data kept)
+const MAX_NEW_CHUNKS_PER_TICK = 3; // throttled so fast movement/teleport doesn't stutter
+
 const BASE_HEIGHT = 20;
 const AMPLITUDE = 14;
 const CROP_GROWTH_SECONDS = 45;
+
+// The village/outpost/dungeon/vault/camp cluster (and spawn) live in a
+// fixed "home region" around a fixed origin rather than being scattered
+// across infinite terrain — keeps the whole quest/merchant/villager/
+// leaderboard system (which assumes ONE known village etc.) unchanged.
+// Terrain OUTSIDE this region is fully infinite/streamed like everywhere
+// else; the home region is just where the hand-placed landmarks happen to
+// live, not a special terrain shape (no falloff/island concept anymore).
+const HOME_ORIGIN_X = 0;
+const HOME_ORIGIN_Z = 0;
+const HOME_REGION_RADIUS = 130; // covers the vault's farthest ring candidate (108) + margin
 
 export const BIOMES = { FOREST: 'forest', DESERT: 'desert', SNOW: 'snow' };
 
@@ -53,8 +42,26 @@ export class World {
     this.heightNoise = makeFractalNoise2D(seed);
     this.treeNoise = makeNoise2D(seed + 501);
     this.biomeNoise = makeNoise2D(seed + 2003);
-    this.chunks = new Map(); // "cx,cz" -> Chunk
-    this.heightMap = new Map(); // "x,z" -> topmost solid y (every column has terrain now — see MIN_FALLOFF)
+    this._resetState();
+  }
+
+  // Clears every chunk/derived-map/structure-position back to a blank
+  // slate. The World instance itself lives for the whole page session
+  // (see Game.js), reused across "New Island" clicks — without this, a
+  // second generateHomeRegion() call would find the home region's chunks
+  // already marked generated (from the FIRST island) and skip regenerating
+  // them, leaving the "new" island built on the old one's leftover terrain.
+  _resetState() {
+    for (const chunk of this.chunks?.values() ?? []) {
+      if (chunk.mesh) {
+        this.scene.remove(chunk.mesh);
+        chunk.mesh.geometry.dispose();
+      }
+    }
+    this.chunks = new Map(); // "cx,cz" -> Chunk, created lazily as the player explores
+    this.generatedChunks = new Set(); // "cx,cz" whose terrain/veins/caves/vegetation are already filled in
+    this.meshedChunks = new Set(); // "cx,cz" currently built + in the scene
+    this.heightMap = new Map(); // "x,z" -> topmost solid y (only populated for generated chunks)
     this.biomeMap = new Map(); // "x,z" -> BIOMES.*
     this.chests = new Map(); // "x,y,z" -> Array(27) of {id,count}|null
     this.leverStates = new Map(); // "x,y,z" -> boolean (on/off)
@@ -66,15 +73,10 @@ export class World {
     this.dungeonPos = null;
     this.vaultPos = null;
     this.campPositions = []; // small far-out single-hut camps — found by exploring, not fast-travel waypoints
+    this.spawnPoint = null;
     this.crops = new Map(); // "x,y,z" -> seconds remaining until WHEAT_CROP_MATURE
     this.lightSources = new Set(); // "x,y,z" of every placed TORCH/LAVA block
     this.lightMap = new Map(); // "x,y,z" -> 0-15 propagated light level (see recomputeLight)
-
-    for (let cx = 0; cx < WORLD_CHUNKS; cx++) {
-      for (let cz = 0; cz < WORLD_CHUNKS; cz++) {
-        this.chunks.set(this.key(cx, cz), new Chunk(cx, cz, this));
-      }
-    }
   }
 
   key(cx, cz) {
@@ -89,12 +91,7 @@ export class World {
     return { cx: Math.floor(x / CHUNK_X), cz: Math.floor(z / CHUNK_Z) };
   }
 
-  // Low-frequency regions so biomes read as continuous patches, not noise —
-  // tuned so a handful of full patches fit across the island's ~168-block
-  // radius (400x400 world) rather than sampling only a sliver of the noise
-  // grid. Scales down from the original 0.06 (tuned for an ~34-radius
-  // island) by the same ~5x the radius grew, so biome regions stay a
-  // believably large, walkable size instead of shrinking into confetti.
+  // Low-frequency regions so biomes read as continuous patches, not noise.
   getBiome(x, z) {
     const n = this.biomeNoise(x * 0.012, z * 0.012);
     if (n < 0.35) return BIOMES.DESERT;
@@ -102,36 +99,55 @@ export class World {
     return BIOMES.FOREST;
   }
 
+  // Pure noise-based height — no falloff/center/void concept, so terrain is
+  // the same continuous rolling hills everywhere, forever, in every
+  // direction. Real mountains come from the noise amplitude itself now,
+  // not from a "closer to the center = taller" shape.
   columnHeight(x, z) {
-    const dx = x - WORLD_SIZE_X / 2;
-    const dz = z - WORLD_SIZE_Z / 2;
-    const dist = Math.sqrt(dx * dx + dz * dz);
-    let falloff = 1 - dist / ISLAND_RADIUS;
-    // Floored, not clamped to 0 — this used to drop all the way to a void
-    // (a floating island with a hard edge, surrounded by nothing). A
-    // floor means the "island" is really just where the terrain gets
-    // tall/mountainous; everywhere past that blends into lower rolling
-    // land instead of stopping — no edge to ever walk into.
-    falloff = Math.max(MIN_FALLOFF, Math.min(1, falloff));
-    falloff = falloff * falloff * (3 - 2 * falloff); // smoothstep edge
     const n = this.heightNoise(x, z); // 0..1
-    const h = Math.round((BASE_HEIGHT + (n - 0.5) * AMPLITUDE * 2) * falloff);
+    const h = Math.round(BASE_HEIGHT + (n - 0.5) * AMPLITUDE * 2);
     return Math.max(2, Math.min(CHUNK_Y - 6, h));
   }
 
-  generate() {
-    // Pass 1: fill column data (grass/dirt/stone/bedrock + ore) into each chunk's array directly.
-    for (let x = 0; x < WORLD_SIZE_X; x++) {
-      for (let z = 0; z < WORLD_SIZE_Z; z++) {
+  // Creates an empty Chunk object at (cx,cz) if one doesn't exist yet —
+  // does NOT fill in terrain (see ensureChunkGenerated for that). Used so
+  // a cave/vein carve reaching into a not-yet-generated neighbor always
+  // has somewhere real to write, instead of throwing.
+  ensureChunkObject(cx, cz) {
+    const key = this.key(cx, cz);
+    let chunk = this.chunks.get(key);
+    if (!chunk) {
+      chunk = new Chunk(cx, cz, this);
+      this.chunks.set(key, chunk);
+    }
+    return chunk;
+  }
+
+  // Fills terrain/ore veins/caves/vegetation for one chunk, if not already
+  // done. Marks itself generated BEFORE actually generating so a cave worm
+  // that reaches back into this same chunk mid-generation (rare, but
+  // possible near the edge of the area a worm can reach) can't recurse.
+  ensureChunkGenerated(cx, cz) {
+    const key = this.key(cx, cz);
+    if (this.generatedChunks.has(key)) return this.chunkAt(cx, cz);
+    this.generatedChunks.add(key);
+    const chunk = this.ensureChunkObject(cx, cz);
+    this._generateChunkTerrain(chunk);
+    this._generateChunkOreVeins(chunk);
+    this._generateChunkCaves(chunk);
+    this._generateChunkVegetation(chunk);
+    return chunk;
+  }
+
+  _generateChunkTerrain(chunk) {
+    const wx = chunk.cx * CHUNK_X, wz = chunk.cz * CHUNK_Z;
+    for (let lx = 0; lx < CHUNK_X; lx++) {
+      for (let lz = 0; lz < CHUNK_Z; lz++) {
+        const x = wx + lx, z = wz + lz;
         const top = this.columnHeight(x, z);
         this.heightMap.set(`${x},${z}`, top);
-        if (top < 0) continue;
         const biome = this.getBiome(x, z);
         this.biomeMap.set(`${x},${z}`, biome);
-        const { cx, cz } = this.worldToChunk(x, z);
-        const chunk = this.chunkAt(cx, cz);
-        const lx = x - cx * CHUNK_X;
-        const lz = z - cz * CHUNK_Z;
         const topBlock = top <= 4 ? BLOCKS.SAND
           : biome === BIOMES.DESERT ? BLOCKS.SAND
           : biome === BIOMES.SNOW ? BLOCKS.SNOW
@@ -142,138 +158,21 @@ export class World {
           if (y === 0) id = BLOCKS.BEDROCK;
           else if (y === top) id = topBlock;
           else if (y > top - 3) id = biome === BIOMES.DESERT && top > 4 ? BLOCKS.SAND : BLOCKS.DIRT;
-          else id = BLOCKS.STONE; // ore/gemstone come later as veins (placeOreVeins), not per-block noise
+          else id = BLOCKS.STONE; // ore/gemstone come from placeOreVeins, not per-block noise
           chunk.setLocal(lx, y, lz, id);
         }
       }
     }
-
-    // Pass 1a: ore/gemstone veins — clustered blobs instead of independent
-    // per-block noise, so mining actually means finding and following a
-    // deposit rather than a single lucky block. Runs before cave carving
-    // so tunnels can cut through and expose veins on their walls.
-    this.placeOreVeins();
-
-    // Pass 1b: cave tunnels — a worm-style random walk carves winding
-    // tunnels through the solid stone mass, occasionally dropping a small
-    // lava pool at the bottom once it's deep enough. Runs before every
-    // structure placement pass below so village/dungeon/vault carving
-    // always has the last word and can't be undermined by a cave.
-    this.carveCaves();
-
-    // Pass 2: sprinkle vegetation — trees in forest/snow, cacti in desert.
-    for (let x = 2; x < WORLD_SIZE_X - 2; x++) {
-      for (let z = 2; z < WORLD_SIZE_Z - 2; z++) {
-        const top = this.heightMap.get(`${x},${z}`);
-        if (top < 6) continue;
-        const biome = this.biomeMap.get(`${x},${z}`);
-        const surface = this.getBlock(x, top, z);
-        if (biome === BIOMES.DESERT) {
-          if (surface !== BLOCKS.SAND) continue;
-          if (this.treeNoise(x * 0.9, z * 0.9) < 0.96) continue;
-          this.placeCactus(x, top + 1, z);
-        } else {
-          const threshold = biome === BIOMES.SNOW ? 0.97 : 0.93;
-          if (surface !== BLOCKS.GRASS && surface !== BLOCKS.SNOW) continue;
-          if (this.treeNoise(x * 0.9, z * 0.9) < threshold) continue;
-          this.placeTree(x, top + 1, z);
-        }
-      }
-    }
-
-    // Pass 3: a small hut cluster for the fast-travel waypoint + villagers.
-    this.villagePos = placeVillage(this, WORLD_SIZE_X, WORLD_SIZE_Z);
-
-    // Pass 3a: a second, smaller settlement elsewhere on the island.
-    this.outpostPos = placeVillage(this, WORLD_SIZE_X, WORLD_SIZE_Z, {
-      avoidPos: this.villagePos, offsets: OUTPOST_OFFSETS, hutCount: 2,
-    });
-
-    // Pass 3b: a ruined chamber with guarded loot, away from both settlements.
-    this.dungeonPos = placeDungeon(this, WORLD_SIZE_X, WORLD_SIZE_Z, [this.villagePos, this.outpostPos]);
-
-    // Pass 3c: a second, buried structure — different silhouette (enclosed,
-    // reached by digging down) and better loot than the open-air Ruins.
-    this.vaultPos = placeVault(this, WORLD_SIZE_X, WORLD_SIZE_Z, [this.villagePos, this.outpostPos, this.dungeonPos]);
-
-    // Pass 3d: small single-hut "camps" scattered much farther out than
-    // the two main settlements — reachable now that the world has no hard
-    // edge, and there so exploring past the main cluster of landmarks
-    // still keeps turning up something new instead of empty terrain.
-    // Not fast-travel waypoints on purpose — these are meant to be found,
-    // not looked up.
-    this.campPositions = [];
-    const placedSoFar = [this.villagePos, this.outpostPos, this.dungeonPos, this.vaultPos];
-    for (const offsetSet of CAMP_OFFSET_SETS) {
-      const pos = placeVillage(this, WORLD_SIZE_X, WORLD_SIZE_Z, {
-        avoidPos: [...placedSoFar, ...this.campPositions],
-        offsets: offsetSet,
-        hutCount: 1,
-      });
-      if (pos) {
-        this.campPositions.push(pos);
-        const cx = Math.round(pos.x), cz = Math.round(pos.z), cy = Math.round(pos.y);
-        this.setBlockRaw(cx + 2, cy, cz, BLOCKS.CHEST);
-        const slots = this.getChest(cx + 2, cy, cz);
-        slots[0] = { id: BLOCKS.BREAD, count: 2 };
-        slots[1] = { id: BLOCKS.GEMSTONE, count: Math.random() < 0.5 ? 2 : 0 };
-      }
-    }
-
-    // Pass 3e: a road network — every landmark (incl. camps) gets a
-    // straight dirt-path road back to spawn, so the island reads as
-    // connected infrastructure rather than a scatter of unrelated
-    // structures dropped at random.
-    const spawn = this.findSpawn();
-    for (const dest of [this.villagePos, this.outpostPos, this.dungeonPos, this.vaultPos, ...this.campPositions]) {
-      if (dest) this.layRoad(Math.round(spawn.x), Math.round(spawn.z), Math.round(dest.x), Math.round(dest.z));
-    }
-
-    // Pass 3f: collect every torch baked into a structure above as a light
-    // source (only near the known structure sites, not a blind full-map
-    // scan — torches only ever come from those at gen time), then
-    // propagate light from all of them before the first mesh build.
-    for (const site of [this.villagePos, this.outpostPos, this.dungeonPos, this.vaultPos, ...this.campPositions]) {
-      if (site) this.scanLightSourcesNear(Math.round(site.x), Math.round(site.z), 20);
-    }
-    this.recomputeLight();
-
-    // Pass 4: build meshes now that all chunk data (incl. neighbors) is ready.
-    for (const chunk of this.chunks.values()) chunk.buildMesh(this.scene);
   }
 
-  // After loading chunk data from a save (which skips procedural
-  // generation), recompute heightMap/biomeMap by scanning the actual
-  // blocks — biome itself is still just a function of position/seed.
-  rebuildDerivedMapsFromChunks() {
-    for (let x = 0; x < WORLD_SIZE_X; x++) {
-      for (let z = 0; z < WORLD_SIZE_Z; z++) {
-        let top = -1;
-        for (let y = CHUNK_Y - 1; y >= 0; y--) {
-          if (this.getBlock(x, y, z) !== BLOCKS.AIR) { top = y; break; }
-        }
-        this.heightMap.set(`${x},${z}`, top);
-        this.biomeMap.set(`${x},${z}`, this.getBiome(x, z));
-      }
-    }
-  }
-
-  // Scatters ore/gemstone as vein clusters (a short random walk of a
-  // handful of blocks, replacing STONE only) rather than one block at a
-  // time — mining now means noticing a vein and following it, not just
-  // getting individually lucky. Count scales with island area.
-  placeOreVeins() {
-    // Attempt count and depth requirements are tuned against this island's
-    // ACTUAL height distribution, not the raw BASE_HEIGHT±AMPLITUDE range —
-    // the falloff multiplier means most columns end up far shorter than
-    // that range suggests (measured: avg surface height only ~6 above
-    // bedrock, with just ~23% of columns reaching 10+). Gating on top>=12
-    // like an early draft did meant ~85% of attempts wasted on columns too
-    // short to ever qualify. Lower requirements + more attempts compensate.
-    const veinCount = Math.floor((WORLD_SIZE_X * WORLD_SIZE_Z) / 600);
-    for (let i = 0; i < veinCount; i++) {
-      const x = Math.floor(Math.random() * WORLD_SIZE_X);
-      const z = Math.floor(Math.random() * WORLD_SIZE_Z);
+  // Vein clusters scoped to just this chunk — the per-world "N attempts
+  // across the whole map" approach doesn't work once the map has no edge,
+  // so each chunk rolls its own small handful of attempts as it streams in.
+  _generateChunkOreVeins(chunk) {
+    const wx = chunk.cx * CHUNK_X, wz = chunk.cz * CHUNK_Z;
+    for (let i = 0; i < 2; i++) {
+      const x = wx + Math.floor(Math.random() * CHUNK_X);
+      const z = wz + Math.floor(Math.random() * CHUNK_Z);
       const top = this.heightMap.get(`${x},${z}`);
       if (top === undefined || top < 8) continue;
       const isGem = Math.random() < 0.28; // gemstone is the deeper, rarer tier
@@ -297,48 +196,42 @@ export class World {
     }
   }
 
-  // Worm-style cave carving: random-walks a handful of tunnels through the
-  // solid stone mass, carving a small sphere of air at every step (radius
-  // drifts a little each step so tunnels don't read as perfectly uniform
-  // pipes). Stays well below the surface and away from bedrock so it never
-  // breaches into open air or the world floor. Occasionally drops a small
-  // lava pool once deep enough — cave hazard, not just empty tunnels.
-  carveCaves() {
-    // Same recalibration as placeOreVeins — top>=16 (an early draft's
-    // guess against the raw BASE_HEIGHT±AMPLITUDE range) meant only ~1%
-    // of columns on the real, falloff-shortened island ever qualified,
-    // so caves only ever existed in a sliver near the exact center. top>=9
-    // matches the actual distribution far better, and the attempt count
-    // is upped to compensate for shallower (shorter, still real) tunnels.
-    const wormCount = Math.floor((WORLD_SIZE_X * WORLD_SIZE_Z) / 1000);
-    for (let w = 0; w < wormCount; w++) {
-      let x = Math.floor(Math.random() * WORLD_SIZE_X);
-      let z = Math.floor(Math.random() * WORLD_SIZE_Z);
-      const top = this.heightMap.get(`${x},${z}`);
-      if (top === undefined || top < 9) continue;
-      let y = 2 + Math.random() * Math.max(1, top - 8);
-      let dx = Math.random() * 2 - 1, dy = (Math.random() * 2 - 1) * 0.3, dz = Math.random() * 2 - 1;
-      let len = Math.hypot(dx, dy, dz) || 1;
+  // A short worm-style tunnel scoped to roughly this chunk's own footprint
+  // (most chunks get none — see the coin-flip below). May carve into an
+  // already-loaded neighbor chunk (setBlockRaw handles that safely) but
+  // won't force-generate one that doesn't exist yet, so generation can
+  // never cascade outward unboundedly. Neighbors streamed in later get
+  // their own independent worms, so cave coverage stays reasonable without
+  // needing every tunnel to perfectly connect across chunk boundaries.
+  _generateChunkCaves(chunk) {
+    if (Math.random() < 0.6) return;
+    const wx = chunk.cx * CHUNK_X, wz = chunk.cz * CHUNK_Z;
+    let x = wx + Math.random() * CHUNK_X;
+    let z = wz + Math.random() * CHUNK_Z;
+    const top = this.heightMap.get(`${Math.round(x)},${Math.round(z)}`);
+    if (top === undefined || top < 9) return;
+    let y = 2 + Math.random() * Math.max(1, top - 8);
+    let dx = Math.random() * 2 - 1, dy = (Math.random() * 2 - 1) * 0.3, dz = Math.random() * 2 - 1;
+    let len = Math.hypot(dx, dy, dz) || 1;
+    dx /= len; dy /= len; dz /= len;
+    let radius = 1.5 + Math.random() * 1.5;
+    const steps = 20 + Math.floor(Math.random() * 40);
+
+    for (let s = 0; s < steps; s++) {
+      this.carveBlob(x, y, z, radius);
+      if (y < 8 && Math.random() < 0.04) this.placeLavaSplash(Math.round(x), Math.round(y), Math.round(z));
+
+      dx += (Math.random() * 2 - 1) * 0.3;
+      dy += (Math.random() * 2 - 1) * 0.15;
+      dz += (Math.random() * 2 - 1) * 0.3;
+      len = Math.hypot(dx, dy, dz) || 1;
       dx /= len; dy /= len; dz /= len;
-      let radius = 1.5 + Math.random() * 1.5;
-      const steps = 40 + Math.floor(Math.random() * 90);
+      x += dx; y += dy; z += dz;
+      radius = Math.max(1, Math.min(3, radius + (Math.random() * 2 - 1) * 0.2));
 
-      for (let s = 0; s < steps; s++) {
-        this.carveBlob(x, y, z, radius);
-        if (y < 8 && Math.random() < 0.04) this.placeLavaSplash(Math.round(x), Math.round(y), Math.round(z));
-
-        dx += (Math.random() * 2 - 1) * 0.3;
-        dy += (Math.random() * 2 - 1) * 0.15;
-        dz += (Math.random() * 2 - 1) * 0.3;
-        len = Math.hypot(dx, dy, dz) || 1;
-        dx /= len; dy /= len; dz /= len;
-        x += dx; y += dy; z += dz;
-        radius = Math.max(1, Math.min(3, radius + (Math.random() * 2 - 1) * 0.2));
-
-        const colTop = this.heightMap.get(`${Math.round(x)},${Math.round(z)}`);
-        if (colTop === undefined || colTop < 0) break; // wandered off the island
-        if (y < 2 || y > colTop - 4) break; // never breach bedrock or the surface
-      }
+      const colTop = this.heightMap.get(`${Math.round(x)},${Math.round(z)}`);
+      if (colTop === undefined) break; // wandered into an ungenerated chunk — stop rather than force it
+      if (y < 2 || y > colTop - 4) break; // never breach bedrock or the surface
     }
   }
 
@@ -368,8 +261,169 @@ export class World {
       const x = cx + dx, y = cy - 1, z = cz + dz;
       if (this.getBlock(x, y, z) === BLOCKS.AIR && this.getBlock(x, y - 1, z) !== BLOCKS.AIR) {
         this.setBlockRaw(x, y, z, BLOCKS.LAVA);
-        this.lightSources.add(this.posKey(x, y, z)); // registered directly — scattered across the whole map, not near any single structure site scanLightSourcesNear covers
+        this.lightSources.add(this.posKey(x, y, z)); // registered directly — scattered everywhere, not near a single structure site
       }
+    }
+  }
+
+  _generateChunkVegetation(chunk) {
+    const wx = chunk.cx * CHUNK_X, wz = chunk.cz * CHUNK_Z;
+    for (let lx = 0; lx < CHUNK_X; lx++) {
+      for (let lz = 0; lz < CHUNK_Z; lz++) {
+        const x = wx + lx, z = wz + lz;
+        const top = this.heightMap.get(`${x},${z}`);
+        if (top === undefined || top < 6) continue;
+        const biome = this.biomeMap.get(`${x},${z}`);
+        const surface = this.getBlock(x, top, z);
+        if (biome === BIOMES.DESERT) {
+          if (surface !== BLOCKS.SAND) continue;
+          if (this.treeNoise(x * 0.9, z * 0.9) < 0.96) continue;
+          this.placeCactus(x, top + 1, z);
+        } else {
+          const threshold = biome === BIOMES.SNOW ? 0.97 : 0.93;
+          if (surface !== BLOCKS.GRASS && surface !== BLOCKS.SNOW) continue;
+          if (this.treeNoise(x * 0.9, z * 0.9) < threshold) continue;
+          this.placeTree(x, top + 1, z);
+        }
+      }
+    }
+  }
+
+  // One-time setup at game start: the fixed home region (spawn + every
+  // hand-placed landmark), generated eagerly and synchronously — same as
+  // the old whole-world generate() used to do, just scoped to a bounded
+  // area instead of the entire (now unbounded) world. Terrain streaming
+  // (see streamChunks) takes over for everywhere else once the player
+  // starts walking.
+  generateHomeRegion() {
+    this._resetState(); // safe to call repeatedly — see _resetState's own comment ("New Island" reuses this same World instance)
+    const half = Math.ceil(HOME_REGION_RADIUS / CHUNK_X) + 1;
+    const { cx: originCx, cz: originCz } = this.worldToChunk(HOME_ORIGIN_X, HOME_ORIGIN_Z);
+    for (let cx = originCx - half; cx <= originCx + half; cx++) {
+      for (let cz = originCz - half; cz <= originCz + half; cz++) {
+        this.ensureChunkGenerated(cx, cz);
+      }
+    }
+
+    // A small hut cluster for the fast-travel waypoint + villagers.
+    this.villagePos = placeVillage(this, HOME_ORIGIN_X, HOME_ORIGIN_Z);
+
+    // A second, smaller settlement elsewhere in the home region.
+    this.outpostPos = placeVillage(this, HOME_ORIGIN_X, HOME_ORIGIN_Z, {
+      avoidPos: this.villagePos, offsets: OUTPOST_OFFSETS, hutCount: 2,
+    });
+
+    // A ruined chamber with guarded loot, away from both settlements.
+    this.dungeonPos = placeDungeon(this, HOME_ORIGIN_X, HOME_ORIGIN_Z, [this.villagePos, this.outpostPos]);
+
+    // A second, buried structure — different silhouette (enclosed, reached
+    // by digging down) and better loot than the open-air Ruins.
+    this.vaultPos = placeVault(this, HOME_ORIGIN_X, HOME_ORIGIN_Z, [this.villagePos, this.outpostPos, this.dungeonPos]);
+
+    // Small single-hut "camps" scattered much farther out than the two
+    // main settlements — there so exploring past the main cluster of
+    // landmarks still keeps turning up something new. Not fast-travel
+    // waypoints on purpose — meant to be found, not looked up.
+    this.campPositions = [];
+    const placedSoFar = [this.villagePos, this.outpostPos, this.dungeonPos, this.vaultPos];
+    for (const offsetSet of CAMP_OFFSET_SETS) {
+      const pos = placeVillage(this, HOME_ORIGIN_X, HOME_ORIGIN_Z, {
+        avoidPos: [...placedSoFar, ...this.campPositions],
+        offsets: offsetSet,
+        hutCount: 1,
+      });
+      if (pos) {
+        this.campPositions.push(pos);
+        const cx = Math.round(pos.x), cz = Math.round(pos.z), cy = Math.round(pos.y);
+        this.setBlockRaw(cx + 2, cy, cz, BLOCKS.CHEST);
+        const slots = this.getChest(cx + 2, cy, cz);
+        slots[0] = { id: BLOCKS.BREAD, count: 2 };
+        slots[1] = { id: BLOCKS.GEMSTONE, count: Math.random() < 0.5 ? 2 : 0 };
+      }
+    }
+
+    // A road network — every landmark (incl. camps) gets a straight
+    // dirt-path road back to spawn, so the home region reads as connected
+    // infrastructure rather than a scatter of unrelated structures.
+    this.spawnPoint = this.findSpawn();
+    const spawn = this.spawnPoint;
+    for (const dest of [this.villagePos, this.outpostPos, this.dungeonPos, this.vaultPos, ...this.campPositions]) {
+      if (dest) this.layRoad(Math.round(spawn.x), Math.round(spawn.z), Math.round(dest.x), Math.round(dest.z));
+    }
+
+    // Collect every torch baked into a structure above as a light source,
+    // then propagate light from all of them before the first mesh build.
+    for (const site of [this.villagePos, this.outpostPos, this.dungeonPos, this.vaultPos, ...this.campPositions]) {
+      if (site) this.scanLightSourcesNear(Math.round(site.x), Math.round(site.z), 20);
+    }
+    this.recomputeLight();
+
+    for (const chunk of this.chunks.values()) {
+      chunk.buildMesh(this.scene);
+      this.meshedChunks.add(this.key(chunk.cx, chunk.cz));
+    }
+  }
+
+  // Called every frame from Game._loop: keeps chunks within CHUNK_LOAD_RADIUS
+  // of the player generated+meshed, and drops the mesh (data stays, so an
+  // edit persists) for anything farther than CHUNK_UNLOAD_RADIUS. New chunk
+  // generation is throttled per call so running fast — or teleporting —
+  // never has to generate a whole ring of chunks in a single frame.
+  streamChunks(playerX, playerZ) {
+    const { cx: pcx, cz: pcz } = this.worldToChunk(playerX, playerZ);
+    let budget = MAX_NEW_CHUNKS_PER_TICK;
+    for (let dz = -CHUNK_LOAD_RADIUS; dz <= CHUNK_LOAD_RADIUS && budget > 0; dz++) {
+      for (let dx = -CHUNK_LOAD_RADIUS; dx <= CHUNK_LOAD_RADIUS && budget > 0; dx++) {
+        if (dx * dx + dz * dz > CHUNK_LOAD_RADIUS * CHUNK_LOAD_RADIUS) continue;
+        const cx = pcx + dx, cz = pcz + dz;
+        const key = this.key(cx, cz);
+        if (!this.generatedChunks.has(key)) {
+          this.ensureChunkGenerated(cx, cz);
+          budget--;
+        }
+        if (!this.meshedChunks.has(key)) {
+          const chunk = this.chunkAt(cx, cz);
+          if (chunk) {
+            chunk.buildMesh(this.scene);
+            this.meshedChunks.add(key);
+          }
+        }
+      }
+    }
+
+    const unloadR2 = CHUNK_UNLOAD_RADIUS * CHUNK_UNLOAD_RADIUS;
+    for (const key of this.meshedChunks) {
+      const [cx, cz] = key.split(',').map(Number);
+      const ddx = cx - pcx, ddz = cz - pcz;
+      if (ddx * ddx + ddz * ddz <= unloadR2) continue;
+      const chunk = this.chunkAt(cx, cz);
+      if (chunk?.mesh) {
+        this.scene.remove(chunk.mesh);
+        chunk.mesh.geometry.dispose();
+        chunk.mesh = null;
+      }
+      this.meshedChunks.delete(key);
+    }
+  }
+
+  // After loading chunk data from a save, recompute heightMap/biomeMap for
+  // every saved chunk by scanning its actual blocks — biome itself is
+  // still just a function of position/seed.
+  rebuildDerivedMapsFromChunks() {
+    for (const chunk of this.chunks.values()) {
+      const wx = chunk.cx * CHUNK_X, wz = chunk.cz * CHUNK_Z;
+      for (let lx = 0; lx < CHUNK_X; lx++) {
+        for (let lz = 0; lz < CHUNK_Z; lz++) {
+          const x = wx + lx, z = wz + lz;
+          let top = -1;
+          for (let y = CHUNK_Y - 1; y >= 0; y--) {
+            if (chunk.getLocal(lx, y, lz) !== BLOCKS.AIR) { top = y; break; }
+          }
+          this.heightMap.set(`${x},${z}`, top);
+          this.biomeMap.set(`${x},${z}`, this.getBiome(x, z));
+        }
+      }
+      this.generatedChunks.add(this.key(chunk.cx, chunk.cz));
     }
   }
 
@@ -377,12 +431,12 @@ export class World {
   // it baked in (village/ruins/vault each place a handful) — bounded
   // rather than a blind full-map scan, since structure torches only ever
   // exist near a known site (cave lava registers itself directly instead,
-  // see placeLavaSplash, since it's scattered across the whole map).
+  // see placeLavaSplash, since it's scattered everywhere).
   scanLightSourcesNear(cx, cz, radius) {
-    for (let x = Math.max(0, cx - radius); x <= Math.min(WORLD_SIZE_X - 1, cx + radius); x++) {
-      for (let z = Math.max(0, cz - radius); z <= Math.min(WORLD_SIZE_Z - 1, cz + radius); z++) {
+    for (let x = cx - radius; x <= cx + radius; x++) {
+      for (let z = cz - radius; z <= cz + radius; z++) {
         const top = this.heightMap.get(`${x},${z}`);
-        if (top === undefined || top < 0) continue;
+        if (top === undefined) continue;
         for (let y = 1; y <= Math.min(top + 6, CHUNK_Y - 1); y++) {
           if (this.getBlock(x, y, z) === BLOCKS.TORCH) this.lightSources.add(this.posKey(x, y, z));
         }
@@ -435,7 +489,7 @@ export class World {
   // block under grass.
   isUnderground(x, y, z) {
     const top = this.heightMap.get(`${x},${z}`);
-    return top !== undefined && top >= 0 && y < top - 2;
+    return top !== undefined && y < top - 2;
   }
 
   placeTree(x, baseY, z) {
@@ -455,9 +509,7 @@ export class World {
 
   // Straight-line dirt-path road at ground level between two points — the
   // same technique Village.js uses for its internal paths, just over a
-  // much longer distance. Deliberately naive (no pathfinding around water/
-  // hills): Minecraft village paths are similarly straight-line, and at
-  // this scale a perfectly planned road reads less "organic" anyway.
+  // longer distance. Only ever used within the (bounded) home region.
   layRoad(x0, z0, x1, z1) {
     const dx = x1 - x0, dz = z1 - z0;
     const steps = Math.max(Math.abs(dx), Math.abs(dz));
@@ -466,7 +518,7 @@ export class World {
       const px = Math.round(x0 + (dx * i) / steps);
       const pz = Math.round(z0 + (dz * i) / steps);
       const top = this.heightMap.get(`${px},${pz}`);
-      if (top === undefined || top < 0) continue; // void gap — leave it
+      if (top === undefined) continue;
       this.setBlockRaw(px, top, pz, BLOCKS.PATH);
     }
   }
@@ -477,17 +529,19 @@ export class World {
   }
 
   // Sets data without triggering a remesh — used only during generation.
+  // Safely no-ops if the target chunk hasn't been created yet (e.g. a cave
+  // worm or tree canopy reaching just past a chunk that hasn't streamed in
+  // — see _generateChunkCaves) rather than throwing.
   setBlockRaw(x, y, z, id) {
     if (y < 0 || y >= CHUNK_Y) return;
-    if (x < 0 || x >= WORLD_SIZE_X || z < 0 || z >= WORLD_SIZE_Z) return;
     const { cx, cz } = this.worldToChunk(x, z);
     const chunk = this.chunkAt(cx, cz);
+    if (!chunk) return;
     chunk.setLocal(x - cx * CHUNK_X, y, z - cz * CHUNK_Z, id);
   }
 
   getBlock(x, y, z) {
     if (y < 0 || y >= CHUNK_Y) return BLOCKS.AIR;
-    if (x < 0 || x >= WORLD_SIZE_X || z < 0 || z >= WORLD_SIZE_Z) return BLOCKS.AIR;
     const { cx, cz } = this.worldToChunk(x, z);
     const chunk = this.chunkAt(cx, cz);
     if (!chunk) return BLOCKS.AIR;
@@ -631,15 +685,16 @@ export class World {
     this._inPowerRecompute = false;
   }
 
-  // Finds a safe spawn point near the island center (topmost solid block + 2,
-  // skipping columns where a tree trunk/canopy occupies that headroom).
+  // Finds a safe spawn point near the home region's origin (topmost solid
+  // block + 2, skipping columns where a tree trunk/canopy occupies that
+  // headroom).
   findSpawn() {
-    const cx = Math.floor(WORLD_SIZE_X / 2);
-    const cz = Math.floor(WORLD_SIZE_Z / 2);
-    for (let r = 0; r < WORLD_SIZE_X / 2; r++) {
+    const cx = HOME_ORIGIN_X;
+    const cz = HOME_ORIGIN_Z;
+    for (let r = 0; r < HOME_REGION_RADIUS; r++) {
       const x = cx + r, z = cz;
       const top = this.heightMap.get(`${x},${z}`);
-      if (top < 0) continue;
+      if (top === undefined) continue;
       let clear = true;
       for (let dy = 1; dy <= 4; dy++) {
         if (this.getBlock(x, top + dy, z) !== BLOCKS.AIR) { clear = false; break; }

@@ -73,13 +73,14 @@ function fillLoot(world, chestPositions) {
 }
 
 // Requires taller terrain than the Ruins/Village (it's buried, not
-// ground-level), so a fixed hand-tuned offset list tends to run dry on
-// bigger islands — rings of candidates at increasing radius, scaled
-// natively to the actual world size, cover it far more reliably.
-function ringCandidates(worldSizeX) {
+// ground-level), so a fixed hand-tuned offset list tends to run dry —
+// rings of candidates at increasing radius cover it far more reliably.
+// Fixed absolute radii (the world itself is unbounded now, nothing left to
+// scale against — see Village.js/Dungeon.js for the same reasoning).
+function ringCandidates() {
   const candidates = [];
-  const maxR = worldSizeX * 0.32;
-  for (let r = worldSizeX * 0.08; r <= maxR; r += worldSizeX * 0.06) {
+  const maxR = 108;
+  for (let r = 27; r <= maxR; r += 20) {
     for (let a = 0; a < Math.PI * 2; a += Math.PI / 6) {
       candidates.push([Math.round(Math.cos(a) * r), Math.round(Math.sin(a) * r)]);
     }
@@ -87,11 +88,11 @@ function ringCandidates(worldSizeX) {
   return candidates;
 }
 
-export function placeVault(world, worldSizeX, worldSizeZ, avoidPositions = []) {
-  const cx = Math.floor(worldSizeX / 2);
-  const cz = Math.floor(worldSizeZ / 2);
-  const minDist = MIN_DIST_FROM_LANDMARKS * (worldSizeX / 80);
-  const offsets = ringCandidates(worldSizeX);
+export function placeVault(world, originX, originZ, avoidPositions = []) {
+  const cx = originX;
+  const cz = originZ;
+  const minDist = MIN_DIST_FROM_LANDMARKS;
+  const offsets = ringCandidates();
   const avoid = avoidPositions.filter(Boolean);
 
   for (const [ox, oz] of offsets) {
