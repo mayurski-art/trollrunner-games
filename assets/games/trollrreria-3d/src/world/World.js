@@ -25,6 +25,15 @@ const BASE_HEIGHT = 20;
 const AMPLITUDE = 14;
 const CROP_GROWTH_SECONDS = 45;
 
+// Phase 3 — water: any column whose noise-height surface falls below this
+// gets filled with WATER from just above the surface up to sea level.
+// Static only (no flow/waves) per the roadmap's own scoping — the point is
+// beaches/lakes/rivers existing at all, not a flow simulation. Deliberately
+// well below BASE_HEIGHT so most of the map stays dry land with water
+// pooling only in the noise's low spots (lakes/rivers), not a single flat
+// ocean plane everywhere.
+const SEA_LEVEL = 12;
+
 // Phase 1 — region-based settlements: the infinite world outside the home
 // region is divided into fixed-size chunk "regions"; each region gets ONE
 // deterministic roll (seed + region coords, no runtime RNG) deciding
@@ -204,6 +213,9 @@ export class World {
       }
     }
 
+    const anchorTop = this.heightMap.get(`${anchorX},${anchorZ}`);
+    if (anchorTop === undefined || anchorTop < SEA_LEVEL) return; // don't found a village on/under water — see phase 4 for a coastal variant
+
     const avoidPos = [this.villagePos, this.outpostPos, this.dungeonPos, this.vaultPos, ...this.campPositions, ...this.wildVillages].filter(Boolean);
     const hutCount = 2 + Math.floor(this._regionHash(rx, rz, 4) * 2); // 2 or 3 modest huts — deliberately smaller than the home village so it reads as "found," not "the same town again"
     const pos = placeVillage(this, anchorX, anchorZ, { avoidPos, offsets: [[0, 0]], hutCount });
@@ -229,7 +241,11 @@ export class World {
         this.heightMap.set(`${x},${z}`, top);
         const biome = this.getBiome(x, z);
         this.biomeMap.set(`${x},${z}`, biome);
-        const topBlock = top <= 4 ? BLOCKS.SAND
+        // A shore band gets sand even outside the DESERT biome, same as the
+        // existing "top <= 4" case — just extended a couple blocks above
+        // sea level so beaches read as a transition, not a hard line.
+        const isShore = top <= SEA_LEVEL + 2;
+        const topBlock = (top <= 4 || isShore) ? BLOCKS.SAND
           : biome === BIOMES.DESERT ? BLOCKS.SAND
           : biome === BIOMES.SNOW ? BLOCKS.SNOW
           : BLOCKS.GRASS;
@@ -238,10 +254,11 @@ export class World {
           let id;
           if (y === 0) id = BLOCKS.BEDROCK;
           else if (y === top) id = topBlock;
-          else if (y > top - 3) id = biome === BIOMES.DESERT && top > 4 ? BLOCKS.SAND : BLOCKS.DIRT;
+          else if (y > top - 3) id = (biome === BIOMES.DESERT && top > 4) || isShore ? BLOCKS.SAND : BLOCKS.DIRT;
           else id = BLOCKS.STONE; // ore/gemstone come from placeOreVeins, not per-block noise
           chunk.setLocal(lx, y, lz, id);
         }
+        for (let y = top + 1; y <= SEA_LEVEL; y++) chunk.setLocal(lx, y, lz, BLOCKS.WATER);
       }
     }
   }
@@ -326,7 +343,7 @@ export class World {
           const x = Math.round(cx + dx), y = Math.round(cy + dy), z = Math.round(cz + dz);
           if (y < 2) continue; // never touch bedrock
           const id = this.getBlock(x, y, z);
-          if (id === BLOCKS.AIR || id === BLOCKS.BEDROCK) continue;
+          if (id === BLOCKS.AIR || id === BLOCKS.BEDROCK || id === BLOCKS.WATER) continue; // never drain a lake into a cave
           this.setBlockRaw(x, y, z, BLOCKS.AIR);
         }
       }
@@ -353,7 +370,7 @@ export class World {
       for (let lz = 0; lz < CHUNK_Z; lz++) {
         const x = wx + lx, z = wz + lz;
         const top = this.heightMap.get(`${x},${z}`);
-        if (top === undefined || top < 6) continue;
+        if (top === undefined || top < 6 || top < SEA_LEVEL) continue; // submerged column — see SEA_LEVEL
         const biome = this.biomeMap.get(`${x},${z}`);
         const surface = this.getBlock(x, top, z);
         if (biome === BIOMES.DESERT) {

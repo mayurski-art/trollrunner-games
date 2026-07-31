@@ -53,6 +53,7 @@ export const BLOCKS = {
   GEM_AXE: 49,
   PATH: 50,
   LAVA: 51,
+  WATER: 52,
 };
 
 // Per-face color so a merged mesh can use vertex colors instead of textures.
@@ -108,6 +109,7 @@ export const BLOCK_COLOR = {
   [BLOCKS.GEM_AXE]: 0xd946ef,
   [BLOCKS.PATH]: 0xb8a06a,
   [BLOCKS.LAVA]: 0xff5a1f,
+  [BLOCKS.WATER]: 0x2f6fd6,
 };
 
 export const BLOCK_NAME = {
@@ -161,6 +163,7 @@ export const BLOCK_NAME = {
   [BLOCKS.GEM_AXE]: 'Gem Axe',
   [BLOCKS.PATH]: 'Path',
   [BLOCKS.LAVA]: 'Lava',
+  [BLOCKS.WATER]: 'Water',
 };
 
 // Icon art for the UI (hotbar/inventory/crafting/trade/quest swatches) —

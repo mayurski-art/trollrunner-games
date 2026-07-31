@@ -1,3 +1,5 @@
+import { BLOCKS } from '../world/blocks.js';
+
 const HALF_W = 0.3;
 const HEIGHT = 1.7;
 const EYE_HEIGHT = 1.55;
@@ -6,9 +8,12 @@ const JUMP_SPEED = 8.2;
 const MOVE_SPEED = 5.2;
 const MAX_HP = 100;
 const MAX_HUNGER = 100;
+const WATER_GRAVITY_MULT = 0.35; // gentle sink instead of falling through water at full speed — see Player.update
 
 // Feet-anchored AABB voxel collision: axis-separated resolve (move X, clamp
 // on overlap; then Y; then Z) — simple and stable enough for a small world.
+// WATER is solid for rendering/meshing (see Chunk.js) but deliberately NOT
+// solid here — static water (phase 3) is walk/fall-through, not a wall.
 function aabbHitsSolid(world, x, y, z) {
   const minX = Math.floor(x - HALF_W), maxX = Math.floor(x + HALF_W);
   const minY = Math.floor(y), maxY = Math.floor(y + HEIGHT);
@@ -16,11 +21,16 @@ function aabbHitsSolid(world, x, y, z) {
   for (let bx = minX; bx <= maxX; bx++) {
     for (let by = minY; by <= maxY; by++) {
       for (let bz = minZ; bz <= maxZ; bz++) {
-        if (world.getBlock(bx, by, bz) !== 0) return true;
+        const id = world.getBlock(bx, by, bz);
+        if (id !== BLOCKS.AIR && id !== BLOCKS.WATER) return true;
       }
     }
   }
   return false;
+}
+
+function isInWater(world, pos) {
+  return world.getBlock(Math.floor(pos.x), Math.floor(pos.y), Math.floor(pos.z)) === BLOCKS.WATER;
 }
 
 export class Player {
@@ -82,12 +92,14 @@ export class Player {
     this.vel.x = dirX * MOVE_SPEED;
     this.vel.z = dirZ * MOVE_SPEED;
 
-    if (wantsJump && this.grounded) {
-      this.vel.y = JUMP_SPEED;
+    const inWater = isInWater(this.world, this.pos);
+    if (wantsJump && (this.grounded || inWater)) {
+      this.vel.y = inWater ? JUMP_SPEED * WATER_GRAVITY_MULT * 2 : JUMP_SPEED;
       this.grounded = false;
     }
-    this.vel.y -= GRAVITY * dt;
-    if (this.vel.y < -40) this.vel.y = -40;
+    this.vel.y -= GRAVITY * (inWater ? WATER_GRAVITY_MULT : 1) * dt;
+    const terminal = inWater ? -6 : -40;
+    if (this.vel.y < terminal) this.vel.y = terminal;
 
     this.moveAxis('x', this.vel.x * dt);
     this.moveAxis('z', this.vel.z * dt);

@@ -11,7 +11,7 @@ const SIZE = GRID * TILE_PX; // 512 — power-of-two, avoids any NPOT texture qu
 // additions — neither is mineable, but both are real world blocks that
 // need their own atlas cell (without this, LAVA would silently fall back
 // to whatever occupies cell 0 — grass — instead of looking like lava).
-const WORLD_BLOCK_IDS = [...new Set([...MINEABLE, BLOCKS.BEDROCK, BLOCKS.LAVA])];
+const WORLD_BLOCK_IDS = [...new Set([...MINEABLE, BLOCKS.BEDROCK, BLOCKS.LAVA, BLOCKS.WATER])];
 
 // Real PixelLab tile art for the blocks that cover the most visible surface
 // area. Anything else in WORLD_BLOCK_IDS (chest, bed, wiring, crops, ...)
