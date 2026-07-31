@@ -55,6 +55,16 @@ export const BLOCKS = {
   LAVA: 51,
   WATER: 52,
   BOW: 53,
+  // Phase 8 — building expansion: decorative full-cube blocks. True
+  // partial-height stairs/slabs would need real mesher geometry changes
+  // AND matching partial-height player collision (Player.js's AABB check
+  // is full-cell only) — deliberately deferred rather than faking the
+  // visual without the collision to match; these four ship the
+  // "decorative variety" half of the roadmap item now.
+  POLISHED_STONE: 54,
+  CARVED_PLANK: 55,
+  ROOF_TILE: 56,
+  GLASS_BLOCK: 57,
 };
 
 // Per-face color so a merged mesh can use vertex colors instead of textures.
@@ -112,6 +122,10 @@ export const BLOCK_COLOR = {
   [BLOCKS.LAVA]: 0xff5a1f,
   [BLOCKS.WATER]: 0x2f6fd6,
   [BLOCKS.BOW]: 0xa9784f,
+  [BLOCKS.POLISHED_STONE]: 0x9a9aa8,
+  [BLOCKS.CARVED_PLANK]: 0xd4a86a,
+  [BLOCKS.ROOF_TILE]: 0x8a3a3a,
+  [BLOCKS.GLASS_BLOCK]: 0xbfe6ec,
 };
 
 export const BLOCK_NAME = {
@@ -167,6 +181,10 @@ export const BLOCK_NAME = {
   [BLOCKS.LAVA]: 'Lava',
   [BLOCKS.WATER]: 'Water',
   [BLOCKS.BOW]: 'Bow',
+  [BLOCKS.POLISHED_STONE]: 'Polished Stone',
+  [BLOCKS.CARVED_PLANK]: 'Carved Plank',
+  [BLOCKS.ROOF_TILE]: 'Roof Tile',
+  [BLOCKS.GLASS_BLOCK]: 'Glass Block',
 };
 
 // Icon art for the UI (hotbar/inventory/crafting/trade/quest swatches) —
@@ -264,6 +282,8 @@ export const TOOL_STATS = {
 export const MINE_TIER = {
   [BLOCKS.STONE]: 1,
   [BLOCKS.STONE_BRICK]: 1,
+  [BLOCKS.POLISHED_STONE]: 1,
+  [BLOCKS.ROOF_TILE]: 1,
   [BLOCKS.ORE]: 2,
 };
 
@@ -280,6 +300,7 @@ export const MINE_HARDNESS = {
   [BLOCKS.LEVER]: 0.3, [BLOCKS.WIRE]: 0.2, [BLOCKS.LAMP_OFF]: 0.4, [BLOCKS.LAMP_ON]: 0.4,
   [BLOCKS.TROLL_CROWN]: 0.3,
   [BLOCKS.WHEAT_CROP]: 0.2, [BLOCKS.WHEAT_CROP_MATURE]: 0.2,
+  [BLOCKS.POLISHED_STONE]: 1.2, [BLOCKS.CARVED_PLANK]: 0.6, [BLOCKS.ROOF_TILE]: 1.2, [BLOCKS.GLASS_BLOCK]: 0.4,
 };
 const DEFAULT_HARDNESS = 0.5;
 
@@ -288,8 +309,8 @@ const DEFAULT_HARDNESS = 0.5;
 // wood<stone<gem progression MINE_TIER already gates existence on, just
 // applied to speed too now instead of only an all-or-nothing gate.
 const TOOL_SPEED_MULT = { 1: 2, 2: 3.2, 3: 4.5 };
-const STONE_FAMILY = new Set([BLOCKS.STONE, BLOCKS.STONE_BRICK, BLOCKS.ORE, BLOCKS.GEMSTONE]);
-const WOOD_FAMILY = new Set([BLOCKS.WOOD, BLOCKS.LEAVES, BLOCKS.PLANK]);
+const STONE_FAMILY = new Set([BLOCKS.STONE, BLOCKS.STONE_BRICK, BLOCKS.ORE, BLOCKS.GEMSTONE, BLOCKS.POLISHED_STONE, BLOCKS.ROOF_TILE]);
+const WOOD_FAMILY = new Set([BLOCKS.WOOD, BLOCKS.LEAVES, BLOCKS.PLANK, BLOCKS.CARVED_PLANK]);
 
 // Seconds to break `id` with `heldItemId` currently selected (undefined/
 // unrecognized = bare hands, multiplier 1).
@@ -308,6 +329,7 @@ export const MINEABLE = [
   BLOCKS.STONE_BRICK, BLOCKS.SNOW, BLOCKS.CACTUS, BLOCKS.GEMSTONE, BLOCKS.BED,
   BLOCKS.LEVER, BLOCKS.WIRE, BLOCKS.LAMP_OFF, BLOCKS.LAMP_ON, BLOCKS.TROLL_CROWN,
   BLOCKS.WHEAT_CROP, BLOCKS.WHEAT_CROP_MATURE, BLOCKS.PATH,
+  BLOCKS.POLISHED_STONE, BLOCKS.CARVED_PLANK, BLOCKS.ROOF_TILE, BLOCKS.GLASS_BLOCK,
 ];
 
 // Items the player can right-click place as a world block. STICK is
@@ -318,6 +340,7 @@ export const PLACEABLE = [
   BLOCKS.LEAVES, BLOCKS.PLANK, BLOCKS.TORCH, BLOCKS.CHEST, BLOCKS.STONE_BRICK,
   BLOCKS.SNOW, BLOCKS.CACTUS, BLOCKS.BED, BLOCKS.LEVER, BLOCKS.WIRE, BLOCKS.LAMP_OFF,
   BLOCKS.TROLL_CROWN, BLOCKS.PATH,
+  BLOCKS.POLISHED_STONE, BLOCKS.CARVED_PLANK, BLOCKS.ROOF_TILE, BLOCKS.GLASS_BLOCK,
 ];
 
 // Mining these gives back a different item than the block itself (grass ->
