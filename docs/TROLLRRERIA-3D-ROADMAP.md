@@ -176,6 +176,12 @@ framing — cheap enough to slot in without a bloated content phase.
 
 ---
 
+**Follow-up (not yet scheduled):** true stairs/slabs. Shipped decorative
+full-cube variants instead (Polished Stone, Carved Plank, Roof Tile, Glass
+Block) — partial-height geometry needs matching changes to both the
+greedy mesher (phase 2, currently full-cell-only) and Player.js's AABB
+collision (also full-cell-only), not just a new block id.
+
 ## Phase 9 — Cloud saves
 
 Currently `Save.js` is localStorage-only (RLE-encoded chunks, base64,
