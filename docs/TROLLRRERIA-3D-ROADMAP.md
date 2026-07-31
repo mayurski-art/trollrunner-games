@@ -210,11 +210,15 @@ works).
 - Depends on phase 9 (cloud saves) — a persistent multiplayer world is a
   cloud save with multiple writers, so the storage layer needs to exist
   first.
-- Biggest open design question, deliberately deferred rather than decided
-  here: do all players share one persistent world (like a Minecraft
-  server) or does each player have their own persistent world that others
-  can visit? This changes the Supabase schema significantly and should get
-  its own short doc when this phase starts, not be decided now.
+- **Resolved when this phase actually started:** the room code IS the
+  persistent world's identity — Net.js auto-saves the host's world to
+  CloudSave.js under the room code every 60s and once more on stop().
+  Resuming later is just loading that same code from the (phase 9) Cloud
+  Save screen before hosting again. No separate schema, no auto-load-on-
+  host (that would silently overwrite whatever the host is currently
+  playing the moment they open a room — an explicit load is the safer
+  default). This answers "shared vs per-player world" as "one world per
+  room code, shared by whoever hosts+joins it."
 
 ---
 

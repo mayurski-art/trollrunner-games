@@ -1,5 +1,6 @@
 import { buildWorldSnapshot, applyWorldSave } from '../world/Save.js';
 import { PeerGhost } from './PeerGhost.js';
+import { cloudSaveGame } from './CloudSave.js';
 
 // Same Supabase project already used by the 2D Trollrreria's co-op
 // (assets/games/trollrreria/src/net.js) — one project backs every game's
@@ -9,6 +10,15 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const POS_SEND_INTERVAL = 0.12; // ~8Hz
 const PEER_TIMEOUT_MS = 8000;
+// Phase 10 — persistent multiplayer: the room code doubles as a
+// CloudSave.js code, so a hosted room's world survives after everyone
+// disconnects — auto-saved on this interval and once more on stop().
+// Resuming it later is just loading that same code from the (already
+// shipped, phase 9) Cloud Save screen before hosting again — deliberately
+// no separate "persistent world" system or auto-load-on-host, since
+// silently overwriting whatever the host is currently playing the moment
+// they open a room would be a much worse default than an explicit load.
+const ROOM_AUTOSAVE_INTERVAL = 60;
 
 class BroadcastTransport {
   constructor() { this.kind = 'tabs'; }
@@ -66,6 +76,7 @@ export class Net {
     this.id = Math.random().toString(36).slice(2, 10);
     this.peers = new Map(); // id -> PeerGhost
     this.posTimer = 0;
+    this.roomSaveTimer = 0;
   }
 
   get active() { return this.connected; }
@@ -92,6 +103,7 @@ export class Net {
 
     this.transport = t;
     this.connected = true;
+    this.roomSaveTimer = ROOM_AUTOSAVE_INTERVAL;
     this.hookWorld();
     if (!asHost) this.send({ t: 'hello', id: this.id });
     return { kind: t.kind };
@@ -101,6 +113,7 @@ export class Net {
     if (this.transport) {
       this.send({ t: 'bye', id: this.id });
       this.transport.close();
+      if (this.isHost) cloudSaveGame(this.game, this.room); // fire-and-forget final persist — see ROOM_AUTOSAVE_INTERVAL
     }
     this.transport = null;
     this.connected = false;
@@ -123,6 +136,13 @@ export class Net {
 
   update(dt, playerPos, playerYaw) {
     if (!this.connected) return;
+    if (this.isHost) {
+      this.roomSaveTimer -= dt;
+      if (this.roomSaveTimer <= 0) {
+        this.roomSaveTimer = ROOM_AUTOSAVE_INTERVAL;
+        cloudSaveGame(this.game, this.room); // fire-and-forget — a failed autosave just retries next interval
+      }
+    }
     this.posTimer -= dt;
     if (this.posTimer <= 0) {
       this.posTimer = POS_SEND_INTERVAL;
