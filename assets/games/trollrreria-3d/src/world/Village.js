@@ -5,13 +5,23 @@ const HUT_HEIGHT = 3;
 const HALL_SIZE = 7; // the [0,0] building in a 4+ hut settlement
 const HALL_HEIGHT = 4;
 
+// Biome-themed materials for region-based settlements (phase 4 — structure
+// variety): same hut/hall shapes as the home village, different walls/roof
+// so a snowy or desert settlement reads as a distinct discovery instead of
+// "the same town again." FOREST is the original plank-and-brick look.
+export const VILLAGE_STYLES = {
+  forest: { wall: BLOCKS.PLANK, roof: BLOCKS.STONE_BRICK },
+  snow: { wall: BLOCKS.STONE_BRICK, roof: BLOCKS.SNOW },
+  desert: { wall: BLOCKS.SAND, roof: BLOCKS.STONE_BRICK },
+};
+
 // Builds one hut/hall: hollow plank box with a door gap on the +z side, a
 // torch inside, and a stepped stone-brick roof (each tier insets by one
 // block, "wedding cake" style — reads as an actual pitched roof rather than
 // a flat plank lid). Anchored to the ground height at its own footprint
 // (terrain isn't flattened first, so buildings follow the local slope a
 // little — reads as rustic rather than perfectly plopped-down).
-function placeHut(world, cx, cz, isHall = false) {
+function placeHut(world, cx, cz, isHall = false, style = VILLAGE_STYLES.forest) {
   const size = isHall ? HALL_SIZE : HUT_SIZE;
   const height = isHall ? HALL_HEIGHT : HUT_HEIGHT;
   const top = world.heightMap.get(`${cx},${cz}`);
@@ -26,12 +36,12 @@ function placeHut(world, cx, cz, isHall = false) {
       const isDoor = lz === half && Math.abs(lx) <= (isHall ? 1 : 0);
       for (let y = 0; y < height; y++) {
         if (isDoor && y < 2) continue; // 2-tall door gap
-        world.setBlockRaw(cx + lx, baseY + y, cz + lz, BLOCKS.PLANK);
+        world.setBlockRaw(cx + lx, baseY + y, cz + lz, style.wall);
       }
     }
   }
-  // Stepped pyramid roof: each tier is a hollow stone-brick ring resting on
-  // the one below, insetting by 1 block until it closes to a single peak.
+  // Stepped pyramid roof: each tier is a hollow ring resting on the one
+  // below, insetting by 1 block until it closes to a single peak.
   let roofHalf = half;
   let ry = baseY + height;
   while (roofHalf >= 0) {
@@ -39,7 +49,7 @@ function placeHut(world, cx, cz, isHall = false) {
       for (let lz = -roofHalf; lz <= roofHalf; lz++) {
         const isEdge = roofHalf === 0 || Math.abs(lx) === roofHalf || Math.abs(lz) === roofHalf;
         if (!isEdge) continue;
-        world.setBlockRaw(cx + lx, ry, cz + lz, BLOCKS.STONE_BRICK);
+        world.setBlockRaw(cx + lx, ry, cz + lz, style.roof);
       }
     }
     roofHalf -= 1;
@@ -133,7 +143,7 @@ const MIN_DIST_FROM_OTHER_VILLAGE = 18;
 // Returns the settlement center (used for the fast-travel waypoint) or
 // null if no suitable spot found. hutCount=2 gives the second "outpost"
 // settlement a visibly smaller footprint than the main village.
-export function placeVillage(world, originX, originZ, { avoidPos = null, offsets = MAIN_OFFSETS, hutCount = 5 } = {}) {
+export function placeVillage(world, originX, originZ, { avoidPos = null, offsets = MAIN_OFFSETS, hutCount = 5, style = VILLAGE_STYLES.forest } = {}) {
   const cx = originX;
   const cz = originZ;
   const minDist = MIN_DIST_FROM_OTHER_VILLAGE;
@@ -154,7 +164,7 @@ export function placeVillage(world, originX, originZ, { avoidPos = null, offsets
     for (let i = 0; i < hutOffsets.length; i++) {
       const [hx, hz] = hutOffsets[i];
       const isHall = i === 0 && hutOffsets.length >= 4;
-      const pos = placeHut(world, centerX + hx, centerZ + hz, isHall);
+      const pos = placeHut(world, centerX + hx, centerZ + hz, isHall, style);
       if (pos) placed.push(pos);
     }
     if (placed.length !== hutOffsets.length) continue;

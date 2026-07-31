@@ -63,6 +63,8 @@ export class Minimap {
       [world.dungeonPos, '#a855f7'],
       [world.vaultPos, '#22d3ee'],
       ...(world.wildVillages || []).map((pos) => [pos, '#34c759']),
+      ...(world.wildRuins || []).map((pos) => [pos, '#a855f7']),
+      ...(world.wildGiantTrees || []).map((pos) => [pos, '#15803d']),
     ];
     for (const [pos, color] of markers) {
       if (!pos) continue;

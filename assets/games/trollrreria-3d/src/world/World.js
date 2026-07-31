@@ -1,9 +1,10 @@
 import { Chunk, CHUNK_X, CHUNK_Y, CHUNK_Z } from './Chunk.js';
 import { BLOCKS, MINEABLE } from './blocks.js';
 import { makeFractalNoise2D, makeNoise2D } from './noise.js';
-import { placeVillage, OUTPOST_OFFSETS, CAMP_OFFSET_SETS } from './Village.js';
+import { placeVillage, OUTPOST_OFFSETS, CAMP_OFFSET_SETS, VILLAGE_STYLES } from './Village.js';
 import { placeDungeon } from './Dungeon.js';
 import { placeVault } from './Vault.js';
+import { placeGiantTree } from './GiantTree.js';
 
 const NEIGHBOR_DIRS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 
@@ -100,6 +101,8 @@ export class World {
     this.vaultPos = null;
     this.campPositions = []; // small far-out single-hut camps — found by exploring, not fast-travel waypoints
     this.wildVillages = []; // region-based settlements scattered across the infinite world, see _maybeSpawnRegionSettlement
+    this.wildRuins = []; // region-based Dungeon.js ruins, same placement machinery, biome-gated (phase 4)
+    this.wildGiantTrees = []; // region-based GiantTree.js landmarks, FOREST-only (phase 4)
     this._settlementRegions = new Set(); // "rx,rz" already rolled (spawned or not) — each region only ever rolls once
     this.spawnPoint = null;
     this.crops = new Map(); // "x,y,z" -> seconds remaining until WHEAT_CROP_MATURE
@@ -216,9 +219,44 @@ export class World {
     const anchorTop = this.heightMap.get(`${anchorX},${anchorZ}`);
     if (anchorTop === undefined || anchorTop < SEA_LEVEL) return; // don't found a village on/under water — see phase 4 for a coastal variant
 
-    const avoidPos = [this.villagePos, this.outpostPos, this.dungeonPos, this.vaultPos, ...this.campPositions, ...this.wildVillages].filter(Boolean);
+    const avoidPos = [
+      this.villagePos, this.outpostPos, this.dungeonPos, this.vaultPos,
+      ...this.campPositions, ...this.wildVillages, ...this.wildRuins, ...this.wildGiantTrees,
+    ].filter(Boolean);
+
+    // Phase 4 — structure variety: which landmark kind this region gets is
+    // itself a deterministic roll, biome-gated so a giant tree never lands
+    // in a desert. Village stays the most common kind (matches phase 1's
+    // original density/feel); ruin and giant-tree are rarer finds layered
+    // on top using the SAME placement machinery (Dungeon.js/GiantTree.js),
+    // not new placement code.
+    const biome = this.getBiome(anchorX, anchorZ);
+    const kindRoll = this._regionHash(rx, rz, 7);
+    const kind = biome === BIOMES.FOREST
+      ? (kindRoll < 0.5 ? 'village' : kindRoll < 0.75 ? 'giant_tree' : 'ruin')
+      : (kindRoll < 0.6 ? 'village' : 'ruin');
+
+    if (kind === 'giant_tree') {
+      const pos = placeGiantTree(this, anchorX, anchorZ, avoidPos, [[0, 0]]);
+      if (!pos) return;
+      this.wildGiantTrees.push(pos);
+      this.scanLightSourcesNear(Math.round(pos.x), Math.round(pos.z), 20);
+      this.recomputeLight();
+      return;
+    }
+
+    if (kind === 'ruin') {
+      const pos = placeDungeon(this, anchorX, anchorZ, avoidPos, [[0, 0]]);
+      if (!pos) return;
+      this.wildRuins.push(pos);
+      this.scanLightSourcesNear(Math.round(pos.x), Math.round(pos.z), 20);
+      this.recomputeLight();
+      return;
+    }
+
+    const style = VILLAGE_STYLES[biome] || VILLAGE_STYLES.forest;
     const hutCount = 2 + Math.floor(this._regionHash(rx, rz, 4) * 2); // 2 or 3 modest huts — deliberately smaller than the home village so it reads as "found," not "the same town again"
-    const pos = placeVillage(this, anchorX, anchorZ, { avoidPos, offsets: [[0, 0]], hutCount });
+    const pos = placeVillage(this, anchorX, anchorZ, { avoidPos, offsets: [[0, 0]], hutCount, style });
     if (!pos) return;
 
     this.wildVillages.push(pos);

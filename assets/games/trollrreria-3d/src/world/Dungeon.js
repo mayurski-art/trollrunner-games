@@ -56,13 +56,14 @@ function fillLoot(world, chestPositions) {
 // Fixed absolute offsets around the home region's origin (see Village.js —
 // same reasoning: the world is unbounded now, nothing left to scale against).
 
+const DEFAULT_OFFSETS = [[-16, -16], [16, 16], [-18, 12], [18, -12], [0, -20]];
+
 // Placed far enough from both settlements that all three landmarks read as
 // separate points of interest rather than crowding one corner of the island.
-export function placeDungeon(world, originX, originZ, avoidPositions = []) {
+export function placeDungeon(world, originX, originZ, avoidPositions = [], offsets = DEFAULT_OFFSETS) {
   const cx = originX;
   const cz = originZ;
   const minDist = MIN_DIST_FROM_VILLAGE;
-  const offsets = [[-16, -16], [16, 16], [-18, 12], [18, -12], [0, -20]];
   const avoid = avoidPositions.filter(Boolean);
 
   for (const [ox, oz] of offsets) {

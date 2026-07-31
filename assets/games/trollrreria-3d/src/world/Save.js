@@ -101,6 +101,8 @@ export function buildWorldSnapshot(world) {
     vaultPos: world.vaultPos,
     campPositions: world.campPositions,
     wildVillages: world.wildVillages,
+    wildRuins: world.wildRuins,
+    wildGiantTrees: world.wildGiantTrees,
     settlementRegions: [...world._settlementRegions],
   };
 }
@@ -185,6 +187,8 @@ export function applyWorldSave(world, saveData) {
   world.vaultPos = saveData.vaultPos || null;
   world.campPositions = saveData.campPositions || [];
   world.wildVillages = saveData.wildVillages || [];
+  world.wildRuins = saveData.wildRuins || [];
+  world.wildGiantTrees = saveData.wildGiantTrees || [];
   world._settlementRegions = new Set(saveData.settlementRegions || []);
   world.spawnPoint = saveData.player?.spawn || null;
   world.rebuildDerivedMapsFromChunks();
