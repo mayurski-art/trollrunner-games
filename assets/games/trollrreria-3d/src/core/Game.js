@@ -109,6 +109,17 @@ export class Game {
     this.villagers = [];
     this.animals = [];
     this.dialogueTimer = 0;
+
+    // Phase 5 — dynamic world events: blood moon (night-only spawn/stat
+    // boost), a temporary traveling merchant, and periodic meteor crashes.
+    // All three are rolled and simulated locally per player (consistent
+    // with Net.js never syncing enemies) — see docs/TROLLRRERIA-3D-ROADMAP.md.
+    this._wasNight = false;
+    this.bloodMoon = false;
+    this.eventMerchant = null;
+    this.eventMerchantTimer = 0;
+    this._nextMerchantCheckIn = 90;
+    this._nextMeteorIn = 240;
     this.waypointsScreen = new WaypointsScreen(hud.waypointList, this);
     this.net = new Net(this);
 
@@ -406,6 +417,7 @@ export class Game {
   entities() {
     const extras = [];
     if (this.merchant) extras.push(this.merchant);
+    if (this.eventMerchant) extras.push(this.eventMerchant);
     extras.push(...this.villagers, ...this.animals);
     return extras.length ? [...this.spawner.enemies, ...extras] : this.spawner.enemies;
   }
@@ -525,6 +537,98 @@ export class Game {
     return { ...kind, hp: Math.round(kind.hp * hp), damage: Math.round(kind.damage * damage) };
   }
 
+  // Phase 5 — dynamic world events. Called once per frame from _loop.
+  // Blood moon is a per-night roll (edge-detected on the day/night
+  // transition); the merchant and meteor are independent real-time
+  // countdowns so they don't all cluster around the same moment.
+  _tickWorldEvents(dt) {
+    const nowNight = this.dayNight.isNight();
+    if (nowNight && !this._wasNight) {
+      this.bloodMoon = Math.random() < 0.2;
+      if (this.bloodMoon) this.announceEvent('🌕 A Blood Moon rises... something feels wrong out there.');
+      this.spawner.bloodMoon = this.bloodMoon;
+    } else if (!nowNight && this._wasNight && this.bloodMoon) {
+      this.bloodMoon = false;
+      this.spawner.bloodMoon = false;
+      this.announceEvent('The Blood Moon has passed.');
+    }
+    this._wasNight = nowNight;
+
+    if (this.eventMerchant) {
+      this.eventMerchantTimer -= dt;
+      if (this.eventMerchantTimer <= 0) this._despawnEventMerchant();
+    } else {
+      this._nextMerchantCheckIn -= dt;
+      if (this._nextMerchantCheckIn <= 0) {
+        this._nextMerchantCheckIn = 90 + Math.random() * 90;
+        if (Math.random() < 0.3) this._spawnTravelingMerchant();
+      }
+    }
+
+    this._nextMeteorIn -= dt;
+    if (this._nextMeteorIn <= 0) {
+      this._nextMeteorIn = 300 + Math.random() * 180;
+      this._spawnMeteorEvent();
+    }
+  }
+
+  // A temporary merchant a short walk from the player — same trade screen
+  // as the permanent bed-triggered one (MerchantScreen isn't tied to a
+  // specific Merchant instance), just here-and-gone instead of permanent.
+  _spawnTravelingMerchant() {
+    if (this.eventMerchant) return;
+    const forward = this.player.forwardVector();
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 6 + Math.random() * 4;
+    const x = Math.round(this.player.pos.x + Math.cos(angle) * dist + forward.x * 2);
+    const z = Math.round(this.player.pos.z + Math.sin(angle) * dist + forward.z * 2);
+    const top = this.world.heightMap.get(`${x},${z}`);
+    if (top === undefined || top < 0) return;
+    this.eventMerchant = new Merchant(this.scene, { x: x + 0.5, y: top + 1, z: z + 0.5 });
+    this.eventMerchantTimer = 90;
+    this.announceEvent('A traveling merchant has arrived nearby.');
+  }
+
+  _despawnEventMerchant() {
+    if (!this.eventMerchant) return;
+    this.scene.remove(this.eventMerchant.mesh);
+    this.eventMerchant = null;
+    this.announceEvent('The traveling merchant has moved on.');
+  }
+
+  // A small crater + loot chest a fair walk from the player, guarded by a
+  // couple of regular (non-hardmode-only) mobs — reuses the same
+  // "carve blob + drop chest" shape World.js already uses for caves/camps,
+  // just triggered by a timer instead of chunk generation.
+  _spawnMeteorEvent() {
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 30 + Math.random() * 15;
+    const cx = Math.round(this.player.pos.x + Math.cos(angle) * dist);
+    const cz = Math.round(this.player.pos.z + Math.sin(angle) * dist);
+    const { cx: chunkCx, cz: chunkCz } = this.world.worldToChunk(cx, cz);
+    this.world.ensureChunkGenerated(chunkCx, chunkCz);
+    const top = this.world.heightMap.get(`${cx},${cz}`);
+    if (top === undefined || top < 3) return; // underwater/ungenerated — skip this roll rather than force a bad spot
+
+    this.world.carveBlob(cx, top, cz, 2.5);
+    const chestY = top - 1;
+    this.world.setBlockRaw(cx, chestY, cz, BLOCKS.CHEST);
+    const slots = this.world.getChest(cx, chestY, cz);
+    slots[0] = { id: BLOCKS.GEMSTONE, count: 3 };
+    slots[1] = { id: BLOCKS.ARCANE_DUST, count: 2 };
+    this.world.scanLightSourcesNear(cx, cz, 10);
+    this.world.recomputeLight();
+    this.world._rebuildChunksNear(cx, cz, 6);
+
+    const pool = [ENEMY_TYPES.TROLL_GRUB, ENEMY_TYPES.TROLL_BAT].filter(Boolean);
+    for (const [ox, oz] of [[-2, 0], [2, 0]]) {
+      const kind = pool[Math.floor(Math.random() * pool.length)];
+      if (!kind) continue;
+      this.spawner.enemies.push(new Enemy(this.scene, { x: cx + ox + 0.5, y: top + 1, z: cz + oz + 0.5 }, this._scaledKind(kind)));
+    }
+    this.announceEvent('☄️ A meteor just crashed nearby!');
+  }
+
   spawnRuinsGuardians() {
     if (!this.world.dungeonPos) return;
     const { x, z } = this.world.dungeonPos;
@@ -565,6 +669,16 @@ export class Game {
     this.hud.dialogue.textContent = `${name}: "${line}"`;
     this.hud.dialogue.hidden = false;
     this.dialogueTimer = 4;
+  }
+
+  // World-event announcements share the same transient dialogue line as
+  // villager chatter (no dedicated banner element exists) — plain text, no
+  // quote formatting, and a longer timer since it's more important.
+  announceEvent(text) {
+    if (!this.hud.dialogue) return;
+    this.hud.dialogue.textContent = text;
+    this.hud.dialogue.hidden = false;
+    this.dialogueTimer = 6;
   }
 
   // Known fast-travel points: world spawn (well, the player's own last bed/
@@ -708,7 +822,7 @@ export class Game {
     // Right-clicking the merchant opens the trade screen; a villager gives
     // a random one-line greeting; an animal gets fed if you're holding wheat.
     if (hit.type === 'entity') {
-      if (hit.entity === this.merchant) this.openMerchant();
+      if (hit.entity === this.merchant || hit.entity === this.eventMerchant) this.openMerchant();
       else if (this.villagers.includes(hit.entity)) {
         const line = hit.entity.line[Math.floor(Math.random() * hit.entity.line.length)];
         this.showDialogue(hit.entity.name, line);
@@ -839,6 +953,7 @@ export class Game {
     if (this.hud.hungerFill) this.hud.hungerFill.style.width = `${Math.max(0, (this.player.hunger / this.player.maxHunger) * 100)}%`;
 
     this.dayNight.update(dt);
+    this._tickWorldEvents(dt);
     this.music.setMode(this.dayNight.isNight() ? 'night' : 'day');
     if (this.hud.clock) this.hud.clock.textContent = `Day ${this.dayNight.day} · ${this.dayNight.clockString()}`;
     if (!this.world.hardmode && this.dayNight.day >= HARDMODE_TRIGGER_DAY) {

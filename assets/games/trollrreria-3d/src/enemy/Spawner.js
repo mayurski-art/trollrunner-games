@@ -11,6 +11,12 @@ const HARDMODE_INTERVAL_SCALE = 0.6; // faster spawns once hardmode hits
 const MIN_SPAWN_DIST = 10;
 const MAX_SPAWN_DIST = 28;
 const HARDMODE_STAT_SCALE = { hp: 1.5, damage: 1.4 };
+// Phase 5 — blood moon: a temporary, per-night event (rolled + toggled by
+// Game._tickWorldEvents) layered on top of the hardmode scale rather than
+// replacing it, same pattern as the difficulty/prestige scaling below.
+const BLOOD_MOON_STAT_SCALE = { hp: 1.3, damage: 1.25 };
+const BLOOD_MOON_INTERVAL_SCALE = 0.55;
+const BLOOD_MOON_CAP_BONUS = 3;
 // Caves are tight, so mobs spawn much closer than on the surface (a 10-28
 // unit ring might not have ANY reachable air pocket in a narrow tunnel).
 // Cap is deliberately lower than the surface — caves should feel sparse
@@ -39,6 +45,7 @@ export class Spawner {
     // Set by Game.js from difficulty + New Game+ prestige level — stacks
     // on top of the hardmode scale below rather than replacing it.
     this.statScale = { hp: 1, damage: 1 };
+    this.bloodMoon = false; // set/cleared by Game._tickWorldEvents
   }
 
   update(dt, playerPos) {
@@ -59,11 +66,13 @@ export class Spawner {
     }
 
     const undergroundPlayer = this.world.isUnderground(Math.floor(playerPos.x), Math.floor(playerPos.y), Math.floor(playerPos.z));
-    const cap = undergroundPlayer ? CAVE_MAX_ENEMIES : (this.world.hardmode ? MAX_ENEMIES_HARDMODE : MAX_ENEMIES);
+    let cap = undergroundPlayer ? CAVE_MAX_ENEMIES : (this.world.hardmode ? MAX_ENEMIES_HARDMODE : MAX_ENEMIES);
+    if (this.bloodMoon && !undergroundPlayer) cap += BLOOD_MOON_CAP_BONUS;
     this.spawnTimer -= dt;
     if (!peaceful && this.spawnTimer <= 0 && this.enemies.length < cap) {
       this.trySpawn(playerPos, undergroundPlayer);
-      const scale = this.world.hardmode ? HARDMODE_INTERVAL_SCALE : 1;
+      let scale = this.world.hardmode ? HARDMODE_INTERVAL_SCALE : 1;
+      if (this.bloodMoon && !undergroundPlayer) scale *= BLOOD_MOON_INTERVAL_SCALE;
       this.spawnTimer = (SPAWN_INTERVAL_MIN + Math.random() * (SPAWN_INTERVAL_MAX - SPAWN_INTERVAL_MIN)) * scale;
     }
 
@@ -83,8 +92,9 @@ export class Spawner {
       const z = Math.floor(playerPos.z + Math.sin(angle) * dist);
 
       let kind = pool[Math.floor(Math.random() * pool.length)];
-      const hpScale = (hardmode && !kind.hardmodeOnly ? HARDMODE_STAT_SCALE.hp : 1) * this.statScale.hp;
-      const dmgScale = (hardmode && !kind.hardmodeOnly ? HARDMODE_STAT_SCALE.damage : 1) * this.statScale.damage;
+      const bloodMoonActive = this.bloodMoon && !underground;
+      const hpScale = (hardmode && !kind.hardmodeOnly ? HARDMODE_STAT_SCALE.hp : 1) * (bloodMoonActive ? BLOOD_MOON_STAT_SCALE.hp : 1) * this.statScale.hp;
+      const dmgScale = (hardmode && !kind.hardmodeOnly ? HARDMODE_STAT_SCALE.damage : 1) * (bloodMoonActive ? BLOOD_MOON_STAT_SCALE.damage : 1) * this.statScale.damage;
       if (hpScale !== 1 || dmgScale !== 1) {
         kind = { ...kind, hp: Math.round(kind.hp * hpScale), damage: Math.round(kind.damage * dmgScale) };
       }
