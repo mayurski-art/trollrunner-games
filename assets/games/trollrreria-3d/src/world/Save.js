@@ -100,6 +100,8 @@ export function buildWorldSnapshot(world) {
     dungeonPos: world.dungeonPos,
     vaultPos: world.vaultPos,
     campPositions: world.campPositions,
+    wildVillages: world.wildVillages,
+    settlementRegions: [...world._settlementRegions],
   };
 }
 
@@ -182,6 +184,8 @@ export function applyWorldSave(world, saveData) {
   world.dungeonPos = saveData.dungeonPos || null;
   world.vaultPos = saveData.vaultPos || null;
   world.campPositions = saveData.campPositions || [];
+  world.wildVillages = saveData.wildVillages || [];
+  world._settlementRegions = new Set(saveData.settlementRegions || []);
   world.spawnPoint = saveData.player?.spawn || null;
   world.rebuildDerivedMapsFromChunks();
   // Lights/lava placed underground need their propagated levels BEFORE the

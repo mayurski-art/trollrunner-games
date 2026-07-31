@@ -14,13 +14,30 @@ const NEIGHBOR_DIRS = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], 
 // an earlier "one big fixed grid" approach (5x5 -> 9x9 -> 25x25 -> 21x21)
 // that kept reading as small/bounded no matter how big the grid got: it
 // was still finite, so there was always an edge to eventually walk into.
-export const CHUNK_LOAD_RADIUS = 6; // chunks kept generated+meshed around the player
-export const CHUNK_UNLOAD_RADIUS = 9; // farther than this, a chunk's mesh gets dropped (data kept)
-const MAX_NEW_CHUNKS_PER_TICK = 3; // throttled so fast movement/teleport doesn't stutter
+// Raised from 6/9/3 once greedy meshing (see Chunk.js) cut per-chunk
+// triangle counts sharply — the old values were tuned around the
+// per-face mesher's cost, not a real draw-distance target.
+export const CHUNK_LOAD_RADIUS = 8; // chunks kept generated+meshed around the player
+export const CHUNK_UNLOAD_RADIUS = 11; // farther than this, a chunk's mesh gets dropped (data kept)
+const MAX_NEW_CHUNKS_PER_TICK = 4; // throttled so fast movement/teleport doesn't stutter
 
 const BASE_HEIGHT = 20;
 const AMPLITUDE = 14;
 const CROP_GROWTH_SECONDS = 45;
+
+// Phase 1 — region-based settlements: the infinite world outside the home
+// region is divided into fixed-size chunk "regions"; each region gets ONE
+// deterministic roll (seed + region coords, no runtime RNG) deciding
+// whether a small settlement exists in it and exactly where. Deterministic
+// so co-op peers on the same seed see the same structures without them
+// ever going over the wire (see Net.js), and so a save/reload always finds
+// the same world. Kept as plain villages for now (Village.js, reused
+// as-is) — dungeon/vault/guardian-mob variety is phase 4's job, not this
+// one's; this phase is purely "make existing content repeat."
+const SETTLEMENT_REGION_CHUNKS = 12; // one roll per 12x12-chunk (192x192 block) area
+const SETTLEMENT_SPAWN_CHANCE = 0.5; // ~half of regions get a settlement
+const SETTLEMENT_MIN_DIST = 60; // blocks, from the home region and from each other
+const SETTLEMENT_PAD_CHUNKS = 1; // neighbor chunks force-generated around an anchor so huts never hang off the edge of ungenerated terrain
 
 // The village/outpost/dungeon/vault/camp cluster (and spawn) live in a
 // fixed "home region" around a fixed origin rather than being scattered
@@ -73,6 +90,8 @@ export class World {
     this.dungeonPos = null;
     this.vaultPos = null;
     this.campPositions = []; // small far-out single-hut camps — found by exploring, not fast-travel waypoints
+    this.wildVillages = []; // region-based settlements scattered across the infinite world, see _maybeSpawnRegionSettlement
+    this._settlementRegions = new Set(); // "rx,rz" already rolled (spawned or not) — each region only ever rolls once
     this.spawnPoint = null;
     this.crops = new Map(); // "x,y,z" -> seconds remaining until WHEAT_CROP_MATURE
     this.lightSources = new Set(); // "x,y,z" of every placed TORCH/LAVA block
@@ -136,7 +155,69 @@ export class World {
     this._generateChunkOreVeins(chunk);
     this._generateChunkCaves(chunk);
     this._generateChunkVegetation(chunk);
+    this._maybeSpawnRegionSettlement(cx, cz);
     return chunk;
+  }
+
+  // Deterministic hash of (region coords, seed, salt) -> [0,1). Cheap
+  // per-call (no grid allocation, unlike noise.js's makeNoise2D) since a
+  // region only ever needs a handful of rolls once, not a sampled field.
+  _regionHash(rx, rz, salt) {
+    let h = (rx * 374761393 + rz * 668265263 + this.seed * 2147483647 + salt * 1274126177) | 0;
+    h = Math.imul(h ^ (h >>> 15), 1 | h);
+    h = (h + Math.imul(h ^ (h >>> 7), 61 | h)) ^ h;
+    return ((h ^ (h >>> 14)) >>> 0) / 4294967296;
+  }
+
+  // Called at the end of every chunk's generation. Each region rolls
+  // exactly once, the first time ANY of its chunks generates — but only
+  // actually places a structure once its own deterministically-chosen
+  // "anchor" chunk (cx,cz) is the one generating, since that's the only
+  // chunk we know is really being visited (regions are large enough that a
+  // player passing near one edge shouldn't force-generate structures on
+  // the far side they may never reach).
+  _maybeSpawnRegionSettlement(cx, cz) {
+    const rx = Math.floor(cx / SETTLEMENT_REGION_CHUNKS);
+    const rz = Math.floor(cz / SETTLEMENT_REGION_CHUNKS);
+    const regionKey = `${rx},${rz}`;
+    if (this._settlementRegions.has(regionKey)) return;
+
+    const anchorCx = rx * SETTLEMENT_REGION_CHUNKS + Math.floor(this._regionHash(rx, rz, 1) * SETTLEMENT_REGION_CHUNKS);
+    const anchorCz = rz * SETTLEMENT_REGION_CHUNKS + Math.floor(this._regionHash(rx, rz, 2) * SETTLEMENT_REGION_CHUNKS);
+    if (cx !== anchorCx || cz !== anchorCz) return; // this chunk generated first, but isn't the anchor — wait for the anchor chunk itself
+
+    this._settlementRegions.add(regionKey);
+    if (this._regionHash(rx, rz, 3) > SETTLEMENT_SPAWN_CHANCE) return; // rolled "no settlement" for this region
+
+    const anchorX = anchorCx * CHUNK_X + Math.floor(CHUNK_X / 2);
+    const anchorZ = anchorCz * CHUNK_Z + Math.floor(CHUNK_Z / 2);
+    if (Math.hypot(anchorX - HOME_ORIGIN_X, anchorZ - HOME_ORIGIN_Z) < HOME_REGION_RADIUS + SETTLEMENT_MIN_DIST) return; // don't crowd the hand-placed home region
+
+    // Force-generate the small pad of neighbor chunks a village's huts
+    // could reach into, so placeVillage never finds an "ungenerated" edge
+    // mid-placement — same technique generateHomeRegion uses, just scoped
+    // to a 3x3 pad instead of the whole home region.
+    for (let dx = -SETTLEMENT_PAD_CHUNKS; dx <= SETTLEMENT_PAD_CHUNKS; dx++) {
+      for (let dz = -SETTLEMENT_PAD_CHUNKS; dz <= SETTLEMENT_PAD_CHUNKS; dz++) {
+        if (dx === 0 && dz === 0) continue; // this chunk is already generating (we're mid-call)
+        this.ensureChunkGenerated(anchorCx + dx, anchorCz + dz);
+      }
+    }
+
+    const avoidPos = [this.villagePos, this.outpostPos, this.dungeonPos, this.vaultPos, ...this.campPositions, ...this.wildVillages].filter(Boolean);
+    const hutCount = 2 + Math.floor(this._regionHash(rx, rz, 4) * 2); // 2 or 3 modest huts — deliberately smaller than the home village so it reads as "found," not "the same town again"
+    const pos = placeVillage(this, anchorX, anchorZ, { avoidPos, offsets: [[0, 0]], hutCount });
+    if (!pos) return;
+
+    this.wildVillages.push(pos);
+    const cx2 = Math.round(pos.x), cz2 = Math.round(pos.z), cy2 = Math.round(pos.y);
+    this.setBlockRaw(cx2 - 2, cy2, cz2, BLOCKS.CHEST);
+    const slots = this.getChest(cx2 - 2, cy2, cz2);
+    slots[0] = { id: BLOCKS.BREAD, count: 1 + Math.floor(this._regionHash(rx, rz, 5) * 3) };
+    slots[1] = { id: BLOCKS.GEMSTONE, count: this._regionHash(rx, rz, 6) < 0.4 ? 1 : 0 };
+
+    this.scanLightSourcesNear(cx2, cz2, 20);
+    this.recomputeLight();
   }
 
   _generateChunkTerrain(chunk) {
