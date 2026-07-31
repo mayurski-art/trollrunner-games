@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { InputManager } from './InputManager.js';
-import { World } from '../world/World.js';
+import { World, BIOMES } from '../world/World.js';
 import { Player } from '../player/Player.js';
 import { Spawner, SPAWN_GRACE_SECONDS } from '../enemy/Spawner.js';
 import { performRaycast } from '../player/Interaction.js';
@@ -27,6 +27,7 @@ import { Enemy } from '../enemy/Enemy.js';
 import { ENEMY_TYPES } from '../enemy/EnemyTypes.js';
 
 const REACH = 6;
+const RANGED_REACH = 22; // bow — see WEAPON_STATS.BOW
 const AUTOSAVE_INTERVAL = 60;
 const HARDMODE_TRIGGER_DAY = 5;
 const HUNGER_DRAIN_INTERVAL = 20; // seconds per -1 hunger
@@ -120,6 +121,7 @@ export class Game {
     this.eventMerchantTimer = 0;
     this._nextMerchantCheckIn = 90;
     this._nextMeteorIn = 240;
+    this.blocking = false; // polled each frame from InputManager — see the main loop
     this.waypointsScreen = new WaypointsScreen(hud.waypointList, this);
     this.net = new Net(this);
 
@@ -131,6 +133,7 @@ export class Game {
       onInventory: () => this.toggleInventory(),
       onPause: () => this.togglePause(),
       onToggleCursor: () => this.toggleCursorLock(),
+      onDodge: () => this.handleDodge(),
     });
 
     window.addEventListener('resize', () => this.resize());
@@ -716,15 +719,27 @@ export class Game {
     this.onStateChange('running');
   }
 
+  handleDodge() {
+    if (this.state !== 'running') return;
+    const move = this.input.moveVector;
+    if (this.player.dodge(move.x, move.z)) this.music.playFootstep();
+  }
+
   handleDig() {
     if (this.state !== 'running') return;
-    const hit = performRaycast(this.world, this.player.eyePos, this.player.forwardVector(), REACH, this.entities());
+    const heldWeapon = this.inventory.selectedItem();
+    const heldStats = (heldWeapon && WEAPON_STATS[heldWeapon.id]) || UNARMED;
+    // A bow reaches much farther than melee — see WEAPON_STATS.BOW's
+    // `ranged` flag. No separate projectile: an extended-range raycast
+    // still respects blocks in the way, same as any other hit-test here.
+    const reach = heldStats.ranged ? RANGED_REACH : REACH;
+    const hit = performRaycast(this.world, this.player.eyePos, this.player.forwardVector(), reach, this.entities());
     if (!hit) return;
     if (hit.type === 'entity') {
-      if (hit.entity === this.merchant || this.villagers.includes(hit.entity)) return; // can't be hurt
+      if (hit.entity === this.merchant || hit.entity === this.eventMerchant || this.villagers.includes(hit.entity)) return; // can't be hurt
       if (this.attackCooldownTimer > 0) return;
-      const weapon = this.inventory.selectedItem();
-      const stats = (weapon && WEAPON_STATS[weapon.id]) || UNARMED;
+      const weapon = heldWeapon;
+      const stats = heldStats;
       this.attackCooldownTimer = stats.cooldown;
       this.heldItem.triggerSwing();
 
@@ -980,7 +995,8 @@ export class Game {
     this.player.lookDelta(look.dx, look.dy);
 
     const move = this.input.moveVector;
-    const fellOff = this.player.update(dt, move.x, move.z, this.input.jumpHeld);
+    this.blocking = this.input.keys.has('KeyR');
+    const fellOff = this.player.update(dt, move.x, move.z, this.input.jumpHeld, this.blocking);
 
     if (this.player.grounded && (move.x !== 0 || move.z !== 0)) {
       this.footstepTimer -= dt;
@@ -1011,7 +1027,14 @@ export class Game {
     const attackers = this.spawner.update(dt, this.player.pos);
     const reduction = this.inventory.armorReduction();
     for (const attacker of attackers) {
-      const dmg = Math.max(1, Math.round(attacker.effectiveDamage() * (1 - reduction)));
+      const blockMult = this.blocking ? 0.5 : 1; // shield — see Player.js's own move-speed tradeoff for holding it
+      const dmg = Math.max(1, Math.round(attacker.effectiveDamage() * (1 - reduction) * blockMult));
+      // Freeze status: an attack landing from a mob currently standing in a
+      // SNOW biome chills the player, slowing movement for a few seconds
+      // (Player.js applies the actual speed multiplier).
+      if (this.world.getBiome(Math.floor(attacker.pos.x), Math.floor(attacker.pos.z)) === BIOMES.SNOW) {
+        this.player.slowTimer = 2.5;
+      }
       if (this.player.takeDamage(dmg)) died = true;
       else this.music.playHurt();
       if (attacker.type.isBoss) {

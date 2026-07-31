@@ -54,6 +54,7 @@ export const BLOCKS = {
   PATH: 50,
   LAVA: 51,
   WATER: 52,
+  BOW: 53,
 };
 
 // Per-face color so a merged mesh can use vertex colors instead of textures.
@@ -110,6 +111,7 @@ export const BLOCK_COLOR = {
   [BLOCKS.PATH]: 0xb8a06a,
   [BLOCKS.LAVA]: 0xff5a1f,
   [BLOCKS.WATER]: 0x2f6fd6,
+  [BLOCKS.BOW]: 0xa9784f,
 };
 
 export const BLOCK_NAME = {
@@ -164,6 +166,7 @@ export const BLOCK_NAME = {
   [BLOCKS.PATH]: 'Path',
   [BLOCKS.LAVA]: 'Lava',
   [BLOCKS.WATER]: 'Water',
+  [BLOCKS.BOW]: 'Bow',
 };
 
 // Icon art for the UI (hotbar/inventory/crafting/trade/quest swatches) —
@@ -222,6 +225,10 @@ export const WEAPON_STATS = {
   [BLOCKS.GEM_SWORD]: { damage: 7, cooldown: 0.3 },
   [BLOCKS.REAPER_SWORD]: { damage: 10, cooldown: 0.28 },
   [BLOCKS.ENCHANTED_SWORD]: { damage: 14, cooldown: 0.22 },
+  // ranged: true — Game.handleDig uses a much longer raycast reach for
+  // this weapon instead of melee REACH. No separate arrow/ammo item for
+  // v1 (phase 6 scoping — a full ammo economy is its own feature).
+  [BLOCKS.BOW]: { damage: 5, cooldown: 0.6, ranged: true },
 };
 
 // Armor: a single equipped item id -> fraction of incoming damage blocked.

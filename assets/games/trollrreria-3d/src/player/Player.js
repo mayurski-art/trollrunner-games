@@ -10,6 +10,18 @@ const MAX_HP = 100;
 const MAX_HUNGER = 100;
 const WATER_GRAVITY_MULT = 0.35; // gentle sink instead of falling through water at full speed — see Player.update
 
+// Phase 6 — combat overhaul: dodge roll (a brief dash + invulnerability
+// window, on a cooldown so it can't be spammed), block (halves move speed
+// while held — the damage reduction itself is applied by Game.js at the
+// hit site, same place armor reduction already is), and a snow-mob slow
+// status effect.
+const DODGE_SPEED = 13;
+const DODGE_DURATION = 0.18;
+const DODGE_INVULN = 0.35;
+const DODGE_COOLDOWN = 1.2;
+const BLOCK_MOVE_MULT = 0.5;
+const SLOW_MOVE_MULT = 0.55;
+
 // Feet-anchored AABB voxel collision: axis-separated resolve (move X, clamp
 // on overlap; then Y; then Z) — simple and stable enough for a small world.
 // WATER is solid for rendering/meshing (see Chunk.js) but deliberately NOT
@@ -47,6 +59,33 @@ export class Player {
     this.invulnT = 0;
     this.hunger = MAX_HUNGER;
     this.maxHunger = MAX_HUNGER;
+    this.dashTimer = 0;
+    this.dashVel = { x: 0, z: 0 };
+    this.dodgeCooldownTimer = 0;
+    this.slowTimer = 0; // snow-mob freeze status — see Game._tickWorldEvents-adjacent attacker handling
+  }
+
+  // Dodge roll: a short fixed-velocity dash in the current move direction
+  // (falls back to facing direction if not moving) with a brief i-frame
+  // window, on its own cooldown. moveX/moveZ are the same raw WASD-space
+  // values Player.update takes, not world-space.
+  dodge(moveX, moveZ) {
+    if (this.dodgeCooldownTimer > 0) return false;
+    const sin = Math.sin(this.yaw), cos = Math.cos(this.yaw);
+    let dirX, dirZ;
+    if (moveX === 0 && moveZ === 0) {
+      dirX = -sin; dirZ = -cos; // facing direction
+    } else {
+      dirX = -sin * moveZ + cos * moveX;
+      dirZ = -cos * moveZ - sin * moveX;
+      const len = Math.hypot(dirX, dirZ) || 1;
+      dirX /= len; dirZ /= len;
+    }
+    this.dashVel = { x: dirX * DODGE_SPEED, z: dirZ * DODGE_SPEED };
+    this.dashTimer = DODGE_DURATION;
+    this.invulnT = Math.max(this.invulnT, DODGE_INVULN);
+    this.dodgeCooldownTimer = DODGE_COOLDOWN;
+    return true;
   }
 
   eat(amount) {
@@ -79,18 +118,31 @@ export class Player {
     this.hp = this.maxHp;
     this.hunger = this.maxHunger;
     this.invulnT = 1.2;
+    this.dashTimer = 0;
+    this.slowTimer = 0;
   }
 
-  update(dt, moveX, moveZ, wantsJump) {
+  update(dt, moveX, moveZ, wantsJump, blocking = false) {
     if (this.invulnT > 0) this.invulnT -= dt;
+    if (this.dodgeCooldownTimer > 0) this.dodgeCooldownTimer -= dt;
+    if (this.slowTimer > 0) this.slowTimer -= dt;
 
-    const sin = Math.sin(this.yaw), cos = Math.cos(this.yaw);
-    // moveZ: forward(+1)/back(-1) relative to facing; moveX: strafe right(+1)/left(-1)
-    const dirX = -sin * moveZ + cos * moveX;
-    const dirZ = -cos * moveZ - sin * moveX;
+    if (this.dashTimer > 0) {
+      this.dashTimer -= dt;
+      this.vel.x = this.dashVel.x;
+      this.vel.z = this.dashVel.z;
+    } else {
+      const sin = Math.sin(this.yaw), cos = Math.cos(this.yaw);
+      // moveZ: forward(+1)/back(-1) relative to facing; moveX: strafe right(+1)/left(-1)
+      const dirX = -sin * moveZ + cos * moveX;
+      const dirZ = -cos * moveZ - sin * moveX;
+      let speed = MOVE_SPEED;
+      if (blocking) speed *= BLOCK_MOVE_MULT;
+      if (this.slowTimer > 0) speed *= SLOW_MOVE_MULT;
 
-    this.vel.x = dirX * MOVE_SPEED;
-    this.vel.z = dirZ * MOVE_SPEED;
+      this.vel.x = dirX * speed;
+      this.vel.z = dirZ * speed;
+    }
 
     const inWater = isInWater(this.world, this.pos);
     if (wantsJump && (this.grounded || inWater)) {

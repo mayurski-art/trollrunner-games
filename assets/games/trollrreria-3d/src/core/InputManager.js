@@ -27,6 +27,9 @@ export class InputManager {
       if (e.code === 'Space') this.jumpHeld = true;
       if (e.code === 'Escape') this.callbacks.onEscape?.();
       if (e.code === 'KeyE') this.callbacks.onInventory?.();
+      // Dodge roll — edge-triggered so holding the key doesn't spam dashes
+      // (Player.dodge also has its own cooldown as a second guard).
+      if (e.code === 'KeyF' && !alreadyHeld) this.callbacks.onDodge?.();
       // Edge-triggered (ignore OS key-repeat) — frees the mouse cursor to
       // click HUD buttons (backpack, map, etc.) without opening the pause
       // menu; pressing it again (or clicking the canvas) re-locks it.
