@@ -5,6 +5,7 @@ const GRAVITY = 24;
 const JUMP_SPEED = 8.2;
 const MOVE_SPEED = 5.2;
 const MAX_HP = 100;
+const MAX_HUNGER = 100;
 
 // Feet-anchored AABB voxel collision: axis-separated resolve (move X, clamp
 // on overlap; then Y; then Z) — simple and stable enough for a small world.
@@ -34,6 +35,12 @@ export class Player {
     this.hp = MAX_HP;
     this.maxHp = MAX_HP;
     this.invulnT = 0;
+    this.hunger = MAX_HUNGER;
+    this.maxHunger = MAX_HUNGER;
+  }
+
+  eat(amount) {
+    this.hunger = Math.min(this.maxHunger, this.hunger + amount);
   }
 
   get eyePos() {
@@ -60,6 +67,7 @@ export class Player {
     this.pos = { ...this.spawn };
     this.vel = { x: 0, y: 0, z: 0 };
     this.hp = this.maxHp;
+    this.hunger = this.maxHunger;
     this.invulnT = 1.2;
   }
 
@@ -86,7 +94,7 @@ export class Player {
     this.grounded = false;
     this.moveAxis('y', this.vel.y * dt);
 
-    // Fell off the island into the void.
+    // Fell into a cave/pit deep enough to be unrecoverable.
     if (this.pos.y < -20) return 'fell';
     return null;
   }

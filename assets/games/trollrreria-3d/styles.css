@@ -83,6 +83,20 @@ html, body {
   margin-top: 10px;
 }
 
+.tr3-difficulty-picker { display: flex; gap: 6px; margin-bottom: 14px; }
+.tr3-diff-btn {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--tr3-border);
+  color: rgba(255,255,255,0.7);
+  border-radius: 8px;
+  padding: 8px 4px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.tr3-diff-btn.is-active { border-color: var(--tr3-gold); color: var(--tr3-gold); background: rgba(255,179,0,0.08); }
+
 .tr3-menu-controls {
   display: flex;
   flex-wrap: wrap;
@@ -247,6 +261,25 @@ html, body {
 }
 .tr3-hp-label { font-size: 11px; font-weight: 700; opacity: 0.7; }
 
+.tr3-hunger-wrap {
+  position: absolute;
+  top: 64px;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--tr3-panel);
+  border: 1px solid var(--tr3-border);
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+.tr3-hunger-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #a8672e, #ffd166);
+  transition: width 0.2s ease;
+}
+
 .tr3-clock {
   position: absolute;
   top: 16px;
@@ -273,6 +306,20 @@ html, body {
   font-size: 11px;
   font-weight: 900;
   letter-spacing: 1px;
+}
+.tr3-safestart-badge {
+  position: absolute;
+  top: 58px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, #14532d, #15803d);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 8px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  transition: opacity 0.6s ease;
 }
 .tr3-hp-bar {
   width: 120px;
@@ -316,7 +363,7 @@ html, body {
 .tr3-hotbar-swatch-empty { background: rgba(255,255,255,0.06); }
 .tr3-hotbar-count { opacity: 0.8; }
 
-.tr3-pause-btn, .tr3-inv-btn, .tr3-music-btn, .tr3-coop-btn {
+.tr3-pause-btn, .tr3-inv-btn, .tr3-music-btn, .tr3-coop-btn, .tr3-waypoints-btn {
   position: absolute;
   top: 16px;
   width: 40px;
@@ -330,9 +377,38 @@ html, body {
   pointer-events: auto;
 }
 .tr3-pause-btn { right: 16px; }
-.tr3-coop-btn { right: 64px; font-size: 16px; }
-.tr3-music-btn { right: 112px; font-size: 16px; }
-.tr3-inv-btn { right: 160px; font-size: 18px; }
+.tr3-waypoints-btn { right: 64px; font-size: 16px; }
+.tr3-coop-btn { right: 112px; font-size: 16px; }
+.tr3-music-btn { right: 160px; font-size: 16px; }
+.tr3-inv-btn { right: 208px; font-size: 18px; }
+
+.tr3-minimap {
+  position: absolute;
+  top: 100px;
+  right: 16px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 1px solid var(--tr3-border);
+  background: rgba(10,6,22,0.4);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+}
+
+.tr3-cursor-hint {
+  position: absolute;
+  top: 60px;
+  right: 16px;
+  max-width: 200px;
+  text-align: right;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: rgba(255,255,255,0.75);
+  background: rgba(0,0,0,0.35);
+  border: 1px solid var(--tr3-border);
+  border-radius: 8px;
+  padding: 5px 10px;
+  transition: opacity 0.6s ease;
+}
 
 .tr3-peer-count {
   position: absolute;
@@ -343,6 +419,68 @@ html, body {
   font-weight: 700;
   opacity: 0.85;
 }
+
+.tr3-dialogue {
+  position: absolute;
+  bottom: 100px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(80vw, 480px);
+  background: var(--tr3-panel);
+  border: 1px solid var(--tr3-border);
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-size: 13px;
+  text-align: center;
+}
+
+.tr3-boss-bar {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 46px;
+  width: min(70vw, 420px);
+  text-align: center;
+}
+.tr3-boss-name {
+  display: block;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #ff4d4d;
+  margin-bottom: 4px;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+}
+.tr3-boss-track {
+  height: 10px;
+  background: rgba(0,0,0,0.5);
+  border: 1px solid rgba(255,77,77,0.4);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.tr3-boss-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #7c2d12, #ff4d4d);
+  transition: width 0.2s ease;
+}
+
+.tr3-waypoint-list { display: flex; flex-direction: column; gap: 10px; }
+.tr3-waypoint-row {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--tr3-border);
+  border-radius: 10px;
+  padding: 14px;
+  color: #fff;
+  cursor: pointer;
+  text-align: left;
+}
+.tr3-waypoint-row:hover { border-color: var(--tr3-gold); }
 
 .tr3-coop-input {
   width: 100%;
@@ -423,6 +561,12 @@ html, body {
 .tr3-armor-slot.is-empty { border-style: dashed; opacity: 0.5; }
 .tr3-slot-swatch { width: 55%; aspect-ratio: 1; border-radius: 4px; }
 .tr3-slot-count { font-size: 10px; font-family: 'DM Mono', monospace; opacity: 0.85; margin-top: 2px; }
+.tr3-slot-icon {
+  background: none;
+  object-fit: contain;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
 
 .tr3-recipe-list { display: flex; flex-direction: column; gap: 8px; }
 .tr3-recipe-row {
@@ -449,6 +593,21 @@ html, body {
 }
 .tr3-recipe-btn:disabled { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.4); cursor: not-allowed; }
 
+.tr3-quest-card {
+  background: rgba(255,179,0,0.06);
+  border: 1px solid rgba(255,179,0,0.3);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+.tr3-quest-title { font-weight: 900; font-size: 15px; margin-bottom: 4px; }
+.tr3-quest-intro { font-size: 12px; opacity: 0.75; margin: 0 0 10px; }
+.tr3-quest-obj { font-size: 13px; font-family: 'DM Mono', monospace; opacity: 0.7; margin-bottom: 4px; }
+.tr3-quest-obj.is-met { opacity: 1; color: var(--tr3-gold); }
+.tr3-quest-claim { width: 100%; margin-top: 10px; }
+.tr3-prestige-btn { width: 100%; margin-top: 8px; }
+.tr3-prestige-hint { margin-top: 8px; font-size: 11px; }
+
 /* Crosshair */
 #tr3-canvas::after { content: ''; }
 .tr3-crosshair {
@@ -462,6 +621,45 @@ html, body {
   background: rgba(255,255,255,0.8);
   pointer-events: none;
   z-index: 11;
+}
+
+/* Mining progress ring — fills clockwise around the crosshair while
+   holding down the dig button, Minecraft-style hold-to-break feedback. */
+.tr3-mine-progress {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 11;
+  --mine-progress: 0;
+  background: conic-gradient(rgba(255,255,255,0.95) calc(var(--mine-progress) * 360deg), rgba(255,255,255,0.15) 0deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+}
+
+.tr3-rain {
+  position: absolute;
+  inset: -20px;
+  pointer-events: none;
+  z-index: 9;
+  background-image: repeating-linear-gradient(
+    115deg,
+    rgba(200, 220, 255, 0.35) 0px,
+    rgba(200, 220, 255, 0.35) 1px,
+    transparent 1px,
+    transparent 14px
+  );
+  background-size: 100% 140px;
+  animation: tr3-rain-fall 0.35s linear infinite;
+  opacity: 0.5;
+}
+@keyframes tr3-rain-fall {
+  from { background-position: 0 -140px; }
+  to { background-position: 40px 0; }
 }
 
 /* Touch controls */

@@ -1,35 +1,49 @@
-import * as THREE from 'three';
+import { createBillboard } from '../render/SpriteTextures.js';
+import { CHUNK_Y } from '../world/Chunk.js';
 
 const KNOCKBACK_DECAY = 6; // per second, exponential-ish falloff
 
-// A wandering/chasing mob whose stats/behavior come from an EnemyTypes
-// config, so ground mobs and flyers share one implementation. Player
-// "attacks" it by pointing the crosshair at it and using the dig/interact
-// button used for mining blocks (see Game.handleDig).
+// A wandering mob whose stats/behavior come from an EnemyTypes config, so
+// ground mobs and flyers share one implementation. Neutral by default —
+// it only chases/attacks once the player has hit it at least once (see
+// `provoked`); until then it just wanders harmlessly, matching
+// Minecraft/Terraria's "you start it" convention rather than aggroing on
+// sight. Player "attacks" it by pointing the crosshair at it and using the
+// dig/interact button used for mining blocks (see Game.handleDig).
+// Rendered as a camera-facing PixelLab billboard sprite rather than a 3D
+// model — see render/SpriteTextures.js for why (this is a voxel-mesh
+// world, not a textured one).
 export class Enemy {
   constructor(scene, spawn, type) {
     this.type = type;
     this.pos = { ...spawn };
     this.hp = type.hp;
+    this.maxHp = type.hp;
     this.alive = true;
     this.radius = type.radius;
     this.attackCooldown = 0;
     this.wanderTarget = null;
     this.wanderTimer = 0;
     this.knockbackVel = { x: 0, z: 0 };
+    this.enraged = false;
+    // Neutral until the player attacks it — mobs wander harmlessly and
+    // never approach/attack on their own, only after being hit at least
+    // once (bosses are the one exception: summoning one is provocation
+    // enough by itself). Persists until it dies; leaving aggroRange just
+    // makes it give up the chase, not forget the grudge.
+    this.provoked = false;
 
-    const geo = new THREE.BoxGeometry(type.size, type.size, type.size);
-    const mat = new THREE.MeshLambertMaterial({ color: type.color });
-    this.mesh = new THREE.Mesh(geo, mat);
-    this.mesh.position.set(spawn.x, spawn.y + type.size / 2, spawn.z);
+    this.mesh = createBillboard(type.sprite.file, type.sprite.w, type.sprite.h, type.size);
+    this.mesh.position.set(spawn.x, spawn.y, spawn.z);
     scene.add(this.mesh);
   }
 
   centerPos() {
-    return { x: this.mesh.position.x, y: this.mesh.position.y, z: this.mesh.position.z };
+    return { x: this.mesh.position.x, y: this.mesh.position.y + this.type.size / 2, z: this.mesh.position.z };
   }
 
   hit(damage, sourcePos) {
+    this.provoked = true;
     this.hp -= damage;
     if (sourcePos) {
       const dx = this.pos.x - sourcePos.x, dz = this.pos.z - sourcePos.z;
@@ -45,25 +59,34 @@ export class Enemy {
     this.mesh.visible = false;
   }
 
-  dispose(scene) {
-    scene.remove(this.mesh);
-    this.mesh.geometry.dispose();
-    this.mesh.material.dispose();
+  effectiveDamage() {
+    return this.enraged ? Math.round(this.type.damage * this.type.enrageDamageMult) : this.type.damage;
   }
 
-  update(dt, world, playerPos) {
+  dispose(scene) {
+    scene.remove(this.mesh); // material/texture are shared+cached — don't dispose here
+  }
+
+  update(dt, world, playerPos, peaceful = false) {
     if (!this.alive) return null;
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
+
+    const t = this.type;
+    if (t.enrageAt && !this.enraged && this.hp / this.maxHp <= t.enrageAt) this.enraged = true;
 
     const dx = playerPos.x - this.pos.x;
     const dz = playerPos.z - this.pos.z;
     const distToPlayer = Math.hypot(dx, dz);
-    const t = this.type;
 
     let moveX = 0, moveZ = 0, speed = t.wanderSpeed;
-    const aggro = distToPlayer < t.aggroRange;
+    // Neutral-mob model: only a provoked (already-attacked) mob or a boss
+    // ever chases/attacks — plain proximity never triggers it. `peaceful`
+    // (the post-spawn-in grace window) additionally suppresses even a
+    // provoked non-boss mob, covering the edge case of a save/continue
+    // where something was already provoked before the window started.
+    const aggro = (this.provoked || t.isBoss) && !(peaceful && !t.isBoss) && distToPlayer < t.aggroRange;
     if (aggro) {
-      speed = t.chaseSpeed;
+      speed = this.enraged ? t.chaseSpeed * t.enrageSpeedMult : t.chaseSpeed;
       moveX = dx / (distToPlayer || 1);
       moveZ = dz / (distToPlayer || 1);
     } else {
@@ -92,7 +115,7 @@ export class Enemy {
     if (t.flies) {
       this.pos.x = nextX;
       this.pos.z = nextZ;
-      const targetY = aggro ? playerPos.y + 1 : this.groundHeight(world, nextX, nextZ) + t.hoverHeight;
+      const targetY = aggro ? playerPos.y + 1 : this.groundHeight(world, nextX, nextZ, this.pos.y) + t.hoverHeight;
       this.pos.y += (targetY - this.pos.y) * Math.min(1, dt * 2);
     } else {
       const groundY = this.findGround(world, nextX, this.pos.y, nextZ);
@@ -103,9 +126,10 @@ export class Enemy {
       }
     }
 
-    this.mesh.position.set(this.pos.x, this.pos.y + t.size / 2, this.pos.z);
+    this.mesh.position.set(this.pos.x, this.pos.y, this.pos.z);
 
-    if (distToPlayer < t.attackRange && this.attackCooldown <= 0) {
+    const canAttack = (this.provoked || t.isBoss) && !(peaceful && !t.isBoss);
+    if (canAttack && distToPlayer < t.attackRange && this.attackCooldown <= 0) {
       this.attackCooldown = t.attackCooldown;
       return 'attack';
     }
@@ -123,8 +147,20 @@ export class Enemy {
     return by;
   }
 
-  groundHeight(world, x, z) {
-    for (let y = 40; y >= 0; y--) {
+  // Bounded local search around the mob's current height first, so a bat
+  // wandering in a cave hovers near the cave floor/ceiling around it
+  // rather than trying to fly all the way up to the distant outdoor
+  // surface (there's no collision check on flying movement, so that would
+  // otherwise mean levitating straight through solid rock). Falls back to
+  // the old always-hits-something full downward scan if nothing's found
+  // nearby (e.g. genuinely floating in open outdoor air).
+  groundHeight(world, x, z, nearY = 40) {
+    const startY = Math.min(CHUNK_Y - 1, Math.round(nearY) + 6);
+    const endY = Math.max(0, Math.round(nearY) - 20);
+    for (let y = startY; y >= endY; y--) {
+      if (world.getBlock(Math.floor(x), y, Math.floor(z)) !== 0) return y + 1;
+    }
+    for (let y = CHUNK_Y - 1; y >= 0; y--) {
       if (world.getBlock(Math.floor(x), y, Math.floor(z)) !== 0) return y + 1;
     }
     return 14;

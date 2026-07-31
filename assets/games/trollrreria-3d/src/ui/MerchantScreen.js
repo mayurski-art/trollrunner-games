@@ -1,10 +1,6 @@
-import { BLOCK_COLOR, BLOCK_NAME } from '../world/blocks.js';
+import { BLOCK_NAME } from '../world/blocks.js';
 import { TRADES } from '../world/trades.js';
-
-function swatchHtml(id, count) {
-  const color = BLOCK_COLOR[id] || 0x333333;
-  return `<div class="tr3-slot-swatch" style="background:#${color.toString(16).padStart(6, '0')}"></div><span class="tr3-slot-count">${count}</span>`;
-}
+import { swatchHtml } from './itemIcon.js';
 
 // Click-to-trade list — same interaction pattern as crafting, just themed
 // as barter with the merchant NPC instead of the player's own workbench.

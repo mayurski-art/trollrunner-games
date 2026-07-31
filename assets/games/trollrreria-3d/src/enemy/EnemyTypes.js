@@ -14,6 +14,7 @@ export const ENEMY_TYPES = {
     attackCooldown: 1.1,
     damage: 12,
     flies: false,
+    sprite: { file: 'troll-grub.png', w: 64, h: 64 },
   },
   TROLL_BAT: {
     name: 'Troll Bat',
@@ -29,6 +30,7 @@ export const ENEMY_TYPES = {
     damage: 6,
     flies: true,
     hoverHeight: 2.5,
+    sprite: { file: 'troll-bat.png', w: 64, h: 64 },
   },
   // Only enters the spawn pool once World.hardmode is triggered (see
   // Spawner.trySpawn) — the "hardmode" phase's tougher escalation mob.
@@ -46,5 +48,51 @@ export const ENEMY_TYPES = {
     damage: 20,
     flies: false,
     hardmodeOnly: true,
+    sprite: { file: 'troll-reaper.png', w: 64, h: 80 },
+  },
+  // Never enters the random spawn pool — only appears via the Summoning
+  // Horn (see blocks.SUMMON_ITEMS / Game.summonBoss). Slam attack also
+  // knocks the player back (see Game._loop's attacker handling).
+  TROLL_KING: {
+    name: 'Troll King',
+    hp: 60,
+    radius: 1.1,
+    color: 0x7c2d12,
+    size: 2.2,
+    wanderSpeed: 1.0,
+    chaseSpeed: 2.8,
+    aggroRange: 20,
+    attackRange: 1.8,
+    attackCooldown: 1.3,
+    damage: 26,
+    flies: false,
+    isBoss: true,
+    summonOnly: true,
+    sprite: { file: 'troll-king.png', w: 96, h: 96 },
+  },
+  // Second world boss — summoned via the Dark Totem (crafted from a Troll
+  // Crown, so it's gated behind having already beaten the Troll King).
+  // Enrages past 50% HP lost: chaseSpeed and damage both scale up (see
+  // Enemy.update's enrage check) — its one boss-specific mechanic, same
+  // spirit as the Troll King's knockback slam.
+  ARCHTROLL: {
+    name: 'Archtroll',
+    hp: 80,
+    radius: 1.2,
+    color: 0x4c1d95,
+    size: 2.4,
+    wanderSpeed: 1.1,
+    chaseSpeed: 2.6,
+    aggroRange: 22,
+    attackRange: 1.8,
+    attackCooldown: 1.1,
+    damage: 22,
+    flies: false,
+    isBoss: true,
+    summonOnly: true,
+    enrageAt: 0.5,
+    enrageSpeedMult: 1.4,
+    enrageDamageMult: 1.35,
+    sprite: { file: 'archtroll.png', w: 96, h: 96 },
   },
 };

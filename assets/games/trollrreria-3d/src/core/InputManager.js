@@ -13,6 +13,7 @@ export class InputManager {
     this.lookDY = 0;
     this.touchMove = { x: 0, z: 0 };
     this.jumpHeld = false;
+    this.digHeld = false;
 
     this._bindKeyboard();
     this._bindMouse();
@@ -21,10 +22,15 @@ export class InputManager {
 
   _bindKeyboard() {
     window.addEventListener('keydown', (e) => {
+      const alreadyHeld = this.keys.has(e.code);
       this.keys.add(e.code);
       if (e.code === 'Space') this.jumpHeld = true;
       if (e.code === 'Escape') this.callbacks.onEscape?.();
       if (e.code === 'KeyE') this.callbacks.onInventory?.();
+      // Edge-triggered (ignore OS key-repeat) — frees the mouse cursor to
+      // click HUD buttons (backpack, map, etc.) without opening the pause
+      // menu; pressing it again (or clicking the canvas) re-locks it.
+      if ((e.code === 'ShiftLeft' || e.code === 'ShiftRight') && !alreadyHeld) this.callbacks.onToggleCursor?.();
       const digit = e.code.match(/^Digit([1-9])$/);
       if (digit) this.callbacks.onHotbar?.(Number(digit[1]) - 1);
     });
@@ -45,8 +51,18 @@ export class InputManager {
     });
     this.canvas.addEventListener('mousedown', (e) => {
       if (document.pointerLockElement !== this.canvas) return;
-      if (e.button === 0) this.callbacks.onDig?.();
+      // digHeld drives block-breaking progress (see Game._tickMining) —
+      // held down over time, Minecraft-style, rather than instant per
+      // click. onDig still fires once immediately too, for entity attacks
+      // (those stay click-based with their own cooldown, unaffected).
+      if (e.button === 0) { this.digHeld = true; this.callbacks.onDig?.(); }
       if (e.button === 2) this.callbacks.onPlace?.();
+    });
+    window.addEventListener('mouseup', (e) => {
+      if (e.button === 0) this.digHeld = false;
+    });
+    document.addEventListener('pointerlockchange', () => {
+      if (document.pointerLockElement !== this.canvas) this.digHeld = false;
     });
     this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   }
@@ -121,7 +137,9 @@ export class InputManager {
     btnJump?.addEventListener('pointerdown', () => { this.jumpHeld = true; });
     btnJump?.addEventListener('pointerup', () => { this.jumpHeld = false; });
     btnJump?.addEventListener('pointercancel', () => { this.jumpHeld = false; });
-    btnDig?.addEventListener('pointerdown', () => this.callbacks.onDig?.());
+    btnDig?.addEventListener('pointerdown', () => { this.digHeld = true; this.callbacks.onDig?.(); });
+    btnDig?.addEventListener('pointerup', () => { this.digHeld = false; });
+    btnDig?.addEventListener('pointercancel', () => { this.digHeld = false; });
     btnPlace?.addEventListener('pointerdown', () => this.callbacks.onPlace?.());
   }
 

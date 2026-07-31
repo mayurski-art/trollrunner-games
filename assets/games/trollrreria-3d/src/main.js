@@ -6,8 +6,11 @@ const canvas = document.getElementById('tr3-canvas');
 const touchRoot = document.getElementById('tr3-touch');
 const hudRoot = document.getElementById('tr3-hud');
 const hpFill = document.getElementById('tr3-hp-fill');
+const hungerFill = document.getElementById('tr3-hunger-fill');
 const clock = document.getElementById('tr3-clock');
 const hardmodeBadge = document.getElementById('tr3-hardmode-badge');
+const safestartBadge = document.getElementById('tr3-safestart-badge');
+const safestartTimer = document.getElementById('tr3-safestart-timer');
 const hotbar = document.getElementById('tr3-hotbar');
 const invGrid = document.getElementById('tr3-inv-grid');
 const recipeList = document.getElementById('tr3-recipe-list');
@@ -15,7 +18,17 @@ const armorSlot = document.getElementById('tr3-armor-slot');
 const chestGrid = document.getElementById('tr3-chest-grid');
 const chestPlayerGrid = document.getElementById('tr3-chest-player-grid');
 const tradeList = document.getElementById('tr3-trade-list');
+const questPanel = document.getElementById('tr3-quest-panel');
 const peerCount = document.getElementById('tr3-peer-count');
+const cursorHint = document.getElementById('tr3-cursor-hint');
+const minimapCanvas = document.getElementById('tr3-minimap');
+const mineProgress = document.getElementById('tr3-mine-progress');
+const dialogue = document.getElementById('tr3-dialogue');
+const waypointList = document.getElementById('tr3-waypoint-list');
+const rainOverlay = document.getElementById('tr3-rain');
+const bossBar = document.getElementById('tr3-boss-bar');
+const bossName = document.getElementById('tr3-boss-name');
+const bossFill = document.getElementById('tr3-boss-fill');
 
 const screenMenu = document.getElementById('tr3-screen-menu');
 const screenPause = document.getElementById('tr3-screen-pause');
@@ -24,7 +37,9 @@ const screenInventory = document.getElementById('tr3-screen-inventory');
 const screenChest = document.getElementById('tr3-screen-chest');
 const screenMerchant = document.getElementById('tr3-screen-merchant');
 const screenCoop = document.getElementById('tr3-screen-coop');
-const allScreens = [screenMenu, screenPause, screenRespawn, screenInventory, screenChest, screenMerchant, screenCoop];
+const screenWaypoints = document.getElementById('tr3-screen-waypoints');
+const screenLeaderboard = document.getElementById('tr3-screen-leaderboard');
+const allScreens = [screenMenu, screenPause, screenRespawn, screenInventory, screenChest, screenMerchant, screenCoop, screenWaypoints, screenLeaderboard];
 
 const btnStart = document.getElementById('tr3-btn-start');
 const btnContinue = document.getElementById('tr3-btn-continue');
@@ -44,6 +59,11 @@ const btnCoopJoin = document.getElementById('tr3-btn-coop-join');
 const btnCoopLeave = document.getElementById('tr3-btn-coop-leave');
 const coopCode = document.getElementById('tr3-coop-code');
 const coopStatus = document.getElementById('tr3-coop-status');
+const btnWaypoints = document.getElementById('tr3-btn-waypoints');
+const btnWaypointsClose = document.getElementById('tr3-btn-waypoints-close');
+const btnLeaderboardMenu = document.getElementById('tr3-btn-leaderboard-menu');
+const btnLeaderboard = document.getElementById('tr3-btn-leaderboard');
+const btnLeaderboardClose = document.getElementById('tr3-btn-leaderboard-close');
 
 const isTouch = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 
@@ -58,6 +78,9 @@ function onStateChange(state) {
   else if (state === 'chest') showScreen(screenChest);
   else if (state === 'merchant') showScreen(screenMerchant);
   else if (state === 'coop') showScreen(screenCoop);
+  else if (state === 'waypoints') showScreen(screenWaypoints);
+  else if (state === 'leaderboard') showScreen(screenLeaderboard);
+  else if (state === 'menu') showScreen(screenMenu);
   else showScreen(null);
   if (touchRoot) touchRoot.hidden = !(isTouch && state === 'running');
 }
@@ -65,9 +88,13 @@ function onStateChange(state) {
 const game = new Game(
   canvas,
   touchRoot,
-  { hud: hudRoot, hpFill, clock, hardmodeBadge, peerCount, hotbar, invGrid, recipeList, armorSlot, chestGrid, chestPlayerGrid, tradeList },
+  { hud: hudRoot, hpFill, hungerFill, clock, hardmodeBadge, safestartBadge, safestartTimer, peerCount, cursorHint, minimapCanvas, mineProgress, dialogue, waypointList, bossBar, bossName, bossFill, hotbar, invGrid, recipeList, armorSlot, chestGrid, chestPlayerGrid, tradeList, questPanel, rainOverlay },
   { onStateChange },
 );
+
+if (game.prestigeLevel > 0) {
+  document.querySelector('.tr3-menu-tag').textContent = `New Game+ ${game.prestigeLevel} — enemies are permanently tougher.`;
+}
 
 if (hasSave()) {
   btnContinue.hidden = false;
@@ -76,11 +103,20 @@ if (hasSave()) {
   btnStart.classList.add('tr3-btn-ghost');
 }
 
+let selectedDifficulty = 'normal';
+const diffButtons = [...document.querySelectorAll('.tr3-diff-btn')];
+diffButtons.forEach((btn) => {
+  btn.addEventListener('click', () => {
+    selectedDifficulty = btn.dataset.diff;
+    diffButtons.forEach((b) => b.classList.toggle('is-active', b === btn));
+  });
+});
+
 function dropIn(mode) {
   showScreen(null);
   hudRoot.hidden = false;
   if (touchRoot) touchRoot.hidden = !isTouch;
-  game.start(mode);
+  game.start(mode, selectedDifficulty);
 }
 
 btnStart.addEventListener('click', () => {
@@ -98,6 +134,7 @@ btnResume.addEventListener('click', () => {
 btnPause.addEventListener('click', () => game.togglePause());
 
 btnExit.addEventListener('click', () => {
+  game.recordProgress('quit');
   window.location.reload();
 });
 
@@ -146,3 +183,10 @@ btnCoopLeave.addEventListener('click', () => {
   game.stopCoop();
   setCoopStatus();
 });
+
+btnWaypoints.addEventListener('click', () => game.toggleWaypoints());
+btnWaypointsClose.addEventListener('click', () => game.closeMenus());
+
+btnLeaderboardMenu.addEventListener('click', () => game.toggleLeaderboard());
+btnLeaderboard.addEventListener('click', () => game.toggleLeaderboard());
+btnLeaderboardClose.addEventListener('click', () => game.toggleLeaderboard());
