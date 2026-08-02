@@ -1,14 +1,19 @@
-/* Grin Halls — game 010, Phase 2.
+/* Grin Halls — game 010, Phase 3.
    Adds the Troll Grin entity (patrol/chase AI with raycast line-of-sight
    and BFS pathfinding), hiding alcoves, a caught/game-over state, and
    level progression with escalating distortion (fog, flicker, entity
-   speed) across MAX_LEVEL+1 levels. Phase 1's maze gen, procedural
-   textures, FPS controls + collision, fragments, and minimap are
-   unchanged in shape; this file restructures scene-build into a
-   per-level rebuild (_buildScene(level)) instead of a one-shot setup.
-   Vendored Three.js via importmap in grin-halls.html — no CDN. */
+   speed) across MAX_LEVEL+1 levels. Phase 3 layers in WebAudio sound
+   (sound.js), the shared weekly leaderboard, and a real PixelLab-
+   generated trollface texture for the entity (art/entity-face.png,
+   falling back to the procedural canvas face if it fails to load).
+   Phase 1's maze gen, procedural textures, FPS controls + collision,
+   fragments, and minimap are unchanged in shape; this file restructures
+   scene-build into a per-level rebuild (_buildScene(level)) instead of
+   a one-shot setup. Vendored Three.js via importmap in grin-halls.html
+   — no CDN. */
 
 import * as THREE from "three";
+import { GrinHallsSound } from "./sound.js";
 
 const CELL = 6;
 const WALL_H = 3.4;
@@ -263,10 +268,29 @@ class GrinHalls {
     this.caught = false;
     this.finished = false;
     this.startTime = performance.now();
-    this.faceTex = makeTrollGrinFaceTexture();
+    this.faceTex = this._loadFaceTexture();
+    this.sound = new GrinHallsSound();
 
     this._bindInput();
     this._buildScene(this.level);
+  }
+
+  _loadFaceTexture() {
+    const loader = new THREE.TextureLoader();
+    const tex = loader.load(
+      "assets/games/grin-halls/art/entity-face.png",
+      undefined,
+      undefined,
+      () => {
+        // real PixelLab art missing/failed to load — fall back to the
+        // procedural canvas trollface so the entity never renders blank.
+        const fallback = makeTrollGrinFaceTexture();
+        tex.image = fallback.image;
+        tex.needsUpdate = true;
+      }
+    );
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
   }
 
   // -------------------------------------------------------------- scene
@@ -340,6 +364,7 @@ class GrinHalls {
     this.exitUnlocked = false;
     this.hiding = false;
     this.caught = false;
+    this.sound.setDistortion(level);
   }
 
   _cellCenter(cx, cz) {
@@ -608,6 +633,7 @@ class GrinHalls {
         f.collected = true;
         f.mesh.visible = false;
         this.collected++;
+        this.sound.pickup();
         if (this.collected >= FRAGMENT_TOTAL) this._unlockExit();
       }
     }
@@ -618,6 +644,11 @@ class GrinHalls {
     }
 
     this._updateEntity(dt, t);
+    this.sound.tick(dt, {
+      moving: (fwd !== 0 || strafe !== 0) && !this.hiding,
+      sprinting: canSprint,
+      entityState: this.entity ? this.entity.state : "patrol",
+    });
     this._updateHud();
   }
 
@@ -635,6 +666,7 @@ class GrinHalls {
 
   _advanceLevel() {
     this.level++;
+    this.sound.levelAdvance();
     this._buildScene(this.level);
     if (this.callbacks.onLevelChange) this.callbacks.onLevelChange(this.level, this._levelLabel());
   }
@@ -644,17 +676,30 @@ class GrinHalls {
     return `Level ${this.level} — ${name}`;
   }
 
+  _reportRun(levelsCleared, escaped, timeSeconds) {
+    const score = levelsCleared * 100000 + (escaped ? Math.max(0, 100000 - Math.floor(timeSeconds * 10)) : 0);
+    try {
+      if (window.TrollLeaderboard) {
+        window.TrollLeaderboard.record("grin-halls", { score, levelsCleared, escaped, timeSeconds });
+      }
+    } catch (_) {}
+  }
+
   _finish() {
     this.finished = true;
     if (document.pointerLockElement === this.canvas) document.exitPointerLock();
-    const seconds = ((performance.now() - this.startTime) / 1000).toFixed(1);
-    if (this.callbacks.onComplete) this.callbacks.onComplete(seconds);
+    const seconds = (performance.now() - this.startTime) / 1000;
+    this.sound.escapeFanfare();
+    this._reportRun(MAX_LEVEL + 1, true, seconds);
+    if (this.callbacks.onComplete) this.callbacks.onComplete(seconds.toFixed(1));
   }
 
   _caught() {
     if (this.caught || this.finished) return;
     this.caught = true;
     if (document.pointerLockElement === this.canvas) document.exitPointerLock();
+    this.sound.caughtBuzz();
+    this._reportRun(this.level, false, null);
     if (this.callbacks.onCaught) this.callbacks.onCaught();
   }
 
@@ -881,12 +926,22 @@ window.addEventListener("DOMContentLoaded", () => {
       game.start();
       window.addEventListener("resize", () => game.resize());
     }
+    game.sound.unlock(); // must happen on a user gesture — this click is one
     canvas.requestPointerLock();
   }
 
   document.getElementById("gh-start-btn").addEventListener("click", launchGame);
   canvas.addEventListener("click", () => {
     if (!viewportEl.hidden && game && !game.caught && !game.finished) canvas.requestPointerLock();
+  });
+
+  const muteBtn = document.getElementById("gh-hud-mute-btn");
+  let muted = false;
+  muteBtn.addEventListener("click", () => {
+    muted = !muted;
+    if (game) game.sound.setMuted(muted);
+    muteBtn.textContent = muted ? "🔇" : "🔊";
+    muteBtn.setAttribute("aria-pressed", String(muted));
   });
 
   document.addEventListener("pointerlockchange", () => {
