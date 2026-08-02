@@ -11,6 +11,8 @@
   --green: #4dff73;
   --red: #ff5a5a;
   --gold: #ffd84d;
+  --cyan: #4deeff;
+  --purple: #9a5cff;
   --ink: #f7f4ec;
   --muted: rgba(247, 244, 236, 0.72);
   --line: rgba(255, 255, 255, 0.14);
@@ -188,6 +190,21 @@ button { cursor: pointer; }
   width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line);
   background: rgba(10, 8, 5, 0.72); color: var(--ink); font-weight: 800;
 }
+.gh-hud-mute {
+  position: absolute; top: 14px; right: 58px; pointer-events: auto;
+  width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line);
+  background: rgba(10, 8, 5, 0.72); color: var(--ink); font-size: 15px;
+}
+.gh-hud-mute[aria-pressed="true"] { opacity: 0.5; }
+
+/* ---- weekly leaderboard section ------------------------------------------ */
+.arcade-rack { margin-top: 22px; padding: 0 clamp(6px, 1vw, 14px); }
+.section-heading { margin-bottom: 10px; }
+.section-heading .eyebrow {
+  margin: 0 0 2px; font-family: var(--mono); text-transform: uppercase;
+  letter-spacing: 0.1em; font-size: 11px; color: var(--muted);
+}
+.section-heading h2 { font-family: var(--pixel); font-size: 20px; }
 
 .gh-crosshair {
   position: absolute; top: 50%; left: 50%; width: 6px; height: 6px;
