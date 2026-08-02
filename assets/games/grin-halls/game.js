@@ -535,8 +535,8 @@ class GrinHalls {
     });
     document.addEventListener("mousemove", (e) => {
       if (document.pointerLockElement !== this.canvas) return;
-      this.yaw -= e.movementX * 0.0022;
-      this.pitch -= e.movementY * 0.0022;
+      this.yaw -= e.movementX * 0.0035;
+      this.pitch -= e.movementY * 0.0035;
       this.pitch = Math.max(-1.2, Math.min(1.2, this.pitch));
     });
   }
@@ -594,7 +594,7 @@ class GrinHalls {
     const speed = BASE_SPEED * (canSprint ? SPRINT_MULT : 1);
 
     if (fwd !== 0 || strafe !== 0) {
-      const dirX = Math.sin(this.yaw), dirZ = Math.cos(this.yaw);
+      const dirX = -Math.sin(this.yaw), dirZ = -Math.cos(this.yaw);
       const rightX = Math.sin(this.yaw + Math.PI / 2), rightZ = Math.cos(this.yaw + Math.PI / 2);
       const moveX = (dirX * fwd + rightX * strafe);
       const moveZ = (dirZ * fwd + rightZ * strafe);
