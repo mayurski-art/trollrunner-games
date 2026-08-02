@@ -1,24 +1,39 @@
-/* Grin Halls — game 010, Phase 1.
-   Procedurally-mazed first-person liminal hallway crawl. Vendored Three.js
-   (assets/vendor/three.module.min.js) via importmap in grin-halls.html —
-   no CDN, matches the Pizzeria Kitchen3D pattern. No entity/chase yet;
-   that's Phase 2. This module owns the whole game: maze gen, procedural
-   textures, FPS controls + collision, fragment pickups, minimap, HUD. */
+/* Grin Halls — game 010, Phase 2.
+   Adds the Troll Grin entity (patrol/chase AI with raycast line-of-sight
+   and BFS pathfinding), hiding alcoves, a caught/game-over state, and
+   level progression with escalating distortion (fog, flicker, entity
+   speed) across MAX_LEVEL+1 levels. Phase 1's maze gen, procedural
+   textures, FPS controls + collision, fragments, and minimap are
+   unchanged in shape; this file restructures scene-build into a
+   per-level rebuild (_buildScene(level)) instead of a one-shot setup.
+   Vendored Three.js via importmap in grin-halls.html — no CDN. */
 
 import * as THREE from "three";
 
-const MAZE_W = 12;
-const MAZE_H = 12;
 const CELL = 6;
 const WALL_H = 3.4;
 const WALL_THICK = 0.45;
 const FRAGMENT_TOTAL = 6;
+const SAFE_ROOM_COUNT = 2;
 const PLAYER_RADIUS = 0.45;
 const PLAYER_EYE_H = 1.6;
 const BASE_SPEED = 3.6;
 const SPRINT_MULT = 1.9;
-const STAMINA_DRAIN = 32; // per second while sprinting
-const STAMINA_REGEN = 18; // per second while not sprinting
+const STAMINA_DRAIN = 32;
+const STAMINA_REGEN = 18;
+
+const MAX_LEVEL = 2; // levels 0, 1, 2 — clearing level 2's exit ends the run
+const LEVEL_NAMES = ["the lobby", "the annex", "sub-level 2"];
+
+const ENTITY_CATCH_DIST = 1.0;
+const ENTITY_EYE_H = 1.5;
+const PATH_RECOMPUTE_INTERVAL = 0.5;
+const ENTITY_LOSE_TIMEOUT = 3.0;
+
+function mazeSizeForLevel(level) {
+  const size = 12 + level * 2;
+  return Math.min(size, 18);
+}
 
 // ---------------------------------------------------------------- maze gen
 function generateMaze(w, h) {
@@ -55,25 +70,71 @@ function generateMaze(w, h) {
   return cells;
 }
 
-function farthestCell(maze, w, h, startX, startZ) {
+const NEIGHBOR_DIRS = [["N", 0, -1], ["S", 0, 1], ["E", 1, 0], ["W", -1, 0]];
+
+function neighbors(maze, w, h, cx, cz) {
+  const out = [];
+  for (const [dir, dx, dz] of NEIGHBOR_DIRS) {
+    if (maze[cz][cx][dir]) continue;
+    const nx = cx + dx, nz = cz + dz;
+    if (nx < 0 || nz < 0 || nx >= w || nz >= h) continue;
+    out.push([nx, nz]);
+  }
+  return out;
+}
+
+function bfsDistances(maze, w, h, startX, startZ) {
   const dist = maze.map((row) => row.map(() => -1));
   dist[startZ][startX] = 0;
   const q = [[startX, startZ]];
-  let best = [startX, startZ];
-  const dirs = [["N", 0, -1], ["S", 0, 1], ["E", 1, 0], ["W", -1, 0]];
   while (q.length) {
     const [cx, cz] = q.shift();
-    for (const [dir, dx, dz] of dirs) {
-      if (maze[cz][cx][dir]) continue;
-      const nx = cx + dx, nz = cz + dz;
-      if (nx < 0 || nz < 0 || nx >= w || nz >= h) continue;
+    for (const [nx, nz] of neighbors(maze, w, h, cx, cz)) {
       if (dist[nz][nx] !== -1) continue;
       dist[nz][nx] = dist[cz][cx] + 1;
-      if (dist[nz][nx] > dist[best[1]][best[0]]) best = [nx, nz];
       q.push([nx, nz]);
     }
   }
+  return dist;
+}
+
+function farthestCell(maze, w, h, startX, startZ) {
+  const dist = bfsDistances(maze, w, h, startX, startZ);
+  let best = [startX, startZ];
+  for (let z = 0; z < h; z++) {
+    for (let x = 0; x < w; x++) {
+      if (dist[z][x] > dist[best[1]][best[0]]) best = [x, z];
+    }
+  }
   return { cell: best, dist };
+}
+
+function bfsPath(maze, w, h, start, goal) {
+  if (start[0] === goal[0] && start[1] === goal[1]) return [];
+  const key = (x, z) => `${x},${z}`;
+  const parent = new Map();
+  parent.set(key(...start), null);
+  const q = [start];
+  while (q.length) {
+    const [cx, cz] = q.shift();
+    if (cx === goal[0] && cz === goal[1]) break;
+    for (const n of neighbors(maze, w, h, cx, cz)) {
+      const k = key(...n);
+      if (parent.has(k)) continue;
+      parent.set(k, [cx, cz]);
+      q.push(n);
+    }
+  }
+  const goalKey = key(...goal);
+  if (!parent.has(goalKey)) return [];
+  const path = [];
+  let cur = goal;
+  while (cur && !(cur[0] === start[0] && cur[1] === start[1])) {
+    path.push(cur);
+    cur = parent.get(key(...cur));
+  }
+  path.reverse();
+  return path;
 }
 
 function deadEndCells(maze, w, h, exclude) {
@@ -89,12 +150,12 @@ function deadEndCells(maze, w, h, exclude) {
   return out;
 }
 
-function cellCenter(cx, cz) {
-  return new THREE.Vector3(
-    (cx - (MAZE_W - 1) / 2) * CELL,
-    0,
-    (cz - (MAZE_H - 1) / 2) * CELL
-  );
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
 }
 
 // -------------------------------------------------------- procedural art
@@ -163,65 +224,95 @@ function makeCeilingTexture() {
   });
 }
 
+function makeTrollGrinFaceTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 128; canvas.height = 128;
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, 128, 128);
+  ctx.fillStyle = "#d9c2a0";
+  ctx.beginPath(); ctx.arc(64, 64, 52, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#151008";
+  ctx.beginPath(); ctx.ellipse(42, 50, 8, 11, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(86, 50, 8, 11, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(24, 66);
+  ctx.quadraticCurveTo(64, 118, 104, 66);
+  ctx.quadraticCurveTo(64, 96, 24, 66);
+  ctx.fill();
+  ctx.fillStyle = "#f4ede0";
+  for (let i = 0; i < 6; i++) ctx.fillRect(32 + i * 12, 72, 8, 6);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 // ------------------------------------------------------------------- game
 class GrinHalls {
-  constructor(canvas, hud) {
+  constructor(canvas, hud, callbacks) {
     this.canvas = canvas;
     this.hud = hud;
+    this.callbacks = callbacks || {};
     this.clock = new THREE.Clock();
     this.keys = new Set();
     this.yaw = 0;
     this.pitch = 0;
+    this.level = 0;
     this.stamina = 100;
     this.sprinting = false;
-    this.collected = 0;
-    this.exitUnlocked = false;
+    this.hiding = false;
+    this.caught = false;
     this.finished = false;
-    this.startTime = 0;
-    this.onComplete = null;
+    this.startTime = performance.now();
+    this.faceTex = makeTrollGrinFaceTexture();
 
-    this._buildScene();
     this._bindInput();
+    this._buildScene(this.level);
   }
 
-  _buildScene() {
-    this.maze = generateMaze(MAZE_W, MAZE_H);
+  // -------------------------------------------------------------- scene
+  _buildScene(level) {
+    this.mazeW = mazeSizeForLevel(level);
+    this.mazeH = mazeSizeForLevel(level);
+    this.maze = generateMaze(this.mazeW, this.mazeH);
     const startCell = [0, 0];
-    const { cell: exitCell } = farthestCell(this.maze, MAZE_W, MAZE_H, 0, 0);
+    const { cell: exitCell } = farthestCell(this.maze, this.mazeW, this.mazeH, 0, 0);
     this.exitCell = exitCell;
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x8a7a44, 0.045);
+    const fogDensity = 0.045 + level * 0.012;
+    scene.fog = new THREE.FogExp2(0x8a7a44, fogDensity);
     this.scene = scene;
+    this.flickerBoost = level * 0.02;
 
-    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    if (!this.renderer) {
+      this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+      this.camera = new THREE.PerspectiveCamera(72, 1, 0.1, 60);
+    }
 
-    this.camera = new THREE.PerspectiveCamera(72, 1, 0.1, 60);
-    const startPos = cellCenter(...startCell);
+    const startPos = this._cellCenter(...startCell);
     this.camera.position.set(startPos.x, PLAYER_EYE_H, startPos.z);
     this.playerPos = new THREE.Vector3(startPos.x, 0, startPos.z);
 
     scene.add(new THREE.AmbientLight(0x8a7a55, 0.55));
-    this.hemi = new THREE.HemisphereLight(0xd8c377, 0x2a2313, 0.35);
-    scene.add(this.hemi);
+    scene.add(new THREE.HemisphereLight(0xd8c377, 0x2a2313, 0.35));
 
-    const mazeW = MAZE_W * CELL, mazeH = MAZE_H * CELL;
+    const mazeWorldW = this.mazeW * CELL, mazeWorldH = this.mazeH * CELL;
 
     const floorTex = makeCarpetTexture();
-    floorTex.repeat.set(MAZE_W * 1.5, MAZE_H * 1.5);
+    floorTex.repeat.set(this.mazeW * 1.5, this.mazeH * 1.5);
     const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(mazeW, mazeH),
+      new THREE.PlaneGeometry(mazeWorldW, mazeWorldH),
       new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.95 })
     );
     floor.rotation.x = -Math.PI / 2;
     scene.add(floor);
 
     const ceilTex = makeCeilingTexture();
-    ceilTex.repeat.set(MAZE_W, MAZE_H);
+    ceilTex.repeat.set(this.mazeW, this.mazeH);
     const ceiling = new THREE.Mesh(
-      new THREE.PlaneGeometry(mazeW, mazeH),
+      new THREE.PlaneGeometry(mazeWorldW, mazeWorldH),
       new THREE.MeshStandardMaterial({ map: ceilTex, roughness: 1 })
     );
     ceiling.rotation.x = Math.PI / 2;
@@ -231,19 +322,38 @@ class GrinHalls {
     const wallTex = makeWallpaperTexture();
     wallTex.repeat.set(1, 0.6);
     this.wallMat = new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.9 });
+    this.wallMat.color.offsetHSL((level * 0.035) % 1, 0, -level * 0.03);
     this.colliders = [];
+    this.wallMeshes = [];
     this._buildWalls(scene);
     this._buildCeilingLights(scene);
-    this._buildFragments(scene, startCell, exitCell);
+
+    const safeCells = shuffle(deadEndCells(this.maze, this.mazeW, this.mazeH, [startCell, exitCell])).slice(0, SAFE_ROOM_COUNT);
+    this.safeCells = safeCells;
+    this._buildSafeRooms(scene, safeCells);
+    this._buildFragments(scene, startCell, exitCell, safeCells);
     this._buildExitDoor(scene, exitCell);
+    this._buildEntity(scene, startCell, exitCell, safeCells);
 
     this.visited = new Set([`${startCell[0]},${startCell[1]}`]);
+    this.collected = 0;
+    this.exitUnlocked = false;
+    this.hiding = false;
+    this.caught = false;
+  }
+
+  _cellCenter(cx, cz) {
+    return new THREE.Vector3(
+      (cx - (this.mazeW - 1) / 2) * CELL,
+      0,
+      (cz - (this.mazeH - 1) / 2) * CELL
+    );
   }
 
   _addWallBox(cx1, cz1, cx2, cz2, scene) {
-    const a = cellCenter(cx1, cz1), b = cellCenter(cx2, cz2);
+    const a = this._cellCenter(cx1, cz1), b = this._cellCenter(cx2, cz2);
     const midX = (a.x + b.x) / 2, midZ = (a.z + b.z) / 2;
-    const horizontal = a.z === b.z; // wall runs along Z (east/west wall)
+    const horizontal = a.z === b.z;
     const length = CELL;
     const geo = horizontal
       ? new THREE.BoxGeometry(WALL_THICK, WALL_H, length)
@@ -251,6 +361,7 @@ class GrinHalls {
     const mesh = new THREE.Mesh(geo, this.wallMat);
     mesh.position.set(midX, WALL_H / 2, midZ);
     scene.add(mesh);
+    this.wallMeshes.push(mesh);
     const halfL = length / 2, halfT = WALL_THICK / 2;
     this.colliders.push(horizontal
       ? { minX: midX - halfT, maxX: midX + halfT, minZ: midZ - halfL, maxZ: midZ + halfL }
@@ -258,22 +369,22 @@ class GrinHalls {
   }
 
   _buildWalls(scene) {
-    for (let z = 0; z < MAZE_H; z++) {
-      for (let x = 0; x < MAZE_W; x++) {
+    for (let z = 0; z < this.mazeH; z++) {
+      for (let x = 0; x < this.mazeW; x++) {
         const c = this.maze[z][x];
         if (c.N) this._addWallBox(x, z, x, z - 1, scene);
         if (c.W) this._addWallBox(x, z, x - 1, z, scene);
-        if (z === MAZE_H - 1 && c.S) this._addWallBox(x, z, x, z + 1, scene);
-        if (x === MAZE_W - 1 && c.E) this._addWallBox(x, z, x + 1, z, scene);
+        if (z === this.mazeH - 1 && c.S) this._addWallBox(x, z, x, z + 1, scene);
+        if (x === this.mazeW - 1 && c.E) this._addWallBox(x, z, x + 1, z, scene);
       }
     }
   }
 
   _buildCeilingLights(scene) {
     this.lights = [];
-    for (let z = 1; z < MAZE_H; z += 3) {
-      for (let x = 1; x < MAZE_W; x += 3) {
-        const center = cellCenter(x, z);
+    for (let z = 1; z < this.mazeH; z += 3) {
+      for (let x = 1; x < this.mazeW; x += 3) {
+        const center = this._cellCenter(x, z);
         const panel = new THREE.Mesh(
           new THREE.PlaneGeometry(2.4, 1.1),
           new THREE.MeshStandardMaterial({ color: 0xfff6d8, emissive: 0xfff2b0, emissiveIntensity: 1.4 })
@@ -289,16 +400,28 @@ class GrinHalls {
     }
   }
 
-  _buildFragments(scene, startCell, exitCell) {
-    const exclude = [startCell, exitCell];
-    let spots = deadEndCells(this.maze, MAZE_W, MAZE_H, exclude);
-    for (let i = spots.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [spots[i], spots[j]] = [spots[j], spots[i]];
+  _buildSafeRooms(scene, safeCells) {
+    const geo = new THREE.CircleGeometry(1.4, 20);
+    const mat = new THREE.MeshStandardMaterial({ color: 0x1c3d38, emissive: 0x2fd4b0, emissiveIntensity: 0.5, roughness: 0.8 });
+    for (const [cx, cz] of safeCells) {
+      const c = this._cellCenter(cx, cz);
+      const patch = new THREE.Mesh(geo, mat);
+      patch.rotation.x = -Math.PI / 2;
+      patch.position.set(c.x, 0.02, c.z);
+      scene.add(patch);
+      const light = new THREE.PointLight(0x4deec7, 0.6, 4, 2);
+      light.position.set(c.x, 1.2, c.z);
+      scene.add(light);
     }
+  }
+
+  _buildFragments(scene, startCell, exitCell, safeCells) {
+    const exclude = [startCell, exitCell, ...safeCells];
+    let spots = deadEndCells(this.maze, this.mazeW, this.mazeH, exclude);
+    shuffle(spots);
     if (spots.length < FRAGMENT_TOTAL) {
-      for (let z = 0; z < MAZE_H && spots.length < FRAGMENT_TOTAL * 2; z++) {
-        for (let x = 0; x < MAZE_W; x++) {
+      for (let z = 0; z < this.mazeH && spots.length < FRAGMENT_TOTAL * 2; z++) {
+        for (let x = 0; x < this.mazeW; x++) {
           if (!exclude.some(([ex, ez]) => ex === x && ez === z) && !spots.some(([sx, sz]) => sx === x && sz === z)) {
             spots.push([x, z]);
           }
@@ -310,7 +433,7 @@ class GrinHalls {
     const geo = new THREE.IcosahedronGeometry(0.32, 0);
     const mat = new THREE.MeshStandardMaterial({ color: 0xffd84d, emissive: 0xffb400, emissiveIntensity: 0.9, roughness: 0.3 });
     this.fragments = spots.map(([cx, cz]) => {
-      const c = cellCenter(cx, cz);
+      const c = this._cellCenter(cx, cz);
       const mesh = new THREE.Mesh(geo, mat);
       mesh.position.set(c.x, 1.1, c.z);
       const light = new THREE.PointLight(0xffcc55, 0.8, 4, 2);
@@ -321,7 +444,7 @@ class GrinHalls {
   }
 
   _buildExitDoor(scene, exitCell) {
-    const c = cellCenter(...exitCell);
+    const c = this._cellCenter(...exitCell);
     const mat = new THREE.MeshStandardMaterial({ color: 0x3a3222, emissive: 0x1a1608, emissiveIntensity: 0.2 });
     const door = new THREE.Mesh(new THREE.BoxGeometry(2.6, WALL_H - 0.4, 0.25), mat);
     door.position.set(c.x, (WALL_H - 0.4) / 2, c.z);
@@ -330,6 +453,52 @@ class GrinHalls {
     this.doorPos = c;
   }
 
+  _buildEntity(scene, startCell, exitCell, safeCells) {
+    const dist = bfsDistances(this.maze, this.mazeW, this.mazeH, ...startCell);
+    const candidates = [];
+    for (let z = 0; z < this.mazeH; z++) {
+      for (let x = 0; x < this.mazeW; x++) {
+        const d = dist[z][x];
+        if (d > 4 && !safeCells.some(([sx, sz]) => sx === x && sz === z) && !(x === exitCell[0] && z === exitCell[1])) {
+          candidates.push([x, z]);
+        }
+      }
+    }
+    const spawnCell = candidates.length ? candidates[Math.floor(Math.random() * candidates.length)] : exitCell;
+
+    const group = new THREE.Group();
+    const body = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.32, 0.42, 1.6, 10),
+      new THREE.MeshStandardMaterial({ color: 0x0d0a06, roughness: 1 })
+    );
+    body.position.y = 0.8;
+    group.add(body);
+    const face = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.faceTex, transparent: true }));
+    face.scale.set(0.62, 0.62, 0.62);
+    face.position.y = 1.55;
+    group.add(face);
+    const eyeLight = new THREE.PointLight(0x3dff8a, 1.2, 5, 2);
+    eyeLight.position.y = 1.5;
+    group.add(eyeLight);
+    scene.add(group);
+
+    const pos = this._cellCenter(...spawnCell);
+    this.entity = {
+      group,
+      pos: new THREE.Vector3(pos.x, 0, pos.z),
+      cell: spawnCell,
+      state: "patrol",
+      path: [],
+      patrolTarget: null,
+      pathTimer: 0,
+      lastSeenTime: -Infinity,
+      speedBase: { patrol: 1.5 + this.level * 0.12, chase: 3.9 + this.level * 0.25 },
+      detectRange: 8 + this.level * 1.2,
+    };
+    group.position.set(pos.x, 0, pos.z);
+  }
+
+  // -------------------------------------------------------------- input
   _bindInput() {
     window.addEventListener("keydown", (e) => {
       this.keys.add(e.code);
@@ -357,7 +526,6 @@ class GrinHalls {
   }
 
   start() {
-    this.startTime = performance.now();
     this.resize();
     this._loop();
   }
@@ -388,6 +556,11 @@ class GrinHalls {
     }
   }
 
+  _cellOf(x, z) {
+    return [Math.round(x / CELL + (this.mazeW - 1) / 2), Math.round(z / CELL + (this.mazeH - 1) / 2)];
+  }
+
+  // -------------------------------------------------------------- update
   _update(dt) {
     const { fwd, strafe } = this._moveKeys();
     const canSprint = this.sprinting && this.stamina > 0 && (fwd !== 0 || strafe !== 0);
@@ -409,16 +582,17 @@ class GrinHalls {
     this.camera.position.set(this.playerPos.x, PLAYER_EYE_H, this.playerPos.z);
     this.camera.rotation.set(this.pitch, this.yaw, 0, "YXZ");
 
-    const cx = Math.round(this.playerPos.x / CELL + (MAZE_W - 1) / 2);
-    const cz = Math.round(this.playerPos.z / CELL + (MAZE_H - 1) / 2);
+    const [cx, cz] = this._cellOf(this.playerPos.x, this.playerPos.z);
     this.visited.add(`${cx},${cz}`);
     this.currentCell = [cx, cz];
+
+    this.hiding = this.keys.has("KeyE") && this.safeCells.some(([sx, sz]) => sx === cx && sz === cz);
 
     const t = performance.now() * 0.001;
     for (const l of this.lights) {
       let flick = 0.92 + 0.08 * Math.sin(t * 6 + l.phase);
       if (t > l.flickerAt) {
-        flick *= Math.random() < 0.06 ? 0.15 : 1;
+        flick *= Math.random() < (0.06 + this.flickerBoost) ? 0.15 : 1;
         if (Math.random() < 0.01) l.flickerAt = t + 0.15;
       }
       l.light.intensity = 1.1 * flick;
@@ -438,11 +612,12 @@ class GrinHalls {
       }
     }
 
-    if (this.exitUnlocked && !this.finished) {
+    if (this.exitUnlocked) {
       const distDoor = Math.hypot(this.playerPos.x - this.doorPos.x, this.playerPos.z - this.doorPos.z);
-      if (distDoor < 1.4) this._finish();
+      if (distDoor < 1.4) this._reachExit();
     }
 
+    this._updateEntity(dt, t);
     this._updateHud();
   }
 
@@ -453,16 +628,128 @@ class GrinHalls {
     this.doorMat.emissiveIntensity = 1.2;
   }
 
+  _reachExit() {
+    if (this.level >= MAX_LEVEL) this._finish();
+    else this._advanceLevel();
+  }
+
+  _advanceLevel() {
+    this.level++;
+    this._buildScene(this.level);
+    if (this.callbacks.onLevelChange) this.callbacks.onLevelChange(this.level, this._levelLabel());
+  }
+
+  _levelLabel() {
+    const name = LEVEL_NAMES[this.level] || `deeper still (${this.level})`;
+    return `Level ${this.level} — ${name}`;
+  }
+
   _finish() {
     this.finished = true;
     if (document.pointerLockElement === this.canvas) document.exitPointerLock();
     const seconds = ((performance.now() - this.startTime) / 1000).toFixed(1);
-    if (this.onComplete) this.onComplete(seconds);
+    if (this.callbacks.onComplete) this.callbacks.onComplete(seconds);
   }
 
+  _caught() {
+    if (this.caught || this.finished) return;
+    this.caught = true;
+    if (document.pointerLockElement === this.canvas) document.exitPointerLock();
+    if (this.callbacks.onCaught) this.callbacks.onCaught();
+  }
+
+  retryLevel() {
+    this._buildScene(this.level);
+  }
+
+  // ----------------------------------------------------------- entity AI
+  _hasLineOfSight(fromPos, fromH, toPos, toH) {
+    const from = new THREE.Vector3(fromPos.x, fromH, fromPos.z);
+    const to = new THREE.Vector3(toPos.x, toH, toPos.z);
+    const dir = to.clone().sub(from);
+    const dist = dir.length();
+    if (dist < 0.001) return true;
+    dir.normalize();
+    const raycaster = new THREE.Raycaster(from, dir, 0, dist - 0.15);
+    const hits = raycaster.intersectObjects(this.wallMeshes, false);
+    return hits.length === 0;
+  }
+
+  _pickPatrolTarget() {
+    const candidates = [];
+    for (let z = 0; z < this.mazeH; z++) {
+      for (let x = 0; x < this.mazeW; x++) candidates.push([x, z]);
+    }
+    return candidates[Math.floor(Math.random() * candidates.length)];
+  }
+
+  _updateEntity(dt, t) {
+    const e = this.entity;
+    if (!e) return;
+
+    if (!this.hiding) {
+      const distToPlayer = e.pos.distanceTo(this.playerPos);
+      if (distToPlayer < e.detectRange && this._hasLineOfSight(e.pos, ENTITY_EYE_H, this.playerPos, PLAYER_EYE_H)) {
+        e.state = "chase";
+        e.lastSeenTime = t;
+        e.lastSeenCell = this.currentCell;
+      }
+    }
+
+    if (e.state === "chase" && t - e.lastSeenTime > ENTITY_LOSE_TIMEOUT) {
+      e.state = "patrol";
+      e.patrolTarget = e.lastSeenCell || null;
+      e.path = [];
+    }
+
+    e.pathTimer -= dt;
+    if (e.pathTimer <= 0) {
+      e.pathTimer = PATH_RECOMPUTE_INTERVAL;
+      let targetCell = null;
+      if (e.state === "chase") targetCell = this.currentCell;
+      else {
+        if (!e.patrolTarget || (e.patrolTarget[0] === e.cell[0] && e.patrolTarget[1] === e.cell[1])) {
+          e.patrolTarget = this._pickPatrolTarget();
+        }
+        targetCell = e.patrolTarget;
+      }
+      if (targetCell) e.path = bfsPath(this.maze, this.mazeW, this.mazeH, e.cell, targetCell);
+    }
+
+    const speed = e.state === "chase" ? e.speedBase.chase : e.speedBase.patrol;
+    if (e.path.length) {
+      const next = e.path[0];
+      const target = this._cellCenter(...next);
+      const dx = target.x - e.pos.x, dz = target.z - e.pos.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist < 0.15) {
+        e.cell = next;
+        e.path.shift();
+      } else {
+        e.pos.x += (dx / dist) * speed * dt;
+        e.pos.z += (dz / dist) * speed * dt;
+      }
+    }
+    e.group.position.set(e.pos.x, 0, e.pos.z);
+    e.group.rotation.y = Math.atan2(this.playerPos.x - e.pos.x, this.playerPos.z - e.pos.z);
+
+    if (e.state === "chase" && !this.hiding && e.pos.distanceTo(this.playerPos) < ENTITY_CATCH_DIST) {
+      this._caught();
+    }
+  }
+
+  // -------------------------------------------------------------- hud
   _updateHud() {
     this.hud.fragmentCount.textContent = `${this.collected}/${FRAGMENT_TOTAL}`;
     this.hud.staminaFill.style.transform = `scaleX(${this.stamina / 100})`;
+    this.hud.hidingChip.hidden = !this.hiding;
+    if (this.entity) {
+      const dist = this.entity.pos.distanceTo(this.playerPos);
+      const danger = this.entity.state === "chase" && !this.hiding
+        ? Math.max(0, Math.min(1, 1 - (dist - ENTITY_CATCH_DIST) / 9))
+        : 0;
+      this.hud.dangerVignette.style.opacity = danger.toFixed(2);
+    }
     this._drawMinimap();
   }
 
@@ -472,10 +759,10 @@ class GrinHalls {
     ctx.clearRect(0, 0, size, size);
     ctx.fillStyle = "#12100a";
     ctx.fillRect(0, 0, size, size);
-    const cellPx = size / MAZE_W;
+    const cellPx = size / this.mazeW;
     ctx.save();
-    for (let z = 0; z < MAZE_H; z++) {
-      for (let x = 0; x < MAZE_W; x++) {
+    for (let z = 0; z < this.mazeH; z++) {
+      for (let x = 0; x < this.mazeW; x++) {
         if (!this.visited.has(`${x},${z}`)) continue;
         ctx.fillStyle = "rgba(216,195,119,0.35)";
         ctx.fillRect(x * cellPx, z * cellPx, cellPx, cellPx);
@@ -483,8 +770,8 @@ class GrinHalls {
     }
     ctx.strokeStyle = "rgba(255,255,255,0.55)";
     ctx.lineWidth = 1.5;
-    for (let z = 0; z < MAZE_H; z++) {
-      for (let x = 0; x < MAZE_W; x++) {
+    for (let z = 0; z < this.mazeH; z++) {
+      for (let x = 0; x < this.mazeW; x++) {
         if (!this.visited.has(`${x},${z}`)) continue;
         const c = this.maze[z][x];
         const px = x * cellPx, pz = z * cellPx;
@@ -502,12 +789,19 @@ class GrinHalls {
       ctx.arc(ex * cellPx + cellPx / 2, ez * cellPx + cellPx / 2, 3, 0, Math.PI * 2);
       ctx.fill();
     }
+    if (this.entity && this.visited.has(`${this.entity.cell[0]},${this.entity.cell[1]}`)) {
+      const [enx, enz] = this.entity.cell;
+      ctx.fillStyle = this.entity.state === "chase" ? "#ff5a5a" : "rgba(255,90,90,0.5)";
+      ctx.beginPath();
+      ctx.arc(enx * cellPx + cellPx / 2, enz * cellPx + cellPx / 2, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
     const [pcx, pcz] = this.currentCell || [0, 0];
     const px = pcx * cellPx + cellPx / 2, pz = pcz * cellPx + cellPx / 2;
     ctx.save();
     ctx.translate(px, pz);
     ctx.rotate(this.yaw);
-    ctx.fillStyle = "#ff5a5a";
+    ctx.fillStyle = "#6ff2ef";
     ctx.beginPath();
     ctx.moveTo(0, -5); ctx.lineTo(3.5, 4); ctx.lineTo(-3.5, 4);
     ctx.closePath(); ctx.fill();
@@ -517,7 +811,7 @@ class GrinHalls {
   _loop() {
     if (this._stopped) return;
     const dt = Math.min(this.clock.getDelta(), 0.05);
-    if (!this.finished) this._update(dt);
+    if (!this.finished && !this.caught) this._update(dt);
     this.renderer.render(this.scene, this.camera);
     requestAnimationFrame(() => this._loop());
   }
@@ -531,17 +825,34 @@ window.addEventListener("DOMContentLoaded", () => {
   const howtoEl = document.getElementById("gh-howto");
   const viewportEl = document.getElementById("gh-viewport");
   const completeEl = document.getElementById("gh-complete");
+  const caughtEl = document.getElementById("gh-caught");
   const pauseHintEl = document.getElementById("gh-pause-hint");
   const canvas = document.getElementById("gh-canvas");
   const minimapCanvas = document.getElementById("gh-minimap");
+  const levelToast = document.getElementById("gh-level-toast");
+  const levelChip = document.getElementById("gh-hud-level");
 
   const hud = {
     fragmentCount: document.getElementById("gh-fragment-count"),
     staminaFill: document.getElementById("gh-stamina-fill"),
+    hidingChip: document.getElementById("gh-hud-hiding"),
+    dangerVignette: document.getElementById("gh-danger-vignette"),
     minimap: { canvas: minimapCanvas, ctx: minimapCanvas.getContext("2d") },
   };
 
   let game = null;
+  let toastTimer = null;
+
+  function showLevelToast(text) {
+    levelToast.textContent = text;
+    levelToast.hidden = false;
+    requestAnimationFrame(() => levelToast.classList.add("is-visible"));
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      levelToast.classList.remove("is-visible");
+      setTimeout(() => { levelToast.hidden = true; }, 500);
+    }, 2200);
+  }
 
   function openHowto() { howtoEl.hidden = false; }
   function closeHowto() { howtoEl.hidden = true; }
@@ -553,11 +864,20 @@ window.addEventListener("DOMContentLoaded", () => {
     titleEl.hidden = true;
     viewportEl.hidden = false;
     if (!game) {
-      game = new GrinHalls(canvas, hud);
-      game.onComplete = (seconds) => {
-        document.getElementById("gh-complete-time").textContent = `Time: ${seconds}s`;
-        completeEl.hidden = false;
-      };
+      game = new GrinHalls(canvas, hud, {
+        onComplete: (seconds) => {
+          document.getElementById("gh-complete-title").textContent = "You escaped the halls.";
+          document.getElementById("gh-complete-body").textContent = `All ${MAX_LEVEL + 1} levels cleared. The grin doesn't follow you out.`;
+          document.getElementById("gh-complete-time").textContent = `Time: ${seconds}s`;
+          completeEl.hidden = false;
+        },
+        onCaught: () => { caughtEl.hidden = false; },
+        onLevelChange: (level, label) => {
+          levelChip.textContent = label;
+          showLevelToast(label);
+        },
+      });
+      levelChip.textContent = game._levelLabel();
       game.start();
       window.addEventListener("resize", () => game.resize());
     }
@@ -565,10 +885,19 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   document.getElementById("gh-start-btn").addEventListener("click", launchGame);
-  canvas.addEventListener("click", () => canvas.requestPointerLock());
+  canvas.addEventListener("click", () => {
+    if (!viewportEl.hidden && game && !game.caught && !game.finished) canvas.requestPointerLock();
+  });
 
   document.addEventListener("pointerlockchange", () => {
-    pauseHintEl.hidden = document.pointerLockElement === canvas || viewportEl.hidden;
+    const active = document.pointerLockElement === canvas;
+    pauseHintEl.hidden = active || viewportEl.hidden || (game && (game.caught || game.finished));
+  });
+
+  document.getElementById("gh-caught-retry-btn").addEventListener("click", () => {
+    caughtEl.hidden = true;
+    game.retryLevel();
+    canvas.requestPointerLock();
   });
 
   document.getElementById("gh-replay-btn").addEventListener("click", () => {
