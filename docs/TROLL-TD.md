@@ -1,11 +1,13 @@
 # Troll TD (game 011) — Design Doc
 
 **Status: SHIPPED 2026-08-03 — ALL 5 phases built + merged to main in one
-Sonnet pass. Live at troll-td.html with hub card wired in. Verified
-end-to-end with headless Chrome (tools/troll-td-smoke.js, 18/18 checks).
-Real art still pending — every unit currently renders via the procedural/
-emoji fallback (see Art pipeline below); balance is unplaytested, same
-caveat as Bridge Patrol's initial ship.**
+Sonnet pass, then real art wired in via PixelLab (superseding the external
+hi-res pipeline in Decision 3 below — user asked for PixelLab directly).
+All 13 characters (12 units + Boss Troll hero) generated and rendering in
+game; procedural circle/emoji remains as the automatic fallback for any
+image load failure. Verified end-to-end with headless Chrome
+(tools/troll-td-smoke.js, 18/18 checks). Balance is still unplaytested,
+same caveat as Bridge Patrol's initial ship.**
 
 ## Pitch
 The flagship tower defense of the TrollRunner arcade: a premium, BTD6-scale
