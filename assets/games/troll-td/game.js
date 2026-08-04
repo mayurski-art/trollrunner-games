@@ -2,9 +2,8 @@
    TROLL TD — flagship tower defense (game 011). All 5 build phases in one
    pass: core sim, full 12-unit roster + 2x3 upgrades, enemy depth + 3 maps,
    Boss Troll hero + meta wiring, juice pass. Canvas 2D, vanilla JS, fixed
-   timestep. Every unit renders with a procedural fallback until real art
-   (external hi-res gen, see docs/art/troll-td-prompts.md) lands in
-   assets/games/troll-td/src/.
+   timestep. Real PixelLab trollface art (assets/games/troll-td/src/) with a
+   procedural circle+emoji fallback for anything that fails to load.
    ============================================================================ */
 (() => {
   'use strict';
@@ -15,6 +14,19 @@
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const fmt = (n) => Math.round(n).toLocaleString('en-US');
   const rnd = (a, b) => a + Math.random() * (b - a);
+
+  // Real trollface art, PixelLab-generated (docs/art/troll-td-pixellab-ids.md).
+  // Loaded best-effort; render code falls back to the emoji/circle icon
+  // whenever an image hasn't loaded (naturalWidth === 0).
+  const UNIT_IMAGES = {};
+  ['thrower', 'sticky', 'sniper', 'explosive', 'hacker', 'ninja', 'ice', 'fire', 'medic', 'gold', 'mechanic', 'laser'].forEach((id) => {
+    const img = new Image();
+    img.src = 'assets/games/troll-td/src/' + id + '.png';
+    UNIT_IMAGES[id] = img;
+  });
+  const HERO_IMAGE = new Image();
+  HERO_IMAGE.src = 'assets/games/troll-td/src/hero.png';
+  const imgReady = (img) => img && img.complete && img.naturalWidth > 0;
 
   /* --------------------------------------------------------------------
      DATA — units, enemies, maps
@@ -717,10 +729,15 @@
     // Hero
     if (G.hero) {
       ctx.save();
-      ctx.globalAlpha = 0.9;
-      ctx.font = '38px serif';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText('👑', G.hero.x, G.hero.y);
+      ctx.globalAlpha = 0.95;
+      if (imgReady(HERO_IMAGE)) {
+        const s = 44;
+        ctx.drawImage(HERO_IMAGE, G.hero.x - s / 2, G.hero.y - s / 2, s, s);
+      } else {
+        ctx.font = '38px serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('👑', G.hero.x, G.hero.y);
+      }
       ctx.restore();
       ctx.fillStyle = '#ffd60a';
       ctx.font = '700 10px "DM Mono", monospace';
@@ -731,6 +748,7 @@
     // Towers
     for (const t of G.towers) {
       const u = UNIT_BY_ID[t.unitId];
+      const img = UNIT_IMAGES[u.id];
       ctx.save();
       ctx.translate(t.x, t.y);
       if (t === G.selectedTower) {
@@ -743,12 +761,18 @@
       ctx.globalAlpha = 0.25;
       ctx.fill();
       ctx.globalAlpha = 1;
-      ctx.font = '26px serif';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(u.icon, 0, 0);
+      if (imgReady(img)) {
+        const s = 34;
+        ctx.drawImage(img, -s / 2, -s / 2, s, s);
+      } else {
+        ctx.font = '26px serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(u.icon, 0, 0);
+      }
       if (t.tiers[0] + t.tiers[1] > 0) {
         ctx.font = '700 9px "DM Mono", monospace';
         ctx.fillStyle = '#ffd60a';
+        ctx.textAlign = 'center';
         ctx.fillText(t.tiers[0] + '•' + t.tiers[1], 0, 20);
       }
       ctx.restore();
