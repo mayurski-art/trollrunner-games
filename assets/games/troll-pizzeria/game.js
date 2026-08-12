@@ -121,7 +121,7 @@
   ];
 
   const CUSTOMERS = [
-    { id: "trollio", name: "Trollio", sprite: "char-trollio.png", emoji: "🧌", patience: 75,  tip: 1.0, day: 1, quirk: "chaos",
+    { id: "trollio", name: "Trollio", sprite: "char-trollio.png", emoji: "😏", patience: 75,  tip: 1.0, day: 1, quirk: "chaos",
       lines: { great: "Problem? None found. NONE.", ok: "Hmm. Acceptable. For now.", bad: "Congratulations. You trolled yourself." } },
     { id: "pepe",    name: "Pepe",    sprite: "char-pepe.png",    emoji: "🐸", patience: 115, tip: 1.2, day: 1, quirk: "simple",
       lines: { great: "Feels good man.", ok: "It's ok I guess...", bad: "Feels bad man." } },
@@ -566,7 +566,7 @@
   function renderGrinMeter() {
     const el = $("#pz-hud-grin");
     if (!el) return;
-    el.textContent = "🧌".repeat(S.grinStage) + "·".repeat(GRIN_MAX - S.grinStage);
+    el.textContent = "😏".repeat(S.grinStage) + "·".repeat(GRIN_MAX - S.grinStage);
     el.title = S.grinStage
       ? `Grin combo ×${S.grinStage} — tips +${S.grinStage * GRIN_BONUS_PER_STAGE * 100}%`
       : "Grin combo — chain perfect stations for bonus tips";
@@ -1436,7 +1436,7 @@
     const rushLine = S.rush.happened
       ? `<p class="pz-serve-line">Rush hour: ${S.rush.clean ? "survived clean — ⭐ +40" : "a few slipped away"}</p>` : "";
     const grinLine = S.dayMaxGrin
-      ? `<p class="pz-serve-line">Best grin combo: ${"🧌".repeat(S.dayMaxGrin)} (×${S.dayMaxGrin * GRIN_BONUS_PER_STAGE * 100}% tips)</p>` : "";
+      ? `<p class="pz-serve-line">Best grin combo: ${"😏".repeat(S.dayMaxGrin)} (×${S.dayMaxGrin * GRIN_BONUS_PER_STAGE * 100}% tips)</p>` : "";
     const unlocks = (newTops.length || newCusts.length)
       ? `<div class="pz-unlock">Tomorrow: ${[...newTops.map(t => t.emoji + " " + t.name), ...newCusts.map(c => c.emoji + " " + c.name)].join(" · ")}</div>`
       : "";
@@ -1505,7 +1505,7 @@
       btn = el("button", "pz-grin-hunt");
       btn.type = "button";
       btn.id = "pz-grin-hunt";
-      btn.textContent = "🧌";
+      btn.textContent = "😏";
       btn.setAttribute("aria-label", "Something's off — click quick!");
       btn.style.left = rand(8, 84) + "%";
       btn.style.top = rand(14, 78) + "%";
@@ -1854,7 +1854,7 @@
     window.addEventListener("resize", setHeaderH);
 
     // title chef sprite + lobby backdrop + oven art (all with fallbacks)
-    $("#pz-title-chef").appendChild(sprite("char-chef.png", "🧌"));
+    $("#pz-title-chef").appendChild(sprite("char-chef.png", "😏"));
     const lobbyBg = new Image();
     lobbyBg.className = "pz-lobby-bg px-art";
     lobbyBg.alt = "";

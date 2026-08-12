@@ -18,7 +18,7 @@ export const QUESTS = {
       { type: "collect", id: "grinFragment", n: 5, label: "Grin fragments" },
       { type: "defeat", id: "trollKing", n: 1, label: "Defeat the Troll King" },
     ],
-    reward: { items: [["lostGrin", 1]], announce: "🧌 Quest complete: the Lost Grin is yours." },
+    reward: { items: [["lostGrin", 1]], announce: "Quest complete: the Lost Grin is yours." },
   },
   pepeRecovery: {
     title: "Rare Pepe Recovery",
@@ -65,7 +65,7 @@ export const QUESTS = {
     objectives: [
       { type: "altar", id: "grinCore", n: 1, label: "Restore the Grin Core" },
     ],
-    reward: { flags: ["grinCoreRestored"], announce: "🧌 THE GRIN IS RESTORED. ...the botnet just noticed." },
+    reward: { flags: ["grinCoreRestored"], announce: "THE GRIN IS RESTORED. ...the botnet just noticed." },
   },
 };
 

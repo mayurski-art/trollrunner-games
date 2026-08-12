@@ -211,7 +211,7 @@
       c.strokeStyle = "#3dff8a"; c.stroke();
       c.textAlign = "center"; c.textBaseline = "middle";
       c.font = `${inner * 0.7}px serif`;
-      c.fillText("🧌", 0, -inner * 0.12);
+      c.fillText("😏", 0, -inner * 0.12);
       c.fillStyle = "#9aa3c0";
       c.font = `700 ${Math.max(8, size * 0.024)}px "DM Mono", monospace`;
       c.fillText("TROLL WHEEL", 0, inner * 0.52);
@@ -778,7 +778,7 @@
   // The wheel is a room like any other game.
   registerGame({
     id: "wheel", room: "room-wheel",
-    name: "Troll Wheel", emoji: "🧌", color: "#3dff8a",
+    name: "Troll Wheel", emoji: "😏", color: "#3dff8a",
     host: "Hosted by Trollface", tagline: "24 segments. One rug. The house always trolls.",
     cta: "Spin the wheel",
     art: "assets/games/troll-casino/scenes/scene-05-first-person-wheel.png",

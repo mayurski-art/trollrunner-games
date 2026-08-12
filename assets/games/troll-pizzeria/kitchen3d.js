@@ -127,7 +127,7 @@ function billboardTexture(emoji) {
   return billboardTexCache[emoji] || (billboardTexCache[emoji] = makeBillboardTexture(emoji));
 }
 function customerTexture(cust) {
-  return cust.sprite ? characterTexture(cust.sprite) : billboardTexture(cust.emoji || "🧌");
+  return cust.sprite ? characterTexture(cust.sprite) : billboardTexture(cust.emoji || "😏");
 }
 
 let lobby = [];                 // { cust, sprite, labelEl }
@@ -157,7 +157,7 @@ let grinHunt = null;            // { sprite, until }
 
 function spawnGrinHunt() {
   if (grinHunt) return;
-  const mat = new THREE.SpriteMaterial({ map: billboardTexture("🧌") });
+  const mat = new THREE.SpriteMaterial({ map: billboardTexture("😏") });
   const sprite = new THREE.Sprite(mat);
   sprite.scale.set(0.4, 0.4, 1);
   const x = (Math.random() - 0.5) * ROOM_HALF_W * 1.6;

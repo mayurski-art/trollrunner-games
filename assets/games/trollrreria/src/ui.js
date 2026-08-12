@@ -175,7 +175,7 @@ export class UI {
       const res = await buyRevive(game);
       if (!res.ok) {
         this.el.btnRevive.disabled = false;
-        this.el.btnRevive.textContent = "🧌 Revive here";
+        this.el.btnRevive.textContent = "Revive here";
         this.el.reviveStatus.textContent = "⚠ " + res.reason;
       }
       /* on success, game.reviveInPlace() already swapped the screen back
@@ -244,7 +244,7 @@ export class UI {
       }
       this.el.reviveStatus.textContent = "";
       this.el.btnRevive.disabled = false;
-      this.el.btnRevive.textContent = "🧌 Revive here";
+      this.el.btnRevive.textContent = "Revive here";
     }
   }
 
@@ -419,7 +419,7 @@ export class UI {
       this.el.dialogFace.innerHTML = "";
       this.el.dialogFace.appendChild(img);
     } else {
-      this.el.dialogFace.textContent = npc.emoji || "🧌";
+      this.el.dialogFace.textContent = npc.emoji || "😏";
     }
     this.el.dialog.hidden = false;
   }

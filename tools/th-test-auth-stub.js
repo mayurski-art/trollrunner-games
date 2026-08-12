@@ -26,7 +26,7 @@ const STUB_JS = (userId, username) => `
         if (v && !v.__thStubbed) {
           v.getCachedProfile = () => ({
             userId: ${JSON.stringify(userId)}, username: ${JSON.stringify(username)},
-            level: 1, xp: 0, avatarUrl: null, avatar: "🧌",
+            level: 1, xp: 0, avatarUrl: null, avatar: null,
           });
           v.__thStubbed = true;
         }

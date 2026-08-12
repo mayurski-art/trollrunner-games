@@ -5,7 +5,7 @@
    "light system support" stance on player-run activities. */
 
 export const CARDS = [
-  { id: "trollface", name: "Trollface", icon: "🧌", rarity: "legendary" },
+  { id: "trollface", name: "Trollface", icon: "😏", rarity: "legendary" },
   { id: "hall-pass", name: "Hall Pass", icon: "🎫", rarity: "common" },
   { id: "gel-pen", name: "Gel Pen", icon: "🖊️", rarity: "common" },
   { id: "mechanical-pencil", name: "Mechanical Pencil", icon: "✏️", rarity: "common" },

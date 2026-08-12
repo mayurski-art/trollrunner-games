@@ -53,13 +53,13 @@
       if (session) {
         avatar.innerHTML = session.avatarUrl
           ? `<img src="${session.avatarUrl}" alt="">`
-          : "🧌";
+          : session.username.charAt(0).toUpperCase();
         name.textContent = session.username;
         sub.textContent = `Level ${session.level}`;
         card.classList.add("is-logged-in");
         card.onclick = () => window.TrollrunnerAccounts.openProfile();
       } else {
-        avatar.textContent = "🧌";
+        avatar.textContent = "?";
         name.textContent = "Guest troll";
         sub.textContent = "Login to save your runs";
         card.classList.remove("is-logged-in");

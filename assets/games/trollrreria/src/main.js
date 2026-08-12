@@ -504,7 +504,7 @@ class Game {
       /* nightfall: occasionally the Troll Moon rises */
       if (this.dayCount >= 2 && Math.random() < 0.15) {
         this.trollMoon = true;
-        this.announce("🧌 The Troll Moon rises… problem?");
+        this.announce("The Troll Moon rises… problem?");
       }
       /* the trader packs up at dusk -- a rotating visitor, not a resident */
       if (this.travelingTrader) this.despawnTravelingTrader();
@@ -2118,7 +2118,7 @@ class Game {
     if (this.ui) this.ui.showScreens({});
     burst(this, p.cx, p.cy, "#ffb300", 20, { spread: 300, up: 200, glow: true });
     this.sfx && this.sfx.potion();
-    this.floatText(p.cx, p.y - 24, "🧌 Back up. Let's go.", "#ffb300");
+    this.floatText(p.cx, p.y - 24, "Back up. Let's go.", "#ffb300");
   }
 
   /* Fast travel is admin-only for now (same "troll_runner" gate as the

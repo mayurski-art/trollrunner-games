@@ -32,7 +32,7 @@
   const SL_SYMBOLS = [
     { id: "candle",  glyph: "📈", weight: 24, pays: { 3: 10, 4: 25,  5: 75 } },
     { id: "usdc",    glyph: "💠", weight: 22, pays: { 3: 15, 4: 40,  5: 125 } },
-    { id: "troll",   glyph: "🧌", weight: 20, pays: { 3: 20, 4: 50,  5: 175 } },
+    { id: "troll",   glyph: "😏", weight: 20, pays: { 3: 20, 4: 50,  5: 175 } },
     { id: "rug",     glyph: "🧻", weight: 18, pays: {} },                        // dead symbol
     { id: "pepe",    glyph: "🐸", weight: 14, pays: { 3: 25, 4: 75,  5: 250 } },
     { id: "diamond", glyph: "💎", weight: 10, pays: { 3: 35, 4: 100, 5: 350 } },

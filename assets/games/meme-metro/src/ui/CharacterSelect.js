@@ -56,7 +56,7 @@ export class CharacterSelect {
         this.render();
       });
     } else {
-      btn.textContent = `🧌 ${fmt(def.price)}`;
+      btn.textContent = `🪙 ${fmt(def.price)}`;
       btn.classList.add('is-price');
       const affordable = this.storage.totalCoins >= def.price;
       btn.disabled = !affordable;

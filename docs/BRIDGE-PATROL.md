@@ -35,7 +35,7 @@ shake down every last one of them. Anyone who makes it across raids your toll
 chest — when the chest hits zero, the run is over. Endless scaling waves make
 it a natural fit for the weekly leaderboard.
 
-Tagline on the hub card: **"Pay the toll. Or else. 🧌"**
+Tagline on the hub card: **"Pay the toll. Or else."**
 
 ## Why this game
 - Most on-brand concept available: trolls literally live under bridges.

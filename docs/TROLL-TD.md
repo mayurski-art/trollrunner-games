@@ -17,7 +17,7 @@ defends **Troll Island** from endless waves of invading NPCs. Bridge Patrol
 one: multiple maps, upgrade paths, a large tower roster, and a proper
 campaign.
 
-Hub card tagline: **"The Corps always delivers. 🧌"** (Defense category)
+Hub card tagline: **"The Corps always delivers."** (Defense category)
 
 ## Relationship to Bridge Patrol
 - Different scale, different fantasy: BP is "one troll under one bridge";

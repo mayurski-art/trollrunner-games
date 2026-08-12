@@ -76,7 +76,7 @@ export function makeBillboardTextures() {
     textSign(['TO THE', 'MOON 🚀'], '#00e5ff'),
     textSign(['BUY', 'MEMES'], '#ff2d95'),
     textSign(['$TROLL'], '#ffb300'),
-    textSign(['🧌'], '#b84dff', 74),
+    textSign(['😏'], '#b84dff', 74),
     textSign(['🐸 FEELS', 'GOOD'], '#39ff14'),
     textSign(['SUCH WOW', '🐶'], '#ffb300'),
     textSign(['WAGMI'], '#00e5ff'),
@@ -107,7 +107,7 @@ export function makeCoinFaceTexture() {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.font = '64px "Segoe UI Emoji", sans-serif';
-  ctx.fillText('🧌', 64, 68);
+  ctx.fillText('😏', 64, 68);
   return toTexture(c);
 }
 
@@ -164,7 +164,7 @@ export function makeTollSignTexture() {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.font = '62px "Segoe UI Emoji", sans-serif';
-  ctx.fillText('🧌', 70, 66);
+  ctx.fillText('😏', 70, 66);
   ctx.fillStyle = '#ffb300';
   ctx.shadowColor = '#ffb300';
   ctx.shadowBlur = 12;

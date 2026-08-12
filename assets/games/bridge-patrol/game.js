@@ -611,7 +611,7 @@
     }
     if (window.TrollNotis && typeof window.TrollNotis.push === 'function') {
       window.TrollNotis.push({
-        icon: '🧌', title: 'Bridge Patrol',
+        icon: '😏', title: 'Bridge Patrol',
         body: 'Chest looted on wave ' + waveReached + ' — 🪙 ' + fmt(G.tolls) + ' tolls collected.',
       });
     }
@@ -632,7 +632,7 @@
     G.spawnQueue = [];
     G.state = 'idle';
     screenOver.hidden = true;
-    addFx({ kind: 'text', str: 'The troll regroups… 🧌', x: W / 2, y: H / 2 - 40, life: 1.6, color: '#5ac8fa', big: true });
+    addFx({ kind: 'text', str: 'The troll regroups…', x: W / 2, y: H / 2 - 40, life: 1.6, color: '#5ac8fa', big: true });
     syncHud();
   }
 
@@ -905,7 +905,7 @@
         ctx.beginPath(); ctx.arc(tp.x, tp.y, 16, 0, 7); ctx.fill();
         ctx.strokeStyle = 'rgba(0,0,0,0.4)';
         ctx.beginPath(); ctx.arc(tp.x, tp.y, 16, 0, 7); ctx.stroke();
-        emoji('🧌', tp.x, tp.y - 6, Math.round(24 * s));
+        emoji('😏', tp.x, tp.y - 6, Math.round(24 * s));
         emoji(spec.badge, tp.x + 12, tp.y + 10, 12);
       }
       // Tier pips
@@ -963,7 +963,7 @@
     // Projectiles: green spitballs, flying troll heads for the cannon
     for (const s of G.shots) {
       if (s.splash) {
-        emoji('🧌', s.x, s.y, 18);
+        emoji('😏', s.x, s.y, 18);
       } else {
         ctx.fillStyle = '#7be382';
         ctx.beginPath(); ctx.arc(s.x, s.y, 5, 0, 7); ctx.fill();

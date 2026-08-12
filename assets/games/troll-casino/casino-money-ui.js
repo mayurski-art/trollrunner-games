@@ -28,7 +28,7 @@
       gate.id = "tc-gate";
       gate.innerHTML = `
         <div class="tc-gate-card">
-          <h2>🧌 Troll Casino</h2>
+          <h2>Troll Casino</h2>
           <p>Real $TROLL and USDC only — log in or create a free account to play.
              Guests can't enter since real money moves here.</p>
           <div class="tc-tab-row">

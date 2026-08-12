@@ -33,7 +33,7 @@
 
     player: {
       dotColor: () => "#5856d6",
-      sublabel: e => e.sessions ? ("Day " + fInt(e.longestSurvival) + " · 🧌 " + fInt(e.bossKills)) : "Fresh island",
+      sublabel: e => e.sessions ? ("Day " + fInt(e.longestSurvival) + " · " + fInt(e.bossKills)) : "Fresh island",
     },
 
     mockRival: rng => ({

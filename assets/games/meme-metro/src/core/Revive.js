@@ -79,7 +79,7 @@ export class ReviveController {
     if (this.dom.payTokenPicker) this.dom.payTokenPicker.hidden = this.isAdmin();
     if (this.dom.button) {
       if (this.mobilePay()) { this.dom.button.disabled = false; this.dom.button.textContent = 'Preparing…'; }
-      else { this.dom.button.disabled = false; this.dom.button.textContent = '🧌 Revive'; }
+      else { this.dom.button.disabled = false; this.dom.button.textContent = 'Revive'; }
     }
     this.prepareMobile();
   }
@@ -120,7 +120,7 @@ export class ReviveController {
 
     this.mobileUrl = url;
     this.mobileToken = payToken;
-    if (this.dom.button && this.phase === 'idle' && this.active) this.dom.button.textContent = '🧌 Revive';
+    if (this.dom.button && this.phase === 'idle' && this.active) this.dom.button.textContent = 'Revive';
   }
 
   onButtonClick() {
@@ -166,7 +166,7 @@ export class ReviveController {
     });
     if (!res.ok) {
       this.phase = 'idle';
-      this.dom.button.disabled = false; this.dom.button.textContent = '🧌 Revive';
+      this.dom.button.disabled = false; this.dom.button.textContent = 'Revive';
       this.setStatus('⚠ ' + (res.reason || 'Payment failed'));
       return;
     }

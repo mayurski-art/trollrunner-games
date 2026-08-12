@@ -159,7 +159,7 @@
   /* customers — patience (windowMult) + tip lean + Grumpy's extra score
      weight, reusing the Pizzeria meme roster & quirks per the design doc. */
   const CUSTS = [
-    { n: "Trollio", e: "🧌", tip: 1.1,  windowMult: 0.8 },
+    { n: "Trollio", e: "😏", tip: 1.1,  windowMult: 0.8 },
     { n: "Pepe",    e: "🐸", tip: 1.25, windowMult: 1.3 },
     { n: "Doge",    e: "🐶", tip: 1.0,  windowMult: 1.0 },
     { n: "Chad",    e: "🗿", tip: 0.9,  windowMult: 0.8 },

@@ -9,7 +9,7 @@ export const CHARACTERS = {
     shortName: 'Trollface Runner',
     charClass: 'Speedster',
     price: 0,
-    emoji: '🧌',
+    emoji: '😏',
     colors: { body: 0x17171c, head: 0xf2f2f2, accent: 0xffb300, trim: 0xd0021b },
   },
   pepe: {

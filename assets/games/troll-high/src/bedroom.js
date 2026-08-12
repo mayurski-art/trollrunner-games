@@ -16,7 +16,7 @@ export const DECORATIONS = [
   { id: "gift-box", icon: "🎁", name: "Gift Box", hint: "Receive a gift from someone", unlocked: s => s.giftsReceived >= 1 },
   { id: "streak-poster", icon: "📅", name: "Attendance Poster", hint: "Attend school on 3 different days", unlocked: s => s.daysAttended >= 3 },
   // Phase 11 — the ultimate "life story" flex: proof you found him.
-  { id: "trollface-autograph", icon: "🧌", name: "Trollface's Autograph", hint: "Find the legendary NPC — good luck", unlocked: s => s.metTrollface },
+  { id: "trollface-autograph", icon: "😏", name: "Trollface's Autograph", hint: "Find the legendary NPC — good luck", unlocked: s => s.metTrollface },
   // Clubs — signing the charter in the Underground HQ doubles as joining.
   { id: "club-pin", icon: "📌", name: "Club Pin", hint: "Join the club — it's hidden somewhere", unlocked: s => s.clubMember },
   // Graduation (design doc §23 Phase 6 capstone) — the front desk hands

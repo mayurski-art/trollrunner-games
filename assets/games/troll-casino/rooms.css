@@ -316,7 +316,7 @@
   color: transparent;
   display: grid; place-items: center;
 }
-.pcard.is-down::after { content: "🧌"; font-size: 30px; }
+.pcard.is-down::after { content: "😏"; font-size: 30px; }
 @keyframes bj-card-in {
   from { transform: translate(46px, -70px) rotate(10deg); opacity: 0; }
   to   { transform: none; opacity: 1; }
