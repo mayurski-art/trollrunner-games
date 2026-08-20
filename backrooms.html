@@ -5,14 +5,14 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com https://mayurski-art.github.io https://trollrunner.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://tjsyhfplxjtakdfkpdtg.supabase.co wss://tjsyhfplxjtakdfkpdtg.supabase.co https://solana-rpc.publicnode.com https://api.devnet.solana.com https://lite-api.jup.ag; object-src 'none'; base-uri 'self'; frame-ancestors 'self';">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#8a7a3c">
-  <meta name="description" content="Grin Halls: a first-person liminal-maze crawl in the Troll Runner Arcade. Endless yellow hallways, a familiar grin somewhere in the wallpaper. Find the fragments, find the exit — something else is looking for you too.">
-  <title>Grin Halls | Troll Runner Arcade</title>
+  <meta name="description" content="Backrooms: a first-person liminal-maze crawl in the Troll Runner Arcade. Endless yellow hallways, a familiar grin somewhere in the wallpaper. Find the fragments, find the exit — something else is looking for you too.">
+  <title>Backrooms | Troll Runner Arcade</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23a89257'/%3E%3Ctext x='8' y='44' font-size='34'%3E%F0%9F%A7%8C%3C/text%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=DM+Sans:wght@500;700;900&family=DM+Mono:wght@500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/troll-leaderboard.css?v=lb-engine-v1">
-  <link rel="stylesheet" href="assets/games/grin-halls/style.css?v=gh-p3">
+  <link rel="stylesheet" href="assets/games/grin-halls/style.css?v=gh-p4">
 </head>
 <body>
 
@@ -21,7 +21,7 @@
       <span class="brand-mark">$TROLL</span>
       <span class="brand-copy">
         <span>Troll Runner</span>
-        <small>Grin Halls</small>
+        <small>Backrooms</small>
       </span>
     </a>
     <nav class="site-nav" aria-label="Primary">
@@ -32,13 +32,13 @@
   </header>
 
   <main class="arcade-shell">
-    <section class="gh-cabinet" id="gh-cabinet" aria-label="Grin Halls">
+    <section class="gh-cabinet" id="gh-cabinet" aria-label="Backrooms">
 
       <!-- Title screen -->
       <div class="gh-title" id="gh-title">
         <div class="gh-title-inner">
           <p class="gh-title-eyebrow">Troll Runner Arcade presents</p>
-          <h1 class="gh-logo">Grin<br><span>Halls</span></h1>
+          <h1 class="gh-logo">Back<br><span>Rooms</span></h1>
           <p class="gh-title-tag">Endless yellow. Familiar grin. You are not lost, you are relocated.</p>
           <div class="gh-title-actions">
             <button type="button" class="gh-btn gh-btn-primary" id="gh-start-btn">Step in</button>
@@ -83,8 +83,11 @@
             <div class="gh-hud-chip gh-hud-hiding" id="gh-hud-hiding" hidden>Hiding — hold E</div>
           </div>
           <button type="button" class="gh-hud-mute" id="gh-hud-mute-btn" aria-label="Mute sound" aria-pressed="false">🔊</button>
+          <button type="button" class="gh-hud-radio" id="gh-hud-radio-btn" aria-label="Play radio" aria-pressed="false">📻</button>
           <button type="button" class="gh-hud-help" id="gh-hud-help-btn" aria-label="How to play">?</button>
         </div>
+
+        <audio id="gh-radio-audio" loop preload="none" src="assets/games/grin-halls/audio/radio-track.mp3"></audio>
 
         <div class="gh-crosshair" aria-hidden="true"></div>
         <div class="gh-danger-vignette" id="gh-danger-vignette" aria-hidden="true"></div>
@@ -126,7 +129,7 @@
     <section class="arcade-rack leaderboard-rack" aria-labelledby="lb-title">
       <div class="section-heading">
         <p class="eyebrow">Weekly ladder</p>
-        <h2 id="lb-title">Grin Hunters</h2>
+        <h2 id="lb-title">Backrooms Hunters</h2>
       </div>
       <div id="lb-root" class="lb-root">
         <p class="lb-foot">Loading leaderboard…</p>
@@ -139,12 +142,11 @@
   </script>
   <script src="assets/js/troll-leaderboard.js?v=lb-engine-v1" defer></script>
   <script src="assets/games/grin-halls/leaderboard.js?v=gh-lb-v1" defer></script>
-  <script type="module" src="assets/games/grin-halls/game.js?v=gh-p3"></script>
+  <script type="module" src="assets/games/grin-halls/game.js?v=gh-p4"></script>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.3" integrity="sha384-uVefCux0Kf6w34gQVv8+jUPUwvwFUdnrcwI1kOJHs7sfPPXdDDucwcrPrppD6oUe" crossorigin="anonymous"></script>
   <script src="https://mayurski-art.github.io/assets/js/troll-accounts.js"></script>
   <script src="assets/js/site-lock.js"></script>
   <script src="https://mayurski-art.github.io/assets/js/troll-notis.js"></script>
-  <script src="https://mayurski-art.github.io/assets/js/coming-soon.js"></script>
 </body>
 </html>
