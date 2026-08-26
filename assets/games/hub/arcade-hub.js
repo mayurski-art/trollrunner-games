@@ -48,6 +48,7 @@
     let paused = false;
     let dragging = false;
     let lastPointerX = 0;
+    let dragStartX = 0;
     let dragMoved = 0;
     let suppressNextClick = false;
 
@@ -102,31 +103,54 @@
     carousel.addEventListener("mouseenter", () => { paused = true; });
     carousel.addEventListener("mouseleave", () => { paused = false; });
 
-    carousel.addEventListener("pointerdown", (e) => {
-      dragging = true;
-      dragMoved = 0;
-      lastPointerX = e.clientX;
-      carousel.classList.add("is-dragging");
-      carousel.setPointerCapture(e.pointerId);
-    });
+    // Deliberately NOT using setPointerCapture here: capturing the pointer
+    // on the carousel retargets every subsequent event for it — including
+    // the compat mouseup/click that follow pointerup — to the CAPTURING
+    // element itself, no matter what's actually under the cursor. That
+    // meant every click anywhere in the carousel arrived as
+    // e.target === carousel, so a "Play Now" link's delegated click handler
+    // (in fs-launcher.js) never matched and no game ever launched. Tracking
+    // the drag with plain document-level listeners (active only while
+    // dragging) gets the same "keep following the pointer past the
+    // carousel's own edge" behavior without touching hit-testing for clicks.
+    let activePointerId = null;
 
-    carousel.addEventListener("pointermove", (e) => {
-      if (!dragging) return;
+    function onPointerMove(e) {
+      if (!dragging || e.pointerId !== activePointerId) return;
       const dx = e.clientX - lastPointerX;
       lastPointerX = e.clientX;
-      dragMoved += Math.abs(dx);
+      // Net distance from where the gesture started, not the sum of every
+      // per-frame delta — a plain mouse/trackpad click always wobbles a few
+      // px between down and up, and summing those deltas blew past a small
+      // fixed threshold on almost every click, silently eating "Play Now"
+      // taps as if they'd been drags.
+      dragMoved = Math.abs(e.clientX - dragStartX);
       pos += dx;
       wrap();
-    });
-
-    function endDrag() {
-      if (!dragging) return;
-      dragging = false;
-      carousel.classList.remove("is-dragging");
-      if (dragMoved > 6) suppressNextClick = true;
     }
-    carousel.addEventListener("pointerup", endDrag);
-    carousel.addEventListener("pointercancel", endDrag);
+
+    function endDrag(e) {
+      if (!dragging || (e && e.pointerId !== activePointerId)) return;
+      dragging = false;
+      activePointerId = null;
+      carousel.classList.remove("is-dragging");
+      document.removeEventListener("pointermove", onPointerMove);
+      document.removeEventListener("pointerup", endDrag);
+      document.removeEventListener("pointercancel", endDrag);
+      if (dragMoved > 10) suppressNextClick = true;
+    }
+
+    carousel.addEventListener("pointerdown", (e) => {
+      dragging = true;
+      activePointerId = e.pointerId;
+      dragMoved = 0;
+      dragStartX = e.clientX;
+      lastPointerX = e.clientX;
+      carousel.classList.add("is-dragging");
+      document.addEventListener("pointermove", onPointerMove);
+      document.addEventListener("pointerup", endDrag);
+      document.addEventListener("pointercancel", endDrag);
+    });
 
     // A drag that ends over a card's "Play Now" link would otherwise still
     // fire a click and launch the game — swallow just that one click.
