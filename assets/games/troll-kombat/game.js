@@ -2551,21 +2551,6 @@
     canvas.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
-  // page roster cards (the "Know Your Memes" section)
-  const rosterCards = document.getElementById("roster-cards");
-  ROSTER.forEach((def, i) => {
-    const card = document.createElement("article");
-    card.className = "coming-card roster-card";
-    card.style.setProperty("--accent", def.pal.accent);
-    const port = portraitEl(def, 110);
-    port.classList.add("roster-card-art");
-    card.appendChild(port);
-    card.insertAdjacentHTML("beforeend",
-      `<span>00${i + 1}</span><h3>${def.name}</h3><p>${def.blurb}</p>` +
-      `<p class="special-line">Special · <strong>${def.special.name}</strong></p>`);
-    rosterCards.appendChild(card);
-  });
-
   /* ==========================================================================
      RESULT OVERLAY
      ========================================================================== */

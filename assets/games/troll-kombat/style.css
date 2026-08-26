@@ -34,6 +34,17 @@ button, a, select { font: inherit; }
 a { color: inherit; text-decoration: none; }
 h1, h2, h3, p { margin: 0; }
 
+/* MK-style molten-gold metal text — used on the arcade's big display titles
+   (match-flow headers, WINNER, kombat-title). Black Ops One was already
+   loaded via the Google Fonts link but never wired to any selector. */
+h1, h2 { font-family: "Black Ops One", var(--font); letter-spacing: 0.01em; }
+.mk-metal {
+  background: linear-gradient(180deg, #fff6c8 0%, #ffd84d 26%, #b8860b 50%, #fff2a0 55%, #a86a1a 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  -webkit-text-stroke: 1px rgba(0, 0, 0, 0.55);
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.65)) drop-shadow(0 0 18px rgba(255, 216, 77, 0.35));
+}
+
 /* ---- CRT + header (shared arcade chrome) ------------------------------- */
 .crt-overlay {
   display: none;
@@ -62,9 +73,13 @@ h1, h2, h3, p { margin: 0; }
   color: var(--green); font-family: var(--mono); font-size: 12px; font-weight: 900;
   text-transform: uppercase; text-shadow: 0 0 16px rgba(77, 255, 115, 0.56);
 }
-/* Visible page heading removed — the marquee bar already carries the
-   "TROLL KOMBAT" title, and duplicating it as a full hero title was most
-   of what pushed the cabinet below the fold. Kept off-screen for a11y/SEO. */
+/* Slim MK-style logo strip above the cabinet. Kept to one compact line —
+   a full hero-sized title was previously dropped (kept sr-only) because it
+   pushed the cabinet below the fold; this stays short enough not to. */
+.kombat-title {
+  text-align: center; text-transform: uppercase; font-size: clamp(22px, 4.4vw, 38px);
+  line-height: 1; margin: 2px 0 8px; letter-spacing: 0.04em;
+}
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
@@ -230,8 +245,8 @@ h1, h2, h3, p { margin: 0; }
 /* ---- Announce banner (ROUND 1 / FIGHT / K.O. / FINISH) ----------------- */
 .tk-announce {
   position: absolute; inset: 0; z-index: 5; display: grid; place-items: center;
-  font-family: var(--font); font-weight: 900; text-transform: uppercase;
-  font-size: clamp(38px, 9vw, 96px); line-height: 0.9; text-align: center;
+  font-family: "Black Ops One", var(--font); font-weight: 900; text-transform: uppercase;
+  font-size: clamp(38px, 9vw, 96px); line-height: 0.9; text-align: center; letter-spacing: 0.02em;
   color: var(--ink); pointer-events: none; opacity: 0; transform: scale(0.6);
   text-shadow: 5px 0 0 rgba(255, 49, 79, 0.7), -5px 0 0 rgba(77, 238, 255, 0.5), 0 0 40px rgba(154, 92, 255, 0.6);
 }
@@ -263,6 +278,14 @@ h1, h2, h3, p { margin: 0; }
 }
 .overlay-kicker { color: var(--green); font-family: var(--mono); font-size: 12px; font-weight: 900; text-transform: uppercase; }
 .overlay-card h2 { margin-top: 5px; font-size: clamp(28px, 4.6vw, 46px); line-height: 0.92; text-transform: uppercase; }
+/* result/pause cards already color their h2 to signal win/loss/paused state —
+   keep the molten-gold treatment for the neutral setup/info overlays only. */
+.overlay-card:not(.result-card):not(.pause-card) h2 {
+  background: linear-gradient(180deg, #fff6c8 0%, #ffd84d 26%, #b8860b 50%, #fff2a0 55%, #a86a1a 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  -webkit-text-stroke: 1px rgba(0, 0, 0, 0.55);
+  filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.65)) drop-shadow(0 0 18px rgba(255, 216, 77, 0.35));
+}
 .select-sub { margin-top: 8px; color: var(--muted); font-size: 14px; }
 
 /* roster picks */
@@ -562,7 +585,15 @@ h1, h2, h3, p { margin: 0; }
   .fight-cabinet { order: -1; }
   .game-copy { order: 1; }
   .touch-controls { display: flex; }   /* show on-screen pad on touch layouts */
-  .screen-wrap { width: 100%; height: auto; max-height: 62svh; }
+  /* width:100%/height:auto/max-height:62svh used to fight the aspect-ratio
+     declaration on short or landscape phones: once max-height clamped the
+     height, the width stayed at 100% and the canvas (width:100%;height:100%
+     inside) got stretched off its 1280x600 ratio. Letterbox instead: derive
+     height FROM the actual used width (--screenW, already width-capped by
+     the viewport) so the box is always exactly 1280:600, in portrait and
+     landscape alike. */
+  .fight-cabinet { --screenH: clamp(180px, 62svh, 520px); }
+  .screen-wrap { width: var(--screenW); height: calc(var(--screenW) * 600 / 1280); max-height: var(--screenH); }
   .hero-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .roster-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .game-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -659,7 +690,7 @@ h1, h2, h3, p { margin: 0; }
 @media (max-width: 760px) {
   .stat-chips { width: 100%; }
   .stage-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .cabinet-footer, .touch-controls { width: 100%; }
+  .cabinet-footer, .touch-controls { width: var(--screenW); }
   .icon-btn { right: 10px; }
 }
 @media (max-width: 430px) {

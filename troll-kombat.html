@@ -13,7 +13,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=DM+Sans:wght@500;700;900&family=DM+Mono:wght@500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/troll-leaderboard.css?v=lb-engine-v1">
   <link rel="stylesheet" href="assets/css/troll-wallet.css?v=lab-v1">
-  <link rel="stylesheet" href="assets/games/troll-kombat/style.css?v=kombat-v26-big-screen">
+  <link rel="stylesheet" href="assets/games/troll-kombat/style.css?v=kombat-v27-mk-type">
 </head>
 <body data-game-state="select">
   <div class="crt-overlay" aria-hidden="true"></div>
@@ -22,7 +22,7 @@
 
   <main class="arcade-shell">
     <section class="fight-hero" aria-label="Troll Kombat">
-      <h1 class="sr-only">Troll Kombat</h1>
+      <h1 class="kombat-title mk-metal">Troll Kombat</h1>
 
       <section class="fight-cabinet" aria-label="Troll Kombat game cabinet">
         <div class="screen-wrap">
@@ -386,14 +386,6 @@
       </section>
     </section>
 
-    <section class="arcade-rack" aria-labelledby="roster-title">
-      <div class="section-heading">
-        <p class="eyebrow">The roster</p>
-        <h2 id="roster-title">Know Your Memes</h2>
-      </div>
-      <div id="roster-cards" class="game-grid"></div>
-    </section>
-
     <!-- Weekly leaderboard (Phase 8 foundation). All markup is built by
          leaderboard.js into #lb-root; prizes here are placeholder/mock-only. -->
     <section class="arcade-rack leaderboard-rack" aria-labelledby="lb-title">
@@ -417,7 +409,7 @@
   <script src="assets/games/troll-kombat/leaderboard.js?v=kombat-lb-v2" defer></script>
   <script src="assets/games/troll-kombat/finisher-sequencer.js?v=phase11b-v1" defer></script>
   <script src="assets/games/troll-kombat/net.js?v=kombat-online-v1" defer></script>
-  <script src="assets/games/troll-kombat/game.js?v=kombat-v33-no-reset-btn" defer></script>
+  <script src="assets/games/troll-kombat/game.js?v=kombat-v34-no-roster-section" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.3" integrity="sha384-uVefCux0Kf6w34gQVv8+jUPUwvwFUdnrcwI1kOJHs7sfPPXdDDucwcrPrppD6oUe" crossorigin="anonymous"></script>
   <script src="https://mayurski-art.github.io/assets/js/troll-accounts.js"></script>
   <script src="assets/js/site-lock.js"></script>
