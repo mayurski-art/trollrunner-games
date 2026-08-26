@@ -77,6 +77,11 @@ h1, h2 { font-family: "Black Ops One", var(--font); letter-spacing: 0.01em; }
    a full hero-sized title was previously dropped (kept sr-only) because it
    pushed the cabinet below the fold; this stays short enough not to. */
 .kombat-title {
+  /* .fight-hero picks up align-items:start below 980px (an older single-
+     column tweak), which shrink-wraps flex children to their content —
+     text-align:center then has no room to center within, so the title sits
+     flush left instead, overlapping .arcade-back-link. Stretch regardless. */
+  align-self: stretch;
   text-align: center; text-transform: uppercase; font-size: clamp(16px, 2.6vw, 26px);
   line-height: 1; margin: 0 0 4px; letter-spacing: 0.04em;
 }
@@ -577,12 +582,12 @@ h1, h2 { font-family: "Black Ops One", var(--font); letter-spacing: 0.01em; }
 /* ---- Responsive -------------------------------------------------------- */
 @media (max-width: 980px) {
   .fight-hero { min-height: 0; grid-template-columns: 1fr; align-items: start; }
-  h1 { max-width: 14ch; }
   .roster-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 760px) {
   .arcade-shell { padding: 10px; }
   .fight-hero { display: flex; flex-direction: column; gap: 14px; }
+  .kombat-title { order: -2; }   /* stay above the cabinet, which is order: -1 */
   .fight-cabinet { order: -1; }
   .game-copy { order: 1; }
   .touch-controls { display: flex; }   /* show on-screen pad on touch layouts */
