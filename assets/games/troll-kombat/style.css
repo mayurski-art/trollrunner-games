@@ -77,8 +77,8 @@ h1, h2 { font-family: "Black Ops One", var(--font); letter-spacing: 0.01em; }
    a full hero-sized title was previously dropped (kept sr-only) because it
    pushed the cabinet below the fold; this stays short enough not to. */
 .kombat-title {
-  text-align: center; text-transform: uppercase; font-size: clamp(22px, 4.4vw, 38px);
-  line-height: 1; margin: 2px 0 8px; letter-spacing: 0.04em;
+  text-align: center; text-transform: uppercase; font-size: clamp(16px, 2.6vw, 26px);
+  line-height: 1; margin: 0 0 4px; letter-spacing: 0.04em;
 }
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
@@ -225,13 +225,14 @@ h1, h2 { font-family: "Black Ops One", var(--font); letter-spacing: 0.01em; }
 
 /* ---- Screen + canvas --------------------------------------------------- */
 /* --screenH is sized from what's actually left in the viewport after the
-   footer/touch rows (~110px on desktop, header + marquee no longer eat into
-   this budget), instead of a flat 84svh that ignored those and forced a
-   scroll to reach the pre-match overlays (choose match type / fighter /
-   stage). Floor keeps it usable on very short viewports; .game-overlay's
-   own overflow:auto is the fallback if a screen still can't fit its
-   content at that size. */
-.fight-cabinet { --screenH: clamp(300px, calc(100svh - 110px), 960px); }
+   footer/touch rows (~110px on desktop) and the slim title strip above the
+   cabinet (~40px incl. margin), instead of a flat 84svh that ignored those
+   and forced a scroll to reach the pre-match overlays (choose match type /
+   fighter / stage). Floor keeps it usable on very short viewports; ceiling
+   raised so the cabinet can actually fill large desktop screens instead of
+   capping out early. .game-overlay's own overflow:auto is the fallback if a
+   screen still can't fit its content at that size. */
+.fight-cabinet { --screenH: clamp(300px, calc(100svh - 150px), 1200px); }
 .screen-wrap {
   position: relative; z-index: 1;
   width: min(calc(100vw - 8px), calc(var(--screenH) * 1280 / 600));
