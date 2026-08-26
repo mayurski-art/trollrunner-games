@@ -6,19 +6,18 @@
    ============================================================================ */
 
 .hub-shell {
-  display: grid;
-  grid-template-columns: 240px 1fr;
   min-height: 100vh;
   min-height: 100svh;
 }
 
-/* ---- sidebar ---- */
-.hub-sidebar {
+/* ---- top bar (logo + account) ---- */
+.hub-topbar {
   display: flex;
-  flex-direction: column;
-  gap: 28px;
-  padding: 24px 18px;
-  border-right: 1px solid var(--line);
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px clamp(20px, 4vw, 48px);
+  border-bottom: 1px solid var(--line);
   background: rgba(5, 0, 8, 0.5);
 }
 
@@ -36,58 +35,24 @@
   text-shadow: 0 0 18px rgba(77, 255, 115, 0.4);
 }
 
-.hub-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.hub-nav-link {
+.hub-topbar-account {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  border-left: 3px solid transparent;
-  color: var(--muted);
-  font-weight: 700;
-  font-size: 14px;
-}
-
-.hub-nav-link:hover {
-  color: var(--ink);
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.hub-nav-link.is-active {
-  color: var(--ink);
-  background: var(--green-soft);
-  border-left-color: var(--green);
-}
-
-.hub-nav-icon {
-  width: 18px;
-  text-align: center;
-}
-
-.hub-sidebar-spacer {
-  flex: 1;
+  gap: 10px;
 }
 
 .hub-profile-card {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 16px 10px;
+  gap: 10px;
+  padding: 6px 14px 6px 6px;
   border: 1px dashed var(--line);
-  border-radius: 12px;
-  text-align: center;
+  border-radius: 999px;
+  text-align: left;
   cursor: pointer;
   background: none;
   font: inherit;
   color: inherit;
-  width: 100%;
 }
 
 .hub-profile-card:hover {
@@ -100,13 +65,14 @@
 }
 
 .hub-profile-avatar {
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
   display: grid;
   place-items: center;
   border-radius: 50%;
   border: 1px solid var(--line);
-  font-size: 18px;
+  font-size: 16px;
   overflow: hidden;
 }
 
@@ -117,60 +83,44 @@
   display: block;
 }
 
+.hub-profile-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
 .hub-profile-name {
   margin: 0;
   font-size: 12px;
   font-weight: 700;
   color: var(--ink);
-  word-break: break-all;
 }
 
 .hub-profile-sub {
   margin: 0;
-  font-size: 11px;
+  font-size: 10px;
   color: var(--muted);
   letter-spacing: 0.02em;
+}
+
+.hub-settings-link {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  font-size: 16px;
+}
+
+.hub-settings-link:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 /* ---- main column ---- */
 .hub-main {
   padding: 28px clamp(20px, 4vw, 48px) 40px;
-}
-
-.hub-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 20px;
-  margin-bottom: 22px;
-}
-
-.hub-search {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 240px;
-  padding: 10px 14px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.hub-search input {
-  flex: 1;
-  border: 0;
-  background: none;
-  color: var(--ink);
-  font: inherit;
-  font-size: 14px;
-}
-
-.hub-search input:focus {
-  outline: none;
-}
-
-.hub-search input::placeholder {
-  color: var(--muted);
 }
 
 .hub-hero h1 {
@@ -188,43 +138,34 @@
   font-size: 16px;
 }
 
-/* ---- category pills ---- */
-.hub-categories {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 28px;
-}
-
-.hub-pill {
-  padding: 9px 18px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--muted);
-  font-weight: 700;
-  font-size: 13px;
-  cursor: pointer;
-  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
-}
-
-.hub-pill:hover {
-  color: var(--ink);
-  border-color: rgba(255, 255, 255, 0.3);
-}
-
-.hub-pill.is-active {
-  background: var(--green);
-  border-color: var(--green);
-  color: #04140a;
-}
-
-/* ---- game grid ---- */
-.hub-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 20px;
+/* ---- game carousel ---- */
+/* Continuous, draggable, infinite-loop strip (JS in arcade-hub.js clones the
+   card set once and drives .hub-carousel-track's transform via rAF — no CSS
+   animation here, that's all script-driven so drag/hover-pause stay simple). */
+.hub-carousel {
+  position: relative;
+  overflow: hidden;
   margin-bottom: 30px;
+  cursor: grab;
+  touch-action: pan-y;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);
+}
+
+.hub-carousel.is-dragging {
+  cursor: grabbing;
+}
+
+.hub-carousel-track {
+  display: flex;
+  gap: 20px;
+  width: max-content;
+  will-change: transform;
+}
+
+.hub-carousel-track .hub-card {
+  width: 260px;
+  flex: 0 0 auto;
 }
 
 .hub-card {
@@ -235,6 +176,7 @@
   border: 1px solid var(--line);
   overflow: hidden;
   background: var(--panel);
+  user-select: none;
   transition: transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
 }
 
@@ -373,10 +315,6 @@
   cursor: default;
 }
 
-.hub-card.hub-card-hidden {
-  display: none;
-}
-
 /* ---- stats + tip footer ---- */
 .hub-footer {
   display: grid;
@@ -428,29 +366,21 @@
 }
 
 @media (max-width: 900px) {
-  .hub-shell {
-    grid-template-columns: 1fr;
+  .hub-topbar {
+    padding: 12px clamp(14px, 4vw, 24px);
   }
 
-  .hub-sidebar {
-    flex-direction: row;
-    align-items: center;
-    overflow-x: auto;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .hub-sidebar-spacer {
+  .hub-profile-text {
     display: none;
   }
 
   .hub-profile-card {
-    display: none;
+    padding: 6px;
+    border-radius: 50%;
   }
 
-  .hub-topbar {
-    flex-direction: column;
-    align-items: stretch;
+  .hub-carousel-track .hub-card {
+    width: 220px;
   }
 
   .hub-footer {
