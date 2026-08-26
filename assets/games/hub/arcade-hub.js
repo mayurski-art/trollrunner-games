@@ -29,14 +29,18 @@
     });
 
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const SPEED = reduceMotion ? 0 : 0.55; // px/frame, ~33px/s at 60fps
+    // Touch/no-hover devices get manual swipe only, no auto-play — an
+    // unattended strip that keeps drifting under a thumb is more annoying
+    // than useful on mobile, where dragging is the primary interaction anyway.
+    const isTouchDevice = window.matchMedia("(hover: none), (pointer: coarse)").matches;
+    const SPEED = (reduceMotion || isTouchDevice) ? 0 : 0.55; // px/frame, ~33px/s at 60fps
+    const EDGE_MAX_SPEED = reduceMotion ? 0 : 16; // px/frame right at the panel's edge
 
     let loopWidth = 0;
     let pos = 0;
     let paused = false;
     let dragging = false;
-    let dragStartX = 0;
-    let dragStartPos = 0;
+    let lastPointerX = 0;
     let dragMoved = 0;
     let suppressNextClick = false;
 
@@ -56,8 +60,30 @@
       while (pos > 0) pos -= loopWidth;
     }
 
+    // While dragging, parking the cursor near the panel's left/right edge
+    // keeps scrolling further in that direction on its own — same idea as
+    // edge auto-scroll in drag-and-drop lists — instead of requiring the
+    // mouse to physically travel the whole strip.
+    function edgeBoost() {
+      if (!dragging || EDGE_MAX_SPEED <= 0) return 0;
+      const rect = carousel.getBoundingClientRect();
+      const zone = Math.min(140, Math.max(50, rect.width * 0.18));
+      if (lastPointerX < rect.left + zone) {
+        const depth = Math.min(1, (rect.left + zone - lastPointerX) / zone);
+        return -EDGE_MAX_SPEED * depth;
+      }
+      if (lastPointerX > rect.right - zone) {
+        const depth = Math.min(1, (lastPointerX - (rect.right - zone)) / zone);
+        return EDGE_MAX_SPEED * depth;
+      }
+      return 0;
+    }
+
     function frame() {
-      if (!dragging && !paused && loopWidth > 0) {
+      if (dragging) {
+        const boost = edgeBoost();
+        if (boost) { pos += boost; wrap(); }
+      } else if (!paused && loopWidth > 0) {
         pos -= SPEED;
         wrap();
       }
@@ -72,17 +98,17 @@
     carousel.addEventListener("pointerdown", (e) => {
       dragging = true;
       dragMoved = 0;
-      dragStartX = e.clientX;
-      dragStartPos = pos;
+      lastPointerX = e.clientX;
       carousel.classList.add("is-dragging");
       carousel.setPointerCapture(e.pointerId);
     });
 
     carousel.addEventListener("pointermove", (e) => {
       if (!dragging) return;
-      const dx = e.clientX - dragStartX;
-      dragMoved = Math.max(dragMoved, Math.abs(dx));
-      pos = dragStartPos + dx;
+      const dx = e.clientX - lastPointerX;
+      lastPointerX = e.clientX;
+      dragMoved += Math.abs(dx);
+      pos += dx;
       wrap();
     });
 
