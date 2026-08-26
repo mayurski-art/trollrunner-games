@@ -129,7 +129,7 @@
     name: "Diamond Hands Blackjack", emoji: "🐸", color: "#3dff8a",
     host: "Hosted by Pepe", tagline: "Hit, stand, split, double. Pepe hits soft 17 and never blinks.",
     cta: "Sit at the table",
-    art: "assets/games/troll-casino/art/pepe-blackjack-hero.png",
+    art: "assets/games/troll-casino/art/pepe-blackjack-hero.webp",
     onEnter: () => setLine(PEPE.idle),
   });
 
@@ -139,7 +139,7 @@
     if (!room) return;
     room.innerHTML = `
       <div class="room-hero">
-        <div class="rh-art" data-art="assets/games/troll-casino/art/pepe-blackjack-hero.png"></div>
+        <div class="rh-art" data-art="assets/games/troll-casino/art/pepe-blackjack-hero.webp"></div>
         <div class="rh-body">
           <span class="rh-kicker">Pepe presents</span>
           <h2>Diamond Hands Blackjack</h2>

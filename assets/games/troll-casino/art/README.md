@@ -4,14 +4,17 @@ Room hero art goes in THIS folder with EXACTLY these names. Same deal as the
 walkthrough scenes (../scenes/): every image is probed at load, and a styled
 neon-gradient fallback renders until the file exists — drop them in any order.
 
+Wired art ships as `.webp` (same shots, ~90% smaller than the source PNGs —
+the `.png` originals stay in this folder as masters, just unreferenced).
+
 | File | Used by | Shot |
 |---|---|---|
-| `pepe-blackjack-hero.png` | Blackjack floor card + room hero | Pepe dealing at the branded blackjack table, crew in the background |
-| `pepe-blackjack-gameplay.png` | (reserved) blackjack play backdrop | First-person over the felt, cards + chips |
-| `doge-jackpot-hero.png` | Slots floor card + room hero | Doge beside the giant Jackpot Reels cabinet |
-| `doge-jackpot-gameplay.png` | (reserved) slots play backdrop | First-person at the reels, hand on SPIN |
-| `whale-launch-hero.png` | Crash floor card + room hero | Elon presenting the holographic multiplier chart |
-| `whale-launch-gameplay.png` | (reserved) crash play backdrop | First-person at the console, LAUNCH under hand |
+| `pepe-blackjack-hero.webp` | Blackjack floor card + room hero | Pepe dealing at the branded blackjack table, crew in the background |
+| `pepe-blackjack-gameplay.webp` | (reserved) blackjack play backdrop | First-person over the felt, cards + chips |
+| `doge-jackpot-hero.webp` | Slots floor card + room hero | Doge beside the giant Jackpot Reels cabinet |
+| `doge-jackpot-gameplay.webp` | (reserved) slots play backdrop | First-person at the reels, hand on SPIN |
+| `whale-launch-hero.webp` | Crash floor card + room hero | Elon presenting the holographic multiplier chart |
+| `whale-launch-gameplay.webp` | (reserved) crash play backdrop | First-person at the console, LAUNCH under hand |
 
 Guidelines (same as scenes/README.md):
 

@@ -11,6 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/troll-leaderboard.css?v=lb-engine-v1">
   <style>
     :root {
       --ts-bg: #0a0a0a;
@@ -393,6 +394,7 @@
         <h2 class="ts-title-font" id="end-title">ENDING</h2>
         <p id="end-desc" class="ts-tagline"></p>
         <div id="end-stats" class="end-stats"></div>
+        <div id="lb-root" class="lb-root"></div>
         <button class="ts-cta" id="btn-play-again" type="button">Play Again ▶</button>
         <button class="ts-cta-ghost" id="btn-to-title" type="button">Back to Title</button>
       </section>
@@ -912,9 +914,21 @@
       }
 
       function crashOut() {
+        const isNewEnding = !loadEndings()['CRASH'];
         recordEnding('CRASH');
+        reportRun('CRASH', isNewEnding);
         crashSound();
         setBodyTier('crash');
+      }
+
+      function reportRun(endingType, isNewEnding) {
+        if (!window.TrollLeaderboard) return;
+        window.TrollLeaderboard.record('nullface', {
+          layer: NODES[state.nodeId] ? NODES[state.nodeId].layer : 0,
+          cyclesUsed: START_CYCLES - Math.max(0, state.cycles),
+          ending: endingType,
+          newEnding: isNewEnding ? 1 : 0,
+        });
       }
 
       // EQUILIBRIUM is a cross-run secret: it unlocks once three specific flags
@@ -941,6 +955,7 @@
         else type = 'UNRESOLVED';
 
         if (type === 'CRASH') { crashOut(); return; }
+        const isNewEnding = !loadEndings()[type];
         recordEnding(type);
 
         const copy = {
@@ -950,6 +965,7 @@
           UNRESOLVED: ["UNRESOLVED", "It couldn't get a clean read on you — not clean enough to purge, not far gone enough to keep. So it does the only other thing it knows how to do: logs the attempt, files your name somewhere it thinks you won't find it, and lets you go.\n\nFor now."],
         }[type];
 
+        reportRun(type, isNewEnding);
         showEnd(copy[0], copy[1]);
       }
 
@@ -1034,5 +1050,7 @@
       });
     })();
   </script>
+  <script src="assets/js/troll-leaderboard.js?v=lb-engine-v1" defer></script>
+  <script src="assets/games/nullface/leaderboard.js?v=nullface-lb-v1" defer></script>
 </body>
 </html>

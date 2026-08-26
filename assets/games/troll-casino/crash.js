@@ -130,7 +130,7 @@
     name: "Whale Launch Crash", emoji: "🚀", color: "#9a5cff",
     host: "Hosted by Elon", tagline: "Ride the whale up. Exit before the rug. Simple.",
     cta: "Approach the console",
-    art: "assets/games/troll-casino/art/whale-launch-hero.png",
+    art: "assets/games/troll-casino/art/whale-launch-hero.webp",
     onEnter: () => { setLine(ELON.idle); sizeCanvas(); drawIdle(); prefetchRound(); },
   });
 
@@ -140,7 +140,7 @@
     if (!room) return;
     room.innerHTML = `
       <div class="room-hero">
-        <div class="rh-art" data-art="assets/games/troll-casino/art/whale-launch-hero.png"></div>
+        <div class="rh-art" data-art="assets/games/troll-casino/art/whale-launch-hero.webp"></div>
         <div class="rh-body">
           <span class="rh-kicker">Elon presents</span>
           <h2>Whale Launch Crash</h2>

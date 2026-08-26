@@ -196,6 +196,12 @@ button { cursor: pointer; }
   background: rgba(10, 8, 5, 0.72); color: var(--ink); font-size: 15px;
 }
 .gh-hud-mute[aria-pressed="true"] { opacity: 0.5; }
+.gh-hud-radio {
+  position: absolute; top: 14px; right: 102px; pointer-events: auto;
+  width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line);
+  background: rgba(10, 8, 5, 0.72); color: var(--ink); font-size: 15px;
+}
+.gh-hud-radio.is-playing { border-color: var(--khaki-bright); box-shadow: 0 0 0 2px rgba(216, 195, 119, 0.25); }
 
 /* ---- weekly leaderboard section ------------------------------------------ */
 .arcade-rack { margin-top: 22px; padding: 0 clamp(6px, 1vw, 14px); }
@@ -220,6 +226,37 @@ button { cursor: pointer; }
 .gh-pause-hint p {
   font-family: var(--mono); background: rgba(10, 8, 5, 0.8); padding: 12px 18px;
   border-radius: 10px; border: 1px solid var(--line);
+}
+
+/* ---- touch controls (coarse pointers only — desktop keeps WASD + mouselook) */
+.gh-touch-controls { display: none; }
+@media (pointer: coarse) {
+  .gh-touch-controls { display: block; position: absolute; inset: 0; z-index: 5; }
+}
+.gh-touch-look-zone {
+  position: absolute; inset: 0; z-index: 1; touch-action: none;
+}
+.gh-touch-joystick {
+  position: absolute; left: 22px; bottom: 22px; z-index: 2;
+  width: 116px; height: 116px; border-radius: 50%;
+  border: 1px solid var(--line); background: rgba(10, 8, 5, 0.45);
+  touch-action: none;
+}
+.gh-touch-joystick-knob {
+  position: absolute; top: 50%; left: 50%; width: 50px; height: 50px;
+  margin: -25px 0 0 -25px; border-radius: 50%;
+  background: rgba(216, 195, 119, 0.55); border: 1px solid var(--khaki-bright);
+  pointer-events: none;
+}
+.gh-touch-hide-btn {
+  position: absolute; right: 22px; bottom: 22px; z-index: 2;
+  width: 72px; height: 72px; border-radius: 50%;
+  border: 1px solid var(--line); background: rgba(10, 8, 5, 0.72);
+  color: var(--ink); font-family: var(--pixel); font-size: 11px;
+  touch-action: none;
+}
+.gh-touch-hide-btn.is-active {
+  border-color: var(--khaki-bright); box-shadow: 0 0 0 2px rgba(216, 195, 119, 0.35);
 }
 
 @media (max-width: 760px) {

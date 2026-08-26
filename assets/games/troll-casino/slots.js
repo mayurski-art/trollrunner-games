@@ -200,7 +200,7 @@
     name: "Doge Jackpot Reels", emoji: "🎰", color: "#ffc94d",
     host: "Hosted by Doge", tagline: "5 reels, 10 lines, one very gold dog. Wow.",
     cta: "Pull the handle",
-    art: "assets/games/troll-casino/art/doge-jackpot-hero.png",
+    art: "assets/games/troll-casino/art/doge-jackpot-hero.webp",
     onEnter: () => { setLine(DOGE.idle); renderMeter(); refreshJackpot(); refreshJackpotFeed(); },
     onLeave: () => stopAutoplay(),
   });
@@ -211,7 +211,7 @@
     if (!room) return;
     room.innerHTML = `
       <div class="room-hero">
-        <div class="rh-art" data-art="assets/games/troll-casino/art/doge-jackpot-hero.png"></div>
+        <div class="rh-art" data-art="assets/games/troll-casino/art/doge-jackpot-hero.webp"></div>
         <div class="rh-body">
           <span class="rh-kicker">Doge presents</span>
           <h2>Doge Jackpot Reels</h2>

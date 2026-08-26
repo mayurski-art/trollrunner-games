@@ -9,7 +9,7 @@
    Phase 1's maze gen, procedural textures, FPS controls + collision,
    fragments, and minimap are unchanged in shape; this file restructures
    scene-build into a per-level rebuild (_buildScene(level)) instead of
-   a one-shot setup. Vendored Three.js via importmap in grin-halls.html
+   a one-shot setup. Vendored Three.js via importmap in backrooms.html
    — no CDN. */
 
 import * as THREE from "three";
@@ -265,6 +265,10 @@ class GrinHalls {
     this.stamina = 100;
     this.sprinting = false;
     this.hiding = false;
+    // touch controls (joystick + hide button) are wired from backrooms.html
+    // and write straight into these instead of duplicating input state.
+    this.touchMove = { fwd: 0, strafe: 0 };
+    this.touchHiding = false;
     this.caught = false;
     this.finished = false;
     this.startTime = performance.now();
@@ -561,6 +565,8 @@ class GrinHalls {
     if (this.keys.has("KeyS") || this.keys.has("ArrowDown")) fwd -= 1;
     if (this.keys.has("KeyD") || this.keys.has("ArrowRight")) strafe += 1;
     if (this.keys.has("KeyA") || this.keys.has("ArrowLeft")) strafe -= 1;
+    fwd = Math.max(-1, Math.min(1, fwd + this.touchMove.fwd));
+    strafe = Math.max(-1, Math.min(1, strafe + this.touchMove.strafe));
     return { fwd, strafe };
   }
 
@@ -611,7 +617,7 @@ class GrinHalls {
     this.visited.add(`${cx},${cz}`);
     this.currentCell = [cx, cz];
 
-    this.hiding = this.keys.has("KeyE") && this.safeCells.some(([sx, sz]) => sx === cx && sz === cz);
+    this.hiding = (this.keys.has("KeyE") || this.touchHiding) && this.safeCells.some(([sx, sz]) => sx === cx && sz === cz);
 
     const t = performance.now() * 0.001;
     for (const l of this.lights) {
@@ -944,10 +950,111 @@ window.addEventListener("DOMContentLoaded", () => {
     muteBtn.setAttribute("aria-pressed", String(muted));
   });
 
+  const radioBtn = document.getElementById("gh-hud-radio-btn");
+  const radioAudio = document.getElementById("gh-radio-audio");
+  if (radioBtn && radioAudio) {
+    radioAudio.volume = 0.5;
+    radioBtn.addEventListener("click", () => {
+      if (radioAudio.paused) {
+        radioAudio.play().catch(() => {
+          radioBtn.title = "Drop an MP3 at assets/games/grin-halls/audio/radio-track.mp3 to enable the radio.";
+        });
+      } else {
+        radioAudio.pause();
+      }
+    });
+    radioAudio.addEventListener("play", () => {
+      radioBtn.textContent = "📻";
+      radioBtn.classList.add("is-playing");
+      radioBtn.setAttribute("aria-pressed", "true");
+    });
+    radioAudio.addEventListener("pause", () => {
+      radioBtn.classList.remove("is-playing");
+      radioBtn.setAttribute("aria-pressed", "false");
+    });
+  }
+
   document.addEventListener("pointerlockchange", () => {
     const active = document.pointerLockElement === canvas;
     pauseHintEl.hidden = active || viewportEl.hidden || (game && (game.caught || game.finished));
   });
+
+  // ---- touch controls: virtual joystick (move) + drag-to-look + hide button.
+  // Pointer lock doesn't apply on touch, so look is a raw drag delta instead.
+  const joystick = document.getElementById("gh-touch-joystick");
+  const joystickKnob = document.getElementById("gh-touch-joystick-knob");
+  const lookZone = document.getElementById("gh-touch-look-zone");
+  const hideBtn = document.getElementById("gh-touch-hide-btn");
+  const JOY_RADIUS = 50;
+  const LOOK_SENSITIVITY = 0.006;
+
+  if (joystick && lookZone && hideBtn) {
+    let joyTouchId = null, joyOriginX = 0, joyOriginY = 0;
+    joystick.addEventListener("touchstart", (e) => {
+      if (joyTouchId !== null) return;
+      const t = e.changedTouches[0];
+      joyTouchId = t.identifier;
+      const r = joystick.getBoundingClientRect();
+      joyOriginX = r.left + r.width / 2;
+      joyOriginY = r.top + r.height / 2;
+      e.preventDefault();
+    }, { passive: false });
+    joystick.addEventListener("touchmove", (e) => {
+      const t = [...e.changedTouches].find((t) => t.identifier === joyTouchId);
+      if (!t || !game) return;
+      let dx = t.clientX - joyOriginX, dy = t.clientY - joyOriginY;
+      const dist = Math.min(JOY_RADIUS, Math.hypot(dx, dy)) || 0;
+      const angle = Math.atan2(dy, dx);
+      dx = Math.cos(angle) * dist; dy = Math.sin(angle) * dist;
+      joystickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+      game.touchMove.strafe = dx / JOY_RADIUS;
+      game.touchMove.fwd = -dy / JOY_RADIUS;
+      e.preventDefault();
+    }, { passive: false });
+    const releaseJoystick = (e) => {
+      if (![...e.changedTouches].some((t) => t.identifier === joyTouchId)) return;
+      joyTouchId = null;
+      joystickKnob.style.transform = "translate(0, 0)";
+      if (game) { game.touchMove.fwd = 0; game.touchMove.strafe = 0; }
+    };
+    joystick.addEventListener("touchend", releaseJoystick);
+    joystick.addEventListener("touchcancel", releaseJoystick);
+
+    let lookTouchId = null, lookLastX = 0, lookLastY = 0;
+    lookZone.addEventListener("touchstart", (e) => {
+      if (lookTouchId !== null) return;
+      const t = e.changedTouches[0];
+      lookTouchId = t.identifier;
+      lookLastX = t.clientX; lookLastY = t.clientY;
+      e.preventDefault();
+    }, { passive: false });
+    lookZone.addEventListener("touchmove", (e) => {
+      const t = [...e.changedTouches].find((t) => t.identifier === lookTouchId);
+      if (!t || !game) return;
+      const dx = t.clientX - lookLastX, dy = t.clientY - lookLastY;
+      lookLastX = t.clientX; lookLastY = t.clientY;
+      game.yaw -= dx * LOOK_SENSITIVITY;
+      game.pitch = Math.max(-1.2, Math.min(1.2, game.pitch - dy * LOOK_SENSITIVITY));
+      e.preventDefault();
+    }, { passive: false });
+    const releaseLook = (e) => {
+      if ([...e.changedTouches].some((t) => t.identifier === lookTouchId)) lookTouchId = null;
+    };
+    lookZone.addEventListener("touchend", releaseLook);
+    lookZone.addEventListener("touchcancel", releaseLook);
+
+    hideBtn.addEventListener("touchstart", (e) => {
+      if (game) game.touchHiding = true;
+      hideBtn.classList.add("is-active");
+      e.preventDefault();
+    }, { passive: false });
+    const releaseHide = () => {
+      if (game) game.touchHiding = false;
+      hideBtn.classList.remove("is-active");
+    };
+    hideBtn.addEventListener("touchend", releaseHide);
+    hideBtn.addEventListener("touchcancel", releaseHide);
+  }
 
   document.getElementById("gh-caught-retry-btn").addEventListener("click", () => {
     caughtEl.hidden = true;
