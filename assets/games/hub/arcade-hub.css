@@ -35,6 +35,28 @@
   text-shadow: 0 0 18px rgba(77, 255, 115, 0.4);
 }
 
+.hub-topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.hub-home-link {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  font-size: 16px;
+}
+
+.hub-home-link:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.05);
+}
+
 .hub-topbar-account {
   display: flex;
   align-items: center;
@@ -225,6 +247,13 @@
   object-fit: cover;
   object-position: center 30%;
   transition: transform 260ms ease;
+  /* Card art must stay inert to native browser drag/selection — a native
+     image drag mid-gesture would otherwise hijack the carousel's own drag
+     handling (see the draggable=false pass in arcade-hub.js). */
+  -webkit-user-drag: none;
+  user-drag: none;
+  -webkit-touch-callout: none;
+  pointer-events: none;
 }
 
 .hub-card:hover .hub-card-art img {

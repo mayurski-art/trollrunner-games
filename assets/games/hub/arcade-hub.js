@@ -28,6 +28,13 @@
       track.appendChild(clone);
     });
 
+    // Card art is otherwise natively draggable/selectable — starting a native
+    // HTML5 image or link drag mid-gesture cancels our pointer-based drag (a
+    // pointercancel fires) before the cursor ever reaches the edge, which is
+    // why the edge auto-scroll below could silently stop working partway
+    // through a drag. Lock the art down so only our own drag handling runs.
+    track.querySelectorAll("img, a").forEach((el) => { el.draggable = false; });
+
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     // Touch/no-hover devices get manual swipe only, no auto-play — an
     // unattended strip that keeps drifting under a thumb is more annoying

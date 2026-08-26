@@ -12,12 +12,19 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;700;900&family=DM+Mono:wght@500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/games/troll-dash/style.css?v=hub-v2-20260627">
-  <link rel="stylesheet" href="assets/games/hub/arcade-hub.css?v=hub-v4-carousel">
+  <link rel="stylesheet" href="assets/games/hub/arcade-hub.css?v=hub-v5-home-lock-img">
 </head>
 <body class="intro-complete">
   <div class="hub-shell">
     <header class="hub-topbar">
-      <div class="hub-logo">TROLLRUNNER<span>ARCADE</span></div>
+      <div class="hub-topbar-brand">
+        <!-- ?enter=1 skips trollrunner.net's boot/lock entrance (loading bar +
+             drag-the-troll-to-the-finish-line) — see index.html there for why
+             a same-origin sessionStorage relay can't be used from this
+             different-origin subdomain instead. -->
+        <a class="hub-home-link" href="https://trollrunner.net/?enter=1" aria-label="Home">🏠</a>
+        <div class="hub-logo">TROLLRUNNER<span>ARCADE</span></div>
+      </div>
 
       <div class="hub-topbar-account">
         <button type="button" class="hub-profile-card" id="hub-profile-card" aria-label="Account">
@@ -271,7 +278,7 @@
     </main>
   </div>
 
-  <script src="assets/games/hub/arcade-hub.js?v=hub-v6-mobile-swipe-only" defer></script>
+  <script src="assets/games/hub/arcade-hub.js?v=hub-v7-lock-art-and-home" defer></script>
   <script src="assets/js/fs-launcher.js?v=fsl-v1" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.3" integrity="sha384-uVefCux0Kf6w34gQVv8+jUPUwvwFUdnrcwI1kOJHs7sfPPXdDDucwcrPrppD6oUe" crossorigin="anonymous"></script>
   <script src="https://www.trollrunner.net/assets/js/troll-accounts.js"></script>
