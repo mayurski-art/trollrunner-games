@@ -127,20 +127,20 @@
 
 /* ---- main column ---- */
 .hub-main {
-  padding: 28px clamp(20px, 4vw, 48px) 40px;
+  padding: 20px clamp(20px, 4vw, 48px) 28px;
 }
 
 .hub-hero h1 {
-  margin: 6px 0 8px;
+  margin: 4px 0 6px;
   font-family: var(--display);
   font-weight: 900;
-  font-size: clamp(38px, 5.2vw, 64px);
+  font-size: clamp(32px, 4.4vw, 56px);
   line-height: 0.96;
   text-transform: uppercase;
 }
 
 .hub-hero p {
-  margin: 0 0 22px;
+  margin: 0 0 16px;
   color: var(--muted);
   font-size: 16px;
 }
@@ -152,7 +152,7 @@
 .hub-carousel {
   position: relative;
   overflow: hidden;
-  margin-bottom: 30px;
+  margin-bottom: 20px;
   cursor: grab;
   touch-action: pan-y;
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);
@@ -330,8 +330,8 @@
 }
 
 /* ---- arcade-wide weekly leaderboard (assets/js/troll-leaderboard.js render) ---- */
-.arcade-rack { padding: clamp(12px, 3vw, 32px) 0 0; }
-.arcade-rack .section-heading { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+.arcade-rack { padding: clamp(8px, 2vw, 20px) 0 0; }
+.arcade-rack .section-heading { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 10px; }
 .arcade-rack .eyebrow { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
 .arcade-rack .section-heading h2 { font-size: clamp(24px, 3.6vw, 40px); line-height: 1; text-transform: uppercase; color: var(--ink); }
 
@@ -405,5 +405,56 @@
 
   .hub-footer {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ---- compact spacing on shorter desktop screens (e.g. 1366x768 laptops) ---- */
+@media (min-width: 761px) and (max-height: 860px) {
+  .hub-topbar {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .hub-main {
+    padding-top: 14px;
+    padding-bottom: 18px;
+  }
+
+  .hub-hero h1 {
+    margin: 0 0 4px;
+    font-size: clamp(26px, 3.6vw, 44px);
+  }
+
+  .hub-hero p {
+    margin-bottom: 10px;
+  }
+
+  .hub-carousel {
+    margin-bottom: 14px;
+  }
+
+  .hub-carousel-track .hub-card {
+    width: 220px;
+  }
+
+  .hub-card-body {
+    padding: 12px 16px 14px;
+    gap: 6px;
+  }
+
+  .hub-card-play {
+    padding: 8px 14px;
+  }
+
+  .arcade-rack {
+    padding-top: 6px;
+  }
+
+  .arcade-rack .section-heading {
+    margin-bottom: 6px;
+  }
+
+  .hub-stats {
+    padding: 12px 18px;
   }
 }
