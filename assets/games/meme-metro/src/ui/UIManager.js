@@ -8,7 +8,7 @@ export class UIManager {
     this.el = {};
     const ids = [
       'screen-menu', 'screen-pause', 'screen-gameover', 'screen-characters',
-      'screen-settings', 'screen-revive', 'screen-leaderboard', 'hud',
+      'screen-settings', 'screen-revive', 'hud',
       'menu-highscore', 'menu-coins',
       'hud-score', 'hud-best', 'hud-run-coins', 'hud-total-coins', 'hud-multiplier',
       'go-score', 'go-coins', 'go-distance', 'go-best', 'go-newbest', 'go-cause',
@@ -110,7 +110,7 @@ export class UIManager {
   showOnly(name) {
     const screens = [
       'screen-menu', 'screen-pause', 'screen-gameover', 'screen-characters',
-      'screen-settings', 'screen-revive', 'screen-leaderboard',
+      'screen-settings', 'screen-revive',
     ];
     for (const s of screens) {
       this.el[s].classList.toggle('is-visible', s === name);
@@ -128,10 +128,6 @@ export class UIManager {
 
   showRevive() {
     this.showOnly('screen-revive');
-  }
-
-  showLeaderboard() {
-    this.showOnly('screen-leaderboard');
   }
 
   showMenu({ highScore, totalCoins }) {

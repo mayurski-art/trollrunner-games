@@ -828,13 +828,6 @@
     syncHud();
   });
 
-  // Weekly ladder overlay (stacks above title/game-over screens)
-  const screenLadder = $('screen-ladder');
-  const openLadder = () => { screenLadder.hidden = false; };
-  $('btn-ladder').addEventListener('click', openLadder);
-  $('btn-ladder2').addEventListener('click', openLadder);
-  $('btn-ladder-close').addEventListener('click', () => { screenLadder.hidden = true; });
-
   // ---------- Render ----------
   function emoji(str, x, y, size) {
     ctx.font = size + 'px "Segoe UI Emoji", "Apple Color Emoji", sans-serif';

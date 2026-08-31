@@ -12,8 +12,7 @@
 
   LB.register({
     gameId: "grin-halls",
-    gameName: "Grin Halls",
-    mount: "#lb-root",
+    gameName: "Backrooms",
 
     blank: () => ({ score: 0, bestLevel: 0, bestTimeSeconds: null, runs: 0 }),
     reduce: (you, ev) => {
@@ -43,6 +42,6 @@
       return { score, bestLevel, bestTimeSeconds: timeSeconds, runs: 1 + Math.floor(rng() * 8) };
     },
 
-    prizes: { poolLabel: "Mock prize pool · Grin Halls", pool: "100 USDC + 1M $TROLL" },
+    prizes: { poolLabel: "Mock prize pool · Backrooms", pool: "100 USDC + 1M $TROLL" },
   });
 })();

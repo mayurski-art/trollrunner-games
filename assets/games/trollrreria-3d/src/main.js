@@ -38,8 +38,7 @@ const screenChest = document.getElementById('tr3-screen-chest');
 const screenMerchant = document.getElementById('tr3-screen-merchant');
 const screenCoop = document.getElementById('tr3-screen-coop');
 const screenWaypoints = document.getElementById('tr3-screen-waypoints');
-const screenLeaderboard = document.getElementById('tr3-screen-leaderboard');
-const allScreens = [screenMenu, screenPause, screenRespawn, screenInventory, screenChest, screenMerchant, screenCoop, screenWaypoints, screenLeaderboard];
+const allScreens = [screenMenu, screenPause, screenRespawn, screenInventory, screenChest, screenMerchant, screenCoop, screenWaypoints];
 
 const btnStart = document.getElementById('tr3-btn-start');
 const btnContinue = document.getElementById('tr3-btn-continue');
@@ -61,9 +60,6 @@ const coopCode = document.getElementById('tr3-coop-code');
 const coopStatus = document.getElementById('tr3-coop-status');
 const btnWaypoints = document.getElementById('tr3-btn-waypoints');
 const btnWaypointsClose = document.getElementById('tr3-btn-waypoints-close');
-const btnLeaderboardMenu = document.getElementById('tr3-btn-leaderboard-menu');
-const btnLeaderboard = document.getElementById('tr3-btn-leaderboard');
-const btnLeaderboardClose = document.getElementById('tr3-btn-leaderboard-close');
 
 const isTouch = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 
@@ -79,7 +75,6 @@ function onStateChange(state) {
   else if (state === 'merchant') showScreen(screenMerchant);
   else if (state === 'coop') showScreen(screenCoop);
   else if (state === 'waypoints') showScreen(screenWaypoints);
-  else if (state === 'leaderboard') showScreen(screenLeaderboard);
   else if (state === 'menu') showScreen(screenMenu);
   else showScreen(null);
   if (touchRoot) touchRoot.hidden = !(isTouch && state === 'running');
@@ -187,6 +182,3 @@ btnCoopLeave.addEventListener('click', () => {
 btnWaypoints.addEventListener('click', () => game.toggleWaypoints());
 btnWaypointsClose.addEventListener('click', () => game.closeMenus());
 
-btnLeaderboardMenu.addEventListener('click', () => game.toggleLeaderboard());
-btnLeaderboard.addEventListener('click', () => game.toggleLeaderboard());
-btnLeaderboardClose.addEventListener('click', () => game.toggleLeaderboard());

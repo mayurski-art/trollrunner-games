@@ -310,14 +310,6 @@ async function boot() {
   bootReady = true;
   if (pendingStart) onStart();
 
-  // ----------------------------------------------------------- leaderboard
-  const lbOverlay = $("th-leaderboard-overlay");
-  $("th-btn-leaderboard")?.addEventListener("click", () => {
-    lbOverlay.hidden = false;
-    window.TrollLeaderboard?.refresh?.("troll-high");
-  });
-  $("th-leaderboard-close")?.addEventListener("click", () => { lbOverlay.hidden = true; });
-
   // ----------------------------------------------------------------- map
   const mapOverlay = $("th-map-overlay");
   const mapCanvas = $("th-map-canvas");

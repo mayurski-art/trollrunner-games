@@ -14,7 +14,6 @@
   LB.register({
     gameId: "trollrreria-3d",
     gameName: "Trollrreria 3D",
-    mount: "#lb-root",
 
     blank: () => ({ sessions: 0, longestSurvival: 0, blocksMined: 0, bossKills: 0 }),
     reduce: (you, ev) => {

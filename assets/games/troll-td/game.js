@@ -851,7 +851,6 @@
   const screenDiffSelect = $('screen-diff-select');
   const screenOver = $('screen-over');
   const screenWin = $('screen-win');
-  const screenLadder = $('screen-ladder');
   const buildMenu = $('build-menu');
   const towerPanel = $('tower-panel');
 
@@ -995,11 +994,6 @@
   $('btn-quit2').addEventListener('click', () => { screenOver.hidden = true; hud.hidden = true; G.state = 'title'; screenTitle.hidden = false; });
   $('btn-freeplay').addEventListener('click', continueFreeplay);
   $('btn-win-quit').addEventListener('click', () => { screenWin.hidden = true; hud.hidden = true; G.state = 'title'; screenTitle.hidden = false; });
-
-  [['btn-ladder', screenTitle], ['btn-ladder2', screenOver]].forEach(([id, from]) => {
-    $(id).addEventListener('click', () => { screenLadder.hidden = false; });
-  });
-  $('btn-ladder-close').addEventListener('click', () => { screenLadder.hidden = true; });
 
   const bestAny = Math.max(0, ...Object.values(loadBest()));
   if (bestAny) { $('title-best').hidden = false; $('title-best').textContent = 'Best round reached: ' + bestAny; }

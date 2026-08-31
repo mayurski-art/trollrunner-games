@@ -12,7 +12,6 @@
   LB.register({
     gameId: "nullface",
     gameName: "NULLFACE",
-    mount: "#lb-root",
 
     blank: () => ({ layer: 0, runs: 0, endings: 0 }),
     reduce: (you, ev) => {

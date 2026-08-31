@@ -14,7 +14,6 @@
   LB.register({
     gameId: "bridge-patrol",
     gameName: "Bridge Patrol",
-    mount: "#lb-root",
 
     blank: () => ({ sessions: 0, bestWave: 0, tolls: 0, bossesSlain: 0 }),
     reduce: (you, ev) => {

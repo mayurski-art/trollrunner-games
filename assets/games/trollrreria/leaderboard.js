@@ -14,7 +14,6 @@
   LB.register({
     gameId: "trollrreria",
     gameName: "Trollrreria",
-    mount: "#lb-root",
 
     blank: () => ({ sessions: 0, deepest: 0, blocksMined: 0, bossKills: 0 }),
     reduce: (you, ev) => {

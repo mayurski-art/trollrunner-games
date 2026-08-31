@@ -25,7 +25,6 @@
   LB.register({
     gameId: "troll-casino",
     gameName: "Troll Casino",
-    mount: "#lb-root",
 
     // local player's stored aggregate
     blank: () => ({ spins: 0, hits: 0, bestMult: 0, streak: 0, rugs: 0 }),

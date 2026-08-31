@@ -14,7 +14,6 @@
   LB.register({
     gameId: "meme-metro",
     gameName: "Meme Metro",
-    mount: "#lb-root",
 
     // local player's stored aggregate (best-of, so paid revives never double-count)
     blank: () => ({ runs: 0, bestScore: 0, bestCoins: 0, totalCoins: 0 }),

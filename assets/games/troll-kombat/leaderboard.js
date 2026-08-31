@@ -28,7 +28,6 @@
   LB.register({
     gameId: "troll-kombat",
     gameName: "Troll Kombat",
-    mount: "#lb-root",
 
     // local player's stored aggregate
     blank: () => ({ wins: 0, losses: 0, kos: 0, damage: 0, streak: 0, charCounts: {} }),

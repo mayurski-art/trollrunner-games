@@ -3,7 +3,6 @@
   LB.register({
     gameId: "troll-high",
     gameName: "Troll High",
-    mount: "#lb-root",
 
     // Only "memories found" is real right now — secrets/stickers/inventory
     // are later-phase systems (see docs/TROLL-HIGH.md §14); adding those

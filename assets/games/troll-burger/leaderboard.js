@@ -9,7 +9,6 @@
   LB.register({
     gameId: "troll-burger",
     gameName: "The Rusty Troll",
-    mount: "#lb-root",
 
     blank: () => ({ score: 0, tips: 0, served: 0 }),
     reduce: (you, ev) => {

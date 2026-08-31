@@ -62,7 +62,6 @@ export class UI {
       screenCharpick: document.getElementById("screen-charpick"),
       screenPause: document.getElementById("screen-pause"),
       screenDeath: document.getElementById("screen-death"),
-      screenLb: document.getElementById("screen-lb"),
       deathCause: document.getElementById("death-cause"),
       btnContinue: document.getElementById("btn-continue"),
       hotkeysPanel: document.getElementById("hotkeys-panel"),
@@ -134,10 +133,6 @@ export class UI {
     document.getElementById("btn-char-prospector").addEventListener("click", () => game.startNewWorld("prospector"));
     document.getElementById("btn-char-gladiator").addEventListener("click", () => game.startNewWorld("gladiator"));
     document.getElementById("btn-charpick-back").addEventListener("click", () => this.showTitle(this._hadSave));
-    document.getElementById("btn-title-lb").addEventListener("click", () => {
-      this.showScreens({ lb: true });
-    });
-    document.getElementById("btn-lb-back").addEventListener("click", () => this.showTitle(this._hadSave));
     document.getElementById("btn-resume").addEventListener("click", () => game.enterPlay());
     document.getElementById("btn-save").addEventListener("click", async e => {
       if (isGuest()) {
@@ -208,14 +203,13 @@ export class UI {
   }
 
   /* ------------------------------------------------------------ screens */
-  showScreens({ title, charpick, pause, death, lb, store } = {}) {
+  showScreens({ title, charpick, pause, death, store } = {}) {
     this.el.screenTitle.hidden = !title;
     this.el.screenCharpick.hidden = !charpick;
     this.el.screenPause.hidden = !pause;
     this.el.screenDeath.hidden = !death;
-    this.el.screenLb.hidden = !lb;
     this.el.screenStore.hidden = !store;
-    this.el.hud.hidden = !!(title || charpick || lb);
+    this.el.hud.hidden = !!(title || charpick);
   }
 
   showTitle(hasSave) {

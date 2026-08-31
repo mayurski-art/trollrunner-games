@@ -87,13 +87,6 @@ game.revive = new ReviveController({
   onDecline: () => game.declineRevive(),
 });
 
-// Leaderboard (shared arcade engine, mounted into #lb-root on load).
-document.getElementById('btn-leaderboard').addEventListener('click', () => {
-  ui.showLeaderboard();
-  audio.play('click');
-});
-document.getElementById('btn-lb-back').addEventListener('click', () => game.exitToMenu());
-
 game.exitToMenu();
 game.start();
 

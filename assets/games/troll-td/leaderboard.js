@@ -14,7 +14,6 @@
   LB.register({
     gameId: 'troll-td',
     gameName: 'Troll TD',
-    mount: '#lb-root',
 
     blank: () => ({ sessions: 0, bestRound: 0, pops: 0, heroLevel: 0 }),
     reduce: (you, ev) => {

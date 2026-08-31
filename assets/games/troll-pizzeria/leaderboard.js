@@ -9,7 +9,6 @@
   LB.register({
     gameId: "troll-pizzeria",
     gameName: "Papa Troll's Pizzeria",
-    mount: "#lb-root",
 
     blank: () => ({ score: 0, tips: 0, served: 0 }),
     reduce: (you, ev) => {

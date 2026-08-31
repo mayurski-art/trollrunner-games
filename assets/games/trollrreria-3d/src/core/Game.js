@@ -282,7 +282,6 @@ export class Game {
 
   // Escape closes whichever menu screen is open; otherwise it pauses.
   handleEscape() {
-    if (this.state === 'leaderboard') { this.toggleLeaderboard(); return; }
     if (['inventory', 'chest', 'merchant', 'coop', 'waypoints'].includes(this.state)) {
       this.closeMenus();
       return;
@@ -357,21 +356,6 @@ export class Game {
     this.state = 'running';
     this.input.requestPointerLock();
     this.onStateChange('running');
-  }
-
-  toggleLeaderboard() {
-    if (this.state === 'leaderboard') {
-      this.state = this._leaderboardReturnState;
-      if (this.state === 'running') this.input.requestPointerLock();
-      this.onStateChange(this.state);
-      return;
-    }
-    if (['running', 'menu', 'paused'].includes(this.state)) {
-      this._leaderboardReturnState = this.state;
-      this.state = 'leaderboard';
-      this.input.exitPointerLock();
-      this.onStateChange('leaderboard');
-    }
   }
 
   // Report session progress to the shared arcade leaderboard (deltas, like
