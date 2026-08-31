@@ -59,6 +59,12 @@
               allowfullscreen></iframe>`;
     document.body.appendChild(overlay);
     document.body.classList.add("fsl-lock");
+    // Without this, the browser keeps focus on the parent document after the
+    // iframe mounts, so the very first tap/click inside the game just shifts
+    // focus into the iframe instead of reaching the button underneath —
+    // players had to tap Play twice. Focusing it here makes the first tap count.
+    const iframe = overlay.querySelector("iframe");
+    if (iframe) iframe.addEventListener("load", () => { try { iframe.focus(); } catch (_) {} }, { once: true });
   }
 
   function removeOverlay() {

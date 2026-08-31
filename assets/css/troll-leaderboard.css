@@ -86,6 +86,13 @@
 .lb-foot strong { color: var(--cyan); }
 
 @media (max-width: 760px) {
+  /* Per-game boards crowd out the actual game on small screens (controls +
+     canvas already fight for space) — the cross-game board on the arcade
+     hub (index.html, #arcade-lb-root — NOT matched here) is the mobile home
+     for leaderboards instead. Hiding the containing section (not just
+     #lb-root) also drops its heading/eyebrow. */
+  #lb-root { display: none; }
+  section:has(> #lb-root), section:has(#lb-root) { display: none; }
   .lb-hide-sm { display: none; }
   .lb-table { min-width: 0; font-size: 13px; }
   .lb-reset { margin-left: 0; }

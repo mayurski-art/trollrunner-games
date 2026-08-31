@@ -377,10 +377,72 @@
     for (const id in games) refresh(games[id]);
   });
 
+  /* ---------- arcade-wide board: games played this week, across every game -
+     Reads the same troll_leaderboard_view (all game_ids, no .eq filter) and
+     ranks by distinct game_id count per user — the RPC upserts one row per
+     user per game per week, so a distinct game_id count is "games played."
+     Local/offline visitors just don't appear (no cross-game local cache). */
+  async function getArcadeBoard() {
+    const wid = weekId();
+    const a = window.TrollrunnerAccounts;
+    const sb = a && a.getClient ? a.getClient() : null;
+    if (!sb) return { weekId: wid, weekLabel: weekLabel(), resetsIn: timeLeft(), source: "local", entries: [], loggedIn: false };
+    const { start, end } = weekWindow();
+    const me = (a.getCachedProfile && a.getCachedProfile()) || null;
+    const myId = me && me.userId;
+    try {
+      const { data, error } = await sb
+        .from("troll_leaderboard_view")
+        .select("user_id,username,game_id,achieved_at")
+        .gte("achieved_at", start.toISOString())
+        .lt("achieved_at", end.toISOString())
+        .limit(2000);
+      if (error) throw error;
+      const byUser = new Map();
+      for (const r of (data || [])) {
+        let u = byUser.get(r.user_id);
+        if (!u) { u = { id: r.user_id, name: r.username, games: new Set(), you: r.user_id === myId }; byUser.set(r.user_id, u); }
+        u.games.add(r.game_id);
+      }
+      const entries = [...byUser.values()].map(u => ({ id: u.id, name: u.name, you: u.you, gamesPlayed: u.games.size }));
+      return { weekId: wid, weekLabel: weekLabel(), resetsIn: timeLeft(), source: "live", entries, loggedIn: !!myId };
+    } catch (err) {
+      console.warn("[leaderboard] arcade board fetch failed:", err);
+      return { weekId: wid, weekLabel: weekLabel(), resetsIn: timeLeft(), source: "live", entries: [], loggedIn: !!myId };
+    }
+  }
+
+  const ARCADE_CFG = {
+    gameId: "__arcade__",
+    columns: [{ key: "gamesPlayed", label: "Games played", align: "num", accent: "green" }],
+    rankBy: ["gamesPlayed"],
+    boardSize: 10,
+    prizes: { enabled: false },
+    footNote: "Ranked by distinct games played this week across the whole arcade. Resets every Monday.",
+  };
+  let arcadeState = null;
+  async function mountArcadeBoard(sel) {
+    const rootEl = typeof sel === "string" ? document.querySelector(sel) : sel;
+    if (!rootEl) return;
+    arcadeState = { rootEl, timer: null };
+    const g = { rootEl, config: ARCADE_CFG };
+    const doRefresh = async () => {
+      try { render(g, await getArcadeBoard()); }
+      catch (err) { rootEl.innerHTML = `<p class="lb-foot">Leaderboard unavailable right now.</p>`; console.warn("[leaderboard] arcade render failed:", err); }
+    };
+    await doRefresh();
+    if (arcadeState.timer) clearInterval(arcadeState.timer);
+    arcadeState.timer = setInterval(() => {
+      const el = rootEl.querySelector("[data-lb-reset]");
+      if (el) el.textContent = timeLeft();
+    }, 60000);
+    window.addEventListener("trollrunner:auth-changed", doRefresh);
+  }
+
   window.TrollLeaderboard = {
     __engine: true,
     register, mount, record, refresh: id => refresh(get(id)),
-    setProvider, configure, setPlayerName,
+    setProvider, configure, setPlayerName, mountArcadeBoard,
     // shared helpers exposed for configs / tests
     weekId, weekLabel, weekWindow, timeLeft, hashStr, rng: mulberry32, hashColor,
     fmt: { int: fmtInt, pct: fmtPct }, RIVAL_NAMES, DEFAULT_PRIZES,
