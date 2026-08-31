@@ -587,7 +587,7 @@ h1, h2 { font-family: "Black Ops One", var(--font); letter-spacing: 0.01em; }
 @media (max-width: 760px) {
   .arcade-shell { padding: 10px; }
   .fight-hero { display: flex; flex-direction: column; gap: 14px; }
-  .kombat-title { order: -2; }   /* stay above the cabinet, which is order: -1 */
+  .kombat-title { order: -2; padding: 0 84px; }   /* stay above the cabinet, which is order: -1; padding keeps centered text clear of the fixed back-link */
   .fight-cabinet { order: -1; }
   .game-copy { order: 1; }
   .touch-controls { display: flex; }   /* show on-screen pad on touch layouts */
@@ -611,6 +611,16 @@ h1, h2 { font-family: "Black Ops One", var(--font); letter-spacing: 0.01em; }
   .roster-pick .portrait { width: 64px; height: 64px; }
   .touch-pad { grid-template-columns: repeat(3, 46px); grid-template-rows: repeat(2, 46px); }
   .touch-acts { grid-template-columns: repeat(2, 50px); }
+}
+
+/* Pre-match overlays (choose match type / difficulty / fighter / stage) are
+   painted inset:0 to .screen-wrap, which is fine on desktop's large cabinet
+   but on mobile .screen-wrap is letterboxed down to ~62svh — the menus were
+   getting clipped into that short strip while the rest of the viewport sat
+   empty below the touch controls. Break them out to the full viewport instead
+   so setup screens get the whole screen, not just the game-canvas box. */
+@media (max-width: 760px) {
+  .game-overlay { position: fixed; z-index: 30; }
 }
 
 /* Pointer (desktop) layouts hide the touch pad */

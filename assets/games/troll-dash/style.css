@@ -1272,6 +1272,13 @@ h1 {
   }
 
   .game-overlay {
+    /* .screen-wrap is letterboxed to 58svh on phones for the portrait play
+       area, but .game-overlay is inset:0 to it — menus/results screens were
+       getting clipped into that short strip instead of using the real
+       viewport. Break out to the full screen for these overlays. */
+    position: fixed;
+    inset: 0;
+    z-index: 30;
     align-items: start;
     padding: 10px;
   }
