@@ -13,7 +13,7 @@ import { QuestScreen } from '../ui/QuestScreen.js';
 import { QuestManager } from '../world/QuestManager.js';
 import { Merchant } from '../npc/Merchant.js';
 import { Villager } from '../npc/Villager.js';
-import { Animal, BREED_COOLDOWN } from '../npc/Animal.js';
+import { Animal, BREED_COOLDOWN, TAME_FEEDS_REQUIRED } from '../npc/Animal.js';
 import { VILLAGER_DEFS, OUTPOST_VILLAGER_DEFS } from '../world/villagers.js';
 import { DayNightCycle } from './DayNightCycle.js';
 import { MusicManager } from './MusicManager.js';
@@ -428,7 +428,10 @@ export class Game {
         const top = this.world.heightMap.get(`${ax},${az}`);
         if (top === undefined || top < 0) continue;
         if (this.world.getBlock(ax, top, az) !== BLOCKS.GRASS) continue;
-        this.animals.push(new Animal(this.scene, this.world, { x: ax + 0.5, y: top + 1, z: az + 0.5 }));
+        // Wild herd mix: mostly boars, roughly a third Trikes — the
+        // tameable half of the dino loop (see Animal.feed/_updateTamed).
+        const kind = Math.random() < 0.35 ? 'trike' : 'boar';
+        this.animals.push(new Animal(this.scene, this.world, { x: ax + 0.5, y: top + 1, z: az + 0.5 }, kind));
         break;
       }
     }
@@ -489,7 +492,7 @@ export class Game {
         const bx = Math.round((a.pos.x + b.pos.x) / 2), bz = Math.round((a.pos.z + b.pos.z) / 2);
         const top = this.world.heightMap.get(`${bx},${bz}`);
         if (top !== undefined && top >= 0) {
-          this.animals.push(new Animal(this.scene, this.world, { x: bx + 0.5, y: top + 1, z: bz + 0.5 }));
+          this.animals.push(new Animal(this.scene, this.world, { x: bx + 0.5, y: top + 1, z: bz + 0.5 }, a.kind));
         }
         break;
       }
@@ -623,6 +626,8 @@ export class Game {
           this.inventory.add(BLOCKS.REAPER_SHARD, 1);
         }
         if (hit.entity.type.name === 'Troll Grub' && Math.random() < 0.4) this.inventory.add(BLOCKS.TROLL_MEAT, 1);
+        if (hit.entity.type.name === 'Raptor') this.inventory.add(BLOCKS.TROLL_MEAT, 1);
+        if (hit.entity.type.name === 'Rex') this.inventory.add(BLOCKS.TROLL_MEAT, 4);
       }
       return;
     }
@@ -699,8 +704,13 @@ export class Game {
       } else if (this.animals.includes(hit.entity)) {
         const slot = this.inventory.selectedItem();
         if (slot && slot.id === BLOCKS.WHEAT && this.inventory.consumeSelected()) {
+          const wasTamed = hit.entity.tamed;
           hit.entity.feed();
           this.music.playPickup();
+          if (hit.entity.kind === 'trike' && !wasTamed) {
+            if (hit.entity.tamed) this.showDialogue('Trike', 'Tamed! It will follow and defend you now.');
+            else this.showDialogue('Trike', `Taming... (${hit.entity.tameProgress}/${TAME_FEEDS_REQUIRED})`);
+          }
         }
       }
       return;
@@ -867,7 +877,7 @@ export class Game {
       v.update(dt);
     }
     this.animals = this.animals.filter((a) => {
-      if (a.alive) { a.update(dt); return true; }
+      if (a.alive) { a.update(dt, { playerPos: this.player.pos, enemies: this.spawner.enemies }); return true; }
       a.dispose(this.scene);
       return false;
     });

@@ -25,6 +25,9 @@ const CAVE_MAX_ENEMIES = 3;
 export const SPAWN_GRACE_SECONDS = 25;
 
 const KIND_LIST = Object.values(ENEMY_TYPES).filter((k) => !k.summonOnly);
+// Rare kinds (e.g. Rex) get picked far less often than the rest of the pool
+// — everything else weighs 1, a rareSpawn kind weighs this fraction of 1.
+const RARE_SPAWN_WEIGHT = 0.15;
 
 // Owns the live mob list: periodic spawning up to a cap, per-frame update,
 // and cleanup of dead mobs. Game.js just calls update() and reads
@@ -82,7 +85,7 @@ export class Spawner {
       const x = Math.floor(playerPos.x + Math.cos(angle) * dist);
       const z = Math.floor(playerPos.z + Math.sin(angle) * dist);
 
-      let kind = pool[Math.floor(Math.random() * pool.length)];
+      let kind = this._weightedPick(pool);
       const hpScale = (hardmode && !kind.hardmodeOnly ? HARDMODE_STAT_SCALE.hp : 1) * this.statScale.hp;
       const dmgScale = (hardmode && !kind.hardmodeOnly ? HARDMODE_STAT_SCALE.damage : 1) * this.statScale.damage;
       if (hpScale !== 1 || dmgScale !== 1) {
@@ -103,8 +106,37 @@ export class Spawner {
         spawnY = kind.flies ? top + 1 + kind.hoverHeight : top + 1;
       }
       this.enemies.push(new Enemy(this.scene, { x: x + 0.5, y: spawnY, z: z + 0.5 }, kind));
+
+      // Raptors hunt in packs — a successful raptor spawn drops in the rest
+      // of the trio clustered nearby instead of one at a time, so the
+      // threat reads immediately rather than trickling in over minutes.
+      if (kind.packSpawn) {
+        for (let i = 1; i < kind.packSpawn; i++) {
+          const px = x + Math.round((Math.random() - 0.5) * 4);
+          const pz = z + Math.round((Math.random() - 0.5) * 4);
+          const pTop = underground ? null : this.world.heightMap.get(`${px},${pz}`);
+          const py = underground
+            ? this.findCaveSpawnY(px, pz, playerPos.y, true)
+            : (pTop !== undefined && pTop >= 0 ? pTop + 1 : null);
+          if (py === null) continue;
+          this.enemies.push(new Enemy(this.scene, { x: px + 0.5, y: py, z: pz + 0.5 }, kind));
+        }
+      }
       return;
     }
+  }
+
+  // Uniform pick, except rareSpawn kinds (e.g. Rex) are down-weighted so
+  // they read as a rare, dangerous encounter rather than a common mob.
+  _weightedPick(pool) {
+    const weights = pool.map((k) => (k.rareSpawn ? RARE_SPAWN_WEIGHT : 1));
+    const total = weights.reduce((a, b) => a + b, 0);
+    let r = Math.random() * total;
+    for (let i = 0; i < pool.length; i++) {
+      r -= weights[i];
+      if (r <= 0) return pool[i];
+    }
+    return pool[pool.length - 1];
   }
 
   // Searches outward (both up and down) from the player's own Y for an air

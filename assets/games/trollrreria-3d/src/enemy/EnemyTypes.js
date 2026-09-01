@@ -75,6 +75,44 @@ export const ENEMY_TYPES = {
   // Enrages past 50% HP lost: chaseSpeed and damage both scale up (see
   // Enemy.update's enrage check) — its one boss-specific mechanic, same
   // spirit as the Troll King's knockback slam.
+  // Dinosaur pack hunter — fast, fragile, hits hard, always spawns in a
+  // trio (see Spawner.trySpawn's DINO_PACK_KINDS handling) so a single one
+  // is easy but three at once is the actual threat, ARK-raptor-pack style.
+  RAPTOR: {
+    name: 'Raptor',
+    hp: 5,
+    radius: 0.45,
+    color: 0x8a3b3b,
+    size: 1.0,
+    wanderSpeed: 1.4,
+    chaseSpeed: 4.2,
+    aggroRange: 11,
+    attackRange: 1.1,
+    attackCooldown: 0.7,
+    damage: 9,
+    flies: false,
+    packSpawn: 3,
+    sprite: { procedural: true, kind: 'raptor', accent: '#f4c430' },
+  },
+  // Rare apex predator — high hp/damage, slow but relentless once provoked.
+  // Never enters hardmode-only pools or boss summon items; it's just a
+  // dangerous wandering encounter (low spawn weight, see Spawner.trySpawn).
+  REX: {
+    name: 'Rex',
+    hp: 26,
+    radius: 0.9,
+    color: 0x5c4a2e,
+    size: 2.0,
+    wanderSpeed: 0.9,
+    chaseSpeed: 2.6,
+    aggroRange: 14,
+    attackRange: 1.6,
+    attackCooldown: 1.2,
+    damage: 22,
+    flies: false,
+    rareSpawn: true,
+    sprite: { procedural: true, kind: 'rex', accent: '#ff5a1f' },
+  },
   ARCHTROLL: {
     name: 'Archtroll',
     hp: 80,

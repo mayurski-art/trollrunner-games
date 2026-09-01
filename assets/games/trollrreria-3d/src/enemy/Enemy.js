@@ -1,4 +1,5 @@
 import { createBillboard } from '../render/SpriteTextures.js';
+import { createProceduralBillboard } from '../render/ProceduralArt.js';
 import { CHUNK_Y } from '../world/Chunk.js';
 
 const KNOCKBACK_DECAY = 6; // per second, exponential-ish falloff
@@ -33,7 +34,9 @@ export class Enemy {
     // makes it give up the chase, not forget the grudge.
     this.provoked = false;
 
-    this.mesh = createBillboard(type.sprite.file, type.sprite.w, type.sprite.h, type.size);
+    this.mesh = type.sprite.procedural
+      ? createProceduralBillboard(type.sprite.kind, type.sprite.accent, type.size)
+      : createBillboard(type.sprite.file, type.sprite.w, type.sprite.h, type.size);
     this.mesh.position.set(spawn.x, spawn.y, spawn.z);
     scene.add(this.mesh);
   }
